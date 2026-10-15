@@ -1,0 +1,61 @@
+<Solution>
+  <Project Path="TagForceSpecial.AI/TagForceSpecial.AI.csproj" />
+  <Project Path="TagForceSpecial.Assets/TagForceSpecial.Assets.csproj" />
+  <Project Path="TagForceSpecial.Cards/TagForceSpecial.Cards.csproj" />
+  <Project Path="TagForceSpecial.Core/TagForceSpecial.Core.csproj" />
+  <Project Path="TagForceSpecial.Effects/TagForceSpecial.Effects.csproj" />
+  <Project Path="TagForceSpecial.PC/TagForceSpecial.PC.csproj" />
+  <Project Path="TagForceSpecial.Tests/TagForceSpecial.Tests.csproj" />
+  <Project Path="TagForceSpecial.Tools/TagForceSpecial.Tools.csproj" />
+  <Folder Name="/Workspace/">
+    <File Path=".gitignore" />
+    <File Path="Directory.Build.props" />
+    <File Path="global.json" />
+    <File Path="README.md" />
+    <File Path="requirements.txt" />
+  </Folder>
+  <Folder Name="/Documentation/">
+    <File Path="docs/MIGRATION-RESULT.md" />
+    <File Path="docs/PLAN.md" />
+    <File Path="docs/STAGE1-RESULT.md" />
+    <File Path="docs/STAGE2-RESULT.md" />
+    <File Path="docs/STAGE3-RESULT.md" />
+    <File Path="docs/STAGE4-RESULT.md" />
+    <File Path="docs/STAGE4B-RESULT.md" />
+    <File Path="docs/STAGE4C-RESULT.md" />
+    <File Path="docs/STAGE4D-RESULT.md" />
+    <File Path="docs/STAGE4D-MANUAL.md" />
+  </Folder>
+  <Folder Name="/Research Tools/">
+    <File Path="tools/extract_iso.py" />
+    <File Path="tools/import_stage3.py" />
+    <File Path="tools/inspect_dump.py" />
+    <File Path="tools/ppsspp_reference.py" />
+    <File Path="tools/prepare_stage3.py" />
+    <File Path="tools/setup_stage3.py" />
+    <File Path="tools/start_reference.ps1" />
+    <File Path="tools/validate_stage4.py" />
+    <File Path="tools/validate_card_data.py" />
+    <File Path="tools/trace_card_access.py" />
+    <File Path="tools/capture_card_runtime.py" />
+    <File Path="tools/probe_card_accessors.py" />
+    <File Path="tools/decode_card_images.py" />
+    <File Path="tools/validate_card_details.py" />
+    <File Path="tools/validate_stage4d.py" />
+    <File Path="tools/trace_card_images.py" />
+    <File Path="tools/inspect_cardh_profile.py" />
+    <File Path="tools/decode_cardh_atlas.py" />
+    <File Path="tools/capture_reference_window.ps1" />
+  </Folder>
+  <Folder Name="/Research Tools/ghidra/">
+    <File Path="tools/ghidra/ExportStage3.java" />
+    <File Path="tools/ghidra/TraceCardAccess.java" />
+  </Folder>
+  <Folder Name="/Python Tests/">
+    <File Path="tests/test_extract_iso.py" />
+    <File Path="tests/test_inspect_dump.py" />
+    <File Path="tests/test_ppsspp_reference.py" />
+    <File Path="tests/test_card_image_decode.py" />
+    <File Path="tests/test_cardh_atlas.py" />
+  </Folder>
+</Solution>

@@ -1,0 +1,114 @@
+# Local research and development directories, excluded from the product repository.
+# Keep every TagForceSpecial.* C# project and its synthetic tests/build configuration.
+/tools/
+/tests/
+/docs/
+/.vscode/
+/.idea/
+/.fleet/
+/.pytest_cache/
+/.mypy_cache/
+/.ruff_cache/
+/.coverage/
+/htmlcov/
+/coverage/
+/artifacts/
+/dist/
+/publish/
+/tmp/
+/temp/
+/logs/
+# Python dependencies belong to the local research scripts above.
+/requirements.txt
+
+# Local documentation (temporary, includes README.md at any depth)
+*.[mM][dD]
+*.[mM][aA][rR][kK][dD][oO][wW][nN]
+
+# Environments and generated builds
+.venv/
+__pycache__/
+*.py[cod]
+bin/
+obj/
+.vs/
+TestResults/
+
+# Source-derived data and third-party material; keep these local.
+# Extensions alone cannot identify copyright: put all game-derived data here.
+data/
+analysis/
+research/
+assets/
+dumps/
+extracted/
+imports/
+saves/
+third_party/
+vendor/
+reverse-engineering/
+
+# Disc images, executables, modules, and dumps
+*.[iI][sS][oO]
+*.[cC][sS][oO]
+*.[zZ][sS][oO]
+*.[cC][hH][dD]
+*.[pP][bB][pP]
+*.[bB][iI][nN]
+*.[pP][rR][xX]
+*.[eE][lL][fF]
+*.[eE][xX][eE]
+*.[dD][lL][lL]
+*.[dD][mM][pP]
+
+# Archives and packaged downloads
+*.[eE][hH][pP]
+*.[cC][iI][pP]
+*.[cC][pP][jJ]
+*.[cC][pP][mM]
+*.[pP][aA][kK]
+*.[dD][aA][tT]
+*.[zZ][iI][pP]
+*.7[zZ]
+*.[rR][aA][rR]
+*.[tT][aA][rR]
+*.[gG][zZ]
+*.[xX][zZ]
+
+# Artwork, textures, audio, video, fonts, and supplied documents
+*.[pP][nN][gG]
+*.[jJ][pP][gG]
+*.[jJ][pP][eE][gG]
+*.[wW][eE][bB][pP]
+*.[gG][iI][fF]
+*.[bB][mM][pP]
+*.[dD][dD][sS]
+*.[gG][iI][mM]
+*.[tT][mM][oO]
+*.[tT][mM]2
+*.[wW][aA][vV]
+*.[mM][pP]3
+*.[oO][gG][gG]
+*.[fF][lL][aA][cC]
+*.[aA][tT]3
+*.[aA][aA]3
+*.[vV][aA][gG]
+*.[pP][mM][fF]
+*.[aA][cC][bB]
+*.[aA][wW][bB]
+*.[aA][cC][fF]
+*.[yY][dD][qQ]
+*.[mM][pP]4
+*.[aA][vV][iI]
+*.[tT][tT][fF]
+*.[oO][tT][fF]
+*.[pP][gG][fF]
+*.[bB][wW][fF][oO][nN]
+*.[pP][dD][fF]
+
+# PSP metadata and saves
+*.[sS][fF][oO]
+*.[sS][aA][vV]
+*.[sS][aA][vV][eE]
+*.[pP][pP][sS][tT]
+*.[sS][tT][aA][tT][eE]
