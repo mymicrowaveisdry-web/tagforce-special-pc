@@ -3,6 +3,8 @@ using System.Text.Json;
 using TagForceSpecial.Assets;
 using TagForceSpecial.Tools;
 
+if (args.Length == 1 && args[0] == "duel-demo") return SyntheticDuelDemo.Run(Console.Out);
+
 uint minimum = 0, maximum = 0;
 bool valid = args.Length == 2 && args[0] is "ehp-list" or "card-images-list" ||
     args.Length == 4 && (args[0] == "cardinfo-list" || args[0] == "card-details" || args[0] == "card-catalog") &&
@@ -11,6 +13,7 @@ if (!valid)
 {
     Console.Error.WriteLine("Usage: TagForceSpecial.Tools ehp-list|card-images-list <file>\n" +
         "       TagForceSpecial.Tools cardinfo-list|card-details|card-catalog <cardinfo.ehp> <minimum-card-id> <maximum-card-id>\n" +
+        "       TagForceSpecial.Tools duel-demo (invented cards; no ISO required)\n" +
         "Read-only JSON output; cardinfo ID range must come from an inspected image index.");
     return 2;
 }

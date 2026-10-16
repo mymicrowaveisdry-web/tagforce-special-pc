@@ -7,6 +7,12 @@
       },
       "tagforcespecial.cards": {
         "type": "Project"
+      },
+      "tagforcespecial.core": {
+        "type": "Project",
+        "dependencies": {
+          "TagForceSpecial.Cards": "[1.0.0, )"
+        }
       }
     }
   }
