@@ -17,6 +17,14 @@
       "executableBytes": 61196,
       "sourceSha256": "9ed267e51aaef2e56a58dd14891db41ac69b630256d7a2e87a6560ceee2d41d3",
       "inventoryEvidenceSha256": "15ea565790085b444427a61fd393f366b6d48b6d88e16219c26a40f7c0928b4c"
+    },
+    {
+      "name": "rel_DuelEng.prx",
+      "kind": "overlay",
+      "registry": "config/npjh00142/overlays/rel_DuelEng_functions.csv",
+      "executableBytes": 4651608,
+      "sourceSha256": "ee0e50c12d78e28ebb9f91625e556d131a84a1729e06359ca5c045bf911085c0",
+      "inventoryEvidenceSha256": "6652586515c984362b998d9b18e7f1305b1dfae677fafa4dba2904a12101fc65"
     }
   ],
   "research": {
@@ -30,16 +38,17 @@
       "analysis/e99cff5774856e16329b94c9ff48f9eb0c6bc61ff1127882d0785ca4221bd707/stage4c/runtime-tables.json": "0ff201f98318a41305dfa2385bb6c1ce89ebcbfb5e4dc86e01251cd0e52a8d8e",
       "analysis/e99cff5774856e16329b94c9ff48f9eb0c6bc61ff1127882d0785ca4221bd707/stage4d/catalog-validation.json": "6e262c850747ca8d22683287a0ae749cd5e18ba1cd5fe4dd319291930fcd3844",
       "analysis/e99cff5774856e16329b94c9ff48f9eb0c6bc61ff1127882d0785ca4221bd707/stage4c/detail-validation.json": "922d53ecf1ee7855f40186b14d23ad9f20f87979111ada7a44d71c18f571735e",
-      "analysis/e99cff5774856e16329b94c9ff48f9eb0c6bc61ff1127882d0785ca4221bd707/stage4d/cardh-atlas.json": "ea5cc2f95531ef360f01f0433670a0bf5369ca6ce106754679810a9d363ac3b7"
+      "analysis/e99cff5774856e16329b94c9ff48f9eb0c6bc61ff1127882d0785ca4221bd707/stage4d/cardh-atlas.json": "ea5cc2f95531ef360f01f0433670a0bf5369ca6ce106754679810a9d363ac3b7",
+      "analysis/duel-reference/validation.json": "b84b8ab3ccf4a18473c236cbbda97c3778b031ac3d34f6c0bd9a74a593b9418c"
     }
   },
   "validation": {
-    "passed": 87,
-    "total": 87,
+    "passed": 90,
+    "total": 90,
     "date": "2026-10-16"
   },
   "implementation": {
-    "milestone": "Stage 5: minimal classic duel model implemented",
+    "milestone": "Stage 5: three primitive state projections compared with PPSSPP",
     "completedFeatures": [
       "Draws",
       "normal summons",
