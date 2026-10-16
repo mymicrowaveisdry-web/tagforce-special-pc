@@ -17,6 +17,7 @@
   <Folder Name="/Documentation/">
     <File Path="docs/MIGRATION-RESULT.md" />
     <File Path="docs/PLAN.md" />
+    <File Path="docs/STAGE5-RESULT.md" />
     <File Path="docs/STAGE1-RESULT.md" />
     <File Path="docs/STAGE2-RESULT.md" />
     <File Path="docs/STAGE3-RESULT.md" />
