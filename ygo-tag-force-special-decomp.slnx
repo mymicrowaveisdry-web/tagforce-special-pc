@@ -17,6 +17,7 @@
   <Folder Name="/Documentation/">
     <File Path="docs/MIGRATION-RESULT.md" />
     <File Path="docs/PLAN.md" />
+    <File Path="docs/STAGE5-RESULT.md" />
     <File Path="docs/STAGE1-RESULT.md" />
     <File Path="docs/STAGE2-RESULT.md" />
     <File Path="docs/STAGE3-RESULT.md" />
@@ -57,5 +58,11 @@
     <File Path="tests/test_ppsspp_reference.py" />
     <File Path="tests/test_card_image_decode.py" />
     <File Path="tests/test_cardh_atlas.py" />
+  </Folder>
+  <Folder Name="/Progress Tracking/">
+    <File Path="config/progress.json" />
+    <File Path="config/npjh00142/functions.csv" />
+    <File Path="config/npjh00142/overlays/rel_CardAlbum_functions.csv" />
+    <File Path=".github/workflows/progress.yml" />
   </Folder>
 </Solution>

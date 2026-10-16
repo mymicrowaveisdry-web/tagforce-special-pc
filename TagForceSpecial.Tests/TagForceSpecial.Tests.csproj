@@ -19,7 +19,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="..\config\reference\duel-primitives.json" Link="Fixtures\duel-primitives.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\TagForceSpecial.Assets\TagForceSpecial.Assets.csproj" />
     <ProjectReference Include="..\TagForceSpecial.Cards\TagForceSpecial.Cards.csproj" />
+    <ProjectReference Include="..\TagForceSpecial.Core\TagForceSpecial.Core.csproj" />
+    <ProjectReference Include="..\TagForceSpecial.Tools\TagForceSpecial.Tools.csproj" />
   </ItemGroup>
 </Project>
