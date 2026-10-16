@@ -59,4 +59,10 @@
     <File Path="tests/test_card_image_decode.py" />
     <File Path="tests/test_cardh_atlas.py" />
   </Folder>
+  <Folder Name="/Progress Tracking/">
+    <File Path="config/progress.json" />
+    <File Path="config/npjh00142/functions.csv" />
+    <File Path="config/npjh00142/overlays/rel_CardAlbum_functions.csv" />
+    <File Path=".github/workflows/progress.yml" />
+  </Folder>
 </Solution>

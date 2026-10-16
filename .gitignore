@@ -112,3 +112,6 @@ reverse-engineering/
 *.[sS][aA][vV][eE]
 *.[pP][pP][sS][tT]
 *.[sS][tT][aA][tT][eE]
+
+# Central project overview and generated progress are public.
+!/README.md

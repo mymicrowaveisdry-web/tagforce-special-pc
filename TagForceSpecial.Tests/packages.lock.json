@@ -110,6 +110,14 @@
         "dependencies": {
           "TagForceSpecial.Cards": "[1.0.0, )"
         }
+      },
+      "tagforcespecial.tools": {
+        "type": "Project",
+        "dependencies": {
+          "TagForceSpecial.Assets": "[1.0.0, )",
+          "TagForceSpecial.Cards": "[1.0.0, )",
+          "TagForceSpecial.Core": "[1.0.0, )"
+        }
       }
     }
   }
