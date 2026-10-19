@@ -47,7 +47,7 @@ Only inventoried overlays are listed; this is not whole-game coverage.
 | --- | --- |
 | Current milestone | Stage 5: three primitive state projections compared with PPSSPP |
 | Core behavior | Draws, normal summons, turn/phase transitions, hand-limit discards, deck-out |
-| C# tests passing at last validation | 90 / 90 (2026-10-16, Europe/Berlin) |
+| C# tests passing at last validation | 90 / 90 (2026-10-19, Europe/Berlin) |
 | Decoded and normalized cards | 7,254 |
 | Card getter samples compared with PPSSPP | 4 |
 | Card tables matching PPSSPP memory | 6 tables, 932,344 (0xE39F8) |
