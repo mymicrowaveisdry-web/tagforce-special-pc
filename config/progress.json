@@ -39,25 +39,30 @@
       "analysis/e99cff5774856e16329b94c9ff48f9eb0c6bc61ff1127882d0785ca4221bd707/stage4d/catalog-validation.json": "6e262c850747ca8d22683287a0ae749cd5e18ba1cd5fe4dd319291930fcd3844",
       "analysis/e99cff5774856e16329b94c9ff48f9eb0c6bc61ff1127882d0785ca4221bd707/stage4c/detail-validation.json": "922d53ecf1ee7855f40186b14d23ad9f20f87979111ada7a44d71c18f571735e",
       "analysis/e99cff5774856e16329b94c9ff48f9eb0c6bc61ff1127882d0785ca4221bd707/stage4d/cardh-atlas.json": "ea5cc2f95531ef360f01f0433670a0bf5369ca6ce106754679810a9d363ac3b7",
-      "analysis/duel-reference/validation.json": "b84b8ab3ccf4a18473c236cbbda97c3778b031ac3d34f6c0bd9a74a593b9418c"
+      "analysis/duel-reference/validation.json": "b84b8ab3ccf4a18473c236cbbda97c3778b031ac3d34f6c0bd9a74a593b9418c",
+      "analysis/duel-reference/battle-validation.json": "f98b26205a082ba196b70e84ac79936c2c49cb98be552d38456c64e9c0442f20"
     }
   },
   "validation": {
-    "passed": 93,
-    "total": 93,
+    "passed": 145,
+    "total": 145,
     "date": "2026-10-25"
   },
   "implementation": {
-    "milestone": "Stage 5: three primitive state projections compared with PPSSPP",
+    "milestone": "Docker PSP compiler comparison runs; first getter mismatch recorded",
     "completedFeatures": [
       "Draws",
       "normal summons",
+      "monster and Spell/Trap sets",
+      "battle position changes and flip summons",
+      "effect-free attacks, battle damage and destruction",
+      "LP defeat",
       "turn/phase transitions",
       "hand-limit discards",
       "deck-out"
     ],
     "pendingFeatures": [
-      "Battle resolution",
+      "Battle response windows and effect-modified combat",
       "executable effects",
       "AI",
       "native UI"

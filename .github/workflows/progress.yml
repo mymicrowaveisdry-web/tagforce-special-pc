@@ -21,8 +21,26 @@ jobs:
       - run: dotnet restore ygo-tag-force-special-decomp.slnx --locked-mode
       - run: dotnet build ygo-tag-force-special-decomp.slnx --no-restore
       - run: dotnet test ygo-tag-force-special-decomp.slnx --no-build --no-restore --logger 'trx;LogFileName=progress.trx' --results-directory TestResults
-      - run: dotnet run --project TagForceSpecial.Tools --no-build -- progress --test-results TestResults/progress.trx
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r native/python-requirements.txt
+      - run: python -m unittest discover -s tests -p 'test_*.py'
+      - run: python -m unittest discover -s native -p 'test_*.py'
+      - run: dotnet run --project TagForceSpecial.Tools --no-build -- research-check
+      - name: Check recorded test counts on PRs
+        if: github.event_name == 'pull_request'
+        run: dotnet run --project TagForceSpecial.Tools --no-build -- progress --verify-test-counts TestResults/progress.trx
+      - name: Regenerate PR progress deterministically
+        if: github.event_name == 'pull_request'
+        run: dotnet run --project TagForceSpecial.Tools --no-build -- progress
+      - name: Refresh test snapshot outside PRs
+        if: github.event_name != 'pull_request'
+        run: dotnet run --project TagForceSpecial.Tools --no-build -- progress --test-results TestResults/progress.trx
       - run: dotnet run --project TagForceSpecial.Tools --no-build -- progress --check
+      - name: Reject stale committed progress on PRs
+        if: github.event_name == 'pull_request'
+        run: git diff --exit-code
       - name: Publish generated progress report
         uses: actions/upload-artifact@v4
         with:
@@ -38,8 +56,13 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    concurrency:
+      group: progress-refresh-${{ github.ref }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
       - uses: actions/download-artifact@v4
         with:
           name: project-progress
