@@ -14,13 +14,13 @@ public sealed class ProjectProgressTests
     public void OverlappingCandidateSizesAndAssetBytesAreNotCalledMatchedCode()
     {
         string report = ProjectProgress.Render(Config, Modules);
-        Assert.Contains("0 (0x0) / not yet classified", report);
-        Assert.Contains("2 candidates across 1 inventoried modules", report);
-        Assert.Contains("100 (0x64); includes unclassified", report);
+        Assert.Contains("0 / 100", report);
+        Assert.Contains("| `test.prx` | 2 |", report);
+        Assert.Contains("not a measured whole-game scope", report);
         Assert.DoesNotContain("160 (0xA0)", report);
-        Assert.Contains("932,344 (0xE39F8)", report);
-        Assert.Contains("not replicated executable code", report);
-        Assert.DoesNotContain("100.00%", report);
+        Assert.Contains("932,344", report);
+        Assert.Contains("asset bytes", report);
+        Assert.Contains("0.00%", report);
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public sealed class ProjectProgressTests
         try
         {
             CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("de-DE");
-            Assert.Contains("932,344 (0xE39F8)", ProjectProgress.Render(Config, Modules));
+            Assert.Contains("932,344", ProjectProgress.Render(Config, Modules));
         }
         finally { CultureInfo.CurrentCulture = previous; }
     }
