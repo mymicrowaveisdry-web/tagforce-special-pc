@@ -5,7 +5,8 @@ namespace TagForceSpecial.Core;
 
 /// <summary>
 /// Deterministic two-player rules subset: opening hands, draws, phases, basic normal summons,
-/// hand-limit discards and deck-out. No RNG, battle resolution, chains, effects or AI.
+/// sets, position changes, effect-free battles, hand-limit discards and defeat.
+/// No RNG, chains, effects, attack replays or AI. Battles resolve in one command.
 /// </summary>
 public sealed class DuelEngine
 {
@@ -31,7 +32,8 @@ public sealed class DuelEngine
         var knownIds = catalog.Cards.Select(c => c.GameCardId).ToHashSet();
         foreach (var (id, profile) in rules)
             if (!knownIds.Contains(id) || profile is null || !Enum.IsDefined(profile.Category) ||
-                profile.AllowsNormalSummon && profile.Category != CardCategory.Monster)
+                (profile.AllowsNormalSummon || profile.AllowsBasicBattle) && profile.Category != CardCategory.Monster ||
+                profile.AllowsSpellTrapSet && profile.Category is not (CardCategory.Spell or CardCategory.Trap))
                 throw new ArgumentException("Invalid explicit card rules.", nameof(rules));
         this.rules = rules.ToFrozenDictionary();
         int nextInstance = 1;
@@ -57,7 +59,11 @@ public sealed class DuelEngine
         {
             ResolveDrawStep => Draw(),
             ChangePhase phase => Advance(phase.Target),
-            NormalSummon summon => Summon(summon.CardInstanceId, summon.MonsterZone),
+            NormalSummon summon => Summon(summon.CardInstanceId, summon.MonsterZone, false),
+            SetMonster set => Summon(set.CardInstanceId, set.MonsterZone, true),
+            SetSpellTrap set => SetBackRow(set.CardInstanceId, set.SpellTrapZone),
+            ChangeMonsterPosition change => ChangePosition(change.MonsterZone, change.Target),
+            DeclareAttack attack => Attack(attack.AttackerZone, attack.TargetZone),
             DiscardForHandLimit discard => Discard(discard.CardInstanceId),
             EndTurn => FinishTurn(),
             _ => Reject(DuelError.UnsupportedCommand)
@@ -94,7 +100,7 @@ public sealed class DuelEngine
         return Accept(State.With(phase: target), new PhaseChanged(State.Phase, target));
     }
 
-    private DuelActionResult Summon(int instanceId, int zone)
+    private DuelActionResult Summon(int instanceId, int zone, bool faceDown)
     {
         if (State.Phase is not (DuelPhase.Main1 or DuelPhase.Main2)) return Reject(DuelError.WrongPhase);
         if (zone is < 0 or >= 5) return Reject(DuelError.InvalidMonsterZone);
@@ -110,11 +116,139 @@ public sealed class DuelEngine
         if (level > 4) return Reject(DuelError.TributeSummonNotSupported);
         if (player.MonsterZones[zone] is not null) return Reject(DuelError.MonsterZoneOccupied);
         if (State.NormalSummonUsed) return Reject(DuelError.NormalSummonLimitReached);
-        var monster = new FieldMonster(card, BattlePosition.FaceUpAttack);
+        var monster = new FieldMonster(card, faceDown ? BattlePosition.FaceDownDefense : BattlePosition.FaceUpAttack,
+            SummonedOnTurn: State.TurnNumber);
         var monsters = player.MonsterZones.ToArray();
         monsters[zone] = monster;
         var next = player.With(hand: player.Hand.Where(c => c.InstanceId != instanceId), monsters: monsters);
-        return Accept(State.With(player: next, normalSummonUsed: true), new MonsterNormalSummoned(player.Id, monster, zone));
+        return Accept(State.With(player: next, normalSummonUsed: true), faceDown
+            ? new MonsterSet(player.Id, monster, zone) : new MonsterNormalSummoned(player.Id, monster, zone));
+    }
+
+    private DuelActionResult SetBackRow(int instanceId, int zone)
+    {
+        if (State.Phase is not (DuelPhase.Main1 or DuelPhase.Main2)) return Reject(DuelError.WrongPhase);
+        if (zone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
+        var player = State.GetPlayer(State.ActivePlayer);
+        var card = player.Hand.SingleOrDefault(c => c.InstanceId == instanceId);
+        if (card is null) return Reject(DuelError.CardNotInHand);
+        if (!rules.TryGetValue(card.GameCardId, out var rule) || rule.Category == CardCategory.Unknown)
+            return Reject(DuelError.UnknownCardRules);
+        if (rule.Category is not (CardCategory.Spell or CardCategory.Trap)) return Reject(DuelError.NotSpellOrTrap);
+        if (!rule.AllowsSpellTrapSet) return Reject(DuelError.SpellTrapSetNotAllowed);
+        if (player.SpellTrapZones[zone] is not null) return Reject(DuelError.SpellTrapZoneOccupied);
+        var zones = player.SpellTrapZones.ToArray();
+        zones[zone] = card;
+        return Accept(State.With(player: player.With(hand: player.Hand.Where(c => c.InstanceId != instanceId),
+            spellTraps: zones)), new SpellTrapSet(player.Id, card, zone));
+    }
+
+    private DuelActionResult ChangePosition(int zone, BattlePosition target)
+    {
+        if (State.Phase is not (DuelPhase.Main1 or DuelPhase.Main2)) return Reject(DuelError.WrongPhase);
+        if (zone is < 0 or >= 5) return Reject(DuelError.InvalidMonsterZone);
+        var player = State.GetPlayer(State.ActivePlayer);
+        var monster = player.MonsterZones[zone];
+        if (monster is null) return Reject(DuelError.MonsterZoneEmpty);
+        if (target is not (BattlePosition.FaceUpAttack or BattlePosition.FaceUpDefense) || target == monster.Position ||
+            monster.Position == BattlePosition.FaceDownDefense && target != BattlePosition.FaceUpAttack)
+            return Reject(DuelError.InvalidBattlePosition);
+        if (monster.SummonedOnTurn == State.TurnNumber || monster.PositionChangedOnTurn == State.TurnNumber ||
+            monster.LastAttackTurn == State.TurnNumber) return Reject(DuelError.PositionChangeNotAllowed);
+        // Flip effects and persistent effects that restrict position changes are not implemented.
+        if (!rules[monster.Card.GameCardId].AllowsBasicBattle) return Reject(DuelError.UnsupportedBattleCard);
+        bool flip = monster.Position == BattlePosition.FaceDownDefense;
+        var changed = monster with { Position = target, PositionChangedOnTurn = State.TurnNumber,
+            SummonedOnTurn = flip ? State.TurnNumber : monster.SummonedOnTurn };
+        var zones = player.MonsterZones.ToArray();
+        zones[zone] = changed;
+        return Accept(State.With(player: player.With(monsters: zones)), flip
+            ? new MonsterFlipSummoned(player.Id, changed, zone)
+            : new MonsterPositionChanged(player.Id, zone, monster.Position, target));
+    }
+
+    private DuelActionResult Attack(int attackerZone, int? targetZone)
+    {
+        if (State.Phase != DuelPhase.Battle) return Reject(DuelError.WrongPhase);
+        if (State.TurnNumber == 1) return Reject(DuelError.FirstTurnBattleNotAllowed);
+        if (attackerZone is < 0 or >= 5 || targetZone is < 0 or >= 5) return Reject(DuelError.InvalidMonsterZone);
+        var attackerPlayer = State.GetPlayer(State.ActivePlayer);
+        var defenderPlayer = State.GetPlayer(Other(State.ActivePlayer));
+        var attacker = attackerPlayer.MonsterZones[attackerZone];
+        if (attacker is null) return Reject(DuelError.MonsterZoneEmpty);
+        if (attacker.Position != BattlePosition.FaceUpAttack) return Reject(DuelError.AttackerNotInAttackPosition);
+        if (attacker.LastAttackTurn == State.TurnNumber) return Reject(DuelError.AlreadyAttacked);
+        FieldMonster? defender = targetZone is int zone ? defenderPlayer.MonsterZones[zone] : null;
+        if (targetZone is not null && defender is null) return Reject(DuelError.MonsterZoneEmpty);
+        if (targetZone is null && defenderPlayer.MonsterZones.Any(m => m is not null))
+            return Reject(DuelError.DirectAttackBlocked);
+        if (!rules[attacker.Card.GameCardId].AllowsBasicBattle ||
+            defender is not null && !rules[defender.Card.GameCardId].AllowsBasicBattle)
+            return Reject(DuelError.UnsupportedBattleCard);
+        var attackStats = catalog[attacker.Card.GameCardId].Statistics;
+        var defenseStats = defender is null ? null : catalog[defender.Card.GameCardId].Statistics;
+        int? defendingValue = defender?.Position == BattlePosition.FaceUpAttack ? defenseStats?.Attack : defenseStats?.Defense;
+        if (attackStats.Attack is not int attack || defender is not null && defendingValue is null)
+            return Reject(DuelError.UnsupportedBattleStatistics);
+
+        var events = new List<DuelEvent> { new AttackDeclared(attackerPlayer.Id, attackerZone, targetZone) };
+        var attackZones = attackerPlayer.MonsterZones.ToArray();
+        var defenseZones = defenderPlayer.MonsterZones.ToArray();
+        attackZones[attackerZone] = attacker with { LastAttackTurn = State.TurnNumber };
+        if (defender?.Position == BattlePosition.FaceDownDefense)
+        {
+            defenseZones[targetZone!.Value] = defender with { Position = BattlePosition.FaceUpDefense };
+            events.Add(new MonsterRevealed(defenderPlayer.Id, targetZone.Value, defender.Card));
+        }
+        bool destroyAttacker = false, destroyDefender = false;
+        int damage = 0;
+        PlayerId damagedPlayer = defenderPlayer.Id;
+        if (defender is null) damage = attack;
+        else
+        {
+            int difference = attack - defendingValue!.Value;
+            if (defender.Position == BattlePosition.FaceUpAttack)
+            {
+                destroyAttacker = difference < 0 || difference == 0 && attack > 0;
+                destroyDefender = difference > 0 || difference == 0 && attack > 0;
+                damage = Math.Abs(difference);
+            }
+            else
+            {
+                destroyDefender = difference > 0;
+                damage = Math.Max(0, -difference); // No piercing damage in this subset.
+            }
+            if (difference < 0) damagedPlayer = attackerPlayer.Id;
+        }
+        attackerPlayer = attackerPlayer.With(monsters: attackZones);
+        defenderPlayer = defenderPlayer.With(monsters: defenseZones);
+        DuelState next = State.With(player: attackerPlayer).With(player: defenderPlayer);
+        if (damage > 0)
+        {
+            var damaged = next.GetPlayer(damagedPlayer);
+            int remaining = Math.Max(0, damaged.LifePoints - damage);
+            next = next.With(player: damaged.With(lifePoints: remaining));
+            events.Add(new BattleDamageDealt(damagedPlayer, damage, damaged.LifePoints, remaining));
+            // LP defeat occurs during damage calculation, before sending battle-destroyed cards to the graveyard.
+            if (remaining == 0)
+            {
+                var outcome = new DuelOutcome(Other(damagedPlayer), damagedPlayer, DuelEndReason.LifePointsDepleted);
+                events.Add(new DuelEnded(outcome));
+                return Accept(next.With(outcome: outcome), events.ToArray());
+            }
+        }
+        void Destroy(PlayerId playerId, int zone)
+        {
+            var player = next.GetPlayer(playerId);
+            var zones = player.MonsterZones.ToArray();
+            var card = zones[zone]!.Card;
+            zones[zone] = null;
+            next = next.With(player: player.With(monsters: zones, graveyard: player.Graveyard.Append(card)));
+            events.Add(new MonsterDestroyed(playerId, zone, card));
+        }
+        if (destroyAttacker) Destroy(attackerPlayer.Id, attackerZone);
+        if (destroyDefender) Destroy(defenderPlayer.Id, targetZone!.Value);
+        return Accept(next, events.ToArray());
     }
 
     private DuelActionResult Discard(int instanceId)

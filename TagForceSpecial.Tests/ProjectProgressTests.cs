@@ -56,6 +56,8 @@ public sealed class ProjectProgressTests
         Assert.Equal(new ProgressValidation(2, 3, "2026-10-16"), ProjectProgress.ReadValidation(trx));
         Assert.Throws<InvalidDataException>(() => ProjectProgress.ReadValidation(trx.Replace("passed=\"2\"", "passed=\"4\"")));
         Assert.Throws<InvalidDataException>(() => ProjectProgress.ReadValidation("<TestRun />"));
+        ProjectProgress.VerifyTestCounts(new(2, 3, "2020-01-01"), trx);
+        Assert.Throws<InvalidDataException>(() => ProjectProgress.VerifyTestCounts(new(3, 3, "2026-10-16"), trx));
     }
 
     [Fact]

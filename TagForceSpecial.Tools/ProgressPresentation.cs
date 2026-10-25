@@ -25,7 +25,7 @@ public static class ProgressPresentation
     private static string Safe(string s) => s.Replace("|", "\\|").Replace("\n", " ").Replace("\r", " ");
 
     public static string RenderCompact(ProgressConfiguration config,
-        IReadOnlyList<ModuleInventory> inventories, NativeByteReport matches)
+        IReadOnlyList<ModuleInventory> inventories, NativeByteReport matches, CoverageManifest? coverage = null)
     {
         Validate(config);
         long inventoried = inventories.Sum(i => i.Module.ExecutableBytes);
@@ -41,6 +41,9 @@ public static class ProgressPresentation
         output.AppendLine();
         output.AppendLine($"**Current milestone:** {Safe(config.Implementation.Milestone)}");
         output.AppendLine();
+        output.AppendLine(string.Join(" · ", CoverageScopes(coverage).Select(scope =>
+            $"**{Safe(scope.Label)}:** {ResearchValidation.FormatCoverage(scope)}")));
+        output.AppendLine();
         output.AppendLine("This is **not** a whole-game completion percentage: the denominator is a partial, unclassified inventory and may grow. CI validates committed match evidence metadata; it cannot rerun PSP byte comparisons without the proprietary game binaries. C# behavioral matches and asset decoding are separate metrics.");
         output.AppendLine();
         output.AppendLine("[Detailed status](docs/STATUS.md) · [Roadmap](docs/ROADMAP.md) · [Updating progress](docs/DEVELOPMENT.md)");
@@ -48,7 +51,7 @@ public static class ProgressPresentation
     }
 
     public static string RenderDetailed(ProgressConfiguration config,
-        IReadOnlyList<ModuleInventory> inventories, NativeByteReport matches)
+        IReadOnlyList<ModuleInventory> inventories, NativeByteReport matches, CoverageManifest? coverage = null)
     {
         Validate(config);
         long executableBytes = inventories.Sum(x => x.Module.ExecutableBytes);
@@ -73,7 +76,9 @@ public static class ProgressPresentation
         s.AppendLine("| Metric | Recorded value |");
         s.AppendLine("| --- | --- |");
         s.AppendLine($"| Milestone | {Safe(config.Implementation.Milestone)} |");
-        s.AppendLine($"| Tested C# scenarios | {N(config.Validation.Passed)} / {N(config.Validation.Total)} ({config.Validation.Date}, Europe/Berlin) |");
+        s.AppendLine($"| C# unit-test cases | {N(config.Validation.Passed)} / {N(config.Validation.Total)} ({config.Validation.Date}, Europe/Berlin) |");
+        foreach (var scope in CoverageScopes(coverage))
+            s.AppendLine($"| {Safe(scope.Label)} | {ResearchValidation.FormatCoverage(scope)} |");
         s.AppendLine($"| Decoded cards | {N(config.Research.DecodedCards)} |");
         s.AppendLine($"| Card getter samples compared with PPSSPP | {N(config.Research.RuntimeGetterSamples)} |");
         s.AppendLine($"| Card tables compared with PPSSPP memory | {N(config.Research.LoadedTables)} tables · {N(config.Research.LoadedTableBytes)} **asset bytes** |");
@@ -87,4 +92,10 @@ public static class ProgressPresentation
         s.AppendLine("Inputs: `config/progress.json`, `config/native-matches.json` and the inventoried function CSVs under `config/npjh00142/`.");
         return s.ToString();
     }
+
+    private static IEnumerable<CoverageScope> CoverageScopes(CoverageManifest? coverage) => coverage?.Scopes ??
+    [
+        new("csharp-acceptance", "C# acceptance-criterion coverage", "unscoped-v1", null, "Denominator not defined.", []),
+        new("psp-reference", "PSP reference-scenario coverage", "unscoped-v1", null, "Denominator not defined.", [])
+    ];
 }

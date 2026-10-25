@@ -20,6 +20,8 @@
 
   <ItemGroup>
     <None Include="..\config\reference\duel-primitives.json" Link="Fixtures\duel-primitives.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\config\reference\duel-battle.json" Link="Fixtures\duel-battle.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\config\reference\card-attack.json" Link="Fixtures\card-attack.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
