@@ -1,0 +1,237 @@
+{
+  "schemaVersion": 1,
+  "sourceIsoSha256": "e99cff5774856e16329b94c9ff48f9eb0c6bc61ff1127882d0785ca4221bd707",
+  "moduleSha256": "ee0e50c12d78e28ebb9f91625e556d131a84a1729e06359ca5c045bf911085c0",
+  "moduleBase": "0x09819300",
+  "emulator": "PPSSPP v1.20.4, software renderer",
+  "scope": "Direct attack with optional effects declined. Selected observable fields; synthetic C# decks. Does not verify effect behavior, hidden state, battle destruction, LP defeat, RNG or timing.",
+  "repeatCount": 2,
+  "attackerCardId": 7716,
+  "attackerZone": 2,
+  "attackerAttack": 1200,
+  "attackerDefense": 400,
+  "attackerLevel": 2,
+  "statEvidence": "Inspected attack-before/after frames display ATK 1200 / DEF 400, level 2.",
+  "scenario": {
+    "id": "direct-attack",
+    "before": {
+      "activePlayer": 0,
+      "turnNumber": 3,
+      "phase": "Battle",
+      "players": [
+        {
+          "lifePoints": 8000,
+          "handCount": 5,
+          "deckCount": 34,
+          "monsterCardIds": [
+            0,
+            0,
+            7716,
+            0,
+            0
+          ]
+        },
+        {
+          "lifePoints": 8000,
+          "handCount": 4,
+          "deckCount": 34,
+          "monsterCardIds": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    "after": {
+      "activePlayer": 0,
+      "turnNumber": 3,
+      "phase": "Battle",
+      "players": [
+        {
+          "lifePoints": 8000,
+          "handCount": 5,
+          "deckCount": 34,
+          "monsterCardIds": [
+            0,
+            0,
+            7716,
+            0,
+            0
+          ]
+        },
+        {
+          "lifePoints": 6800,
+          "handCount": 4,
+          "deckCount": 34,
+          "monsterCardIds": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    }
+  },
+  "snapshots": {
+    "m3-attack-before-1": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 3,
+        "phase": "Battle",
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "ramSha256": "43a65648740b915f6eb17e25741f28e9593b0c2dd4f6e0eafe5e124df4c7b86d",
+      "observationSha256": "7352019d62529b7894b2952c6c881f270903c6922b0d799cbfb55b44fdd4e2a9",
+      "transcriptSha256": "130f1a4b3cf5ff8d11231e3b670e7d96eb703421af447991a1369c261fd47337",
+      "frameSha256": "5b3ebc927f6fc9a123fd6b4af48931c009f6673e2b88a9c9a89bfc4b05c0432c"
+    },
+    "m3-attack-after-1": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 3,
+        "phase": "Battle",
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 6800,
+            "handCount": 4,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "ramSha256": "ea91a48ace0b7f667af2a07a8e577eb46040eee66334818560b92cbfb372dde7",
+      "observationSha256": "695fc39dab8200dfc95fdaa5d210c4a2fb89f421441c7babe3d89d65facd8bba",
+      "transcriptSha256": "3657b298e035df337178f5db255868a9172d533b518793609a7b59979260605b",
+      "frameSha256": "c4ddccce1fd8e42f934e9dcab838ca1e28dedf240202d14a1c5f61d73c35ef3d"
+    },
+    "m3-attack-before-2": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 3,
+        "phase": "Battle",
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "ramSha256": "799c91614e7f11129f5461aadf8f3d1ae8c1d9e624b77d56edb9f01872e3ffcc",
+      "observationSha256": "29a5707b1099bb85e8bd40b606d5f8da0ca78a3284e65c2f692c7fb64674dac6",
+      "transcriptSha256": "0996671f3b77a556e385b43c97ff9b86cc6ef1d2c8831bc42d5d180ce8a641d5",
+      "frameSha256": "66a5a2c292b3ac6388bb100dc4e88a4e2e65148a28ca739d4f968b06a99e348b"
+    },
+    "m3-attack-after-2": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 3,
+        "phase": "Battle",
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 6800,
+            "handCount": 4,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "ramSha256": "612981194da37371377e5153f3d46732da3f57fa0807760dbd96907fae209de2",
+      "observationSha256": "ef25688dade0fe198954d20df82fd128e7522e178c62efe77c647d19f5d26d88",
+      "transcriptSha256": "f805f5e7a81a29bedfa662349eeaef260cb8b8ef8d0f4694b747bd3eff4e41c8",
+      "frameSha256": "fb1cbce6fac064d7a4a8ea32c0a362725279ad1e451957bc50c80d247376ed04"
+    }
+  },
+  "inputTranscripts": {
+    "m3-attack-confirm": "e7d6e0eb81f14c3906e1e02b7628a19adda1a02fe4fcdb2aeba495d8a0cea91f",
+    "m3-decline-effect": "cbd00c058328b7d5526ec6295048e99fb6143f6ce7290e018961070d232062a1",
+    "m3-attack-confirm-repeat": "c9799191bfaa2982385ca86f764aba9e521b4ede89adfad22143cfd2ec333d1c",
+    "m3-decline-effect-repeat": "31ac24f0731139bcb85d11b668e88ec83e6af44705968db5d61e37ce76987e6a"
+  },
+  "saveStateSha256": "b29dff3e99271a6c9177eec3b26aaf692d581b40db324d3829f2bea29a5039da"
+}
