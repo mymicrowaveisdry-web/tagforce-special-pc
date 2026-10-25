@@ -19,15 +19,17 @@ The inventories mix as-yet-unclassified game code, CRT/SDK code and candidate fu
 
 | Metric | Recorded value |
 | --- | --- |
-| Milestone | Stage 5: three primitive state projections compared with PPSSPP |
-| Tested C# scenarios | 93 / 93 (2026-10-25, Europe/Berlin) |
+| Milestone | Docker PSP compiler comparison runs; first getter mismatch recorded |
+| C# unit-test cases | 145 / 145 (2026-10-25, Europe/Berlin) |
+| C# acceptance-criterion coverage | N/A (denominator not defined) |
+| PSP reference-scenario coverage | N/A (denominator not defined) |
 | Decoded cards | 7,254 |
 | Card getter samples compared with PPSSPP | 4 |
 | Card tables compared with PPSSPP memory | 6 tables · 932,344 **asset bytes** |
 | Card atlas sprite samples | 16 |
 | Card-screen visual acceptance | Partial; complete card-screen comparisons pending |
-| Implemented subset | Draws, normal summons, turn/phase transitions, hand-limit discards, deck-out |
-| Pending | Battle resolution, executable effects, AI, native UI |
+| Implemented subset | Draws, normal summons, monster and Spell/Trap sets, battle position changes and flip summons, effect-free attacks, battle damage and destruction, LP defeat, turn/phase transitions, hand-limit discards, deck-out |
+| Pending | Battle response windows and effect-modified combat, executable effects, AI, native UI |
 
 Inventory recorded: 2026-10-16. Tests and research counts are recorded snapshots; CI does not include the original game ISO or rerun PPSSPP evidence capture.
 
