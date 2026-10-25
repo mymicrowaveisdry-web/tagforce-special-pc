@@ -45,11 +45,3 @@ The example is **not valid until placeholders are replaced** and length equals t
 The tracker rejects unknown modules, mismatched source hashes, unrecognized addresses, partial functions, invalid digests, contradictory original/rebuilt hashes, duplicate or overlapping match regions, missing evidence files and coverage exceeding the module's inventoried executable bytes. The tracker does not certify arbitrary matches as native source-equivalent; evidence should be peer reviewed.
 
 For **C#-only behavior reconstructions**, keep test evidence and address provenance in the research records; do not add them to the native match manifest.
-
-## Research hygiene
-
-- Never commit ISO, EBOOT.BIN, PRX, decrypted code bytes, artwork, or proprietary assets.
-- Keep local capture dumps and decompiler exports outside version control.
-- Store only compact source references and independently verifiable test summaries in tracked metadata.
-- Prefer one address-backed, testable function at a time and note all unknowns explicitly.
-- Treat matched bytes, PPSSPP behavioral equivalence and eventual PC playability as independent achievements.
