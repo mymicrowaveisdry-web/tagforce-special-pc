@@ -115,3 +115,10 @@ reverse-engineering/
 
 # Central project overview and generated progress are public.
 !/README.md
+
+# Public project documentation tracked in Git, despite broad local Markdown exclusions.
+!/docs/
+/docs/*
+!/docs/STATUS.md
+!/docs/ROADMAP.md
+!/docs/DEVELOPMENT.md
