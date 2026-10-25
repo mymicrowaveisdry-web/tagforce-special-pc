@@ -29,6 +29,7 @@ jobs:
           name: project-progress
           path: |
             README.md
+            docs/STATUS.md
             config/progress.json
 
   refresh-default-branch:
@@ -46,7 +47,7 @@ jobs:
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
-          git add README.md config/progress.json
+          git add README.md docs/STATUS.md config/progress.json
           if git diff --cached --quiet; then exit 0; fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
