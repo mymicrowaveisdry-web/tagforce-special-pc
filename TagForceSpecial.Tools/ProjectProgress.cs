@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text;
 using System.Text.Json;
 using System.Xml.Linq;
 
@@ -55,20 +54,31 @@ public static class ProjectProgress
                     throw new InvalidDataException("Function registries must be under config/.");
                 return new ModuleInventory(module, ReadFunctions(File.ReadAllText(registry)));
             }).ToArray();
+            var native = NativeByteProgress.Load(root, modules);
             string readmePath = Path.Combine(root, "README.md");
-            string before = File.ReadAllText(readmePath).Replace("\r\n", "\n");
-            string after = ReplaceProgress(before, Render(config, modules));
+            string statusPath = Path.Combine(root, "docs", "STATUS.md");
+            string originalReadme = File.ReadAllText(readmePath).Replace("\r\n", "\n");
+            string originalStatus = File.ReadAllText(statusPath).Replace("\r\n", "\n");
+            string newReadme = ReplaceProgress(originalReadme,
+                ProgressPresentation.RenderCompact(config, modules, native));
+            string newStatus = ReplaceProgress(originalStatus,
+                ProgressPresentation.RenderDetailed(config, modules, native));
             if (check)
             {
-                if (before != after) { error.WriteLine("README progress is stale. Run the progress command."); return 1; }
-                output.WriteLine("README progress matches the recorded inventory and validation snapshot.");
+                if (originalReadme != newReadme || originalStatus != newStatus)
+                {
+                    error.WriteLine("Generated README or docs/STATUS.md progress is stale. Run progress to refresh.");
+                    return 1;
+                }
+                output.WriteLine("README and docs/STATUS.md are current.");
             }
             else
             {
-                // Render/validate first; malformed input must not partially update the snapshot.
+                // Calculate/validate before writing either page. Preserve all prose outside progress markers.
                 if (trx is not null) File.WriteAllText(configPath, JsonSerializer.Serialize(config, JsonOptions) + "\n");
-                if (before != after) File.WriteAllText(readmePath, after);
-                output.WriteLine("README progress updated. Verified executable matches: 0 functions, 0 bytes.");
+                if (originalReadme != newReadme) File.WriteAllText(readmePath, newReadme);
+                if (originalStatus != newStatus) File.WriteAllText(statusPath, newStatus);
+                output.WriteLine($"Progress updated. Evidence-backed native matches: {native.MatchedFunctions} functions, {native.MatchedBytes} bytes.");
             }
             return 0;
         }
@@ -117,63 +127,14 @@ public static class ProjectProgress
         return new(passed, total, date);
     }
 
-    public static string Render(ProgressConfiguration config, IReadOnlyList<ModuleInventory> modules)
-    {
-        if (config.Validation.Total <= 0 || config.Validation.Passed < 0 || config.Validation.Passed > config.Validation.Total ||
-            config.Research.LoadedTableBytes < 0 || config.Research.DecodedCards < 0 || config.Research.LoadedTables < 0 ||
-            config.Research.RuntimeGetterSamples < 0 || config.Research.CardhSprites < 0 ||
-            config.Research.EvidenceSha256 is null || config.Research.EvidenceSha256.Values.Any(hash => !ValidHash(hash)) ||
-            !DateOnly.TryParseExact(config.InventoryDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _) ||
-            !DateOnly.TryParseExact(config.Validation.Date, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
-            throw new InvalidDataException("Invalid progress counters or dates.");
-        long discovered = modules.Sum(m => (long)m.Functions.Count);
-        long executableBytes = modules.Sum(m => m.Module.ExecutableBytes);
-        var text = new StringBuilder();
-        text.AppendLine("## Progress\n");
-        text.AppendLine("| Metric | Current |");
-        text.AppendLine("| --- | --- |");
-        text.AppendLine("| Game C-decompilation targets matched | 0 / not yet classified |");
-        text.AppendLine("| Game C-decompilation target bytes matched | 0 (0x0) / not yet classified |");
-        text.AppendLine("| Remaining game C-decompilation targets | Not yet classified |");
-        text.AppendLine("| Evidence-backed handwritten game assembly | 0 functions, 0 (0x0) bytes |");
-        text.AppendLine("| Total game-owned functions | Not yet classified |");
-        text.AppendLine("| Preserved PSP CRT/SDK assembly | Not yet classified |");
-        text.AppendLine($"| Total discovered functions | {Number(discovered)} candidates across {Number(modules.Count)} inventoried modules |");
-        text.AppendLine($"| Inventoried executable-section bytes | {Bytes(executableBytes)}; includes unclassified game/SDK code |");
-        text.AppendLine("| Embedded/unassigned resident text | Not yet measured |\n");
-        text.AppendLine("Discovered functions are Ghidra candidates, not confirmed C targets. Function-body sizes can overlap and are not summed as code coverage. Uninventoried modules are outside these totals.\n");
-        text.AppendLine("### Runtime overlay modules\n");
-        text.AppendLine("| Module | Discovered candidates | Matching C functions | Matching C bytes |");
-        text.AppendLine("| --- | --- | --- | --- |");
-        foreach (var module in modules.Where(m => m.Module.Kind == "overlay"))
-            text.AppendLine($"| {Cell(module.Module.Name)} | {Number(module.Functions.Count)} | 0 / unclassified | 0 (0x0) / unclassified |");
-        text.AppendLine();
-        text.AppendLine("Only inventoried overlays are listed; this is not whole-game coverage.\n");
-        text.AppendLine("### C# reconstruction and asset research\n");
-        text.AppendLine("| Metric | Current |");
-        text.AppendLine("| --- | --- |");
-        text.AppendLine($"| Current milestone | {Cell(config.Implementation.Milestone)} |");
-        text.AppendLine($"| Core behavior | {Cell(string.Join(", ", config.Implementation.CompletedFeatures))} |");
-        text.AppendLine($"| C# tests passing at last validation | {Number(config.Validation.Passed)} / {Number(config.Validation.Total)} ({config.Validation.Date}, Europe/Berlin) |");
-        text.AppendLine($"| Decoded and normalized cards | {Number(config.Research.DecodedCards)} |");
-        text.AppendLine($"| Card getter samples compared with PPSSPP | {Number(config.Research.RuntimeGetterSamples)} |");
-        text.AppendLine($"| Card tables matching PPSSPP memory | {Number(config.Research.LoadedTables)} tables, {Bytes(config.Research.LoadedTableBytes)} |");
-        text.AppendLine($"| Bounded cardh atlas sprite samples decoded | {Number(config.Research.CardhSprites)} |");
-        text.AppendLine($"| Stage 4D visual acceptance | {Cell(config.Research.VisualAcceptance)} |");
-        text.AppendLine($"| Pending implementation | {Cell(string.Join(", ", config.Implementation.PendingFeatures))} |\n");
-        text.AppendLine("The table-byte figure measures original asset data verified against memory, not replicated executable code. Research numbers are recorded local-evidence snapshots; CI does not contain the ISO or rerun those comparisons. No reliable whole-project completion percentage is available.\n");
-        text.AppendLine("Generated by `TagForceSpecial.Tools progress` from:");
-        text.AppendLine();
-        foreach (var module in modules) text.AppendLine($"- `{module.Module.Registry}`");
-        text.AppendLine("- `config/progress.json` (module provenance, research evidence and last test validation)");
-        text.AppendLine();
-        text.AppendLine($"Function inventory snapshot: {config.InventoryDate}. Matching is deliberately zero until a PSP rebuild/comparison pipeline supplies evidence.");
-        return text.ToString().Replace("\r\n", "\n").TrimEnd() + "\n";
-    }
+    public static string Render(ProgressConfiguration config, IReadOnlyList<ModuleInventory> modules,
+        NativeByteReport? verified = null) => ProgressPresentation.RenderDetailed(config, modules,
+            verified ?? NativeByteProgress.Measure(modules, Array.Empty<NativeFunctionMatch>()));
 
     public static string ReplaceProgress(string readme, string generated)
     {
         readme = readme.Replace("\r\n", "\n");
+        generated = generated.Replace("\r\n", "\n");
         int start = readme.IndexOf(StartMarker, StringComparison.Ordinal);
         int end = readme.IndexOf(EndMarker, StringComparison.Ordinal);
         if (start < 0 || end <= start || start != readme.LastIndexOf(StartMarker, StringComparison.Ordinal) ||
