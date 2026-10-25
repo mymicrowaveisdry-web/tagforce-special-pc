@@ -43,9 +43,9 @@
     }
   },
   "validation": {
-    "passed": 93,
-    "total": 93,
-    "date": "2026-10-25"
+    "passed": 90,
+    "total": 90,
+    "date": "2026-10-19"
   },
   "implementation": {
     "milestone": "Stage 5: three primitive state projections compared with PPSSPP",
