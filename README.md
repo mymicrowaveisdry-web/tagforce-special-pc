@@ -1,96 +1,76 @@
-# Tag Force Special PC
+# Yu-Gi-Oh! ARC-VTag Force Special PC
 
 A C# rewrite of the PSP game **Yu-Gi-Oh! ARC-V Tag Force Special** for native PC
 play, with a long-term goal of extensible cards and modern duel rules.
 
-**Status:** Research and early duel-engine reconstruction. **Not yet a playable PC port.** No copyrighted game files are included; the planned importer requires a user-supplied, legally obtained game dump.
-
-## Reconstruction approach
-
-The main path is to recover behavior from original-game observations, data and
-targeted MIPS analysis, implement understood contracts in C#, and verify them
-against reproducible PSP reference scenarios. Reconstructed C or pseudocode can
-help explain a function; neither is a mandatory intermediate language.
-
-**Exact native byte matching is optional research, not a requirement for the C#
-engine or playable PC build.** Its byte bar measures only that separate track.
-Functional fidelity is checked through reference comparisons; PC readiness is
-checked by completing supported duels in the packaged application.
-
-Next: close the remaining M3 behavior-reference gaps, add a small supported
-effects set and deterministic opponent, then connect input, rendering and local
-asset import for a playable sample duel. Preserve the current .NET solution and
-keep unsupported behavior explicit.
-
-CI builds the C# solution, tests behavior/reference fixtures and checks evidence
-and progress integrity. Native comparison tooling tests are opt-in through the
-workflow's `native_tooling` input; original PSP byte comparisons run locally.
+**Status:** Early duel-engine reconstruction. The PC host is a placeholder;
+this is not yet a playable PC port. No original game assets are included.
 
 ## Quick start
 
-Requires the .NET SDK selected by [`global.json`](global.json).
+Requires the .NET 10 SDK. These commands work with the committed source and
+synthetic inputs; no game dump, Docker, Python tooling or local research files
+are required.
 
 ```powershell
-dotnet restore ygo-tag-force-special-decomp.slnx --locked-mode
-dotnet build ygo-tag-force-special-decomp.slnx --no-restore
-dotnet test ygo-tag-force-special-decomp.slnx --no-build --no-restore
+dotnet restore ygo-tag-force-special-decomp.slnx -p:RestorePackagesWithLockFile=false
+dotnet build ygo-tag-force-special-decomp.slnx --no-restore -p:IncludeReferenceFixtures=false
+dotnet test ygo-tag-force-special-decomp.slnx --no-build --no-restore -p:IncludeReferenceFixtures=false --filter 'Category!=LocalReference'
 dotnet run --project TagForceSpecial.Tools --no-build -- duel-demo
 ```
 
-The demo uses synthetic card data; it is not the original game.
+The console demo uses invented cards and exercises the headless engine. It is
+not the original game or a graphical PC application.
 
-<!-- progress:start -->
-## Progress
+## Implemented scope
 
-**Current milestone:** Emergency Teleport End Phase banishment and battle-destruction expiry comparisons pass; full card support and PC integration pending
+The deterministic two-player engine supports opening hands, draws, phase and
+turn transitions, eligible normal summons, monster and Spell/Trap sets, battle
+position changes, flip summons, explicitly enabled effect-free attacks, battle
+damage and destruction, LP defeat, hand-limit discards and deck-out.
 
-| Measure | Recorded status |
-| --- | --- |
-| C# tests | **193/193** (last recorded 2026-10-27) |
-| C# acceptance-criterion coverage | N/A (denominator not defined) |
-| PSP reference-scenario coverage | N/A (denominator not defined) |
-| Decoded cards | 7,254; full visual acceptance remains pending |
+Opt-in immutable decision sequences select card instances, positions and empty
+monster zones. Experimental Emergency Teleport profiles support a bounded deck
+Krebons / attack-position branch, with either a stop after resolution or an End
+Phase banishment lifecycle. They do not implement the full card.
 
-**Implemented subset:** Draws, normal summons, monster and Spell/Trap sets, battle position changes and flip summons, effect-free attacks, battle damage and destruction, LP defeat, turn/phase transitions, hand-limit discards, deck-out, opt-in immutable card, position and zone decision sequences (managed tests), experimental Emergency Teleport activation/resolution only (deck Krebons, attack position), experimental End Phase banishment or expiry after basic battle destruction (deck Krebons).
+General effects, response windows, chains, shuffle, broader delayed-effect
+handling, opponent AI, rendering, input and first-launch asset import remain
+unfinished. The next application milestone is a small supported duel with a
+deterministic opponent, player-specific visibility and a complete win/loss flow.
 
-**Still to build:** Battle response windows and effect-modified combat, general effects, shuffle and full delayed effect lifecycle including movement/reset exceptions, AI, native UI.
+## Validation and research
 
-Passing tests and decoded assets are not a whole-game completion percentage. PSP comparisons cover only their declared inputs and behavior; a supported duel in the PC application remains a separate acceptance gate.
+[CI](.github/workflows/progress.yml) restores and builds the C# solution, runs
+tests that do not require local reference fixtures, and publishes a test summary
+and TRX artifact. It does not regenerate this README or commit progress reports.
+Use the workflow run's results for current test counts.
 
-<details>
-<summary>Optional native byte-matching research</summary>
+Tests marked `Category=LocalReference` read PSP observation projections from
+local JSON fixtures. Those fixtures are excluded from this branch, so the quick
+start disables copying them and filters those tests out. Running them requires
+the corresponding local fixtures, a build with `IncludeReferenceFixtures=true`,
+and a test run without that filter.
 
-`░░░░░░░░░░░░░░░░░░░░░░░░` **0.00%** — 0 / 5,547,712 inventoried executable bytes
+Decompilation scripts, native comparison infrastructure, Docker configuration,
+research JSON files and Markdown notes under `docs/` remain local. The retained
+legacy progress/evidence commands depend on those local research files and are
+not part of the clean-checkout workflow.
 
-**0** native functions matched · **11,482** discovered candidates.
+Original-game fidelity requires bounded reference comparisons with declared
+inputs and limitations. Passing synthetic tests does not establish full PSP
+equivalence. Exact native byte matching is separate research; neither it nor
+decoded asset counts measures completion of the C# engine or PC application.
 
-This measures only exact native reconstruction against a partial, unclassified inventory. It is not PC-build progress and does not gate the C# rewrite. CI checks evidence metadata; original-byte comparisons require local proprietary inputs.
-
-</details>
-
-[Detailed status](docs/STATUS.md) · [Roadmap](docs/ROADMAP.md) · [Updating progress](docs/DEVELOPMENT.md)
-<!-- progress:end -->
-
-## Solution layout
+## Solution layout and documentation
 
 | Project | Responsibility |
 | --- | --- |
-| `TagForceSpecial.Assets` / `.Cards` | PSP resource readers and card catalog |
-| `TagForceSpecial.Core` | Headless duel-state reconstruction |
-| `TagForceSpecial.Effects` / `.AI` | Planned effect engine and opponent AI |
-| `TagForceSpecial.PC` | Planned native application host |
-| `TagForceSpecial.Tools` | Importers, research utilities and progress generation |
-| `TagForceSpecial.Tests` | Synthetic tests and bounded PPSSPP reference comparisons |
-
-## Project documentation
-
-- [Progress and evidence status](docs/STATUS.md)
-- [Milestones and research roadmap](docs/ROADMAP.md)
-- [Development setup, behavior validation and automation](docs/DEVELOPMENT.md)
-- [Bounded M3 reference comparisons and limitations](docs/M3_REFERENCE.md)
-- [Optional native compiler comparison](docs/NATIVE-COMPARISON.md)
-
-**Accuracy policy:** Passing synthetic tests alone does not establish original-game
-fidelity. Reference comparisons prove only their declared behavior and inputs.
-Native matches require independently reviewed byte-comparison evidence; neither
-those matches nor decoded assets measure whole-game or PC-build completion.
+| [Assets](TagForceSpecial.Assets/README.md) | PSP resource readers and packed-property decoding |
+| [Cards](TagForceSpecial.Cards/README.md) | Immutable normalized card records and catalog |
+| [Core](TagForceSpecial.Core/README.md) | Headless duel state, commands, decisions and scoped spell lifecycle |
+| [Effects](TagForceSpecial.Effects/README.md) | Experimental Emergency Teleport profiles |
+| [AI](TagForceSpecial.AI/README.md) | Placeholder for deterministic opponent logic |
+| [PC](TagForceSpecial.PC/README.md) | Placeholder application host and planned asset setup |
+| [Tools](TagForceSpecial.Tools/README.md) | Synthetic duel demo, local asset inspection and legacy research commands |
+| `TagForceSpecial.Tests` | Synthetic tests and optional local reference comparisons |
