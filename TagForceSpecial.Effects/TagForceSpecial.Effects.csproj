@@ -6,4 +6,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\TagForceSpecial.Core\TagForceSpecial.Core.csproj" />
+  </ItemGroup>
 </Project>

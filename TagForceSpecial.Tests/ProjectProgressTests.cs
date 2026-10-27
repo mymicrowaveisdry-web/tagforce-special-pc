@@ -6,7 +6,7 @@ namespace TagForceSpecial.Tests;
 public sealed class ProjectProgressTests
 {
     private static ProgressConfiguration Config => new(1, "2026-10-16", [],
-        new(10, 2, 6, 932344, 16, "Partial", []), new(82, 82, "2026-10-16"), new("Stage 5", ["Draw"], ["Battle"]));
+        new(10, 2, 6, 932344, 16, "Partial", []), new(82, 82, "2026-10-16"), new("Bounded behavior", ["Draw"], ["Battle"]));
     private static ModuleInventory[] Modules => [new(new("test.prx", "overlay", "config/test.csv", 100,
         new string('0', 64), new string('1', 64)), [new(0x8804000, 80), new(0x8804020, 80)])];
 
@@ -21,6 +21,15 @@ public sealed class ProjectProgressTests
         Assert.Contains("932,344", report);
         Assert.Contains("asset bytes", report);
         Assert.Contains("0.00%", report);
+        Assert.True(report.IndexOf("### C# reconstruction", StringComparison.Ordinal) <
+                    report.IndexOf("### Optional native", StringComparison.Ordinal));
+        string compact = ProgressPresentation.RenderCompact(Config, Modules, NativeByteProgress.Measure(Modules, []));
+        Assert.Contains("**82/82**", compact);
+        Assert.Contains("N/A (denominator not defined)", compact);
+        Assert.Contains("0 / 100", compact);
+        Assert.Contains("<summary>Optional native byte-matching research</summary>", compact);
+        Assert.True(compact.IndexOf("| C# tests |", StringComparison.Ordinal) <
+                    compact.IndexOf("<details>", StringComparison.Ordinal));
     }
 
     [Fact]

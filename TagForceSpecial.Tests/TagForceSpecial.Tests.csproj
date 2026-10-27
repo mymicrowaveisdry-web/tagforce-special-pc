@@ -18,9 +18,16 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
-  <ItemGroup>
+  <!-- CI opts out of local PSP fixtures and filters Category=LocalReference. -->
+  <ItemGroup Condition="'$(IncludeReferenceFixtures)' != 'false'">
     <None Include="..\config\reference\duel-primitives.json" Link="Fixtures\duel-primitives.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\config\reference\duel-battle.json" Link="Fixtures\duel-battle.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\config\reference\duel-rejections.json" Link="Fixtures\duel-rejections.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\config\reference\duel-boundaries.json" Link="Fixtures\duel-boundaries.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\config\reference\duel-sets.json" Link="Fixtures\duel-sets.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\config\reference\emergency-teleport.json" Link="Fixtures\emergency-teleport.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\config\reference\emergency-teleport-lifecycle.json" Link="Fixtures\emergency-teleport-lifecycle.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\config\reference\emergency-teleport-destroyed.json" Link="Fixtures\emergency-teleport-destroyed.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\config\reference\card-attack.json" Link="Fixtures\card-attack.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
@@ -28,6 +35,7 @@
     <ProjectReference Include="..\TagForceSpecial.Assets\TagForceSpecial.Assets.csproj" />
     <ProjectReference Include="..\TagForceSpecial.Cards\TagForceSpecial.Cards.csproj" />
     <ProjectReference Include="..\TagForceSpecial.Core\TagForceSpecial.Core.csproj" />
+    <ProjectReference Include="..\TagForceSpecial.Effects\TagForceSpecial.Effects.csproj" />
     <ProjectReference Include="..\TagForceSpecial.Tools\TagForceSpecial.Tools.csproj" />
   </ItemGroup>
 </Project>

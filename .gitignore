@@ -1,5 +1,5 @@
 # Local environments, results and private research inputs.
-# Source tools, tests, project READMEs and dependency manifests belong in Git.
+# Project source and main READMEs belong in Git.
 /.vscode/
 /.idea/
 /.fleet/
@@ -120,9 +120,26 @@ reverse-engineering/
 *.[pP][pP][sS][tT]
 *.[sS][tT][aA][tT][eE]
 
-# Historical research/migration reports remain local. Publish reviewed docs only.
-/docs/*
-!/docs/STATUS.md
-!/docs/ROADMAP.md
-!/docs/DEVELOPMENT.md
-!/docs/NATIVE-COMPARISON.md
+# Decompilation tooling and Python tests remain local.
+/native/
+/tools/
+/tests/
+/requirements.txt
+
+# Docker tooling and Compose configuration.
+Dockerfile
+Dockerfile.*
+.dockerignore
+compose*.yaml
+compose*.yml
+docker-compose*.yaml
+docker-compose*.yml
+
+# Local configuration and agent metadata.
+*.json
+openai.yaml
+openai.yml
+
+# Documentation notes remain local; main project READMEs stay tracked.
+/docs/**/*.md
+/skills
