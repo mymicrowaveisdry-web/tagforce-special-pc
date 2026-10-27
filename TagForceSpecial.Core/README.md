@@ -10,7 +10,7 @@ explicit gameplay metadata is required rather than guessing binary kind codes.
 Battle eligibility and ordinary Spell/Trap placement require explicit opt-in metadata.
 There is no renderer, emulator, randomness, response window or general effect engine.
 Snapshots expose complete engine information; presentation needs a visibility view.
-See [development instructions](../docs/DEVELOPMENT.md) for battle scope, API and validation.
+See the [root quick start](../README.md#quick-start) for build and validation commands.
 
 ## Pending decisions
 

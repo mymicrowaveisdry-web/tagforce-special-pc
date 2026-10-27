@@ -3,10 +3,8 @@
 Contains bounded Emergency Teleport profiles for **activation/resolution** and
 **direct End Phase banishment**, using the observed deck Krebons / attack-position
 branch. Costs, targets, chains, triggers and the broader effect system remain
-future work; see the [roadmap](../docs/ROADMAP.md).
+future work; see the [implemented scope](../README.md#implemented-scope).
 
-The first bounded specification is the
-[Emergency Teleport activation contract](../docs/EMERGENCY_TELEPORT_CONTRACT.md).
 Enable only through explicit research configuration:
 
 ```csharp
@@ -25,8 +23,8 @@ and stops gameplay after resolution. It does not implement hand summons,
 shuffle, responses/chains or cancellation after commitment.
 Do not expose it as a fully supported card in normal PC gameplay.
 
-`config/reference/emergency-teleport.json` is independently exported from validated
-PSP captures; C# compares two before/placed/resolved observations. Actor, turn,
+The optional local `config/reference/emergency-teleport.json` fixture is exported
+from validated PSP captures; C# compares two before/placed/resolved observations. Actor, turn,
 phase, acting-player card IDs/counts and selected slots agree. Absolute LP after
 an earlier native effect, opponent contents, deck order and response timing are
 excluded; LP deltas and unchanged opponent state are checked separately.
@@ -38,10 +36,12 @@ Phase banishes the surviving summoned instance, or expires the obligation if
 battle already put it in the graveyard, then stops the research slice. It
 preserves other copies. Other card actions fail atomically.
 
-`emergency-teleport-lifecycle.json` contains two independently validated original
+The optional local `emergency-teleport-lifecycle.json` fixture contains two independently validated original
 before/after projections. `emergency-teleport-destroyed.json` verifies that a
 summoned Krebons destroyed by battle stays in the graveyard through End Phase.
 Other movement, face-down resets, control changes,
 leave/re-enter cases, multiple obligations and effect
 exceptions are unsupported. These profiles remain disabled in normal PC play;
-neither claims full Emergency Teleport support.
+neither claims full Emergency Teleport support. Reference JSON fixtures are not
+included in this branch; CI excludes the tests that require them and runs the
+synthetic lifecycle tests.
