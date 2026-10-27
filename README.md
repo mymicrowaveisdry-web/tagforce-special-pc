@@ -1,4 +1,4 @@
-# Yu-Gi-Oh! ARC-VTag Force Special PC
+# Yu-Gi-Oh! ARC-V Tag Force Special PC
 
 A C# rewrite of the PSP game **Yu-Gi-Oh! ARC-V Tag Force Special** for native PC
 play, with a long-term goal of extensible cards and modern duel rules.
