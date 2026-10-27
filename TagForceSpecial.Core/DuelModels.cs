@@ -28,29 +28,35 @@ public sealed class DuelPlayerState
     public IReadOnlyList<CardInstance> Deck { get; }
     public IReadOnlyList<CardInstance> Hand { get; }
     public IReadOnlyList<FieldMonster?> MonsterZones { get; }
-    /// <summary>All occupied slots are set face-down. Activation is not implemented.</summary>
+    /// <summary>Compatibility card view; inspect SpellTrapFields for face-up versus set state.</summary>
     public IReadOnlyList<CardInstance?> SpellTrapZones { get; }
+    public IReadOnlyList<FieldSpellTrap?> SpellTrapFields { get; }
     public CardInstance? FieldZone => null;
     public IReadOnlyList<CardInstance> Graveyard { get; }
+    public IReadOnlyList<CardInstance> Banished { get; }
 
     internal DuelPlayerState(PlayerId id, IEnumerable<CardInstance> deck, IEnumerable<CardInstance> hand,
         IEnumerable<FieldMonster?>? monsters = null, IEnumerable<CardInstance>? graveyard = null,
-        IEnumerable<CardInstance?>? spellTraps = null, int lifePoints = 8000)
+        IEnumerable<FieldSpellTrap?>? spellTraps = null, int lifePoints = 8000,
+        IEnumerable<CardInstance>? banished = null)
     {
         Id = id;
         LifePoints = lifePoints;
         Deck = Array.AsReadOnly(deck.ToArray());
         Hand = Array.AsReadOnly(hand.ToArray());
         MonsterZones = Array.AsReadOnly(monsters?.ToArray() ?? new FieldMonster?[5]);
-        SpellTrapZones = Array.AsReadOnly(spellTraps?.ToArray() ?? new CardInstance?[5]);
+        SpellTrapFields = Array.AsReadOnly(spellTraps?.ToArray() ?? new FieldSpellTrap?[5]);
+        SpellTrapZones = Array.AsReadOnly(SpellTrapFields.Select(s => s?.Card).ToArray());
         Graveyard = Array.AsReadOnly(graveyard?.ToArray() ?? []);
+        Banished = Array.AsReadOnly(banished?.ToArray() ?? []);
     }
 
     internal DuelPlayerState With(IEnumerable<CardInstance>? deck = null, IEnumerable<CardInstance>? hand = null,
         IEnumerable<FieldMonster?>? monsters = null, IEnumerable<CardInstance>? graveyard = null,
-        IEnumerable<CardInstance?>? spellTraps = null, int? lifePoints = null) =>
+        IEnumerable<FieldSpellTrap?>? spellTraps = null, int? lifePoints = null,
+        IEnumerable<CardInstance>? banished = null) =>
         new(Id, deck ?? Deck, hand ?? Hand, monsters ?? MonsterZones, graveyard ?? Graveyard,
-            spellTraps ?? SpellTrapZones, lifePoints ?? LifePoints);
+            spellTraps ?? SpellTrapFields, lifePoints ?? LifePoints, banished ?? Banished);
 }
 
 public sealed class DuelState
@@ -61,9 +67,19 @@ public sealed class DuelState
     public DuelPhase Phase { get; }
     public bool NormalSummonUsed { get; }
     public DuelOutcome? Outcome { get; }
+    public long Revision { get; }
+    public PendingDecision? PendingDecision { get; }
+    public DecisionSequenceResult? DecisionResult { get; }
+    public bool ResearchSliceComplete { get; }
+    public PendingSpellActivation? PendingSpellActivation { get; }
+    public IReadOnlyList<PendingEndPhaseBanishment> PendingEndPhaseBanishments { get; }
 
     internal DuelState(IEnumerable<DuelPlayerState> players, PlayerId activePlayer, int turnNumber = 1,
-        DuelPhase phase = DuelPhase.Draw, bool normalSummonUsed = false, DuelOutcome? outcome = null)
+        DuelPhase phase = DuelPhase.Draw, bool normalSummonUsed = false, DuelOutcome? outcome = null,
+        long revision = 0, PendingDecision? pendingDecision = null,
+        DecisionSequenceResult? decisionResult = null, bool researchSliceComplete = false,
+        PendingSpellActivation? pendingSpellActivation = null,
+        IEnumerable<PendingEndPhaseBanishment>? pendingEndPhaseBanishments = null)
     {
         Players = Array.AsReadOnly(players.ToArray());
         ActivePlayer = activePlayer;
@@ -71,19 +87,40 @@ public sealed class DuelState
         Phase = phase;
         NormalSummonUsed = normalSummonUsed;
         Outcome = outcome;
+        Revision = revision;
+        PendingDecision = pendingDecision;
+        DecisionResult = decisionResult;
+        ResearchSliceComplete = researchSliceComplete;
+        PendingSpellActivation = pendingSpellActivation;
+        PendingEndPhaseBanishments = Array.AsReadOnly(pendingEndPhaseBanishments?.ToArray() ?? []);
     }
 
     public DuelPlayerState GetPlayer(PlayerId player) => player is PlayerId.One or PlayerId.Two
         ? Players[(int)player] : throw new ArgumentOutOfRangeException(nameof(player));
 
     internal DuelState With(DuelPlayerState? player = null, PlayerId? activePlayer = null,
-        int? turnNumber = null, DuelPhase? phase = null, bool? normalSummonUsed = null, DuelOutcome? outcome = null)
+        int? turnNumber = null, DuelPhase? phase = null, bool? normalSummonUsed = null, DuelOutcome? outcome = null,
+        long? revision = null)
     {
         var players = Players.ToArray();
         if (player is not null) players[(int)player.Id] = player;
         return new(players, activePlayer ?? ActivePlayer, turnNumber ?? TurnNumber, phase ?? Phase,
-            normalSummonUsed ?? NormalSummonUsed, outcome ?? Outcome);
+            normalSummonUsed ?? NormalSummonUsed, outcome ?? Outcome, revision ?? Revision,
+            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments);
     }
+
+    internal DuelState WithDecision(PendingDecision? pending, DecisionSequenceResult? result = null,
+        bool researchSliceComplete = false) => new(Players, ActivePlayer, TurnNumber, Phase,
+            NormalSummonUsed, Outcome, Revision, pending, result, researchSliceComplete, PendingSpellActivation,
+            PendingEndPhaseBanishments);
+
+    internal DuelState WithActivation(PendingSpellActivation? activation) => new(Players, ActivePlayer,
+        TurnNumber, Phase, NormalSummonUsed, Outcome, Revision, PendingDecision, DecisionResult,
+        ResearchSliceComplete, activation, PendingEndPhaseBanishments);
+
+    internal DuelState WithEndPhaseBanishments(IEnumerable<PendingEndPhaseBanishment> banishments) =>
+        new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
+            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, banishments);
 }
 
 public abstract record DuelCommand(PlayerId Player);
@@ -106,7 +143,10 @@ public enum DuelError
     NormalSummonLimitReached, HandLimitExceeded, DiscardNotRequired, UnsupportedCommand,
     NotSpellOrTrap, SpellTrapSetNotAllowed, InvalidSpellTrapZone, SpellTrapZoneOccupied,
     MonsterZoneEmpty, InvalidBattlePosition, PositionChangeNotAllowed, AlreadyAttacked,
-    AttackerNotInAttackPosition, DirectAttackBlocked, UnsupportedBattleCard, UnsupportedBattleStatistics
+    AttackerNotInAttackPosition, DirectAttackBlocked, UnsupportedBattleCard, UnsupportedBattleStatistics,
+    UnsupportedDecisionSequence, DecisionPending, NoPendingDecision, StaleDecision,
+    WrongDecisionKind, InvalidDecisionChoice, DecisionUnavailable, ResearchSliceComplete,
+    UnsupportedSpellEffect, InvalidEffectState, UnsupportedLifecycleContinuation
 }
 
 public abstract record DuelEvent;

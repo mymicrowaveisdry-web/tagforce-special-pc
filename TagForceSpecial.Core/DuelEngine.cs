@@ -6,12 +6,15 @@ namespace TagForceSpecial.Core;
 /// <summary>
 /// Deterministic two-player rules subset: opening hands, draws, phases, basic normal summons,
 /// sets, position changes, effect-free battles, hand-limit discards and defeat.
-/// No RNG, chains, effects, attack replays or AI. Battles resolve in one command.
+/// No RNG, chains, general effects, attack replays or AI. Battles resolve in one command.
+/// Explicitly configured selection-only workflows pause the command loop for immutable decisions.
 /// </summary>
-public sealed class DuelEngine
+public sealed partial class DuelEngine
 {
     private readonly CardCatalog catalog;
     private readonly FrozenDictionary<uint, DuelCardRules> rules;
+    private readonly FrozenDictionary<string, DecisionSequence> decisionSequences;
+    private readonly FrozenDictionary<uint, DeckSpecialSummonSpell> spellEffects;
     public DuelState State { get; private set; }
 
     /// <summary>
@@ -20,7 +23,9 @@ public sealed class DuelEngine
     /// Rule metadata is explicit; missing classifications fail closed when attempting to summon.
     /// </summary>
     public DuelEngine(CardCatalog catalog, IReadOnlyDictionary<uint, DuelCardRules> rules,
-        IEnumerable<uint> playerOneDeck, IEnumerable<uint> playerTwoDeck, PlayerId startingPlayer = PlayerId.One)
+        IEnumerable<uint> playerOneDeck, IEnumerable<uint> playerTwoDeck, PlayerId startingPlayer = PlayerId.One,
+        IEnumerable<DecisionSequence>? decisionSequences = null,
+        IEnumerable<DeckSpecialSummonSpell>? experimentalSpellEffects = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(rules);
@@ -36,6 +41,18 @@ public sealed class DuelEngine
                 profile.AllowsSpellTrapSet && profile.Category is not (CardCategory.Spell or CardCategory.Trap))
                 throw new ArgumentException("Invalid explicit card rules.", nameof(rules));
         this.rules = rules.ToFrozenDictionary();
+        var sequences = (decisionSequences ?? []).ToArray();
+        if (sequences.Any(s => s is null || s.Steps.Any(step => step.AllowedCardIds.Any(id => !knownIds.Contains(id)))))
+            throw new ArgumentException("Decision sequences must reference catalog IDs.", nameof(decisionSequences));
+        this.decisionSequences = sequences.ToFrozenDictionary(s => s.Id, StringComparer.Ordinal);
+        var effects = (experimentalSpellEffects ?? []).ToArray();
+        if (effects.Any(e => e is null || !this.rules.TryGetValue(e.SpellCardId, out var spellRule) ||
+                spellRule.Category != CardCategory.Spell || this.decisionSequences.ContainsKey(e.Decisions.Id) ||
+                e.EligibleMonsterIds.Any(id => !knownIds.Contains(id) || !this.rules.TryGetValue(id, out var monsterRule) ||
+                    monsterRule.Category != CardCategory.Monster)) ||
+            effects.Select(e => e.EffectId).Distinct(StringComparer.Ordinal).Count() != effects.Length)
+            throw new ArgumentException("Effect profiles need distinct IDs, explicit Spell/Monster rules and unreserved sequence IDs.", nameof(experimentalSpellEffects));
+        spellEffects = effects.ToFrozenDictionary(e => e.SpellCardId);
         int nextInstance = 1;
         DuelPlayerState CreatePlayer(PlayerId id, IEnumerable<uint> ids)
         {
@@ -55,8 +72,23 @@ public sealed class DuelEngine
         if (State.Outcome is not null) return Reject(DuelError.DuelFinished);
         if (command.Player is not (PlayerId.One or PlayerId.Two)) return Reject(DuelError.InvalidPlayer);
         if (command.Player != State.ActivePlayer) return Reject(DuelError.NotActivePlayer);
+        if (State.ResearchSliceComplete) return Reject(DuelError.ResearchSliceComplete);
+        if (command is DecisionCommand answer) return AnswerDecision(answer);
+        if (State.PendingDecision is not null) return Reject(DuelError.DecisionPending);
+        // A searched deck has no verified shuffle contract yet. Permit phase
+        // progression and explicitly opted-in basic battle, never another draw.
+        if (State.PendingEndPhaseBanishments.Count != 0)
+            return command switch
+            {
+                ChangePhase { Target: DuelPhase.End } => ResolveEndPhaseBanishment(),
+                ChangePhase { Target: DuelPhase.Battle or DuelPhase.Main2 } phase => Advance(phase.Target),
+                DeclareAttack attack => Attack(attack.AttackerZone, attack.TargetZone),
+                _ => Reject(DuelError.UnsupportedLifecycleContinuation)
+            };
         return command switch
         {
+            BeginDecisionSequence begin => BeginDecisions(begin.SequenceId),
+            ActivateSpell activate => Activate(activate.CardInstanceId, activate.SpellTrapZone),
             ResolveDrawStep => Draw(),
             ChangePhase phase => Advance(phase.Target),
             NormalSummon summon => Summon(summon.CardInstanceId, summon.MonsterZone, false),
@@ -137,8 +169,8 @@ public sealed class DuelEngine
         if (rule.Category is not (CardCategory.Spell or CardCategory.Trap)) return Reject(DuelError.NotSpellOrTrap);
         if (!rule.AllowsSpellTrapSet) return Reject(DuelError.SpellTrapSetNotAllowed);
         if (player.SpellTrapZones[zone] is not null) return Reject(DuelError.SpellTrapZoneOccupied);
-        var zones = player.SpellTrapZones.ToArray();
-        zones[zone] = card;
+        var zones = player.SpellTrapFields.ToArray();
+        zones[zone] = new(card, IsFaceUp: false);
         return Accept(State.With(player: player.With(hand: player.Hand.Where(c => c.InstanceId != instanceId),
             spellTraps: zones)), new SpellTrapSet(player.Id, card, zone));
     }
@@ -274,8 +306,8 @@ public sealed class DuelEngine
 
     private DuelActionResult Accept(DuelState state, params DuelEvent[] events)
     {
-        State = state;
-        return new(true, DuelError.None, state, Array.AsReadOnly(events));
+        State = state.With(revision: checked(State.Revision + 1));
+        return new(true, DuelError.None, State, Array.AsReadOnly(events));
     }
 
     private DuelActionResult Reject(DuelError error) => new(false, error, State, Array.Empty<DuelEvent>());

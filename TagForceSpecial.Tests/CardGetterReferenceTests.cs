@@ -13,6 +13,7 @@ public sealed class CardGetterReferenceTests
     [InlineData(4041u)]
     [InlineData(4842u)]
     [InlineData(11213u)]
+    [Trait("Category", "LocalReference")]
     public void PackedPropertyAttackMatchesRecordedOriginalGetter(uint cardId)
     {
         using var fixture = JsonDocument.Parse(File.ReadAllText(
