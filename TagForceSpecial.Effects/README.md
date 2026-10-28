@@ -71,5 +71,12 @@ chains, negation or refunds. They are not fully supported cards.
 Local PSP references repeat payment before the response prompt and selection of
 Scapegoat as a target. In the original, Scapegoat turns face-up, resolves first
 and creates four tokens; Typhoon destroys it afterward and the tokens survive.
-This is evidence for future chain work, not C# resolution support. Native missing-
-target, replacement/re-entry and negation/refund outcomes remain research gates.
+The separate `ChainResearch` profiles now consume those receipts for a bounded
+Vortex or Typhoon/Scapegoat chain, then freeze. Register them through Core's
+`experimentalChainEffects` together with the matching activation contracts.
+Scapegoat requires explicit Monster rules for token IDs 3902-3905 and a previously
+set, targeted source with four empty slots. Its token allocation is a deterministic
+PC policy; later token play and full Scapegoat support are outside this slice.
+Native missing-target, replacement/re-entry, response priority and negation/refund
+outcomes remain research gates. The activation-only profiles still freeze unless
+the separate chain profiles are enabled.
