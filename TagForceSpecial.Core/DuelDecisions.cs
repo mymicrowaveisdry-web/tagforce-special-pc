@@ -1,6 +1,6 @@
 namespace TagForceSpecial.Core;
 
-public enum DecisionKind { Card, Position, MonsterZone }
+public enum DecisionKind { Card, Position, MonsterZone, SpellTrapTarget }
 public enum DecisionCardSource { Hand, Deck }
 
 /// <summary>Trusted, immutable selection policy. It does not activate or resolve a card effect.</summary>
@@ -40,6 +40,7 @@ public sealed class DecisionStep
     }
 
     public static DecisionStep EmptyMonsterZone() => new(DecisionKind.MonsterZone, null, [], []);
+    public static DecisionStep SpellTrapTarget() => new(DecisionKind.SpellTrapTarget, null, [], []);
 }
 
 /// <summary>
@@ -66,7 +67,7 @@ public sealed class DecisionSequence
 }
 
 public sealed record DecisionAnswer(DecisionKind Kind, int? CardInstanceId = null,
-    BattlePosition? Position = null, int? MonsterZone = null);
+    BattlePosition? Position = null, int? MonsterZone = null, SpellTrapTarget? Target = null);
 
 /// <summary>Immutable full-information request; a presentation layer must restrict private card options.</summary>
 public sealed class PendingDecision
@@ -81,9 +82,11 @@ public sealed class PendingDecision
     public IReadOnlyList<BattlePosition> PositionOptions { get; }
     public IReadOnlyList<int> MonsterZoneOptions { get; }
     public IReadOnlyList<DecisionAnswer> Answers { get; }
+    public IReadOnlyList<SpellTrapTarget> TargetOptions { get; }
 
     internal PendingDecision(long id, DecisionSequence sequence, PlayerId player, int index,
-        IEnumerable<CardInstance> cards, IEnumerable<int> zones, IEnumerable<DecisionAnswer> answers)
+        IEnumerable<CardInstance> cards, IEnumerable<int> zones, IEnumerable<DecisionAnswer> answers,
+        IEnumerable<SpellTrapTarget>? targets = null)
     {
         DecisionId = id;
         SequenceId = sequence.Id;
@@ -96,6 +99,7 @@ public sealed class PendingDecision
         PositionOptions = Array.AsReadOnly(step.AllowedPositions.ToArray());
         MonsterZoneOptions = Array.AsReadOnly(zones.ToArray());
         Answers = Array.AsReadOnly(answers.ToArray());
+        TargetOptions = Array.AsReadOnly(targets?.ToArray() ?? []);
     }
 }
 
@@ -120,6 +124,8 @@ public abstract record DecisionCommand(PlayerId Player, long DecisionId) : DuelC
 public sealed record ChooseDecisionCard(PlayerId Player, long DecisionId, int CardInstanceId) : DecisionCommand(Player, DecisionId);
 public sealed record ChooseDecisionPosition(PlayerId Player, long DecisionId, BattlePosition Position) : DecisionCommand(Player, DecisionId);
 public sealed record ChooseDecisionZone(PlayerId Player, long DecisionId, int MonsterZone) : DecisionCommand(Player, DecisionId);
+public sealed record ChooseDecisionTarget(PlayerId Player, long DecisionId, PlayerId TargetPlayer,
+    int SpellTrapZone, int CardInstanceId) : DecisionCommand(Player, DecisionId);
 
 public sealed record DecisionRequested(PendingDecision Decision) : DuelEvent;
 public sealed record DecisionAnswered(PlayerId Player, string SequenceId, long DecisionId, DecisionAnswer Answer) : DuelEvent;

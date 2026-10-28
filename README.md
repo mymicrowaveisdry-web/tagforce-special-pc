@@ -34,6 +34,10 @@ monster zones. Experimental Emergency Teleport profiles support a bounded deck
 Krebons / attack-position branch, with either a stop after resolution or an End
 Phase banishment lifecycle. They do not implement the full card.
 
+Separate activation-only research contracts support a discard cost and binding
+a Spell/Trap target to its card instance and field placement. These stop before
+responses or effect resolution; they do not make additional cards playable.
+
 General effects, response windows, chains, shuffle, broader delayed-effect
 handling, opponent AI, rendering, input and first-launch asset import remain
 unfinished. The next application milestone is a small supported duel with a
