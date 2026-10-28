@@ -28,6 +28,7 @@
     <None Include="..\config\reference\emergency-teleport.json" Link="Fixtures\emergency-teleport.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\config\reference\emergency-teleport-lifecycle.json" Link="Fixtures\emergency-teleport-lifecycle.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\config\reference\emergency-teleport-destroyed.json" Link="Fixtures\emergency-teleport-destroyed.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\config\reference\activation-contracts.json" Link="Fixtures\activation-contracts.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\config\reference\card-attack.json" Link="Fixtures\card-attack.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

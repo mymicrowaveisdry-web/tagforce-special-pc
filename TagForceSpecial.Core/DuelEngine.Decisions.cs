@@ -2,21 +2,28 @@ namespace TagForceSpecial.Core;
 
 public sealed partial class DuelEngine
 {
-    private PendingDecision? CreateDecision(DecisionSequence sequence, int index, IEnumerable<DecisionAnswer> answers)
+    private PendingDecision? CreateDecision(DecisionSequence sequence, int index, IEnumerable<DecisionAnswer> answers,
+        int? excludeInstanceId = null)
     {
         var player = State.GetPlayer(State.ActivePlayer);
         var step = sequence.Steps[index];
         CardInstance[] cards = step.Kind == DecisionKind.Card
             ? (step.CardSource == DecisionCardSource.Deck ? player.Deck : player.Hand)
-                .Where(c => step.AllowedCardIds.Contains(c.GameCardId)).ToArray()
+                .Where(c => c.InstanceId != excludeInstanceId && step.AllowedCardIds.Contains(c.GameCardId)).ToArray()
             : [];
         int[] zones = step.Kind == DecisionKind.MonsterZone
             ? Enumerable.Range(0, 5).Where(z => player.MonsterZones[z] is null).ToArray()
             : [];
+        var excluded = excludeInstanceId ?? State.PendingSpellActivation?.Spell.InstanceId;
+        var targets = step.Kind == DecisionKind.SpellTrapTarget
+            ? State.Players.SelectMany(p => p.SpellTrapFields.Select((field, zone) => (field, zone))
+                .Where(s => s.field is not null && s.field.Card.InstanceId != excluded)
+                .Select(s => new SpellTrapTarget(p.Id, s.zone, s.field!.Card, s.field.PlacementId))).ToArray() : [];
         if (step.Kind == DecisionKind.Card && cards.Length == 0 ||
-            step.Kind == DecisionKind.MonsterZone && zones.Length == 0)
+            step.Kind == DecisionKind.MonsterZone && zones.Length == 0 ||
+            step.Kind == DecisionKind.SpellTrapTarget && targets.Length == 0)
             return null;
-        return new(checked(State.Revision + 1), sequence, player.Id, index, cards, zones, answers);
+        return new(checked(State.Revision + 1), sequence, player.Id, index, cards, zones, answers, targets);
     }
 
     private DuelActionResult BeginDecisions(string sequenceId)
@@ -43,6 +50,7 @@ public sealed partial class DuelEngine
             ChooseDecisionCard => DecisionKind.Card,
             ChooseDecisionPosition => DecisionKind.Position,
             ChooseDecisionZone => DecisionKind.MonsterZone,
+            ChooseDecisionTarget => DecisionKind.SpellTrapTarget,
             _ => (DecisionKind)(-1)
         };
         if (kind != pending.Kind) return Reject(DuelError.WrongDecisionKind);
@@ -52,10 +60,19 @@ public sealed partial class DuelEngine
                 new(kind, CardInstanceId: c.CardInstanceId),
             ChooseDecisionPosition c when pending.PositionOptions.Contains(c.Position) => new(kind, Position: c.Position),
             ChooseDecisionZone c when pending.MonsterZoneOptions.Contains(c.MonsterZone) => new(kind, MonsterZone: c.MonsterZone),
+            ChooseDecisionTarget c when pending.TargetOptions.Any(t => t.Player == c.TargetPlayer &&
+                t.Zone == c.SpellTrapZone && t.Card.InstanceId == c.CardInstanceId) =>
+                new(kind, Target: pending.TargetOptions.Single(t => t.Player == c.TargetPlayer &&
+                    t.Zone == c.SpellTrapZone && t.Card.InstanceId == c.CardInstanceId)),
             _ => null
         };
         if (answer is null) return Reject(DuelError.InvalidDecisionChoice);
+        if (answer.Target is { } binding && !binding.IsStillPresent(State.GetPlayer(binding.Player).SpellTrapFields[binding.Zone]))
+            return Reject(DuelError.InvalidDecisionChoice);
         var answers = pending.Answers.Append(answer).ToArray();
+        if (State.PendingSpellActivation is { } contractActivation &&
+            activationContracts.TryGetValue(contractActivation.Spell.GameCardId, out var contract))
+            return AnswerActivationContract(pending, answer, answers, contract);
         var sequence = State.PendingSpellActivation is { } activation
             ? spellEffects[activation.Spell.GameCardId].Decisions
             : decisionSequences[pending.SequenceId];

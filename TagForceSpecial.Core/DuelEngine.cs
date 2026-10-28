@@ -15,6 +15,7 @@ public sealed partial class DuelEngine
     private readonly FrozenDictionary<uint, DuelCardRules> rules;
     private readonly FrozenDictionary<string, DecisionSequence> decisionSequences;
     private readonly FrozenDictionary<uint, DeckSpecialSummonSpell> spellEffects;
+    private readonly FrozenDictionary<uint, ActivationContract> activationContracts;
     public DuelState State { get; private set; }
 
     /// <summary>
@@ -25,7 +26,8 @@ public sealed partial class DuelEngine
     public DuelEngine(CardCatalog catalog, IReadOnlyDictionary<uint, DuelCardRules> rules,
         IEnumerable<uint> playerOneDeck, IEnumerable<uint> playerTwoDeck, PlayerId startingPlayer = PlayerId.One,
         IEnumerable<DecisionSequence>? decisionSequences = null,
-        IEnumerable<DeckSpecialSummonSpell>? experimentalSpellEffects = null)
+        IEnumerable<DeckSpecialSummonSpell>? experimentalSpellEffects = null,
+        IEnumerable<ActivationContract>? experimentalActivationContracts = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(rules);
@@ -53,6 +55,14 @@ public sealed partial class DuelEngine
             effects.Select(e => e.EffectId).Distinct(StringComparer.Ordinal).Count() != effects.Length)
             throw new ArgumentException("Effect profiles need distinct IDs, explicit Spell/Monster rules and unreserved sequence IDs.", nameof(experimentalSpellEffects));
         spellEffects = effects.ToFrozenDictionary(e => e.SpellCardId);
+        var contracts = (experimentalActivationContracts ?? []).ToArray();
+        if (contracts.Any(c => c is null || !this.rules.TryGetValue(c.SpellCardId, out var rule) ||
+                rule.Category != CardCategory.Spell || spellEffects.ContainsKey(c.SpellCardId) ||
+                effects.Any(e => e.EffectId == c.EffectId) ||
+                this.decisionSequences.ContainsKey(c.Decisions.Id) || c.DiscardCardIds.Any(id => !knownIds.Contains(id))) ||
+            contracts.Select(c => c.EffectId).Distinct(StringComparer.Ordinal).Count() != contracts.Length)
+            throw new ArgumentException("Activation contracts need distinct IDs, explicit Spell rules and catalog cost choices.", nameof(experimentalActivationContracts));
+        activationContracts = contracts.ToFrozenDictionary(c => c.SpellCardId);
         int nextInstance = 1;
         DuelPlayerState CreatePlayer(PlayerId id, IEnumerable<uint> ids)
         {
@@ -170,7 +180,7 @@ public sealed partial class DuelEngine
         if (!rule.AllowsSpellTrapSet) return Reject(DuelError.SpellTrapSetNotAllowed);
         if (player.SpellTrapZones[zone] is not null) return Reject(DuelError.SpellTrapZoneOccupied);
         var zones = player.SpellTrapFields.ToArray();
-        zones[zone] = new(card, IsFaceUp: false);
+        zones[zone] = new(card, IsFaceUp: false, PlacementId: checked(State.Revision + 1));
         return Accept(State.With(player: player.With(hand: player.Hand.Where(c => c.InstanceId != instanceId),
             spellTraps: zones)), new SpellTrapSet(player.Id, card, zone));
     }

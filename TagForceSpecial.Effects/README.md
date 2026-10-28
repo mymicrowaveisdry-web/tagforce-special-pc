@@ -2,7 +2,7 @@
 
 Contains bounded Emergency Teleport profiles for **activation/resolution** and
 **direct End Phase banishment**, using the observed deck Krebons / attack-position
-branch. Costs, targets, chains, triggers and the broader effect system remain
+branch. General costs, targets, chains, triggers and the broader effect system remain
 future work; see the [implemented scope](../README.md#implemented-scope).
 
 Enable only through explicit research configuration:
@@ -45,3 +45,31 @@ exceptions are unsupported. These profiles remain disabled in normal PC play;
 neither claims full Emergency Teleport support. Reference JSON fixtures are not
 included in this branch; CI excludes the tests that require them and runs the
 synthetic lifecycle tests.
+
+## Cost and target commitment research
+
+Register the separate, default-off `experimentalActivationContracts` argument:
+
+```csharp
+experimentalActivationContracts: [
+    ActivationResearch.LightningVortex(allowedDiscardIds),
+    ActivationResearch.MysticalSpaceTyphoon()
+]
+```
+
+These profiles only commit an activation from hand during Main1. Vortex requests
+one eligible discard; that exact instance enters the graveyard before the
+committed receipt is published. The discard is a cost, not a monster target.
+Typhoon uses `ChooseDecisionTarget` to bind a Spell/Trap card instance, controller,
+slot and uninterrupted placement token. The source cannot target itself.
+Field Zone targeting is outside the current back-row-only profile.
+
+Both profiles freeze before responses or resolution, leaving the source on the
+field. They do not implement Vortex destruction, Typhoon destruction, Scapegoat,
+chains, negation or refunds. They are not fully supported cards.
+
+Local PSP references repeat payment before the response prompt and selection of
+Scapegoat as a target. In the original, Scapegoat turns face-up, resolves first
+and creates four tokens; Typhoon destroys it afterward and the tokens survive.
+This is evidence for future chain work, not C# resolution support. Native missing-
+target, replacement/re-entry and negation/refund outcomes remain research gates.

@@ -90,3 +90,34 @@ zone and due turn; it removes only that field instance and appends it to its
 owner's banished zone. Graveyard, hand copies, earlier field copies and Normal
 Summon allowance remain unchanged. This is a bounded experiment, with no general
 delayed-effect scheduler, shuffle, movement/reset exceptions or next-turn continuation.
+
+## Activation costs and targets: commitment only
+
+`experimentalActivationContracts` registers immutable, default-off
+`ActivationContract` profiles. These are distinct from executable Spell effects:
+they stop at an `ActivationCommitted` receipt, before resolving effects or
+responses. Cost and target availability are checked before moving the source
+Spell from hand to a face-up slot.
+
+`ChooseDecisionCard` pays an eligible discard immediately, appending the selected
+owned hand instance to graveyard and emitting `ActivationCostPaid`. The source
+cannot pay for itself. If a target choice follows, payment remains committed;
+invalid answers neither refund nor charge it again. Combined cost/target order
+has synthetic tests, not a newly verified native costed-targeting card.
+
+`ChooseDecisionTarget` selects an immutable `PendingDecision.TargetOptions` entry.
+The binding records player, slot, card instance and `FieldSpellTrap.PlacementId`.
+Engine placements receive deterministic revision-based tokens. Face-up changes
+must preserve the token; leaving/re-entering must allocate a new one.
+`SpellTrapTarget.IsStillPresent` checks the field at the bound player/slot:
+it accepts a face-up change and rejects absence, replacement and a new placement
+of the same card. It does not resolve, fizzle or automatically retarget an effect.
+The target policy covers the five back-row slots; Field Zone targeting is outside
+this research profile.
+
+The committed receipt retains source Spell, paid discard and optional target.
+Research then freezes with the source still on the field. No destruction,
+negation, refund, cleanup or chain resolution is silently performed. Costs and
+targets differ from resolution choices such as Emergency Teleport's deck choice.
+Snapshots remain full-information: opponent face-down target identities require
+an opaque presentation view before UI integration.
