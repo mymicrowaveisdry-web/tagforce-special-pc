@@ -6,7 +6,7 @@ namespace TagForceSpecial.Core;
 /// <summary>
 /// Deterministic two-player rules subset: opening hands, draws, phases, basic normal summons,
 /// sets, position changes, effect-free battles, hand-limit discards and defeat.
-/// No RNG, chains, general effects, attack replays or AI. Battles resolve in one command.
+/// No RNG, general effects, attack replays or AI. Chains require separate research opt-in. Battles resolve in one command.
 /// Explicitly configured selection-only workflows pause the command loop for immutable decisions.
 /// </summary>
 public sealed partial class DuelEngine
@@ -16,6 +16,7 @@ public sealed partial class DuelEngine
     private readonly FrozenDictionary<string, DecisionSequence> decisionSequences;
     private readonly FrozenDictionary<uint, DeckSpecialSummonSpell> spellEffects;
     private readonly FrozenDictionary<uint, ActivationContract> activationContracts;
+    private readonly FrozenDictionary<uint, ChainEffectProfile> chainEffects;
     public DuelState State { get; private set; }
 
     /// <summary>
@@ -27,7 +28,8 @@ public sealed partial class DuelEngine
         IEnumerable<uint> playerOneDeck, IEnumerable<uint> playerTwoDeck, PlayerId startingPlayer = PlayerId.One,
         IEnumerable<DecisionSequence>? decisionSequences = null,
         IEnumerable<DeckSpecialSummonSpell>? experimentalSpellEffects = null,
-        IEnumerable<ActivationContract>? experimentalActivationContracts = null)
+        IEnumerable<ActivationContract>? experimentalActivationContracts = null,
+        IEnumerable<ChainEffectProfile>? experimentalChainEffects = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(rules);
@@ -63,6 +65,20 @@ public sealed partial class DuelEngine
             contracts.Select(c => c.EffectId).Distinct(StringComparer.Ordinal).Count() != contracts.Length)
             throw new ArgumentException("Activation contracts need distinct IDs, explicit Spell rules and catalog cost choices.", nameof(experimentalActivationContracts));
         activationContracts = contracts.ToFrozenDictionary(c => c.SpellCardId);
+        var chainProfiles = (experimentalChainEffects ?? []).ToArray();
+        if (chainProfiles.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) ||
+                rule.Category != CardCategory.Spell ||
+                p.Operation == ChainOperation.SummonFourTokens &&
+                    (activationContracts.ContainsKey(p.CardId) || spellEffects.ContainsKey(p.CardId) ||
+                        !rule.AllowsSpellTrapSet || p.TokenCardIds.Any(id => !knownIds.Contains(id) ||
+                        !this.rules.TryGetValue(id, out var tokenRule) || tokenRule.Category != CardCategory.Monster)) ||
+                p.Operation != ChainOperation.SummonFourTokens &&
+                    (!activationContracts.TryGetValue(p.CardId, out var c) || c.EffectId != p.EffectId ||
+                        p.Operation == ChainOperation.DestroyBoundSpellTrap && (!c.RequiresSpellTrapTarget || c.DiscardCardIds.Count != 0) ||
+                        p.Operation == ChainOperation.DestroyOpposingFaceUpMonsters && (c.RequiresSpellTrapTarget || c.DiscardCardIds.Count == 0))) ||
+            chainProfiles.Select(p => p.EffectId).Distinct(StringComparer.Ordinal).Count() != chainProfiles.Length)
+            throw new ArgumentException("Chain profiles require matching activation contracts or explicit token rules.", nameof(experimentalChainEffects));
+        chainEffects = chainProfiles.ToFrozenDictionary(p => p.CardId);
         int nextInstance = 1;
         DuelPlayerState CreatePlayer(PlayerId id, IEnumerable<uint> ids)
         {
@@ -81,6 +97,8 @@ public sealed partial class DuelEngine
         ArgumentNullException.ThrowIfNull(command);
         if (State.Outcome is not null) return Reject(DuelError.DuelFinished);
         if (command.Player is not (PlayerId.One or PlayerId.Two)) return Reject(DuelError.InvalidPlayer);
+        if (State.PendingChain is not null) return ExecuteChain(command);
+        if (command is PassChainResponse or ActivateChainResponse or ResolveNextChainLink) return Reject(DuelError.NoPendingChain);
         if (command.Player != State.ActivePlayer) return Reject(DuelError.NotActivePlayer);
         if (State.ResearchSliceComplete) return Reject(DuelError.ResearchSliceComplete);
         if (command is DecisionCommand answer) return AnswerDecision(answer);
@@ -180,7 +198,7 @@ public sealed partial class DuelEngine
         if (!rule.AllowsSpellTrapSet) return Reject(DuelError.SpellTrapSetNotAllowed);
         if (player.SpellTrapZones[zone] is not null) return Reject(DuelError.SpellTrapZoneOccupied);
         var zones = player.SpellTrapFields.ToArray();
-        zones[zone] = new(card, IsFaceUp: false, PlacementId: checked(State.Revision + 1));
+        zones[zone] = new(card, IsFaceUp: false, PlacementId: checked(State.Revision + 1), SetOnTurn: State.TurnNumber);
         return Accept(State.With(player: player.With(hand: player.Hand.Where(c => c.InstanceId != instanceId),
             spellTraps: zones)), new SpellTrapSet(player.Id, card, zone));
     }

@@ -74,6 +74,7 @@ public sealed class DuelState
     public PendingSpellActivation? PendingSpellActivation { get; }
     public IReadOnlyList<PendingEndPhaseBanishment> PendingEndPhaseBanishments { get; }
     public CommittedActivation? CommittedActivation { get; }
+    public PendingChain? PendingChain { get; }
 
     internal DuelState(IEnumerable<DuelPlayerState> players, PlayerId activePlayer, int turnNumber = 1,
         DuelPhase phase = DuelPhase.Draw, bool normalSummonUsed = false, DuelOutcome? outcome = null,
@@ -81,7 +82,7 @@ public sealed class DuelState
         DecisionSequenceResult? decisionResult = null, bool researchSliceComplete = false,
         PendingSpellActivation? pendingSpellActivation = null,
         IEnumerable<PendingEndPhaseBanishment>? pendingEndPhaseBanishments = null,
-        CommittedActivation? committedActivation = null)
+        CommittedActivation? committedActivation = null, PendingChain? pendingChain = null)
     {
         Players = Array.AsReadOnly(players.ToArray());
         ActivePlayer = activePlayer;
@@ -96,6 +97,7 @@ public sealed class DuelState
         PendingSpellActivation = pendingSpellActivation;
         PendingEndPhaseBanishments = Array.AsReadOnly(pendingEndPhaseBanishments?.ToArray() ?? []);
         CommittedActivation = committedActivation;
+        PendingChain = pendingChain;
     }
 
     public DuelPlayerState GetPlayer(PlayerId player) => player is PlayerId.One or PlayerId.Two
@@ -109,25 +111,29 @@ public sealed class DuelState
         if (player is not null) players[(int)player.Id] = player;
         return new(players, activePlayer ?? ActivePlayer, turnNumber ?? TurnNumber, phase ?? Phase,
             normalSummonUsed ?? NormalSummonUsed, outcome ?? Outcome, revision ?? Revision,
-            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments, CommittedActivation);
+            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments, CommittedActivation, PendingChain);
     }
 
     internal DuelState WithDecision(PendingDecision? pending, DecisionSequenceResult? result = null,
         bool researchSliceComplete = false) => new(Players, ActivePlayer, TurnNumber, Phase,
             NormalSummonUsed, Outcome, Revision, pending, result, researchSliceComplete, PendingSpellActivation,
-            PendingEndPhaseBanishments, CommittedActivation);
+            PendingEndPhaseBanishments, CommittedActivation, PendingChain);
 
     internal DuelState WithActivation(PendingSpellActivation? activation) => new(Players, ActivePlayer,
         TurnNumber, Phase, NormalSummonUsed, Outcome, Revision, PendingDecision, DecisionResult,
-        ResearchSliceComplete, activation, PendingEndPhaseBanishments, CommittedActivation);
+        ResearchSliceComplete, activation, PendingEndPhaseBanishments, CommittedActivation, PendingChain);
 
     internal DuelState WithEndPhaseBanishments(IEnumerable<PendingEndPhaseBanishment> banishments) =>
         new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
-            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, banishments, CommittedActivation);
+            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, banishments, CommittedActivation, PendingChain);
+
+    internal DuelState WithChain(PendingChain? chain) =>
+        new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
+            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments, CommittedActivation, chain);
 
     internal DuelState WithCommittedActivation(CommittedActivation activation) =>
         new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
-            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments, activation);
+            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments, activation, PendingChain);
 }
 
 public abstract record DuelCommand(PlayerId Player);
@@ -153,7 +159,9 @@ public enum DuelError
     AttackerNotInAttackPosition, DirectAttackBlocked, UnsupportedBattleCard, UnsupportedBattleStatistics,
     UnsupportedDecisionSequence, DecisionPending, NoPendingDecision, StaleDecision,
     WrongDecisionKind, InvalidDecisionChoice, DecisionUnavailable, ResearchSliceComplete,
-    UnsupportedSpellEffect, InvalidEffectState, UnsupportedLifecycleContinuation
+    UnsupportedSpellEffect, InvalidEffectState, UnsupportedLifecycleContinuation,
+    ChainPending, NoPendingChain, StaleChainDecision, NotChainResponder, ChainResolving,
+    UnsupportedChainResponse, UnsupportedChainResolution
 }
 
 public abstract record DuelEvent;

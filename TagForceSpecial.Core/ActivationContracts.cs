@@ -1,6 +1,6 @@
 namespace TagForceSpecial.Core;
 
-/// <summary>Research-only commitment boundary. It never resolves effects or chains.</summary>
+/// <summary>Research commitment boundary; resolution requires a separate chain profile opt-in.</summary>
 public sealed class ActivationContract
 {
     public string EffectId { get; }

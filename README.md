@@ -36,9 +36,13 @@ Phase banishment lifecycle. They do not implement the full card.
 
 Separate activation-only research contracts support a discard cost and binding
 a Spell/Trap target to its card instance and field placement. These stop before
-responses or effect resolution; they do not make additional cards playable.
+responses or effect resolution unless a separate chain research profile is enabled.
+That default-off slice supports explicit passes, Vortex resolution and a targeted
+Typhoon/Scapegoat two-link chain through token creation and cleanup, then stops.
+It does not make those cards generally playable. Native priority, negation and
+interrupted-resolution cases remain unverified; stage 6 is still in progress.
 
-General effects, response windows, chains, shuffle, broader delayed-effect
+General effects, broader response windows/chains, shuffle, delayed-effect
 handling, opponent AI, rendering, input and first-launch asset import remain
 unfinished. The next application milestone is a small supported duel with a
 deterministic opponent, player-specific visibility and a complete win/loss flow.
