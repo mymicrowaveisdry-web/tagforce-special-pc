@@ -9,6 +9,7 @@ public sealed partial class DuelEngine
         var player = State.GetPlayer(State.ActivePlayer);
         var card = player.Hand.SingleOrDefault(c => c.InstanceId == instanceId);
         if (card is null) return Reject(DuelError.CardNotInHand);
+        if (activationContracts.TryGetValue(card.GameCardId, out var contract)) return ActivateContract(card, zone, contract);
         if (!spellEffects.TryGetValue(card.GameCardId, out var effect)) return Reject(DuelError.UnsupportedSpellEffect);
         if (player.SpellTrapFields[zone] is not null) return Reject(DuelError.SpellTrapZoneOccupied);
         if (Enumerable.Range(0, effect.Decisions.Steps.Count).Any(i => CreateDecision(effect.Decisions, i, []) is null))
@@ -16,7 +17,7 @@ public sealed partial class DuelEngine
         var decision = CreateDecision(effect.Decisions, 0, [])!;
         var activation = new PendingSpellActivation(player.Id, effect.EffectId, card, zone);
         var slots = player.SpellTrapFields.ToArray();
-        slots[zone] = new(card, IsFaceUp: true);
+        slots[zone] = new(card, IsFaceUp: true, PlacementId: checked(State.Revision + 1));
         var next = State.With(player: player.With(hand: player.Hand.Where(c => c.InstanceId != instanceId), spellTraps: slots))
             .WithActivation(activation).WithDecision(decision);
         return Accept(next, new SpellActivated(player.Id, effect.EffectId, card, zone), new DecisionRequested(decision));
