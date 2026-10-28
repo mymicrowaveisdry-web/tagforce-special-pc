@@ -8,7 +8,7 @@ the normalized catalog;
 explicit gameplay metadata is required rather than guessing binary kind codes.
 
 Battle eligibility and ordinary Spell/Trap placement require explicit opt-in metadata.
-There is no renderer, emulator, randomness, response window or general effect engine.
+There is no renderer, emulator, randomness or general effect engine.
 Snapshots expose complete engine information; presentation needs a visibility view.
 See the [root quick start](../README.md#quick-start) for build and validation commands.
 
@@ -121,3 +121,39 @@ negation, refund, cleanup or chain resolution is silently performed. Costs and
 targets differ from resolution choices such as Emergency Teleport's deck choice.
 Snapshots remain full-information: opponent face-down target identities require
 an opaque presentation view before UI integration.
+
+## Bounded chain research
+
+`experimentalChainEffects` adds a separate, default-off opt-in. A matching
+`ChainEffectProfile` consumes the committed receipt and opens `State.PendingChain`
+instead of freezing. Existing activation-only callers keep their previous behavior.
+The supported operations are opposing face-up monster destruction, bound back-row
+destruction, and the targeted, previously set four-token response. Registration
+validates matching commitment kinds and explicit Spell/Monster metadata.
+
+`PassChainResponse(player, decisionId)` alternates responders. Two consecutive
+passes close the response window. `ActivateChainResponse(player, decisionId, zone)`
+only exposes the retained opponent's targeted Scapegoat response to Typhoon; it preserves
+the target placement token and resets the pass count. No other response card,
+hand activation, third link, negation or general response timing is enabled.
+
+`ResolveNextChainLink(activePlayer, decisionId)` advances one complete link in
+reverse order, with no responses during resolution. Both players' commands go
+through the same `Execute` entry point, independently of the active turn player
+while a response is pending. Wrong player, stale ID, unsupported response and
+unrelated commands reject with the same state object and no events. Snapshots,
+links, source placements and paid costs remain immutable and deterministic.
+
+The four tokens resolve before Typhoon destroys the bound Scapegoat. Its face-up
+change preserves target identity; its later destruction does not remove tokens.
+Source cleanup follows the last link and does not duplicate a destroyed source.
+Completion freezes the research slice without a duel result or later token play.
+Missing/replaced targets reject `UnsupportedChainResolution` without mutation;
+this deliberately does not invent native fizzle, retarget or refund behavior.
+
+The alternating-pass protocol, revision IDs, explicit resolution stepping, token
+instance/zone allocation and event ordering are PC design choices. Local reference
+tests compare retained repeated paid/committed, four-token and final state
+projections. They do not establish PSP response priority or internal cleanup order.
+Native rejection, interruption, negation and broader activation windows remain
+required before the roadmap's stage 6 completion gate can pass.

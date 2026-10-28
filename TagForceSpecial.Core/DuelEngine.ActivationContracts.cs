@@ -52,6 +52,15 @@ public sealed partial class DuelEngine
             activation.SpellTrapZone, activation.DiscardedCost, target);
         events.Add(new DecisionSequenceCompleted(result));
         events.Add(new ActivationCommitted(committed));
+        if (chainEffects.TryGetValue(committed.Spell.GameCardId, out var profile))
+        {
+            var link = new ChainLink(1, committed, source.PlacementId, profile.Operation);
+            var chain = new PendingChain(checked(State.Revision + 1), [link], Other(player.Id));
+            events.Add(new ChainLinkAdded(link));
+            events.Add(new ChainResponseRequested(chain.Responder, chain.DecisionId));
+            return Accept(next.WithDecision(null, result).WithActivation(null)
+                .WithCommittedActivation(committed).WithChain(chain), events.ToArray());
+        }
         // The original evidence reaches a response window here. A chain resolver
         // must consume this receipt later; do not silently resolve or refund costs.
         return Accept(next.WithDecision(null, result, researchSliceComplete: true).WithActivation(null)
