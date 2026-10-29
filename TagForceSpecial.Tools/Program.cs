@@ -4,6 +4,7 @@ using TagForceSpecial.Assets;
 using TagForceSpecial.Tools;
 
 if (args.Length > 0 && args[0] == "progress") return ProjectProgress.Run(args[1..], Console.Out, Console.Error);
+if (args.Length > 0 && args[0] == "research-check") return ResearchValidation.Run(args[1..], Console.Out, Console.Error);
 
 if (args.Length == 1 && args[0] == "duel-demo") return SyntheticDuelDemo.Run(Console.Out);
 

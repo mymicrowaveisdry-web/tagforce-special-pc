@@ -1,0 +1,5 @@
+* text=auto eol=lf
+
+# These files have byte-level provenance hashes; preserve their exact contents.
+/config/reference/*.json -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+/native/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

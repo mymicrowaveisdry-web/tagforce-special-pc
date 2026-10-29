@@ -26,7 +26,9 @@ The demo uses synthetic card data; it is not the original game.
 
 **0** native functions matched · **11,482** discovered candidates · **7,254** decoded cards · **93/93** C# tests (last recorded 2026-10-26)
 
-**Current milestone:** Stage 5: three primitive state projections compared with PPSSPP
+**Current milestone:** Docker PSP compiler comparison runs; first getter mismatch recorded
+
+**C# acceptance-criterion coverage:** N/A (denominator not defined) · **PSP reference-scenario coverage:** N/A (denominator not defined)
 
 This is **not** a whole-game completion percentage: the denominator is a partial, unclassified inventory and may grow. CI validates committed match evidence metadata; it cannot rerun PSP byte comparisons without the proprietary game binaries. C# behavioral matches and asset decoding are separate metrics.
 

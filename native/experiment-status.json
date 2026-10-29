@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "target": "EBOOT.BIN:0x0881F334",
+  "status": "comparison-differs",
+  "nativeMatchedBytes": 0,
+  "originalModuleSha256": "8087681f81f87a87471591752b3c0c9bc3cec48ffff15a115a1e2525f670c975",
+  "originalFunctionSha256": "3f0a901b2457890da45b057c87573d65ac9595ae2bd9560b2de269f74099e655",
+  "rebuiltFunctionSha256": "2a17c2cd0cdb3b6039020c5bac3cd7f7b687927304859350b0e45a933223ba51",
+  "originalLength": 84,
+  "rebuiltLength": 68,
+  "differentBytePositionsIncludingLength": 59,
+  "compilerVersion": "psp-gcc (GCC) 15.2.0",
+  "compileFlags": [
+    "-march=allegrex",
+    "-mabi=32",
+    "-G0",
+    "-fno-pic",
+    "-mno-abicalls",
+    "-O2",
+    "-ffreestanding",
+    "-fno-builtin",
+    "-fno-stack-protector",
+    "-fno-asynchronous-unwind-tables",
+    "-ffunction-sections"
+  ],
+  "dockerBaseImage": "pspdev/pspdev@sha256:54895e6f5afb71b8f4f6915ee6d5023e1e087ca7afdf2dcb1d7a694a5233e45f",
+  "dockerImageId": "sha256:c072e48ac523a4442fc583802b7aecb23a6a9634dfd8b9e0384cc6885897900b",
+  "pythonVersion": "3.14.8",
+  "repeatedTrials": 2,
+  "actualByteValidation": "passed for both recorded mismatches",
+  "privateReports": [
+    {
+      "path": "analysis/native/card-attack-docker/comparison.json",
+      "sha256": "2e278c325243492379db223338db4f738213c596b36a24038f5cef6208c2ef71"
+    },
+    {
+      "path": "analysis/native/card-attack-docker-repeat/comparison.json",
+      "sha256": "2e278c325243492379db223338db4f738213c596b36a24038f5cef6208c2ef71"
+    }
+  ],
+  "nextStep": "Inspect the MIPS diff and perform bounded source/compiler trials; continue trace-backed C# behavior work toward the initial PC release.",
+  "limitations": [
+    "No native match is recorded.",
+    "Original compiler/version/optimization flags remain unknown.",
+    "Repeated builds and byte validation do not replace independent review before recording a positive native match."
+  ]
+}

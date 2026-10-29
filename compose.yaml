@@ -1,0 +1,38 @@
+name: tagforce-research
+
+services:
+  psp-python:
+    image: tagforce-pspdev:local
+    build:
+      context: ./native
+      dockerfile: Dockerfile
+    container_name: tagforce-psp-python
+    restart: unless-stopped
+    init: true
+    command: ["sleep", "infinity"]
+    working_dir: /source
+    read_only: true
+    network_mode: none
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    tmpfs:
+      - /tmp:rw,nosuid,size=128m
+    volumes:
+      - ./native:/source/native:ro
+      - ./config:/source/config:ro
+      - ./tools:/source/tools:ro
+      - ./tests:/source/tests:ro
+      - ./data:/source/data:ro
+      - ./analysis:/source/analysis
+    healthcheck:
+      test: ["CMD-SHELL", "psp-gcc --version >/dev/null && python3 -c 'import pycdlib, pypdf, websocket, PIL'"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "2"

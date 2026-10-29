@@ -1,15 +1,13 @@
-# Local research and development directories, excluded from the product repository.
-# Keep every TagForceSpecial.* C# project and its synthetic tests/build configuration.
-/tools/
-/tests/
-/docs/
+# Local environments, results and private research inputs.
+# Source tools, tests, project READMEs and dependency manifests belong in Git.
 /.vscode/
 /.idea/
 /.fleet/
 /.pytest_cache/
 /.mypy_cache/
 /.ruff_cache/
-/.coverage/
+/.coverage
+/.coverage.*
 /htmlcov/
 /coverage/
 /artifacts/
@@ -18,21 +16,30 @@
 /tmp/
 /temp/
 /logs/
-# Python dependencies belong to the local research scripts above.
-/requirements.txt
-
-# Local documentation (temporary, includes README.md at any depth)
-*.[mM][dD]
-*.[mM][aA][rR][kK][dD][oO][wW][nN]
+# Machine-specific configuration and credentials.
+.env
+.env.*
+!.env.example
+compose.override.yaml
+compose.override.yml
+*.local
 
 # Environments and generated builds
 .venv/
+venv/
 __pycache__/
 *.py[cod]
 bin/
 obj/
 .vs/
 TestResults/
+*.o
+*.obj
+*.a
+*.so
+*.pdb
+*.log
+*.trx
 
 # Source-derived data and third-party material; keep these local.
 # Extensions alone cannot identify copyright: put all game-derived data here.
@@ -113,12 +120,9 @@ reverse-engineering/
 *.[pP][pP][sS][tT]
 *.[sS][tT][aA][tT][eE]
 
-# Central project overview and generated progress are public.
-!/README.md
-
-# Public project documentation tracked in Git, despite broad local Markdown exclusions.
-!/docs/
+# Historical research/migration reports remain local. Publish reviewed docs only.
 /docs/*
 !/docs/STATUS.md
 !/docs/ROADMAP.md
 !/docs/DEVELOPMENT.md
+!/docs/NATIVE-COMPARISON.md

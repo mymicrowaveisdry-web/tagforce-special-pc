@@ -27,9 +27,10 @@ public static class ProjectProgress
     {
         bool check = args.SequenceEqual(["--check"]);
         string? trx = args.Length == 2 && args[0] == "--test-results" ? args[1] : null;
-        if (args.Length != 0 && !check && trx is null)
+        string? verifyTrx = args.Length == 2 && args[0] == "--verify-test-counts" ? args[1] : null;
+        if (args.Length != 0 && !check && trx is null && verifyTrx is null)
         {
-            error.WriteLine("Usage: TagForceSpecial.Tools progress [--check | --test-results <run.trx>]");
+            error.WriteLine("Usage: TagForceSpecial.Tools progress [--check | --test-results <run.trx> | --verify-test-counts <run.trx>]");
             return 2;
         }
         try
@@ -38,6 +39,12 @@ public static class ProjectProgress
             string configPath = Path.Combine(root, "config", "progress.json");
             var config = JsonSerializer.Deserialize<ProgressConfiguration>(File.ReadAllText(configPath), JsonOptions)
                 ?? throw new InvalidDataException("Missing progress configuration.");
+            if (verifyTrx is not null)
+            {
+                VerifyTestCounts(config.Validation, File.ReadAllText(verifyTrx));
+                output.WriteLine("Recorded test counts match the executed suite; snapshot date preserved.");
+                return 0;
+            }
             if (trx is not null) config = config with { Validation = ReadValidation(File.ReadAllText(trx)) };
             if (config.SchemaVersion != 1 || config.Modules is null || config.Modules.Length == 0 ||
                 config.Research is null || config.Validation is null || config.Implementation is null ||
@@ -55,14 +62,16 @@ public static class ProjectProgress
                 return new ModuleInventory(module, ReadFunctions(File.ReadAllText(registry)));
             }).ToArray();
             var native = NativeByteProgress.Load(root, modules);
+            var coverage = ResearchValidation.Read<CoverageManifest>(File.ReadAllText(Path.Combine(root, "config/coverage.json")));
+            ResearchValidation.ValidateCoverage(coverage, modules);
             string readmePath = Path.Combine(root, "README.md");
             string statusPath = Path.Combine(root, "docs", "STATUS.md");
             string originalReadme = File.ReadAllText(readmePath).Replace("\r\n", "\n");
             string originalStatus = File.ReadAllText(statusPath).Replace("\r\n", "\n");
             string newReadme = ReplaceProgress(originalReadme,
-                ProgressPresentation.RenderCompact(config, modules, native));
+                ProgressPresentation.RenderCompact(config, modules, native, coverage));
             string newStatus = ReplaceProgress(originalStatus,
-                ProgressPresentation.RenderDetailed(config, modules, native));
+                ProgressPresentation.RenderDetailed(config, modules, native, coverage));
             if (check)
             {
                 if (originalReadme != newReadme || originalStatus != newStatus)
@@ -82,7 +91,7 @@ public static class ProjectProgress
             }
             return 0;
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or
+        catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or
             JsonException or System.Xml.XmlException or InvalidOperationException or FormatException or OverflowException)
         {
             error.WriteLine($"Progress error: {e.Message}");
@@ -125,6 +134,13 @@ public static class ProjectProgress
         string date = TimeZoneInfo.ConvertTime(time, TimeZoneInfo.FindSystemTimeZoneById("Europe/Berlin"))
             .ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         return new(passed, total, date);
+    }
+
+    public static void VerifyTestCounts(ProgressValidation recorded, string trx)
+    {
+        var actual = ReadValidation(trx);
+        if (recorded.Passed != actual.Passed || recorded.Total != actual.Total)
+            throw new InvalidDataException("Recorded test counts are stale. Refresh progress using the latest test results.");
     }
 
     public static string Render(ProgressConfiguration config, IReadOnlyList<ModuleInventory> modules,
