@@ -48,9 +48,9 @@ remain pending. They do not make those cards generally playable; stage 6 is in p
 
 Stage 6's fresh PSP comparisons are deferred for later. The first Stage 7 slice
 adds opt-in monster event triggers, player-selected simultaneous ordering,
-follow-up chains, continuous ATK/DEF auras and temporary stat modifiers. Basic
-battle consumes effective stats; removing sources and expiring modifiers update
-the immutable snapshot. These are rules-informed synthetic-tested primitives,
+follow-up chains, trigger costs/targets, once-per-turn use limits and optional-when
+timing. Continuous ATK/DEF auras, temporary modifiers and scoped monster-effect
+negation update immutable snapshots; basic battle consumes effective stats. These are rules-informed synthetic-tested primitives,
 with no new full-card or native timing support claim. See [Core](TagForceSpecial.Core/README.md#stage-7-event-driven-triggers-and-continuous-stats).
 
 General effects, broader response windows/chains, shuffle, delayed-effect

@@ -20,6 +20,8 @@ public sealed partial class DuelEngine
     private readonly FrozenDictionary<uint, ChainResponseProfile> chainResponses;
     private readonly TriggerEffectProfile[] triggerEffects;
     private readonly ContinuousEffectProfile[] continuousEffects;
+    private readonly ContinuousNegationProfile[] continuousNegations;
+    private readonly uint[] negationOrder;
     public DuelState State { get; private set; }
 
     /// <summary>
@@ -35,7 +37,8 @@ public sealed partial class DuelEngine
         IEnumerable<ChainEffectProfile>? experimentalChainEffects = null,
         IEnumerable<ChainResponseProfile>? experimentalChainResponses = null,
         IEnumerable<TriggerEffectProfile>? experimentalTriggerEffects = null,
-        IEnumerable<ContinuousEffectProfile>? experimentalContinuousEffects = null)
+        IEnumerable<ContinuousEffectProfile>? experimentalContinuousEffects = null,
+        IEnumerable<ContinuousNegationProfile>? experimentalContinuousNegations = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(rules);
@@ -100,11 +103,20 @@ public sealed partial class DuelEngine
         chainResponses = responses.ToFrozenDictionary(p => p.CardId);
         triggerEffects = (experimentalTriggerEffects ?? []).ToArray();
         continuousEffects = (experimentalContinuousEffects ?? []).ToArray();
-        if (triggerEffects.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) || rule.Category != CardCategory.Monster))
+        continuousNegations = (experimentalContinuousNegations ?? []).ToArray();
+        if (triggerEffects.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) || rule.Category != CardCategory.Monster ||
+                p.DiscardCardIds.Any(id => !knownIds.Contains(id)) ||
+                p.Target is { } target && target.AllowedCardIds.Any(id => !knownIds.Contains(id) ||
+                    !this.rules.TryGetValue(id, out var targetRule) || targetRule.Category != CardCategory.Monster)))
             throw new ArgumentException("Triggers require explicit catalog Monster rules.", nameof(experimentalTriggerEffects));
         if (continuousEffects.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) || rule.Category != CardCategory.Monster))
             throw new ArgumentException("Continuous sources require explicit catalog Monster rules.", nameof(experimentalContinuousEffects));
-        var eventIds = triggerEffects.Select(p => p.EffectId).Concat(continuousEffects.Select(p => p.EffectId)).ToArray();
+        if (continuousNegations.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) || rule.Category != CardCategory.Monster ||
+            p.TargetCardIds.Any(id => !this.rules.TryGetValue(id, out var targetRule) || targetRule.Category != CardCategory.Monster)))
+            throw new ArgumentException("Negation profiles need explicit Monster sources and targets.", nameof(experimentalContinuousNegations));
+        negationOrder = ValidateNegationDependencies(continuousNegations);
+        var eventIds = triggerEffects.Select(p => p.EffectId).Concat(continuousEffects.Select(p => p.EffectId))
+            .Concat(continuousNegations.Select(p => p.EffectId)).ToArray();
         var reservedIds = effects.Select(p => p.EffectId).Concat(contracts.Select(p => p.EffectId))
             .Concat(chainProfiles.Select(p => p.EffectId)).Concat(responses.Select(p => p.EffectId)).ToHashSet(StringComparer.Ordinal);
         if (eventIds.Distinct(StringComparer.Ordinal).Count() != eventIds.Length || eventIds.Any(reservedIds.Contains))
@@ -127,6 +139,8 @@ public sealed partial class DuelEngine
         ArgumentNullException.ThrowIfNull(command);
         if (State.Outcome is not null) return Reject(DuelError.DuelFinished);
         if (command.Player is not (PlayerId.One or PlayerId.Two)) return Reject(DuelError.InvalidPlayer);
+        if (State.EventEffects.PendingCommitment is not null) return AnswerTriggerCommitment(command);
+        if (command is ChooseTriggerCostCard or ChooseTriggerMonsterTarget) return Reject(DuelError.NoPendingTriggerCommitment);
         if (State.EventEffects.PendingTriggers is not null)
             return command is ChooseTriggerOrder order ? OrderTriggers(order) : Reject(DuelError.TriggerOrderPending);
         if (command is ChooseTriggerOrder) return Reject(DuelError.NoPendingTriggers);

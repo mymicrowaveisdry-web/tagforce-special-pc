@@ -78,6 +78,8 @@ public sealed partial class DuelEngine
         if (link.EffectNegated)
             events.Add(new ChainLinkSkipped(link.Number, link.ActivationNegated
                 ? ChainSkipReason.ActivationNegated : ChainSkipReason.EffectNegated));
+        else if (link.Trigger is { } sourceTrigger && IsSourceEffectNegated(next, sourceTrigger))
+            events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.SourceEffectsNegated));
         else switch (link.Operation)
         {
             case ChainOperation.DestroyOpposingFaceUpMonsters:
