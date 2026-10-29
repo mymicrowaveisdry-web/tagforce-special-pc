@@ -2,7 +2,7 @@ namespace TagForceSpecial.Core;
 
 /// <summary>
 /// Trusted, default-off research metadata for previously set responses in the
-/// existing Main1 chain slice. This is not a card-text interpreter or a complete
+/// activation slice and registered trigger chains. This is not a card-text interpreter or a complete
 /// native legality/protection contract. Effect-only probes require explicit configuration.
 /// </summary>
 public sealed class ChainResponseProfile
@@ -26,7 +26,7 @@ public sealed class ChainResponseProfile
             throw new ArgumentOutOfRangeException(nameof(operation));
         if (spellSpeed is not (ChainSpellSpeed.Two or ChainSpellSpeed.Three))
             throw new ArgumentOutOfRangeException(nameof(spellSpeed));
-        if (respondsToCategory is not (null or CardCategory.Spell or CardCategory.Trap))
+        if (respondsToCategory is not (null or CardCategory.Monster or CardCategory.Spell or CardCategory.Trap))
             throw new ArgumentOutOfRangeException(nameof(respondsToCategory));
         if (destroyNegatedSource && operation == ChainOperation.DestroyBoundSpellTrap)
             throw new ArgumentException("Source destruction is a separate negation policy.", nameof(destroyNegatedSource));

@@ -80,7 +80,7 @@ public sealed partial class DuelEngine
         var link = new ChainLink(chain.Links.Count + 1, receipt, placement, profile.Operation, profile.SpellSpeed,
             profile.Operation is ChainOperation.NegateActivation or ChainOperation.NegateEffect ? precedingNumber : null,
             DestroyNegatedSource: profile.DestroyNegatedSource);
-        var pending = new PendingChain(checked(State.Revision + 1), chain.Links.Append(link), Other(receipt.Player));
+        var pending = new PendingChain(checked(State.Revision + 1), chain.Links.Append(link), Other(receipt.Player), freezeOnCompletion: chain.FreezeOnCompletion);
         events.Add(new ActivationCommitted(receipt));
         events.Add(new ChainLinkAdded(link));
         events.Add(new ChainResponseRequested(pending.Responder, pending.DecisionId));

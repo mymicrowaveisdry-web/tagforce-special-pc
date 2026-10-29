@@ -6,7 +6,7 @@ namespace TagForceSpecial.Core;
 /// <summary>
 /// Deterministic two-player rules subset: opening hands, draws, phases, basic normal summons,
 /// sets, position changes, effect-free battles, hand-limit discards and defeat.
-/// No RNG, general effects, attack replays or AI. Chains require separate research opt-in. Battles resolve in one command.
+/// No RNG, general effects, attack replays or AI. Chains and event effects require explicit opt-ins. Battles resolve in one command.
 /// Explicitly configured selection-only workflows pause the command loop for immutable decisions.
 /// </summary>
 public sealed partial class DuelEngine
@@ -18,6 +18,8 @@ public sealed partial class DuelEngine
     private readonly FrozenDictionary<uint, ActivationContract> activationContracts;
     private readonly FrozenDictionary<uint, ChainEffectProfile> chainEffects;
     private readonly FrozenDictionary<uint, ChainResponseProfile> chainResponses;
+    private readonly TriggerEffectProfile[] triggerEffects;
+    private readonly ContinuousEffectProfile[] continuousEffects;
     public DuelState State { get; private set; }
 
     /// <summary>
@@ -31,7 +33,9 @@ public sealed partial class DuelEngine
         IEnumerable<DeckSpecialSummonSpell>? experimentalSpellEffects = null,
         IEnumerable<ActivationContract>? experimentalActivationContracts = null,
         IEnumerable<ChainEffectProfile>? experimentalChainEffects = null,
-        IEnumerable<ChainResponseProfile>? experimentalChainResponses = null)
+        IEnumerable<ChainResponseProfile>? experimentalChainResponses = null,
+        IEnumerable<TriggerEffectProfile>? experimentalTriggerEffects = null,
+        IEnumerable<ContinuousEffectProfile>? experimentalContinuousEffects = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(rules);
@@ -94,6 +98,17 @@ public sealed partial class DuelEngine
             responses.Select(p => p.EffectId).Distinct(StringComparer.Ordinal).Count() != responses.Length)
             throw new ArgumentException("Response profiles need explicit set rules, distinct IDs and catalog costs.", nameof(experimentalChainResponses));
         chainResponses = responses.ToFrozenDictionary(p => p.CardId);
+        triggerEffects = (experimentalTriggerEffects ?? []).ToArray();
+        continuousEffects = (experimentalContinuousEffects ?? []).ToArray();
+        if (triggerEffects.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) || rule.Category != CardCategory.Monster))
+            throw new ArgumentException("Triggers require explicit catalog Monster rules.", nameof(experimentalTriggerEffects));
+        if (continuousEffects.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) || rule.Category != CardCategory.Monster))
+            throw new ArgumentException("Continuous sources require explicit catalog Monster rules.", nameof(experimentalContinuousEffects));
+        var eventIds = triggerEffects.Select(p => p.EffectId).Concat(continuousEffects.Select(p => p.EffectId)).ToArray();
+        var reservedIds = effects.Select(p => p.EffectId).Concat(contracts.Select(p => p.EffectId))
+            .Concat(chainProfiles.Select(p => p.EffectId)).Concat(responses.Select(p => p.EffectId)).ToHashSet(StringComparer.Ordinal);
+        if (eventIds.Distinct(StringComparer.Ordinal).Count() != eventIds.Length || eventIds.Any(reservedIds.Contains))
+            throw new ArgumentException("Event effect IDs must be distinct and unreserved.");
         int nextInstance = 1;
         DuelPlayerState CreatePlayer(PlayerId id, IEnumerable<uint> ids)
         {
@@ -112,6 +127,9 @@ public sealed partial class DuelEngine
         ArgumentNullException.ThrowIfNull(command);
         if (State.Outcome is not null) return Reject(DuelError.DuelFinished);
         if (command.Player is not (PlayerId.One or PlayerId.Two)) return Reject(DuelError.InvalidPlayer);
+        if (State.EventEffects.PendingTriggers is not null)
+            return command is ChooseTriggerOrder order ? OrderTriggers(order) : Reject(DuelError.TriggerOrderPending);
+        if (command is ChooseTriggerOrder) return Reject(DuelError.NoPendingTriggers);
         if (State.PendingChain is not null) return ExecuteChain(command);
         if (command is PassChainResponse or ActivateChainResponse or ResolveNextChainLink) return Reject(DuelError.NoPendingChain);
         if (command.Player != State.ActivePlayer) return Reject(DuelError.NotActivePlayer);
@@ -192,7 +210,7 @@ public sealed partial class DuelEngine
         if (player.MonsterZones[zone] is not null) return Reject(DuelError.MonsterZoneOccupied);
         if (State.NormalSummonUsed) return Reject(DuelError.NormalSummonLimitReached);
         var monster = new FieldMonster(card, faceDown ? BattlePosition.FaceDownDefense : BattlePosition.FaceUpAttack,
-            SummonedOnTurn: State.TurnNumber);
+            SummonedOnTurn: State.TurnNumber, PlacementId: checked(State.Revision + 1));
         var monsters = player.MonsterZones.ToArray();
         monsters[zone] = monster;
         var next = player.With(hand: player.Hand.Where(c => c.InstanceId != instanceId), monsters: monsters);
@@ -230,7 +248,8 @@ public sealed partial class DuelEngine
             return Reject(DuelError.InvalidBattlePosition);
         if (monster.SummonedOnTurn == State.TurnNumber || monster.PositionChangedOnTurn == State.TurnNumber ||
             monster.LastAttackTurn == State.TurnNumber) return Reject(DuelError.PositionChangeNotAllowed);
-        // Flip effects and persistent effects that restrict position changes are not implemented.
+        // Registered flip-summon triggers are collected after this transition.
+        // Unregistered flip effects and position-change restrictions remain unsupported.
         if (!rules[monster.Card.GameCardId].AllowsBasicBattle) return Reject(DuelError.UnsupportedBattleCard);
         bool flip = monster.Position == BattlePosition.FaceDownDefense;
         var changed = monster with { Position = target, PositionChangedOnTurn = State.TurnNumber,
@@ -260,8 +279,17 @@ public sealed partial class DuelEngine
         if (!rules[attacker.Card.GameCardId].AllowsBasicBattle ||
             defender is not null && !rules[defender.Card.GameCardId].AllowsBasicBattle)
             return Reject(DuelError.UnsupportedBattleCard);
-        var attackStats = catalog[attacker.Card.GameCardId].Statistics;
-        var defenseStats = defender is null ? null : catalog[defender.Card.GameCardId].Statistics;
+        // A battle-revealed monster's continuous effects apply before damage calculation.
+        // This is still an atomic battle; response/damage-step windows remain Stage 8 work.
+        var calculationState = State;
+        if (defender?.Position == BattlePosition.FaceDownDefense)
+        {
+            var revealed = defenderPlayer.MonsterZones.ToArray();
+            revealed[targetZone!.Value] = defender with { Position = BattlePosition.FaceUpDefense };
+            calculationState = State.With(player: defenderPlayer.With(monsters: revealed));
+        }
+        var attackStats = GetMonsterStatistics(calculationState, attackerPlayer.Id, attackerZone)!;
+        var defenseStats = defender is null ? null : GetMonsterStatistics(calculationState, defenderPlayer.Id, targetZone!.Value);
         int? defendingValue = defender?.Position == BattlePosition.FaceUpAttack ? defenseStats?.Attack : defenseStats?.Defense;
         if (attackStats.Attack is not int attack || defender is not null && defendingValue is null)
             return Reject(DuelError.UnsupportedBattleStatistics);
@@ -349,8 +377,10 @@ public sealed partial class DuelEngine
 
     private DuelActionResult Accept(DuelState state, params DuelEvent[] events)
     {
+        var emitted = events.ToList();
+        state = PrepareEventEffects(State, state, emitted);
         State = state.With(revision: checked(State.Revision + 1));
-        return new(true, DuelError.None, State, Array.AsReadOnly(events));
+        return new(true, DuelError.None, State, emitted.AsReadOnly());
     }
 
     private DuelActionResult Reject(DuelError error) => new(false, error, State, Array.Empty<DuelEvent>());
