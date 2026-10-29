@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "module": "EBOOT.BIN",
+  "moduleSha256": "8087681f81f87a87471591752b3c0c9bc3cec48ffff15a115a1e2525f670c975",
+  "runtimeAddress": 142734132,
+  "loadBase": 142622720,
+  "elfAddress": 111412,
+  "length": 84,
+  "originalFunctionSha256": "3f0a901b2457890da45b057c87573d65ac9595ae2bd9560b2de269f74099e655",
+  "symbol": "card_attack",
+  "dependency": { "symbol": "property_record", "elfAddress": 109924 },
+  "comparisonDomain": "unrelocated ELF virtual addresses; no byte masking",
+  "compileFlags": ["-march=allegrex", "-mabi=32", "-G0", "-fno-pic", "-mno-abicalls", "-O2", "-ffreestanding", "-fno-builtin", "-fno-stack-protector", "-fno-asynchronous-unwind-tables", "-ffunction-sections"]
+}

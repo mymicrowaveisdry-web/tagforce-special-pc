@@ -9,13 +9,13 @@ public static class SyntheticDuelDemo
     public static int Run(TextWriter output)
     {
         var ids = Enumerable.Range(1, 40).Select(i => (uint)i).ToArray();
-        var catalog = new CardCatalog(new(new string('0', 64), "synthetic-stage5"), ids.Select(id =>
+        var catalog = new CardCatalog(new(new string('0', 64), "synthetic-duel"), ids.Select(id =>
             new CardDefinition(id, $"Synthetic Monster {id:00}", "Invented demonstration card.",
                 new(1000, 1000, 4), new(0, 0, 0, 0, 0, 0, 0),
                 new((int)id, id | 100u << 14 | 100u << 23, 4u << 11, 0))));
-        var rules = ids.ToDictionary(id => id, _ => new DuelCardRules(CardCategory.Monster, true));
+        var rules = ids.ToDictionary(id => id, _ => new DuelCardRules(CardCategory.Monster, true, AllowsBasicBattle: true));
         var duel = new DuelEngine(catalog, rules, ids, ids);
-        output.WriteLine("Stage 5 synthetic duel demo — invented cards, fixed deck order.");
+        output.WriteLine("Synthetic duel demo — invented cards, fixed deck order.");
         output.WriteLine("Both players: 8000 LP, 5 cards in hand, 35 cards in deck.");
 
         void Execute(DuelCommand command)
@@ -29,6 +29,8 @@ public static class SyntheticDuelDemo
                     CardDrawn e => $"Player {e.Player}: drew {catalog[e.Card.GameCardId].Name} (instance {e.Card.InstanceId}).",
                     PhaseChanged e => $"Phase: {e.From} -> {e.To}.",
                     MonsterNormalSummoned e => $"Player {e.Player}: normal summoned {catalog[e.Monster.Card.GameCardId].Name} to zone {e.Zone} in {e.Monster.Position}.",
+                    BattleDamageDealt e => $"Player {e.Player}: took {e.Damage} battle damage; LP {e.LifePointsBefore} -> {e.LifePointsAfter}.",
+                    MonsterDestroyed e => $"Player {e.Player}: {catalog[e.Card.GameCardId].Name} destroyed in zone {e.Zone} and sent to the graveyard.",
                     TurnStarted e => $"Turn {e.TurnNumber}: Player {e.Player}.",
                     _ => item.GetType().Name
                 });
@@ -46,13 +48,20 @@ public static class SyntheticDuelDemo
         Execute(new ChangePhase(PlayerId.Two, DuelPhase.Main1));
         Execute(new NormalSummon(PlayerId.Two, duel.State.GetPlayer(PlayerId.Two).Hand[0].InstanceId, 2));
         Execute(new ChangePhase(PlayerId.Two, DuelPhase.Battle));
+        Execute(new DeclareAttack(PlayerId.Two, 2, 0));
+        if (duel.State.Players.Any(p => p.MonsterZones.Any(m => m is not null) || p.Graveyard.Count != 1))
+            throw new InvalidOperationException("Equal-ATK battle did not destroy both monsters.");
         Execute(new ChangePhase(PlayerId.Two, DuelPhase.Main2));
         Execute(new ChangePhase(PlayerId.Two, DuelPhase.End));
         Execute(new EndTurn(PlayerId.Two));
         Execute(new ResolveDrawStep(PlayerId.One));
         Execute(new ChangePhase(PlayerId.One, DuelPhase.Main1));
         Execute(new NormalSummon(PlayerId.One, duel.State.GetPlayer(PlayerId.One).Hand[0].InstanceId, 1));
-        output.WriteLine("Demo complete. Battle resolution and executable effects are not implemented.");
+        Execute(new ChangePhase(PlayerId.One, DuelPhase.Battle));
+        Execute(new DeclareAttack(PlayerId.One, 1));
+        if (duel.State.GetPlayer(PlayerId.Two).LifePoints != 7000)
+            throw new InvalidOperationException("Direct attack did not deal 1000 damage.");
+        output.WriteLine("Demo complete. Basic battles resolve; chains and executable effects remain pending.");
         return 0;
     }
 }

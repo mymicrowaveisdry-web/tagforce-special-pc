@@ -44,6 +44,8 @@ public sealed class NativeByteProgressTests
         Assert.Throws<InvalidDataException>(() => NativeByteProgress.Measure(Inventories,
             [Valid with { Length = 20 }]));
         Assert.Throws<InvalidDataException>(() => NativeByteProgress.Measure(Inventories,
+            [Valid with { EvidencePath = "C:/private/review.json" }]));
+        Assert.Throws<InvalidDataException>(() => NativeByteProgress.Measure(Inventories,
             [Valid, Valid]));
         Assert.Throws<InvalidDataException>(() => NativeByteProgress.Measure(Inventories,
             [Valid, Valid with { Address = "0x08804010", Length = 16 }]));

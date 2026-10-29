@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Security.Cryptography;
-using System.Text.Json;
 
 namespace TagForceSpecial.Tools;
 
@@ -20,18 +19,22 @@ public sealed record NativeByteReport(
 
 public static class NativeByteProgress
 {
-    private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
     public const string ManifestPath = "config/native-matches.json";
 
     public static NativeByteReport Load(string root, IReadOnlyList<ModuleInventory> inventories)
     {
         string path = Path.Combine(root, "config", "native-matches.json");
-        var manifest = JsonSerializer.Deserialize<NativeMatchManifest>(File.ReadAllText(path), Options)
-            ?? throw new InvalidDataException("Native match manifest is empty.");
+        var manifest = ResearchValidation.Read<NativeMatchManifest>(File.ReadAllText(path));
         if (manifest.SchemaVersion != 1 || manifest.Matches is null)
             throw new InvalidDataException("Unsupported native match manifest.");
 
         var report = Measure(inventories, manifest.Matches);
+        ResearchQueue? queue = null;
+        if (manifest.Matches.Length > 0)
+        {
+            queue = ResearchValidation.Read<ResearchQueue>(File.ReadAllText(Path.Combine(root, "config/research-queue.json")));
+            ResearchValidation.ValidateQueue(queue, inventories);
+        }
         string evidenceRoot = Path.GetFullPath(Path.Combine(root, "config", "match-evidence"))
             + Path.DirectorySeparatorChar;
         foreach (var match in manifest.Matches)
@@ -44,6 +47,7 @@ public static class NativeByteProgress
             string actual = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(evidence)));
             if (!actual.Equals(match.EvidenceSha256, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException($"Match evidence digest mismatch: {match.EvidencePath}");
+            NativeEvidenceValidation.ValidateReview(root, match, queue!);
         }
         return report;
     }
@@ -73,7 +77,7 @@ public static class NativeByteProgress
                 !match.SourceSha256.Equals(module.Module.SourceSha256, StringComparison.OrdinalIgnoreCase) ||
                 !ValidSha(match.OriginalSha256) || !ValidSha(match.RebuiltSha256) ||
                 !match.OriginalSha256.Equals(match.RebuiltSha256, StringComparison.OrdinalIgnoreCase) ||
-                string.IsNullOrWhiteSpace(match.EvidencePath) || !ValidSha(match.EvidenceSha256))
+                !ResearchValidation.RelativePath(match.EvidencePath) || !ValidSha(match.EvidenceSha256))
                 throw new InvalidDataException($"Unsubstantiated native match: {match.Module} {match.Address}");
 
             // No function-body overlap or double-counting, including on intentionally overlapping Ghidra candidates.
