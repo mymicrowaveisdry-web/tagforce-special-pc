@@ -6,12 +6,24 @@ namespace TagForceSpecial.Core;
 /// <summary>
 /// Deterministic two-player rules subset: opening hands, draws, phases, basic normal summons,
 /// sets, position changes, effect-free battles, hand-limit discards and defeat.
-/// No RNG, chains, effects, attack replays or AI. Battles resolve in one command.
+/// No RNG, general effects, attack replays or AI. Chains, event effects and staged battle require explicit opt-ins. Atomic battle remains the compatibility default.
+/// Explicitly configured selection-only workflows pause the command loop for immutable decisions.
 /// </summary>
-public sealed class DuelEngine
+public sealed partial class DuelEngine
 {
     private readonly CardCatalog catalog;
     private readonly FrozenDictionary<uint, DuelCardRules> rules;
+    private readonly FrozenDictionary<string, DecisionSequence> decisionSequences;
+    private readonly FrozenDictionary<uint, DeckSpecialSummonSpell> spellEffects;
+    private readonly FrozenDictionary<uint, ActivationContract> activationContracts;
+    private readonly FrozenDictionary<uint, ChainEffectProfile> chainEffects;
+    private readonly FrozenDictionary<uint, ChainResponseProfile> chainResponses;
+    private readonly TriggerEffectProfile[] triggerEffects;
+    private readonly ContinuousEffectProfile[] continuousEffects;
+    private readonly ContinuousNegationProfile[] continuousNegations;
+    private readonly uint[] negationOrder;
+    private readonly bool experimentalBattleFlow;
+    private readonly FrozenDictionary<uint, BattleResponseProfile> battleResponses;
     public DuelState State { get; private set; }
 
     /// <summary>
@@ -20,7 +32,16 @@ public sealed class DuelEngine
     /// Rule metadata is explicit; missing classifications fail closed when attempting to summon.
     /// </summary>
     public DuelEngine(CardCatalog catalog, IReadOnlyDictionary<uint, DuelCardRules> rules,
-        IEnumerable<uint> playerOneDeck, IEnumerable<uint> playerTwoDeck, PlayerId startingPlayer = PlayerId.One)
+        IEnumerable<uint> playerOneDeck, IEnumerable<uint> playerTwoDeck, PlayerId startingPlayer = PlayerId.One,
+        IEnumerable<DecisionSequence>? decisionSequences = null,
+        IEnumerable<DeckSpecialSummonSpell>? experimentalSpellEffects = null,
+        IEnumerable<ActivationContract>? experimentalActivationContracts = null,
+        IEnumerable<ChainEffectProfile>? experimentalChainEffects = null,
+        IEnumerable<ChainResponseProfile>? experimentalChainResponses = null,
+        IEnumerable<TriggerEffectProfile>? experimentalTriggerEffects = null,
+        IEnumerable<ContinuousEffectProfile>? experimentalContinuousEffects = null,
+        IEnumerable<ContinuousNegationProfile>? experimentalContinuousNegations = null,
+        bool experimentalBattleFlow = false, IEnumerable<BattleResponseProfile>? experimentalBattleResponses = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(rules);
@@ -36,6 +57,84 @@ public sealed class DuelEngine
                 profile.AllowsSpellTrapSet && profile.Category is not (CardCategory.Spell or CardCategory.Trap))
                 throw new ArgumentException("Invalid explicit card rules.", nameof(rules));
         this.rules = rules.ToFrozenDictionary();
+        var sequences = (decisionSequences ?? []).ToArray();
+        if (sequences.Any(s => s is null || s.Steps.Any(step => step.AllowedCardIds.Any(id => !knownIds.Contains(id)))))
+            throw new ArgumentException("Decision sequences must reference catalog IDs.", nameof(decisionSequences));
+        this.decisionSequences = sequences.ToFrozenDictionary(s => s.Id, StringComparer.Ordinal);
+        var effects = (experimentalSpellEffects ?? []).ToArray();
+        if (effects.Any(e => e is null || !this.rules.TryGetValue(e.SpellCardId, out var spellRule) ||
+                spellRule.Category != CardCategory.Spell || this.decisionSequences.ContainsKey(e.Decisions.Id) ||
+                e.EligibleMonsterIds.Any(id => !knownIds.Contains(id) || !this.rules.TryGetValue(id, out var monsterRule) ||
+                    monsterRule.Category != CardCategory.Monster)) ||
+            effects.Select(e => e.EffectId).Distinct(StringComparer.Ordinal).Count() != effects.Length)
+            throw new ArgumentException("Effect profiles need distinct IDs, explicit Spell/Monster rules and unreserved sequence IDs.", nameof(experimentalSpellEffects));
+        spellEffects = effects.ToFrozenDictionary(e => e.SpellCardId);
+        var contracts = (experimentalActivationContracts ?? []).ToArray();
+        if (contracts.Any(c => c is null || !this.rules.TryGetValue(c.SpellCardId, out var rule) ||
+                rule.Category != CardCategory.Spell || spellEffects.ContainsKey(c.SpellCardId) ||
+                effects.Any(e => e.EffectId == c.EffectId) ||
+                this.decisionSequences.ContainsKey(c.Decisions.Id) || c.DiscardCardIds.Any(id => !knownIds.Contains(id))) ||
+            contracts.Select(c => c.EffectId).Distinct(StringComparer.Ordinal).Count() != contracts.Length)
+            throw new ArgumentException("Activation contracts need distinct IDs, explicit Spell rules and catalog cost choices.", nameof(experimentalActivationContracts));
+        activationContracts = contracts.ToFrozenDictionary(c => c.SpellCardId);
+        var chainProfiles = (experimentalChainEffects ?? []).ToArray();
+        if (chainProfiles.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) ||
+                rule.Category != CardCategory.Spell ||
+                p.Operation == ChainOperation.SummonFourTokens &&
+                    (activationContracts.ContainsKey(p.CardId) || spellEffects.ContainsKey(p.CardId) ||
+                        !rule.AllowsSpellTrapSet || p.TokenCardIds.Any(id => !knownIds.Contains(id) ||
+                        !this.rules.TryGetValue(id, out var tokenRule) || tokenRule.Category != CardCategory.Monster)) ||
+                p.Operation != ChainOperation.SummonFourTokens &&
+                    (!activationContracts.TryGetValue(p.CardId, out var c) || c.EffectId != p.EffectId ||
+                        p.Operation == ChainOperation.DestroyBoundSpellTrap && (!c.RequiresSpellTrapTarget || c.DiscardCardIds.Count != 0) ||
+                        p.Operation == ChainOperation.DestroyOpposingFaceUpMonsters && (c.RequiresSpellTrapTarget || c.DiscardCardIds.Count == 0))) ||
+            chainProfiles.Select(p => p.EffectId).Distinct(StringComparer.Ordinal).Count() != chainProfiles.Length)
+            throw new ArgumentException("Chain profiles require matching activation contracts or explicit token rules.", nameof(experimentalChainEffects));
+        chainEffects = chainProfiles.ToFrozenDictionary(p => p.CardId);
+        var responses = (experimentalChainResponses ?? []).ToArray();
+        if (responses.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) ||
+                rule.Category is not (CardCategory.Spell or CardCategory.Trap) || !rule.AllowsSpellTrapSet ||
+                spellEffects.ContainsKey(p.CardId) ||
+                p.DiscardCardIds.Any(id => !knownIds.Contains(id)) ||
+                chainEffects.TryGetValue(p.CardId, out var existing) &&
+                    (existing.Operation != p.Operation || existing.EffectId != p.EffectId) ||
+                contracts.Any(c => c.EffectId == p.EffectId && c.SpellCardId != p.CardId) ||
+                chainProfiles.Any(c => c.EffectId == p.EffectId && c.CardId != p.CardId) ||
+                p.Decisions is { } decisions && this.decisionSequences.ContainsKey(decisions.Id)) ||
+            responses.Select(p => p.EffectId).Distinct(StringComparer.Ordinal).Count() != responses.Length)
+            throw new ArgumentException("Response profiles need explicit set rules, distinct IDs and catalog costs.", nameof(experimentalChainResponses));
+        chainResponses = responses.ToFrozenDictionary(p => p.CardId);
+        triggerEffects = (experimentalTriggerEffects ?? []).ToArray();
+        continuousEffects = (experimentalContinuousEffects ?? []).ToArray();
+        continuousNegations = (experimentalContinuousNegations ?? []).ToArray();
+        if (triggerEffects.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) || rule.Category != CardCategory.Monster ||
+                p.DiscardCardIds.Any(id => !knownIds.Contains(id)) ||
+                p.Target is { } target && target.AllowedCardIds.Any(id => !knownIds.Contains(id) ||
+                    !this.rules.TryGetValue(id, out var targetRule) || targetRule.Category != CardCategory.Monster)))
+            throw new ArgumentException("Triggers require explicit catalog Monster rules.", nameof(experimentalTriggerEffects));
+        if (continuousEffects.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) || rule.Category != CardCategory.Monster))
+            throw new ArgumentException("Continuous sources require explicit catalog Monster rules.", nameof(experimentalContinuousEffects));
+        if (continuousNegations.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) || rule.Category != CardCategory.Monster ||
+            p.TargetCardIds.Any(id => !this.rules.TryGetValue(id, out var targetRule) || targetRule.Category != CardCategory.Monster)))
+            throw new ArgumentException("Negation profiles need explicit Monster sources and targets.", nameof(experimentalContinuousNegations));
+        negationOrder = ValidateNegationDependencies(continuousNegations);
+        var eventIds = triggerEffects.Select(p => p.EffectId).Concat(continuousEffects.Select(p => p.EffectId))
+            .Concat(continuousNegations.Select(p => p.EffectId)).ToArray();
+        var reservedIds = effects.Select(p => p.EffectId).Concat(contracts.Select(p => p.EffectId))
+            .Concat(chainProfiles.Select(p => p.EffectId)).Concat(responses.Select(p => p.EffectId)).ToHashSet(StringComparer.Ordinal);
+        if (eventIds.Distinct(StringComparer.Ordinal).Count() != eventIds.Length || eventIds.Any(reservedIds.Contains))
+            throw new ArgumentException("Event effect IDs must be distinct and unreserved.");
+        this.experimentalBattleFlow = experimentalBattleFlow;
+        var battleProfiles = (experimentalBattleResponses ?? []).ToArray();
+        if (battleProfiles.Length != 0 && !experimentalBattleFlow || battleProfiles.Any(p => p is null ||
+            !this.rules.TryGetValue(p.CardId, out var sourceRule) || sourceRule.Category is not (CardCategory.Spell or CardCategory.Trap) ||
+            !sourceRule.AllowsSpellTrapSet || p.SpellSpeed == ChainSpellSpeed.Three && sourceRule.Category != CardCategory.Trap ||
+            spellEffects.ContainsKey(p.CardId) || activationContracts.ContainsKey(p.CardId) || chainEffects.ContainsKey(p.CardId) || chainResponses.ContainsKey(p.CardId) ||
+            p.SummonableCardIds.Any(id => !this.rules.TryGetValue(id, out var targetRule) || targetRule.Category != CardCategory.Monster)) ||
+            battleProfiles.Select(p => p.EffectId).Distinct(StringComparer.Ordinal).Count() != battleProfiles.Length ||
+            battleProfiles.Any(p => reservedIds.Contains(p.EffectId) || eventIds.Contains(p.EffectId)))
+            throw new ArgumentException("Battle profiles need the staged flow, distinct source/effect IDs and explicit rules.", nameof(experimentalBattleResponses));
+        battleResponses = battleProfiles.ToFrozenDictionary(p => p.CardId);
         int nextInstance = 1;
         DuelPlayerState CreatePlayer(PlayerId id, IEnumerable<uint> ids)
         {
@@ -54,9 +153,38 @@ public sealed class DuelEngine
         ArgumentNullException.ThrowIfNull(command);
         if (State.Outcome is not null) return Reject(DuelError.DuelFinished);
         if (command.Player is not (PlayerId.One or PlayerId.Two)) return Reject(DuelError.InvalidPlayer);
+        if (State.EventEffects.PendingCommitment is not null) return AnswerTriggerCommitment(command);
+        if (command is ChooseTriggerCostCard or ChooseTriggerMonsterTarget) return Reject(DuelError.NoPendingTriggerCommitment);
+        if (State.EventEffects.PendingTriggers is not null)
+            return command is ChooseTriggerOrder order ? OrderTriggers(order) : Reject(DuelError.TriggerOrderPending);
+        if (command is ChooseTriggerOrder) return Reject(DuelError.NoPendingTriggers);
+        if (State.PendingChain is not null) return ExecuteChain(command);
+        if (command is PassChainResponse or ActivateChainResponse or ResolveNextChainLink) return Reject(DuelError.NoPendingChain);
+        if (command is AdvanceBattle or PassBattleResponse or ChooseAttackReplay or ActivateBattleResponse)
+        {
+            if (!experimentalBattleFlow) return Reject(DuelError.BattleFlowNotEnabled);
+            if (State.Battle is null) return Reject(DuelError.NoBattleInProgress);
+        }
+        if (State.Battle is not null)
+            return State.ResearchSliceComplete ? Reject(DuelError.ResearchSliceComplete) : ExecuteBattleFlow(command);
         if (command.Player != State.ActivePlayer) return Reject(DuelError.NotActivePlayer);
+        if (State.ResearchSliceComplete) return Reject(DuelError.ResearchSliceComplete);
+        if (command is DecisionCommand answer) return AnswerDecision(answer);
+        if (State.PendingDecision is not null) return Reject(DuelError.DecisionPending);
+        // A searched deck has no verified shuffle contract yet. Permit phase
+        // progression and explicitly opted-in basic battle, never another draw.
+        if (State.PendingEndPhaseBanishments.Count != 0)
+            return command switch
+            {
+                ChangePhase { Target: DuelPhase.End } => ResolveEndPhaseBanishment(),
+                ChangePhase { Target: DuelPhase.Battle or DuelPhase.Main2 } phase => Advance(phase.Target),
+                DeclareAttack attack => Attack(attack.AttackerZone, attack.TargetZone),
+                _ => Reject(DuelError.UnsupportedLifecycleContinuation)
+            };
         return command switch
         {
+            BeginDecisionSequence begin => BeginDecisions(begin.SequenceId),
+            ActivateSpell activate => Activate(activate.CardInstanceId, activate.SpellTrapZone),
             ResolveDrawStep => Draw(),
             ChangePhase phase => Advance(phase.Target),
             NormalSummon summon => Summon(summon.CardInstanceId, summon.MonsterZone, false),
@@ -97,6 +225,12 @@ public sealed class DuelEngine
             (DuelPhase.Main1, DuelPhase.Battle) or (DuelPhase.Main1, DuelPhase.End) or
             (DuelPhase.Battle, DuelPhase.Main2) or (DuelPhase.Main2, DuelPhase.End);
         if (!valid) return Reject(DuelError.InvalidPhaseTransition);
+        if (target == DuelPhase.Battle && experimentalBattleFlow)
+        {
+            var battle = new BattleState(BattleStep.Start, null, NewBattleWindow(BattleTiming.Start, State.ActivePlayer));
+            return Accept(State.With(phase: target).WithBattle(battle), new PhaseChanged(State.Phase, target),
+                new BattleStepChanged(null, BattleStep.Start), new BattleResponseRequested(battle.Window));
+        }
         return Accept(State.With(phase: target), new PhaseChanged(State.Phase, target));
     }
 
@@ -117,7 +251,7 @@ public sealed class DuelEngine
         if (player.MonsterZones[zone] is not null) return Reject(DuelError.MonsterZoneOccupied);
         if (State.NormalSummonUsed) return Reject(DuelError.NormalSummonLimitReached);
         var monster = new FieldMonster(card, faceDown ? BattlePosition.FaceDownDefense : BattlePosition.FaceUpAttack,
-            SummonedOnTurn: State.TurnNumber);
+            SummonedOnTurn: State.TurnNumber, PlacementId: checked(State.Revision + 1));
         var monsters = player.MonsterZones.ToArray();
         monsters[zone] = monster;
         var next = player.With(hand: player.Hand.Where(c => c.InstanceId != instanceId), monsters: monsters);
@@ -137,8 +271,8 @@ public sealed class DuelEngine
         if (rule.Category is not (CardCategory.Spell or CardCategory.Trap)) return Reject(DuelError.NotSpellOrTrap);
         if (!rule.AllowsSpellTrapSet) return Reject(DuelError.SpellTrapSetNotAllowed);
         if (player.SpellTrapZones[zone] is not null) return Reject(DuelError.SpellTrapZoneOccupied);
-        var zones = player.SpellTrapZones.ToArray();
-        zones[zone] = card;
+        var zones = player.SpellTrapFields.ToArray();
+        zones[zone] = new(card, IsFaceUp: false, PlacementId: checked(State.Revision + 1), SetOnTurn: State.TurnNumber);
         return Accept(State.With(player: player.With(hand: player.Hand.Where(c => c.InstanceId != instanceId),
             spellTraps: zones)), new SpellTrapSet(player.Id, card, zone));
     }
@@ -155,7 +289,8 @@ public sealed class DuelEngine
             return Reject(DuelError.InvalidBattlePosition);
         if (monster.SummonedOnTurn == State.TurnNumber || monster.PositionChangedOnTurn == State.TurnNumber ||
             monster.LastAttackTurn == State.TurnNumber) return Reject(DuelError.PositionChangeNotAllowed);
-        // Flip effects and persistent effects that restrict position changes are not implemented.
+        // Registered flip-summon triggers are collected after this transition.
+        // Unregistered flip effects and position-change restrictions remain unsupported.
         if (!rules[monster.Card.GameCardId].AllowsBasicBattle) return Reject(DuelError.UnsupportedBattleCard);
         bool flip = monster.Position == BattlePosition.FaceDownDefense;
         var changed = monster with { Position = target, PositionChangedOnTurn = State.TurnNumber,
@@ -185,8 +320,17 @@ public sealed class DuelEngine
         if (!rules[attacker.Card.GameCardId].AllowsBasicBattle ||
             defender is not null && !rules[defender.Card.GameCardId].AllowsBasicBattle)
             return Reject(DuelError.UnsupportedBattleCard);
-        var attackStats = catalog[attacker.Card.GameCardId].Statistics;
-        var defenseStats = defender is null ? null : catalog[defender.Card.GameCardId].Statistics;
+        // A battle-revealed monster's continuous effects apply before damage calculation.
+        // This is still an atomic battle; response/damage-step windows remain Stage 8 work.
+        var calculationState = State;
+        if (defender?.Position == BattlePosition.FaceDownDefense)
+        {
+            var revealed = defenderPlayer.MonsterZones.ToArray();
+            revealed[targetZone!.Value] = defender with { Position = BattlePosition.FaceUpDefense };
+            calculationState = State.With(player: defenderPlayer.With(monsters: revealed));
+        }
+        var attackStats = GetMonsterStatistics(calculationState, attackerPlayer.Id, attackerZone)!;
+        var defenseStats = defender is null ? null : GetMonsterStatistics(calculationState, defenderPlayer.Id, targetZone!.Value);
         int? defendingValue = defender?.Position == BattlePosition.FaceUpAttack ? defenseStats?.Attack : defenseStats?.Defense;
         if (attackStats.Attack is not int attack || defender is not null && defendingValue is null)
             return Reject(DuelError.UnsupportedBattleStatistics);
@@ -200,26 +344,10 @@ public sealed class DuelEngine
             defenseZones[targetZone!.Value] = defender with { Position = BattlePosition.FaceUpDefense };
             events.Add(new MonsterRevealed(defenderPlayer.Id, targetZone.Value, defender.Card));
         }
-        bool destroyAttacker = false, destroyDefender = false;
-        int damage = 0;
-        PlayerId damagedPlayer = defenderPlayer.Id;
-        if (defender is null) damage = attack;
-        else
-        {
-            int difference = attack - defendingValue!.Value;
-            if (defender.Position == BattlePosition.FaceUpAttack)
-            {
-                destroyAttacker = difference < 0 || difference == 0 && attack > 0;
-                destroyDefender = difference > 0 || difference == 0 && attack > 0;
-                damage = Math.Abs(difference);
-            }
-            else
-            {
-                destroyDefender = difference > 0;
-                damage = Math.Max(0, -difference); // No piercing damage in this subset.
-            }
-            if (difference < 0) damagedPlayer = attackerPlayer.Id;
-        }
+        var calculation = CalculateBasicBattle(attack, defendingValue, defender?.Position, attackerPlayer.Id, defenderPlayer.Id);
+        bool destroyAttacker = calculation.DestroyAttacker, destroyDefender = calculation.DestroyDefender;
+        int damage = calculation.Damage;
+        PlayerId damagedPlayer = calculation.DamagedPlayer;
         attackerPlayer = attackerPlayer.With(monsters: attackZones);
         defenderPlayer = defenderPlayer.With(monsters: defenseZones);
         DuelState next = State.With(player: attackerPlayer).With(player: defenderPlayer);
@@ -274,8 +402,11 @@ public sealed class DuelEngine
 
     private DuelActionResult Accept(DuelState state, params DuelEvent[] events)
     {
-        State = state;
-        return new(true, DuelError.None, state, Array.AsReadOnly(events));
+        var emitted = events.ToList();
+        state = PrepareBattleState(State, state, emitted);
+        state = PrepareEventEffects(State, state, emitted);
+        State = state.With(revision: checked(State.Revision + 1));
+        return new(true, DuelError.None, State, emitted.AsReadOnly());
     }
 
     private DuelActionResult Reject(DuelError error) => new(false, error, State, Array.Empty<DuelEvent>());

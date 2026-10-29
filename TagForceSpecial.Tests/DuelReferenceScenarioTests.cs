@@ -9,6 +9,7 @@ namespace TagForceSpecial.Tests;
 /// decks reproduce the observed counts and summon card; hidden state and deck
 /// identities/order are deliberately outside this comparison.
 /// </summary>
+[Trait("Category", "LocalReference")]
 public sealed class DuelReferenceScenarioTests
 {
     [Theory]
