@@ -19,10 +19,8 @@ The inventories mix as-yet-unclassified game code, CRT/SDK code and candidate fu
 
 | Metric | Recorded value |
 | --- | --- |
-| Milestone | Docker PSP compiler comparison runs; first getter mismatch recorded |
-| C# unit-test cases | 145 / 145 (2026-10-25, Europe/Berlin) |
-| C# acceptance-criterion coverage | N/A (denominator not defined) |
-| PSP reference-scenario coverage | N/A (denominator not defined) |
+| Milestone | Stage 5: three primitive state projections compared with PPSSPP |
+| Tested C# scenarios | 93 / 93 (2026-10-26, Europe/Berlin) |
 | Decoded cards | 7,254 |
 | Card getter samples compared with PPSSPP | 4 |
 | Card tables compared with PPSSPP memory | 6 tables · 932,344 **asset bytes** |
