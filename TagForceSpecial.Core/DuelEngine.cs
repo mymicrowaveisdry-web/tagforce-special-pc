@@ -6,7 +6,7 @@ namespace TagForceSpecial.Core;
 /// <summary>
 /// Deterministic two-player rules subset: opening hands, draws, phases, basic normal summons,
 /// sets, position changes, effect-free battles, hand-limit discards and defeat.
-/// No RNG, general effects, attack replays or AI. Chains and event effects require explicit opt-ins. Battles resolve in one command.
+/// No RNG, general effects, attack replays or AI. Chains, event effects and staged battle require explicit opt-ins. Atomic battle remains the compatibility default.
 /// Explicitly configured selection-only workflows pause the command loop for immutable decisions.
 /// </summary>
 public sealed partial class DuelEngine
@@ -22,6 +22,8 @@ public sealed partial class DuelEngine
     private readonly ContinuousEffectProfile[] continuousEffects;
     private readonly ContinuousNegationProfile[] continuousNegations;
     private readonly uint[] negationOrder;
+    private readonly bool experimentalBattleFlow;
+    private readonly FrozenDictionary<uint, BattleResponseProfile> battleResponses;
     public DuelState State { get; private set; }
 
     /// <summary>
@@ -38,7 +40,8 @@ public sealed partial class DuelEngine
         IEnumerable<ChainResponseProfile>? experimentalChainResponses = null,
         IEnumerable<TriggerEffectProfile>? experimentalTriggerEffects = null,
         IEnumerable<ContinuousEffectProfile>? experimentalContinuousEffects = null,
-        IEnumerable<ContinuousNegationProfile>? experimentalContinuousNegations = null)
+        IEnumerable<ContinuousNegationProfile>? experimentalContinuousNegations = null,
+        bool experimentalBattleFlow = false, IEnumerable<BattleResponseProfile>? experimentalBattleResponses = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(rules);
@@ -121,6 +124,17 @@ public sealed partial class DuelEngine
             .Concat(chainProfiles.Select(p => p.EffectId)).Concat(responses.Select(p => p.EffectId)).ToHashSet(StringComparer.Ordinal);
         if (eventIds.Distinct(StringComparer.Ordinal).Count() != eventIds.Length || eventIds.Any(reservedIds.Contains))
             throw new ArgumentException("Event effect IDs must be distinct and unreserved.");
+        this.experimentalBattleFlow = experimentalBattleFlow;
+        var battleProfiles = (experimentalBattleResponses ?? []).ToArray();
+        if (battleProfiles.Length != 0 && !experimentalBattleFlow || battleProfiles.Any(p => p is null ||
+            !this.rules.TryGetValue(p.CardId, out var sourceRule) || sourceRule.Category is not (CardCategory.Spell or CardCategory.Trap) ||
+            !sourceRule.AllowsSpellTrapSet || p.SpellSpeed == ChainSpellSpeed.Three && sourceRule.Category != CardCategory.Trap ||
+            spellEffects.ContainsKey(p.CardId) || activationContracts.ContainsKey(p.CardId) || chainEffects.ContainsKey(p.CardId) || chainResponses.ContainsKey(p.CardId) ||
+            p.SummonableCardIds.Any(id => !this.rules.TryGetValue(id, out var targetRule) || targetRule.Category != CardCategory.Monster)) ||
+            battleProfiles.Select(p => p.EffectId).Distinct(StringComparer.Ordinal).Count() != battleProfiles.Length ||
+            battleProfiles.Any(p => reservedIds.Contains(p.EffectId) || eventIds.Contains(p.EffectId)))
+            throw new ArgumentException("Battle profiles need the staged flow, distinct source/effect IDs and explicit rules.", nameof(experimentalBattleResponses));
+        battleResponses = battleProfiles.ToFrozenDictionary(p => p.CardId);
         int nextInstance = 1;
         DuelPlayerState CreatePlayer(PlayerId id, IEnumerable<uint> ids)
         {
@@ -146,6 +160,13 @@ public sealed partial class DuelEngine
         if (command is ChooseTriggerOrder) return Reject(DuelError.NoPendingTriggers);
         if (State.PendingChain is not null) return ExecuteChain(command);
         if (command is PassChainResponse or ActivateChainResponse or ResolveNextChainLink) return Reject(DuelError.NoPendingChain);
+        if (command is AdvanceBattle or PassBattleResponse or ChooseAttackReplay or ActivateBattleResponse)
+        {
+            if (!experimentalBattleFlow) return Reject(DuelError.BattleFlowNotEnabled);
+            if (State.Battle is null) return Reject(DuelError.NoBattleInProgress);
+        }
+        if (State.Battle is not null)
+            return State.ResearchSliceComplete ? Reject(DuelError.ResearchSliceComplete) : ExecuteBattleFlow(command);
         if (command.Player != State.ActivePlayer) return Reject(DuelError.NotActivePlayer);
         if (State.ResearchSliceComplete) return Reject(DuelError.ResearchSliceComplete);
         if (command is DecisionCommand answer) return AnswerDecision(answer);
@@ -204,6 +225,12 @@ public sealed partial class DuelEngine
             (DuelPhase.Main1, DuelPhase.Battle) or (DuelPhase.Main1, DuelPhase.End) or
             (DuelPhase.Battle, DuelPhase.Main2) or (DuelPhase.Main2, DuelPhase.End);
         if (!valid) return Reject(DuelError.InvalidPhaseTransition);
+        if (target == DuelPhase.Battle && experimentalBattleFlow)
+        {
+            var battle = new BattleState(BattleStep.Start, null, NewBattleWindow(BattleTiming.Start, State.ActivePlayer));
+            return Accept(State.With(phase: target).WithBattle(battle), new PhaseChanged(State.Phase, target),
+                new BattleStepChanged(null, BattleStep.Start), new BattleResponseRequested(battle.Window));
+        }
         return Accept(State.With(phase: target), new PhaseChanged(State.Phase, target));
     }
 
@@ -317,26 +344,10 @@ public sealed partial class DuelEngine
             defenseZones[targetZone!.Value] = defender with { Position = BattlePosition.FaceUpDefense };
             events.Add(new MonsterRevealed(defenderPlayer.Id, targetZone.Value, defender.Card));
         }
-        bool destroyAttacker = false, destroyDefender = false;
-        int damage = 0;
-        PlayerId damagedPlayer = defenderPlayer.Id;
-        if (defender is null) damage = attack;
-        else
-        {
-            int difference = attack - defendingValue!.Value;
-            if (defender.Position == BattlePosition.FaceUpAttack)
-            {
-                destroyAttacker = difference < 0 || difference == 0 && attack > 0;
-                destroyDefender = difference > 0 || difference == 0 && attack > 0;
-                damage = Math.Abs(difference);
-            }
-            else
-            {
-                destroyDefender = difference > 0;
-                damage = Math.Max(0, -difference); // No piercing damage in this subset.
-            }
-            if (difference < 0) damagedPlayer = attackerPlayer.Id;
-        }
+        var calculation = CalculateBasicBattle(attack, defendingValue, defender?.Position, attackerPlayer.Id, defenderPlayer.Id);
+        bool destroyAttacker = calculation.DestroyAttacker, destroyDefender = calculation.DestroyDefender;
+        int damage = calculation.Damage;
+        PlayerId damagedPlayer = calculation.DamagedPlayer;
         attackerPlayer = attackerPlayer.With(monsters: attackZones);
         defenderPlayer = defenderPlayer.With(monsters: defenseZones);
         DuelState next = State.With(player: attackerPlayer).With(player: defenderPlayer);
@@ -392,6 +403,7 @@ public sealed partial class DuelEngine
     private DuelActionResult Accept(DuelState state, params DuelEvent[] events)
     {
         var emitted = events.ToList();
+        state = PrepareBattleState(State, state, emitted);
         state = PrepareEventEffects(State, state, emitted);
         State = state.With(revision: checked(State.Revision + 1));
         return new(true, DuelError.None, State, emitted.AsReadOnly());

@@ -1,6 +1,6 @@
 namespace TagForceSpecial.Core;
 
-public enum MonsterEventKind { NormalSummoned, SpecialSummoned, FlipSummoned, Destroyed, SentToGraveyard }
+public enum MonsterEventKind { NormalSummoned, SpecialSummoned, FlipSummoned, Destroyed, SentToGraveyard, FlippedFaceUp }
 public enum EffectRelation { Self, Controller, Opponent, Any }
 public enum TriggerRequirement { Mandatory, Optional }
 public enum TriggerSourceLocation { FaceUpMonster, DestroyedSelf, GraveyardSelf }
@@ -79,6 +79,7 @@ public sealed class TriggerEffectProfile
     public TriggerRequirement Requirement { get; }
     public TriggerSourceLocation SourceLocation { get; }
     public TriggerTiming Timing { get; }
+    public bool? DamageStepAllowed { get; }
     public TriggerTurnLimit TurnLimit { get; }
     public string LimitKey { get; }
     public int LifePointCost { get; }
@@ -92,17 +93,17 @@ public sealed class TriggerEffectProfile
         TriggerSourceLocation sourceLocation = TriggerSourceLocation.FaceUpMonster,
         TriggerTiming timing = TriggerTiming.If, TriggerTurnLimit turnLimit = TriggerTurnLimit.None,
         string? limitKey = null, int lifePointCost = 0, IEnumerable<uint>? discardCardIds = null,
-        MonsterTargetPolicy? target = null)
+        MonsterTargetPolicy? target = null, bool? damageStepAllowed = null)
         : this(effectId, cardId, eventKind, relation, requirement,
             [new TriggerEffectStep([new TriggerEffectAction(operation, lifePointGain, attackDelta, defenseDelta)])],
-            sourceLocation, timing, turnLimit, limitKey, lifePointCost, discardCardIds, target) { }
+            sourceLocation, timing, turnLimit, limitKey, lifePointCost, discardCardIds, target, damageStepAllowed) { }
 
     public TriggerEffectProfile(string effectId, uint cardId, MonsterEventKind eventKind,
         EffectRelation relation, TriggerRequirement requirement, IEnumerable<TriggerEffectStep> steps,
         TriggerSourceLocation sourceLocation = TriggerSourceLocation.FaceUpMonster,
         TriggerTiming timing = TriggerTiming.If, TriggerTurnLimit turnLimit = TriggerTurnLimit.None,
         string? limitKey = null, int lifePointCost = 0, IEnumerable<uint>? discardCardIds = null,
-        MonsterTargetPolicy? target = null)
+        MonsterTargetPolicy? target = null, bool? damageStepAllowed = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(effectId);
         ArgumentNullException.ThrowIfNull(steps);
@@ -125,7 +126,7 @@ public sealed class TriggerEffectProfile
             eventKind is MonsterEventKind.Destroyed or MonsterEventKind.SentToGraveyard))
             throw new ArgumentException("Target policy and resolution operations do not agree.");
         EffectId = effectId; CardId = cardId; EventKind = eventKind; Relation = relation;
-        Requirement = requirement; SourceLocation = sourceLocation; Timing = timing;
+        Requirement = requirement; SourceLocation = sourceLocation; Timing = timing; DamageStepAllowed = damageStepAllowed;
         TurnLimit = turnLimit; LimitKey = limitKey ?? effectId; LifePointCost = lifePointCost;
         DiscardCardIds = Array.AsReadOnly(discards); Target = target; Steps = Array.AsReadOnly(copy);
     }

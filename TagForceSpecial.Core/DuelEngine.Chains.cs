@@ -29,8 +29,17 @@ public sealed partial class DuelEngine
         {
             if (response.SpellTrapZone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
             var source = State.GetPlayer(command.Player).SpellTrapFields[response.SpellTrapZone];
+            if (source is not null && battleResponses.TryGetValue(source.Card.GameCardId, out var battleProfile))
+                return BeginBattleResponse(command.Player, response.SpellTrapZone, response.SummonedCardInstanceId, response.MonsterZone, battleProfile);
+            if (response.SummonedCardInstanceId is not null || response.MonsterZone is not null)
+                return Reject(DuelError.InvalidDecisionChoice);
             if (source is not null && chainResponses.TryGetValue(source.Card.GameCardId, out var profile))
+            {
+                if (State.Battle is { } battle && !profile.BattleWindows.HasFlag(battle.Window.Timing))
+                    return Reject(DuelError.UnsupportedBattleResponse);
                 return BeginChainResponse(chain, response.SpellTrapZone, source, profile);
+            }
+            if (State.Battle is not null) return Reject(DuelError.UnsupportedBattleResponse);
             return AddTokenResponse(chain, response.SpellTrapZone);
         }
         var passes = chain.ConsecutivePasses + 1;
@@ -132,6 +141,11 @@ public sealed partial class DuelEngine
                     events.Add(new TokenSpecialSummoned(player.Id, empty[i], token));
                 }
                 next = next.With(player: player.With(monsters: zones));
+                break;
+            }
+            case ChainOperation.BattleResponse:
+            {
+                next = ResolveBattleResponse(next, link, events);
                 break;
             }
             case ChainOperation.TriggerEffect:

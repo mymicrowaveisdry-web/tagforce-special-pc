@@ -27,7 +27,7 @@ public sealed partial class DuelEngine
             n.Target.IsStillPresent(state)).Select(n => n.Target).ToHashSet();
         // Dependency order, not card/zone priority. Cyclic dependencies fail closed at registration.
         foreach (uint id in negationOrder)
-            foreach (var (source, _) in monsters.Where(e => e.Monster.Card.GameCardId == id))
+            foreach (var (source, _) in monsters.Where(e => e.Monster.Card.GameCardId == id && !e.Monster.BattleDestroyed))
                 if (!negated.Contains(source))
                     foreach (var profile in continuousNegations.Where(p => p.CardId == id).OrderBy(p => p.EffectId, StringComparer.Ordinal))
                         foreach (var (target, _) in monsters)

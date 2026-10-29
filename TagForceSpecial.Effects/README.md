@@ -107,3 +107,12 @@ once-per-turn use limits, optional-when timing, negation, LP gains, placement-bo
 temporary deltas and aura removal. No real trigger/continuous
 card profile is declared fully supported. See the [Core contract](../TagForceSpecial.Core/README.md#stage-7-event-driven-triggers-and-continuous-stats)
 for supported events, durations, response integration and remaining timing rules.
+
+## Staged battle research
+
+The separate `experimentalBattleFlow`/`experimentalBattleResponses` opt-ins add
+phase/step windows, replay decisions and scoped set responses. Core owns their
+state transitions and shared damage calculation. Battle profiles in tests use
+invented cards; existing real-card research factories do not automatically gain
+battle or Damage Step legality. See the [Stage 8 contract](../TagForceSpecial.Core/README.md#stage-8-interruptible-battle-flow)
+for commands, explicit window metadata, supported exceptions and reference limits.
