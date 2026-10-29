@@ -133,9 +133,23 @@ validates matching commitment kinds and explicit Spell/Monster metadata.
 
 `PassChainResponse(player, decisionId)` alternates responders. Two consecutive
 passes close the response window. `ActivateChainResponse(player, decisionId, zone)`
-only exposes the retained opponent's targeted Scapegoat response to Typhoon; it preserves
-the target placement token and resets the pass count. No other response card,
-hand activation, third link, negation or general response timing is enabled.
+preserves the source placement and resets passes after commitment. The opponent's
+targeted Scapegoat response retains its original two-link restriction.
+
+The separate `experimentalChainResponses` argument registers immutable
+`ChainResponseProfile` metadata for previously set responses. It is empty by
+default. Supported operations are bound back-row destruction, activation negation
+and effect-only negation. Profiles declare response speed, eligible discard IDs,
+optional preceding source category and whether negation destroys that source.
+Only speed 2/3 responses are accepted; a speed 2 response cannot follow speed 3.
+Sources must be face-down and set on an earlier turn. Hand responses, general
+timing windows, protection effects and full card legality remain unsupported.
+
+Costs and target choices use the existing decision commands, owned by the
+responder rather than necessarily the active turn player. Invalid answers reject
+atomically; a paid discard remains paid while a target choice waits. Each receipt
+is stored in its chain link; `State.CommittedActivation` retains the initial
+activation receipt. A negation response binds the immediately preceding link.
 
 `ResolveNextChainLink(activePlayer, decisionId)` advances one complete link in
 reverse order, with no responses during resolution. Both players' commands go
@@ -148,12 +162,23 @@ The four tokens resolve before Typhoon destroys the bound Scapegoat. Its face-up
 change preserves target identity; its later destruction does not remove tokens.
 Source cleanup follows the last link and does not duplicate a destroyed source.
 Completion freezes the research slice without a duel result or later token play.
-Missing/replaced targets reject `UnsupportedChainResolution` without mutation;
-this deliberately does not invent native fizzle, retarget or refund behavior.
+Typhoon's missing/replaced target skips destruction, emits `ChainLinkSkipped`
+and continues through cleanup without retargeting. Negated links also emit a skip
+reason before completing. `ChainLink.Negation` distinguishes effect-only and
+activation negation; both suppress the effect, while only the latter sets
+`ActivationNegated`. Source destruction is a separate profile policy and checks
+the bound source placement. Paid costs stay in graveyard, even if a response is
+itself negated. Source cleanup appends each surviving source once and emits
+`ChainTrapSentToGraveyard` for Traps. At most 16 links may be committed.
 
 The alternating-pass protocol, revision IDs, explicit resolution stepping, token
 instance/zone allocation and event ordering are PC design choices. Local reference
 tests compare retained repeated paid/committed, four-token and final state
-projections. They do not establish PSP response priority or internal cleanup order.
-Native rejection, interruption, negation and broader activation windows remain
-required before the roadmap's stage 6 completion gate can pass.
+projections. Native controller analysis corroborates other-player-first offers,
+reverse resolution, distinct negation flags and target identity revalidation.
+New synthetic interaction tests exercise the interpreted contract, including
+negating a negation and destroying a lower link's source without negating it.
+Effect-only negation is an engine primitive tested with invented profiles; no
+real effect-only card's complete eligibility is advertised. Fresh native
+rejection, interruption and negation replays remain required before the roadmap's
+stage 6 completion gate can pass.
