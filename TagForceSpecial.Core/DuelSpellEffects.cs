@@ -17,7 +17,7 @@ public sealed class DeckSpecialSummonSpell
         bool banishAtEndPhase = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(effectId);
-        if (spellCardId is 0 or > 0x3fff) throw new ArgumentOutOfRangeException(nameof(spellCardId));
+        if (spellCardId == 0) throw new ArgumentOutOfRangeException(nameof(spellCardId));
         var cardStep = DecisionStep.Card(DecisionCardSource.Deck, eligibleMonsterIds);
         EffectId = effectId;
         SpellCardId = spellCardId;
