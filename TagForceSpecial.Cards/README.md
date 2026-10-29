@@ -1,9 +1,16 @@
-# Card database models
+# Card catalog
 
-Immutable normalized card records and a catalog keyed by game-local ID. Source
-hashes and raw row fields preserve provenance. Numeric codes remain uninterpreted;
-null ATK/DEF preserves the variable-stat sentinel. No game assets are bundled.
+Immutable records keyed by nonzero `uint` IDs, with direct nonnegative stats
+and nullable variable values. Gameplay requires explicit Core rules/effects.
 
-The local PSP import adapter is in TagForceSpecial.Tools; binary readers remain
-in TagForceSpecial.Assets. This project has no format, renderer or emulator dependency.
-See [research status](../docs/STATUS.md) for evidence and pending visual checks.
+```csharp
+var additions = new CardCatalog(new(null, "my-cards-v1"), [
+    new CardDefinition(100_000, "Additional monster", "Authored card text.",
+        new CardStatistics(9999, 5501, 4))
+]);
+var combined = importedCatalog.Merge(additions);
+```
+
+`Merge` rejects ID collisions and preserves per-card origins and imported rows.
+Authored cards need no PSP metadata; supplied hashes must be valid SHA-256.
+Tools validates PSP encoding at import. Cards has no binary-reader or emulator dependency.

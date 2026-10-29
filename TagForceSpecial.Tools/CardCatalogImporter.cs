@@ -22,11 +22,13 @@ public static class CardCatalogImporter
             {
                 var p = detail.Properties;
                 var row = rows[detail.CardId];
-                return new CardDefinition(detail.CardId, detail.Name, detail.Description,
+                var card = new CardDefinition(detail.CardId, detail.Name, detail.Description,
                     new(p.Attack, p.Defense, p.Level),
                     new(p.AttributeCode, p.TypeCode, p.RawKindCode, p.GetterKindCode,
                         p.IconCode, p.Field23To26, p.Field27To30),
                     new(row.InternalIndex, row.RawPropertyWord0, row.RawPropertyWord1, row.RawDescriptionIndex));
+                PspCardCatalogValidator.Validate(card);
+                return card;
             }).ToArray();
             source.Position = 0;
             if (Convert.ToHexStringLower(SHA256.HashData(source)) != before)

@@ -33,18 +33,31 @@ public static class ProgressPresentation
         var output = new StringBuilder();
         output.AppendLine("## Progress");
         output.AppendLine();
-        output.AppendLine("**Verified native PSP code bytes** (relative to currently inventoried executable text):");
-        output.AppendLine();
-        output.AppendLine($"`{NativeByteProgress.Bar(matches.MatchedBytes, inventoried)}` **{NativeByteProgress.Percent(matches.MatchedBytes, inventoried)}** — {N(matches.MatchedBytes)} / {N(inventoried)} bytes");
-        output.AppendLine();
-        output.AppendLine($"**{N(matches.MatchedFunctions)}** native functions matched · **{N(candidates)}** discovered candidates · **{N(config.Research.DecodedCards)}** decoded cards · **{N(config.Validation.Passed)}/{N(config.Validation.Total)}** C# tests (last recorded {config.Validation.Date})");
-        output.AppendLine();
         output.AppendLine($"**Current milestone:** {Safe(config.Implementation.Milestone)}");
         output.AppendLine();
-        output.AppendLine(string.Join(" · ", CoverageScopes(coverage).Select(scope =>
-            $"**{Safe(scope.Label)}:** {ResearchValidation.FormatCoverage(scope)}")));
+        output.AppendLine("| Measure | Recorded status |");
+        output.AppendLine("| --- | --- |");
+        output.AppendLine($"| C# tests | **{N(config.Validation.Passed)}/{N(config.Validation.Total)}** (last recorded {config.Validation.Date}) |");
+        foreach (var scope in CoverageScopes(coverage))
+            output.AppendLine($"| {Safe(scope.Label)} | {ResearchValidation.FormatCoverage(scope)} |");
+        output.AppendLine($"| Decoded cards | {N(config.Research.DecodedCards)}; full visual acceptance remains pending |");
         output.AppendLine();
-        output.AppendLine("This is **not** a whole-game completion percentage: the denominator is a partial, unclassified inventory and may grow. CI validates committed match evidence metadata; it cannot rerun PSP byte comparisons without the proprietary game binaries. C# behavioral matches and asset decoding are separate metrics.");
+        output.AppendLine($"**Implemented subset:** {Safe(string.Join(", ", config.Implementation.CompletedFeatures))}.");
+        output.AppendLine();
+        output.AppendLine($"**Still to build:** {Safe(string.Join(", ", config.Implementation.PendingFeatures))}.");
+        output.AppendLine();
+        output.AppendLine("Passing tests and decoded assets are not a whole-game completion percentage. PSP comparisons cover only their declared inputs and behavior; a supported duel in the PC application remains a separate acceptance gate.");
+        output.AppendLine();
+        output.AppendLine("<details>");
+        output.AppendLine("<summary>Optional native byte-matching research</summary>");
+        output.AppendLine();
+        output.AppendLine($"`{NativeByteProgress.Bar(matches.MatchedBytes, inventoried)}` **{NativeByteProgress.Percent(matches.MatchedBytes, inventoried)}** — {N(matches.MatchedBytes)} / {N(inventoried)} inventoried executable bytes");
+        output.AppendLine();
+        output.AppendLine($"**{N(matches.MatchedFunctions)}** native functions matched · **{N(candidates)}** discovered candidates.");
+        output.AppendLine();
+        output.AppendLine("This measures only exact native reconstruction against a partial, unclassified inventory. It is not PC-build progress and does not gate the C# rewrite. CI checks evidence metadata; original-byte comparisons require local proprietary inputs.");
+        output.AppendLine();
+        output.AppendLine("</details>");
         output.AppendLine();
         output.AppendLine("[Detailed status](docs/STATUS.md) · [Roadmap](docs/ROADMAP.md) · [Updating progress](docs/DEVELOPMENT.md)");
         return output.ToString();
@@ -57,19 +70,6 @@ public static class ProgressPresentation
         long executableBytes = inventories.Sum(x => x.Module.ExecutableBytes);
         var s = new StringBuilder();
         s.AppendLine("## Generated status");
-        s.AppendLine();
-        s.AppendLine($"`{NativeByteProgress.Bar(matches.MatchedBytes, executableBytes)}` **{NativeByteProgress.Percent(matches.MatchedBytes, executableBytes)}** · **{N(matches.MatchedBytes)} / {N(executableBytes)}** inventoried executable bytes (verified native matches)");
-        s.AppendLine();
-        s.AppendLine("| Module | Function candidates | Native matches | Matched bytes / inventoried bytes | Coverage |");
-        s.AppendLine("| --- | ---: | ---: | ---: | ---: |");
-        foreach (var module in inventories)
-        {
-            string key = module.Module.Name;
-            long bytes = matches.ModuleBytes[key];
-            s.AppendLine($"| `{Safe(key)}` | {N(module.Functions.Count)} | {N(matches.ModuleFunctions[key])} | {N(bytes)} / {N(module.Module.ExecutableBytes)} | {NativeByteProgress.Percent(bytes, module.Module.ExecutableBytes)} |");
-        }
-        s.AppendLine();
-        s.AppendLine("The inventories mix as-yet-unclassified game code, CRT/SDK code and candidate function boundaries. This denominator is **only currently inventoried executable text**, not a measured whole-game scope. Overlapping candidates are never summed as coverage. Native byte matches require matched original/rebuilt code digests and recorded evidence; CI cannot reproduce those comparisons without the original binaries.");
         s.AppendLine();
         s.AppendLine("### C# reconstruction and asset research");
         s.AppendLine();
@@ -86,6 +86,23 @@ public static class ProgressPresentation
         s.AppendLine($"| Card-screen visual acceptance | {Safe(config.Research.VisualAcceptance)} |");
         s.AppendLine($"| Implemented subset | {Safe(string.Join(", ", config.Implementation.CompletedFeatures))} |");
         s.AppendLine($"| Pending | {Safe(string.Join(", ", config.Implementation.PendingFeatures))} |");
+        s.AppendLine();
+        s.AppendLine("These tests and bounded reference comparisons do not establish whole-game completion or a playable PC application. Native byte equality is optional and does not gate functional reconstruction or PC integration.");
+        s.AppendLine();
+        s.AppendLine("### Optional native byte-matching research");
+        s.AppendLine();
+        s.AppendLine($"`{NativeByteProgress.Bar(matches.MatchedBytes, executableBytes)}` **{NativeByteProgress.Percent(matches.MatchedBytes, executableBytes)}** · **{N(matches.MatchedBytes)} / {N(executableBytes)}** inventoried executable bytes (verified native matches)");
+        s.AppendLine();
+        s.AppendLine("| Module | Function candidates | Native matches | Matched bytes / inventoried bytes | Coverage |");
+        s.AppendLine("| --- | ---: | ---: | ---: | ---: |");
+        foreach (var module in inventories)
+        {
+            string key = module.Module.Name;
+            long bytes = matches.ModuleBytes[key];
+            s.AppendLine($"| `{Safe(key)}` | {N(module.Functions.Count)} | {N(matches.ModuleFunctions[key])} | {N(bytes)} / {N(module.Module.ExecutableBytes)} | {NativeByteProgress.Percent(bytes, module.Module.ExecutableBytes)} |");
+        }
+        s.AppendLine();
+        s.AppendLine("The inventories mix as-yet-unclassified game code, CRT/SDK code and candidate function boundaries. This denominator is **only currently inventoried executable text**, not a measured whole-game scope. Overlapping candidates are never summed as coverage. Native byte matches require matched original/rebuilt code digests and recorded evidence; CI cannot reproduce those comparisons without the original binaries.");
         s.AppendLine();
         s.AppendLine($"Inventory recorded: {config.InventoryDate}. Tests and research counts are recorded snapshots; CI does not include the original game ISO or rerun PPSSPP evidence capture.");
         s.AppendLine();
