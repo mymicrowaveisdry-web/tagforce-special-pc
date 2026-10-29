@@ -5,6 +5,9 @@ public sealed partial class DuelEngine
     private DuelActionResult ExecuteChain(DuelCommand command)
     {
         var chain = State.PendingChain!;
+        if (State.PendingDecision is not null)
+            return command is DecisionCommand answer ? AnswerDecision(answer) : Reject(DuelError.DecisionPending);
+        if (command is DecisionCommand) return Reject(DuelError.NoPendingDecision);
         var id = command switch
         {
             PassChainResponse c => c.DecisionId,
@@ -22,7 +25,15 @@ public sealed partial class DuelEngine
         }
         if (command is ResolveNextChainLink) return Reject(DuelError.ChainPending);
         if (command.Player != chain.Responder) return Reject(DuelError.NotChainResponder);
-        if (command is ActivateChainResponse response) return AddTokenResponse(chain, response.SpellTrapZone);
+        if (command is ActivateChainResponse response)
+        {
+            if (chain.Links.Count >= PendingChain.MaximumLinks) return Reject(DuelError.ChainLimitReached);
+            if (response.SpellTrapZone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
+            var source = State.GetPlayer(command.Player).SpellTrapFields[response.SpellTrapZone];
+            if (source is not null && chainResponses.TryGetValue(source.Card.GameCardId, out var profile))
+                return BeginChainResponse(chain, response.SpellTrapZone, source, profile);
+            return AddTokenResponse(chain, response.SpellTrapZone);
+        }
         var passes = chain.ConsecutivePasses + 1;
         var next = new PendingChain(checked(State.Revision + 1), chain.Links, Other(chain.Responder),
             passes, passes == 2 ? chain.Links.Count : 0);
@@ -37,8 +48,7 @@ public sealed partial class DuelEngine
         if (zone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
         var player = State.GetPlayer(chain.Responder);
         var source = player.SpellTrapFields[zone];
-        // Only the retained two-link experiment is exposed. Other response cards,
-        // hand activations, negation, and longer chains fail closed.
+        // The token dependency remains limited to the retained two-link scenario.
         if (player.Id == State.ActivePlayer || chain.Links.Count != 1 ||
             chain.Links[0].Operation != ChainOperation.DestroyBoundSpellTrap ||
             source is null || source.IsFaceUp || source.SetOnTurn >= State.TurnNumber ||
@@ -52,7 +62,7 @@ public sealed partial class DuelEngine
         var slots = player.SpellTrapFields.ToArray();
         slots[zone] = source with { IsFaceUp = true }; // same uninterrupted placement
         var receipt = new CommittedActivation(player.Id, effect.EffectId, source.Card, zone, null, null);
-        var link = new ChainLink(2, receipt, source.PlacementId, effect.Operation);
+        var link = new ChainLink(2, receipt, source.PlacementId, effect.Operation, ChainSpellSpeed.Two);
         var next = new PendingChain(checked(State.Revision + 1), chain.Links.Append(link), Other(player.Id));
         return Accept(State.With(player: player.With(spellTraps: slots)).WithChain(next),
             new SpellActivated(player.Id, effect.EffectId, source.Card, zone), new ChainLinkAdded(link),
@@ -64,8 +74,12 @@ public sealed partial class DuelEngine
         var link = chain.Links[chain.NextLink - 1];
         var activation = link.Activation;
         var next = State;
+        var links = chain.Links.ToArray();
         List<DuelEvent> events = [];
-        switch (link.Operation)
+        if (link.EffectNegated)
+            events.Add(new ChainLinkSkipped(link.Number, link.ActivationNegated
+                ? ChainSkipReason.ActivationNegated : ChainSkipReason.EffectNegated));
+        else switch (link.Operation)
         {
             case ChainOperation.DestroyOpposingFaceUpMonsters:
             {
@@ -86,10 +100,13 @@ public sealed partial class DuelEngine
             {
                 var target = activation.Target!;
                 var player = next.GetPlayer(target.Player);
-                // No native changed-target outcome is established. Preserve the
-                // entire pre-command state and stop instead of inventing a fizzle.
+                // Native Typhoon's target validator returns without issuing
+                // destruction for an absent or different placement. No retargeting.
                 if (!target.IsStillPresent(player.SpellTrapFields[target.Zone]))
-                    return Reject(DuelError.UnsupportedChainResolution);
+                {
+                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
+                    break;
+                }
                 var slots = player.SpellTrapFields.ToArray();
                 slots[target.Zone] = null;
                 next = next.With(player: player.With(spellTraps: slots, graveyard: player.Graveyard.Append(target.Card)));
@@ -116,16 +133,43 @@ public sealed partial class DuelEngine
                 next = next.With(player: player.With(monsters: zones));
                 break;
             }
+            case ChainOperation.NegateActivation:
+            case ChainOperation.NegateEffect:
+            {
+                if (link.TargetLinkNumber is not int number || number < 1 || number >= link.Number)
+                    return Reject(DuelError.InvalidEffectState);
+                var target = links[number - 1];
+                var negation = link.Operation == ChainOperation.NegateActivation || target.ActivationNegated
+                    ? ChainNegation.Activation : ChainNegation.Effect;
+                links[number - 1] = target with { Negation = negation };
+                events.Add(new ChainLinkNegated(number, link.Number, negation));
+                // This is explicit per-profile policy; negation alone never
+                // destroys a source or refunds an already committed cost.
+                if (link.DestroyNegatedSource)
+                {
+                    var receipt = target.Activation;
+                    var player = next.GetPlayer(receipt.Player);
+                    var field = player.SpellTrapFields[receipt.SpellTrapZone];
+                    if (field is not null && field.Card == receipt.Spell && field.PlacementId == target.SourcePlacementId)
+                    {
+                        var slots = player.SpellTrapFields.ToArray();
+                        slots[receipt.SpellTrapZone] = null;
+                        next = next.With(player: player.With(spellTraps: slots, graveyard: player.Graveyard.Append(receipt.Spell)));
+                        events.Add(new SpellTrapDestroyed(player.Id, receipt.SpellTrapZone, receipt.Spell));
+                    }
+                }
+                break;
+            }
             default: return Reject(DuelError.UnsupportedChainResolution);
         }
         events.Add(new ChainLinkResolved(link.Number, activation.EffectId));
         if (chain.NextLink > 1)
-            return Accept(next.WithChain(new(checked(State.Revision + 1), chain.Links, chain.Responder,
+            return Accept(next.WithChain(new(checked(State.Revision + 1), links, chain.Responder,
                 chain.ConsecutivePasses, chain.NextLink - 1)), events.ToArray());
 
         // Normal/Quick-Play sources remain on the field while links resolve.
         // A source already destroyed as a target must not be sent a second time.
-        foreach (var entry in chain.Links.Reverse())
+        foreach (var entry in links.Reverse())
         {
             var receipt = entry.Activation;
             var player = next.GetPlayer(receipt.Player);
@@ -134,7 +178,9 @@ public sealed partial class DuelEngine
             var slots = player.SpellTrapFields.ToArray();
             slots[receipt.SpellTrapZone] = null;
             next = next.With(player: player.With(spellTraps: slots, graveyard: player.Graveyard.Append(receipt.Spell)));
-            events.Add(new SpellSentToGraveyard(player.Id, receipt.Spell, receipt.SpellTrapZone));
+            events.Add(rules[receipt.Spell.GameCardId].Category == CardCategory.Trap
+                ? new ChainTrapSentToGraveyard(player.Id, receipt.Spell, receipt.SpellTrapZone)
+                : new SpellSentToGraveyard(player.Id, receipt.Spell, receipt.SpellTrapZone));
         }
         events.Add(new ChainCompleted());
         return Accept(next.WithChain(null).WithDecision(null, State.DecisionResult, researchSliceComplete: true), events.ToArray());

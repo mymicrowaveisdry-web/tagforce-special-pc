@@ -77,6 +77,22 @@ Vortex or Typhoon/Scapegoat chain, then freeze. Register them through Core's
 Scapegoat requires explicit Monster rules for token IDs 3902-3905 and a previously
 set, targeted source with four empty slots. Its token allocation is a deterministic
 PC policy; later token play and full Scapegoat support are outside this slice.
-Native missing-target, replacement/re-entry, response priority and negation/refund
-outcomes remain research gates. The activation-only profiles still freeze unless
-the separate chain profiles are enabled.
+The activation-only profiles still freeze unless separate chain profiles are enabled.
+
+`ChainResearch.MysticalSpaceTyphoonResponse()` and
+`ChainResearch.MagicJammer(allowedDiscardIds)` register through the separate
+`experimentalChainResponses` argument. They require explicit ordinary set rules
+for their source IDs; Magic Jammer (4862) is a Trap. Typhoon requires matching
+initial chain/activation profiles when those are also registered. Its set response
+requests a back-row target. Magic Jammer responds to a Spell, pays one eligible
+owned discard and commits a speed-3 link that negates the preceding activation
+and destroys its still-present source placement. It does not refund either cost.
+
+These are native-static-code-backed research branches with synthetic managed
+interaction tests. They do not establish all card restrictions, protection,
+activation windows, refund exceptions or fresh PSP outcome equivalence. The Core
+effect-only negation primitive is tested with invented profiles; The Dragon's
+Bead and other real effect-only cards are not made playable by that primitive.
+Typhoon now continues without destruction if its bound target is absent/replaced,
+using the inspected native validator path. Re-entry and broader movement cases
+still need original gameplay replays. The slice freezes after chain cleanup.

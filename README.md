@@ -39,8 +39,12 @@ a Spell/Trap target to its card instance and field placement. These stop before
 responses or effect resolution unless a separate chain research profile is enabled.
 That default-off slice supports explicit passes, Vortex resolution and a targeted
 Typhoon/Scapegoat two-link chain through token creation and cleanup, then stops.
-It does not make those cards generally playable. Native priority, negation and
-interrupted-resolution cases remain unverified; stage 6 is still in progress.
+Additional default-off response profiles support set Typhoon responses and a
+discard-paid Magic Jammer branch. The engine distinguishes activation negation
+from effect-only negation, preserves paid costs, and lets Typhoon finish without
+destruction when its bound target is gone. These contracts follow native static
+analysis with synthetic interaction tests; fresh PSP negation/interruption replays
+remain pending. They do not make those cards generally playable; stage 6 is in progress.
 
 General effects, broader response windows/chains, shuffle, delayed-effect
 handling, opponent AI, rendering, input and first-launch asset import remain

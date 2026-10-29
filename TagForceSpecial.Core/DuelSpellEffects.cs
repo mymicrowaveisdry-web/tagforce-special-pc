@@ -30,7 +30,7 @@ public sealed class DeckSpecialSummonSpell
 
 public sealed record FieldSpellTrap(CardInstance Card, bool IsFaceUp, long PlacementId = 0, int SetOnTurn = 0);
 public sealed record PendingSpellActivation(PlayerId Player, string EffectId, CardInstance Spell, int SpellTrapZone,
-    CardInstance? DiscardedCost = null);
+    CardInstance? DiscardedCost = null, int ResponseToLink = 0, long SourcePlacementId = 0);
 public sealed record ActivateSpell(PlayerId Player, int CardInstanceId, int SpellTrapZone) : DuelCommand(Player);
 public sealed record SpellActivated(PlayerId Player, string EffectId, CardInstance Card, int Zone) : DuelEvent;
 public sealed record MonsterSpecialSummoned(PlayerId Player, FieldMonster Monster, int Zone, DecisionCardSource Source) : DuelEvent;
