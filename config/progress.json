@@ -44,9 +44,9 @@
     }
   },
   "validation": {
-    "passed": 145,
-    "total": 145,
-    "date": "2026-10-25"
+    "passed": 93,
+    "total": 93,
+    "date": "2026-10-26"
   },
   "implementation": {
     "milestone": "Docker PSP compiler comparison runs; first getter mismatch recorded",
