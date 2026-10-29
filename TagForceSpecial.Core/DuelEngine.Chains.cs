@@ -35,7 +35,7 @@ public sealed partial class DuelEngine
         }
         var passes = chain.ConsecutivePasses + 1;
         var next = new PendingChain(checked(State.Revision + 1), chain.Links, Other(chain.Responder),
-            passes, passes == 2 ? chain.Links.Count : 0);
+            passes, passes == 2 ? chain.Links.Count : 0, chain.FreezeOnCompletion);
         return passes == 2
             ? Accept(State.WithChain(next), new ChainResponsePassed(command.Player), new ChainResolutionStarted(chain.Links.Count))
             : Accept(State.WithChain(next), new ChainResponsePassed(command.Player),
@@ -62,7 +62,7 @@ public sealed partial class DuelEngine
         slots[zone] = source with { IsFaceUp = true }; // same uninterrupted placement
         var receipt = new CommittedActivation(player.Id, effect.EffectId, source.Card, zone, null, null);
         var link = new ChainLink(2, receipt, source.PlacementId, effect.Operation, ChainSpellSpeed.Two);
-        var next = new PendingChain(checked(State.Revision + 1), chain.Links.Append(link), Other(player.Id));
+        var next = new PendingChain(checked(State.Revision + 1), chain.Links.Append(link), Other(player.Id), freezeOnCompletion: chain.FreezeOnCompletion);
         return Accept(State.With(player: player.With(spellTraps: slots)).WithChain(next),
             new SpellActivated(player.Id, effect.EffectId, source.Card, zone), new ChainLinkAdded(link),
             new ChainResponseRequested(next.Responder, next.DecisionId));
@@ -125,11 +125,17 @@ public sealed partial class DuelEngine
                 for (int i = 0; i < 4; i++)
                 {
                     var card = new CardInstance(checked(++instance), profile.TokenCardIds[i], player.Id);
-                    var token = new FieldMonster(card, BattlePosition.FaceUpDefense, SummonedOnTurn: State.TurnNumber);
+                    var token = new FieldMonster(card, BattlePosition.FaceUpDefense, SummonedOnTurn: State.TurnNumber, PlacementId: checked(State.Revision + 1));
                     zones[empty[i]] = token;
                     events.Add(new TokenSpecialSummoned(player.Id, empty[i], token));
                 }
                 next = next.With(player: player.With(monsters: zones));
+                break;
+            }
+            case ChainOperation.TriggerEffect:
+            {
+                if (link.Trigger is not { } trigger) return Reject(DuelError.InvalidEffectState);
+                next = ResolveTrigger(next, trigger, events);
                 break;
             }
             case ChainOperation.NegateActivation:
@@ -144,7 +150,7 @@ public sealed partial class DuelEngine
                 events.Add(new ChainLinkNegated(number, link.Number, negation));
                 // This is explicit per-profile policy; negation alone never
                 // destroys a source or refunds an already committed cost.
-                if (link.DestroyNegatedSource)
+                if (link.DestroyNegatedSource && target.Trigger is null)
                 {
                     var receipt = target.Activation;
                     var player = next.GetPlayer(receipt.Player);
@@ -157,6 +163,15 @@ public sealed partial class DuelEngine
                         events.Add(new SpellTrapDestroyed(player.Id, receipt.SpellTrapZone, receipt.Spell));
                     }
                 }
+                if (link.DestroyNegatedSource && target.Trigger is { } triggered && triggered.Source.IsStillPresent(next))
+                {
+                    var binding = triggered.Source;
+                    var player = next.GetPlayer(binding.Player);
+                    var monsters = player.MonsterZones.ToArray();
+                    monsters[binding.Zone] = null;
+                    next = next.With(player: player.With(monsters: monsters, graveyard: player.Graveyard.Append(binding.Card)));
+                    events.Add(new MonsterDestroyed(player.Id, binding.Zone, binding.Card));
+                }
                 break;
             }
             default: return Reject(DuelError.UnsupportedChainResolution);
@@ -164,12 +179,13 @@ public sealed partial class DuelEngine
         events.Add(new ChainLinkResolved(link.Number, activation.EffectId));
         if (chain.NextLink > 1)
             return Accept(next.WithChain(new(checked(State.Revision + 1), links, chain.Responder,
-                chain.ConsecutivePasses, chain.NextLink - 1)), events.ToArray());
+                chain.ConsecutivePasses, chain.NextLink - 1, chain.FreezeOnCompletion)), events.ToArray());
 
         // Normal/Quick-Play sources remain on the field while links resolve.
         // A source already destroyed as a target must not be sent a second time.
         foreach (var entry in links.Reverse())
         {
+            if (entry.Trigger is not null) continue; // monster/graveyard effect sources are not Spell activations
             var receipt = entry.Activation;
             var player = next.GetPlayer(receipt.Player);
             var field = player.SpellTrapFields[receipt.SpellTrapZone];
@@ -182,6 +198,6 @@ public sealed partial class DuelEngine
                 : new SpellSentToGraveyard(player.Id, receipt.Spell, receipt.SpellTrapZone));
         }
         events.Add(new ChainCompleted());
-        return Accept(next.WithChain(null).WithDecision(null, State.DecisionResult, researchSliceComplete: true), events.ToArray());
+        return Accept(next.WithChain(null).WithDecision(null, State.DecisionResult, researchSliceComplete: chain.FreezeOnCompletion), events.ToArray());
     }
 }

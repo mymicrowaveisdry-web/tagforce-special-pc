@@ -39,7 +39,7 @@ public sealed partial class DuelEngine
             player.MonsterZones[zone] is not null)
             return Reject(DuelError.InvalidEffectState);
         var monsters = player.MonsterZones.ToArray();
-        var summoned = new FieldMonster(card, BattlePosition.FaceUpAttack, SummonedOnTurn: State.TurnNumber);
+        var summoned = new FieldMonster(card, BattlePosition.FaceUpAttack, SummonedOnTurn: State.TurnNumber, PlacementId: checked(State.Revision + 1));
         monsters[zone] = summoned;
         var slots = player.SpellTrapFields.ToArray();
         slots[activation.SpellTrapZone] = null;

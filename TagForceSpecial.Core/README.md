@@ -186,3 +186,74 @@ Effect-only negation is an engine primitive tested with invented profiles; no
 real effect-only card's complete eligibility is advertised. Fresh native
 rejection, interruption and negation replays remain required before the roadmap's
 stage 6 completion gate can pass.
+
+## Stage 7: event-driven triggers and continuous stats
+
+Register immutable `TriggerEffectProfile` and `ContinuousEffectProfile` instances
+through `experimentalTriggerEffects` and `experimentalContinuousEffects`. Both
+are empty by default and require explicit catalog Monster rules. Multiple effects
+on a card and multiple copies of a card are supported. All effect IDs are distinct
+from existing activation/response IDs. IDs use the full catalog identity range.
+No card text, PSP category codes or per-card timing switches are interpreted.
+
+Supported if-style trigger events are normal summons, Special Summons (including
+tokens), flip summons, and destruction. A field source must be face-up at the
+event and still occupy the same placement at the activation boundary. An explicit
+`DestroyedSelf` profile instead activates from that exact card in the graveyard;
+it may have been face-down before destruction. Other source locations, optional
+"when" timing, damage-step activation windows, costs/targets on triggers,
+once-per-turn restrictions and replacement/prevention effects remain unsupported.
+Atomic battle's destruction events are collected after its damage/destruction
+transition; LP defeat still ends the duel before battle destruction.
+
+`State.EventEffects.PendingTriggers` publishes immutable groups. Use
+`ChooseTriggerOrder(player, decisionId, triggerIds)` to order every mandatory
+option, or an ordered subset of optional options (empty declines that group).
+Groups are turn-player mandatory, other-player mandatory, turn-player optional,
+then other-player optional. No fast response is admitted between these groups.
+Wrong player, stale IDs, duplicates, unknown IDs and omitted mandatory effects
+reject without state changes or events. Ordering is a player choice, independent
+of profile registration order, zone order and card ID.
+
+Once the groups are ordered, ordinary `PendingChain` links use the existing
+response/pass, reverse-resolution and distinct negation machinery. Registered
+set responses can explicitly filter for a Monster source. Monster effect sources
+are not Spell activations and are not sent to the graveyard by chain cleanup.
+Removing one source does not negate its other committed effects. Effects generated
+during a chain are collected and revalidated after all links and cleanup, never
+inserted into the resolving chain. Follow-up trigger chains preserve an existing
+research stop; triggers raised by ordinary commands resume ordinary gameplay.
+Unsupported spell shuffle/lifecycle continuations are not enabled by opting in.
+
+The first reusable trigger operations gain controller LP or add an ATK/DEF delta
+to the event monster until entry into the current turn's End Phase. The latter
+binds a placement, rechecks it on resolution, persists independently of the source
+and expires on End Phase entry or when its subject leaves/becomes face-down.
+This precise duration is a PC primitive, not a complete "until end of turn" card
+contract. New operations can share the same event/order/chain path.
+
+Continuous profiles add ATK/DEF to self, controller's monsters, opponent's monsters
+or all face-up monsters while the source is face-up. Contributions are derived
+from current placements after every accepted transition, not accumulated into
+printed catalog stats. Copies stack; removing a source removes only its
+contributions. `State.EventEffects` publishes applied modifiers, effective stats
+and temporary durations; `GetMonsterStatistics(player, zone)` queries the current
+placement. Additive deltas are summed before clamping to the managed nonnegative
+`int` range; unresolved printed values remain unresolved. LP gains saturate at
+`int.MaxValue`. These are managed numeric policies, unrelated to PSP encoding.
+
+Basic battle consumes these effective stats. A defender's battle reveal enables
+its aura before damage calculation. Battle remains atomic; this adds no response,
+replay or damage-step windows. Continuous Spell/Trap activation/persistence,
+Field Spells, stat-setting/swap/layer rules, continuous effect negation and control
+changes remain outside this slice. Modifier application/removal emits explicit
+events and preserves previously published snapshots.
+
+The ordering contract follows the [official rulebook's simultaneous-effects rule](https://img.yugioh-card.com/en/downloads/rulebook/SD_RuleBook_EN_10.pdf);
+continuous monster lifetime follows the [official v9 rulebook](https://img.yugioh-card.com/ygo_cms/ygo/all/uploads/Rulebook_v9_en.pdf).
+These are rules-informed managed contracts, not observations of PSP behavior.
+Synthetic interaction/replay tests validate the supported scope; no additional
+real card is advertised as fully supported. Stage 6 priority/negation/interruption
+PSP comparisons are deferred for later by user direction (2026-10-29). Stage 6
+remains incomplete; Stage 7's native timing and broader card interactions still
+need their own reference comparisons before claiming original-game agreement.

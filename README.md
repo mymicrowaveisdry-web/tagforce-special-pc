@@ -46,6 +46,13 @@ destruction when its bound target is gone. These contracts follow native static
 analysis with synthetic interaction tests; fresh PSP negation/interruption replays
 remain pending. They do not make those cards generally playable; stage 6 is in progress.
 
+Stage 6's fresh PSP comparisons are deferred for later. The first Stage 7 slice
+adds opt-in monster event triggers, player-selected simultaneous ordering,
+follow-up chains, continuous ATK/DEF auras and temporary stat modifiers. Basic
+battle consumes effective stats; removing sources and expiring modifiers update
+the immutable snapshot. These are rules-informed synthetic-tested primitives,
+with no new full-card or native timing support claim. See [Core](TagForceSpecial.Core/README.md#stage-7-event-driven-triggers-and-continuous-stats).
+
 General effects, broader response windows/chains, shuffle, delayed-effect
 handling, opponent AI, rendering, input and first-launch asset import remain
 unfinished. The next application milestone is a small supported duel with a
