@@ -190,19 +190,19 @@ stage 6 completion gate can pass.
 ## Stage 7: event-driven triggers and continuous stats
 
 Register immutable `TriggerEffectProfile` and `ContinuousEffectProfile` instances
-through `experimentalTriggerEffects` and `experimentalContinuousEffects`. Both
+through `experimentalTriggerEffects` and `experimentalContinuousEffects`. They
 are empty by default and require explicit catalog Monster rules. Multiple effects
 on a card and multiple copies of a card are supported. All effect IDs are distinct
 from existing activation/response IDs. IDs use the full catalog identity range.
 No card text, PSP category codes or per-card timing switches are interpreted.
 
-Supported if-style trigger events are normal summons, Special Summons (including
-tokens), flip summons, and destruction. A field source must be face-up at the
+Supported trigger events are normal summons, Special Summons (including
+tokens), flip summons, destruction and supported sends to the graveyard. A field source must be face-up at the
 event and still occupy the same placement at the activation boundary. An explicit
 `DestroyedSelf` profile instead activates from that exact card in the graveyard;
-it may have been face-down before destruction. Other source locations, optional
-"when" timing, damage-step activation windows, costs/targets on triggers,
-once-per-turn restrictions and replacement/prevention effects remain unsupported.
+it may have been face-down before destruction. `GraveyardSelf` also supports
+monster discards and destruction via `SentToGraveyard`. Other source locations,
+damage-step activation windows and replacement/prevention effects remain unsupported.
 Atomic battle's destruction events are collected after its damage/destruction
 transition; LP defeat still ends the duel before battle destruction.
 
@@ -245,7 +245,7 @@ placement. Additive deltas are summed before clamping to the managed nonnegative
 Basic battle consumes these effective stats. A defender's battle reveal enables
 its aura before damage calculation. Battle remains atomic; this adds no response,
 replay or damage-step windows. Continuous Spell/Trap activation/persistence,
-Field Spells, stat-setting/swap/layer rules, continuous effect negation and control
+Field Spells, stat-setting/swap/layer rules and control
 changes remain outside this slice. Modifier application/removal emits explicit
 events and preserves previously published snapshots.
 
@@ -257,3 +257,87 @@ real card is advertised as fully supported. Stage 6 priority/negation/interrupti
 PSP comparisons are deferred for later by user direction (2026-10-29). Stage 6
 remains incomplete; Stage 7's native timing and broader card interactions still
 need their own reference comparisons before claiming original-game agreement.
+
+### Trigger activation commitments and turn limits
+
+A profile can require a positive `lifePointCost` and one discard from its copied
+`discardCardIds` allowlist. LP costs must leave at least 1 LP. Its optional
+`MonsterTargetPolicy` selects one face-up monster using an explicit controller
+relation, catalog allowlist and source-exclusion rule. New reusable operations
+destroy that bound target, modify its stats, or negate its monster effects until
+End Phase. Target identity includes the uninterrupted placement; an absent target
+is not replaced automatically. Costs remain paid when a target disappears or an
+effect/activation is negated.
+
+After `ChooseTriggerOrder`, inspect `State.EventEffects.PendingCommitment`.
+`ChooseTriggerCostCard` pays the selected discard and LP cost before the target
+prompt. `ChooseTriggerMonsterTarget` commits the binding. Both commands belong
+to the trigger controller, including the non-turn player. Options and receipts
+are immutable; stale/wrong-player/kind/choice answers leave state/events unchanged.
+The current ordered group commits before the next group's options are offered;
+fast responses wait until every group and its commitments are complete.
+Eligibility is checked before costs; subsequent competing mandatory effects that
+cannot pay or share an already consumed use are explicitly reported unavailable,
+so a batch cannot become stranded. Cancellation after paying costs is unsupported.
+
+`TriggerTurnLimit.PerPlacement` counts one use per source placement and limit key;
+`SharedPerPlayer` shares that key across copies/effects for the controller. Set an
+explicit `limitKey` to share a restriction between several profiles. The immutable
+`UsedTriggers` ledger is updated on commitment and resets with the turn. Declines,
+missed timing and rejected answers consume no use. Both activation and effect
+negation preserve a committed **use**. Restrictions counting only successful card
+activations (with activation-negation refunds), once-per-duel limits, name changes
+and original-era reset exceptions are not implemented by these use counters.
+
+### Optional when timing and resolution steps
+
+`TriggerTiming.If` is the default. Only an **optional** `TriggerTiming.When`
+profile requires its occurrence to belong to the last gameplay action group at
+the next trigger window. Mandatory when profiles and if profiles do not use this
+missing-timing filter; all their other conditions still apply. Triggers wait for
+the next available chain and cannot be saved for a later open state.
+
+`TriggerEffectStep` explicitly groups simultaneous resolution actions. Separate
+steps are sequential. `RequiresPreviousStepSuccess` adds a sequential dependency;
+`RequiresPreviousActionSuccess` adds a dependency within a simultaneous group.
+This separates chronology from causation (for example, then versus and-if-you-do)
+without parsing card text. Supported failures skip dependent actions and leave
+independent actions available. Unknown conjunction/card-specific cases require an
+explicit contract before support is advertised.
+
+Trigger occurrences retain a timing point. Later resolving links/steps invalidate
+earlier optional-when events; simultaneous destruction/summon events share a
+point. Activation costs do not open optional-when windows. Costs can still create
+if/mandatory triggers, which wait through the current chain. Renderer/log events,
+aura recalculation, chain bookkeeping and ordinary Spell cleanup do not redefine
+the last gameplay action. A negated activation is distinguished from a resolving,
+effect-negated link. These are managed timing contracts pending PSP comparisons.
+
+See [Konami's conjunction explanation](https://www.yugioh-card.com/eu/es/play/understanding-card-text/part-7-conjunction-functions/)
+and [trigger/fast-effect windows](https://www.yugioh-card.com/en/play/fast-effect-timing/).
+This timing mode applies to the registered Spell Speed 1 triggers, not every card
+containing the word when; direct response/Quick Effect eligibility is separate.
+
+### Persistent monster-effect negation
+
+`NegateTargetMonsterUntilEndPhase` creates a placement-bound suppression that
+persists independently of its source after resolution, ending when the target
+leaves/becomes face-down or the current End Phase is entered. The target's
+continuous aura stops contributing and is restored if suppression expires while
+that placement survives. Already resolved stat modifiers are not retroactively
+erased. Field effects can still activate and pay costs while negated; the
+registered field-source effect is skipped at resolution if its source remains
+negated there. Graveyard effects are not negated by an old field-placement scope.
+
+`experimentalContinuousNegations` registers `ContinuousNegationProfile` sources:
+a face-up monster, a controller relation and explicit target catalog IDs. Their
+suppression ends when the source becomes inactive. Acyclic dependencies are
+resolved in dependency order, so negating a negation source restores its targets;
+registration order and catalog ID do not decide precedence. Cyclic/self-negating
+dependencies fail closed at registration pending a precedence contract. This is
+not full Skill Drain/Jinzo/Spell-Trap support or a general continuous-layer solver.
+
+The selected scope is reusable profiles plus invented test examples. Representative
+PSP captures, native comparisons and real-card branch verification are recorded
+as future improvements; none is implied by passing synthetic tests. The separate
+Stage 6 comparison backlog remains deferred as requested.

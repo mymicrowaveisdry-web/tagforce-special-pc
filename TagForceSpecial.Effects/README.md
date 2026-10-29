@@ -102,7 +102,8 @@ still need original gameplay replays. The slice freezes after chain cleanup.
 Core's separate `experimentalTriggerEffects` and `experimentalContinuousEffects`
 register rules-informed monster trigger and aura primitives. They are independent
 of the hard-coded original-card research profiles above. The synthetic test
-profiles exercise simultaneous ordering, follow-up chains, negation, LP gains,
-placement-bound temporary deltas and aura removal. No real trigger/continuous
+profiles exercise simultaneous ordering, follow-up chains, cost/target commitments,
+once-per-turn use limits, optional-when timing, negation, LP gains, placement-bound
+temporary deltas and aura removal. No real trigger/continuous
 card profile is declared fully supported. See the [Core contract](../TagForceSpecial.Core/README.md#stage-7-event-driven-triggers-and-continuous-stats)
 for supported events, durations, response integration and remaining timing rules.
