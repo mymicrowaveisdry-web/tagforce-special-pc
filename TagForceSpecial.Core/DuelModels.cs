@@ -170,10 +170,15 @@ public enum DuelError
     UnsupportedSpellEffect, InvalidEffectState, UnsupportedLifecycleContinuation,
     ChainPending, NoPendingChain, StaleChainDecision, NotChainResponder, ChainResolving,
     UnsupportedChainResponse, UnsupportedChainResolution, ChainResponseSpeedNotAllowed,
-    TriggerOrderPending, NoPendingTriggers, StaleTriggerDecision, NotTriggerPlayer, InvalidTriggerOrder
+    TriggerOrderPending, NoPendingTriggers, StaleTriggerDecision, NotTriggerPlayer, InvalidTriggerOrder,
+    TriggerCommitmentPending, NoPendingTriggerCommitment, WrongTriggerCommitment, InvalidTriggerCommitment
 }
 
-public abstract record DuelEvent;
+public abstract record DuelEvent
+{
+    // Rules timing, not renderer/log order. Absent means the transition's simultaneous group zero.
+    internal int? TimingGroup { get; init; }
+}
 public sealed record CardDrawn(PlayerId Player, CardInstance Card) : DuelEvent;
 public sealed record FirstDrawSkipped(PlayerId Player) : DuelEvent;
 public sealed record PhaseChanged(DuelPhase From, DuelPhase To) : DuelEvent;

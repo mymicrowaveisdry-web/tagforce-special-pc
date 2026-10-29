@@ -19,78 +19,122 @@ public sealed partial class DuelEngine
                     yield return (new(player.Id, zone, monster.Card, monster.PlacementId), monster);
     }
 
-    private static bool CanActivateTrigger(DuelState state, TriggerActivation trigger) =>
-        trigger.Profile.SourceLocation == TriggerSourceLocation.DestroyedSelf
+    private bool CanActivateTrigger(DuelState state, TriggerActivation trigger)
+    {
+        bool location = trigger.Profile.SourceLocation != TriggerSourceLocation.FaceUpMonster
             ? state.GetPlayer(trigger.Player).Graveyard.Contains(trigger.Source.Card)
-            : trigger.Source.IsStillPresent(state) &&
-                state.GetPlayer(trigger.Player).MonsterZones[trigger.Source.Zone]!.Position != BattlePosition.FaceDownDefense;
+            : trigger.Source.IsStillPresent(state) && state.GetPlayer(trigger.Player).MonsterZones[trigger.Source.Zone]!.Position != BattlePosition.FaceDownDefense;
+        if (!location || IsTriggerUsed(state, trigger)) return false;
+        if (trigger.DiscardedCost is not null || trigger.PaidLifePoints > 0) return true;
+        var player = state.GetPlayer(trigger.Player);
+        return player.LifePoints > trigger.Profile.LifePointCost &&
+            (trigger.Profile.DiscardCardIds.Count == 0 || player.Hand.Any(c => trigger.Profile.DiscardCardIds.Contains(c.GameCardId))) &&
+            (trigger.Profile.Target is null || TriggerTargets(state, trigger).Any());
+    }
 
-    private IEnumerable<TriggerActivation> CollectTriggers(DuelState before, DuelState after, IReadOnlyList<DuelEvent> events,
-        int firstId)
+    private IEnumerable<MonsterEventOccurrence> Occurrences(DuelState before, DuelEvent emitted)
+    {
+        MonsterBinding? subject = emitted switch
+        {
+            MonsterNormalSummoned e => new(e.Player, e.Zone, e.Monster.Card, e.Monster.PlacementId),
+            MonsterSpecialSummoned e => new(e.Player, e.Zone, e.Monster.Card, e.Monster.PlacementId),
+            TokenSpecialSummoned e => new(e.Player, e.Zone, e.Monster.Card, e.Monster.PlacementId),
+            MonsterFlipSummoned e => new(e.Player, e.Zone, e.Monster.Card, e.Monster.PlacementId),
+            MonsterDestroyed e when before.GetPlayer(e.Player).MonsterZones[e.Zone] is { } m => new(e.Player, e.Zone, e.Card, m.PlacementId),
+            CardDiscarded e => new(e.Player, -1, e.Card, 0),
+            ActivationCostPaid e => new(e.Player, -1, e.Card, 0),
+            TriggerCostPaid { DiscardedCard: { } card } e => new(e.Trigger.Player, -1, card, 0),
+            _ => null
+        };
+        if (subject is null || !rules.TryGetValue(subject.Card.GameCardId, out var rule) || rule.Category != CardCategory.Monster) yield break;
+        bool cost = emitted is ActivationCostPaid or TriggerCostPaid;
+        var point = new EffectTimingPoint(checked(State.Revision + 1), cost ? -1 : emitted.TimingGroup ?? 0);
+        var kind = emitted switch
+        {
+            MonsterNormalSummoned => MonsterEventKind.NormalSummoned,
+            MonsterSpecialSummoned or TokenSpecialSummoned => MonsterEventKind.SpecialSummoned,
+            MonsterFlipSummoned => MonsterEventKind.FlipSummoned,
+            MonsterDestroyed => MonsterEventKind.Destroyed,
+            _ => MonsterEventKind.SentToGraveyard
+        };
+        yield return new(kind, subject, point, cost);
+        if (kind == MonsterEventKind.Destroyed) yield return new(MonsterEventKind.SentToGraveyard, subject, point);
+    }
+
+    private IEnumerable<TriggerActivation> CollectTriggers(DuelState before, DuelState after, IReadOnlyList<DuelEvent> events, int firstId)
     {
         int id = firstId;
-        // Destruction in one atomic transition is one simultaneous event batch.
-        // Battle reveals precede destruction; a revealed source is face-up at that event.
         var destructionSources = FieldMonsters(before).Select(entry =>
             events.OfType<MonsterRevealed>().Any(e => e.Card == entry.Monster.Card)
                 ? (entry.Binding, entry.Monster with { Position = BattlePosition.FaceUpDefense }) : entry).ToArray();
         foreach (var emitted in events)
-        {
-            MonsterEventOccurrence? occurrence = emitted switch
+            foreach (var occurrence in Occurrences(before, emitted))
             {
-                MonsterNormalSummoned e => new(MonsterEventKind.NormalSummoned,
-                    new(e.Player, e.Zone, e.Monster.Card, e.Monster.PlacementId)),
-                MonsterSpecialSummoned e => new(MonsterEventKind.SpecialSummoned,
-                    new(e.Player, e.Zone, e.Monster.Card, e.Monster.PlacementId)),
-                TokenSpecialSummoned e => new(MonsterEventKind.SpecialSummoned,
-                    new(e.Player, e.Zone, e.Monster.Card, e.Monster.PlacementId)),
-                MonsterFlipSummoned e => new(MonsterEventKind.FlipSummoned,
-                    new(e.Player, e.Zone, e.Monster.Card, e.Monster.PlacementId)),
-                MonsterDestroyed e when before.GetPlayer(e.Player).MonsterZones[e.Zone] is { } monster =>
-                    new(MonsterEventKind.Destroyed, new(e.Player, e.Zone, e.Card, monster.PlacementId)),
-                _ => null
-            };
-            if (occurrence is null) continue;
-            var sources = occurrence.Kind == MonsterEventKind.Destroyed ? destructionSources : FieldMonsters(after);
-            foreach (var profile in triggerEffects.Where(p => p.EventKind == occurrence.Kind).OrderBy(p => p.EffectId, StringComparer.Ordinal))
-            {
-                if (profile.SourceLocation == TriggerSourceLocation.DestroyedSelf)
+                var sources = emitted is MonsterDestroyed ? destructionSources : FieldMonsters(after);
+                foreach (var profile in triggerEffects.Where(p => p.EventKind == occurrence.Kind).OrderBy(p => p.EffectId, StringComparer.Ordinal))
                 {
-                    if (profile.CardId == occurrence.Subject.Card.GameCardId)
-                        yield return new(id++, profile, occurrence.Subject, occurrence);
-                    continue;
+                    if (profile.SourceLocation != TriggerSourceLocation.FaceUpMonster)
+                    {
+                        if (profile.CardId == occurrence.Subject.Card.GameCardId) yield return new(id++, profile, occurrence.Subject, occurrence);
+                        continue;
+                    }
+                    foreach (var (binding, monster) in sources)
+                        if (monster.Position != BattlePosition.FaceDownDefense && monster.Card.GameCardId == profile.CardId &&
+                            Relates(profile.Relation, binding, occurrence.Subject))
+                            yield return new(id++, profile, binding, occurrence);
                 }
-                foreach (var (binding, monster) in sources)
-                    if (monster.Position != BattlePosition.FaceDownDefense && monster.Card.GameCardId == profile.CardId &&
-                        Relates(profile.Relation, binding, occurrence.Subject))
-                        yield return new(id++, profile, binding, occurrence);
             }
-        }
     }
+
+    private EffectTimingPoint? LastTimingPoint(DuelState before, IReadOnlyList<DuelEvent> events)
+    {
+        var point = before.EventEffects.LastTimingPoint;
+        // A negated activation does not resolve; an effect-negated/empty link still has a resolution boundary.
+        if (events.OfType<ChainLinkResolved>().Any() && !events.OfType<ChainLinkSkipped>().Any(e => e.Reason == ChainSkipReason.ActivationNegated))
+            point = new(checked(State.Revision + 1), 0);
+        foreach (var emitted in events)
+            if (emitted is MonsterNormalSummoned or MonsterSpecialSummoned or TokenSpecialSummoned or MonsterFlipSummoned or
+                MonsterDestroyed or CardDiscarded or ActivationCostPaid or TriggerCostPaid or MonsterRevealed or SpellTrapDestroyed or
+                MonsterBanished or LifePointsGained or BattleDamageDealt or MonsterModifierCreated or MonsterEffectsNegated or
+                SpellActivated or ChainResponseActivated or MonsterPositionChanged or MonsterSet or SpellTrapSet or CardDrawn or
+                PhaseChanged or TurnStarted)
+                point = new(checked(State.Revision + 1), emitted.TimingGroup ?? 0);
+        return point;
+    }
+
+    private static bool HasTriggerTiming(TriggerActivation trigger, EffectTimingPoint? last) =>
+        trigger.Profile.Requirement != TriggerRequirement.Optional || trigger.Profile.Timing != TriggerTiming.When ||
+        !trigger.Occurrence.IsActivationCost && trigger.Occurrence.TimingPoint == last;
 
     private DuelState PrepareEventEffects(DuelState before, DuelState next, List<DuelEvent> events)
     {
-        if (triggerEffects.Length == 0 && continuousEffects.Length == 0) return next;
+        if (triggerEffects.Length == 0 && continuousEffects.Length == 0 && continuousNegations.Length == 0) return next;
         var current = next.EventEffects;
         var timed = current.TimedModifiers.Where(m => m.Target.IsStillPresent(next) &&
             next.GetPlayer(m.Target.Player).MonsterZones[m.Target.Zone]!.Position != BattlePosition.FaceDownDefense &&
             m.ExpiresOnTurn == next.TurnNumber && next.Phase != DuelPhase.End).ToArray();
-        var applied = CalculateModifiers(next, timed);
+        var negations = current.TimedNegations.Where(n => n.ExpiresOnTurn == next.TurnNumber && next.Phase != DuelPhase.End &&
+            n.Target.IsStillPresent(next) && next.GetPlayer(n.Target.Player).MonsterZones[n.Target.Zone]!.Position != BattlePosition.FaceDownDefense).ToArray();
+        foreach (var ended in before.EventEffects.TimedNegations.Except(negations)) events.Add(new MonsterEffectNegationEnded(ended));
+        var negated = CalculateNegatedMonsters(next, negations);
+        var applied = CalculateModifiers(next, timed, negated);
         foreach (var old in before.EventEffects.AppliedModifiers.Except(applied))
             events.Add(new StatModifierRemoved(old, old.ExpiresOnTurn is not null &&
                 (next.Phase == DuelPhase.End || old.ExpiresOnTurn != next.TurnNumber)
                     ? ModifierRemovalReason.EndPhaseReached : ModifierRemovalReason.ConditionNoLongerMet));
         foreach (var added in applied.Except(before.EventEffects.AppliedModifiers)) events.Add(new StatModifierApplied(added));
         var statistics = FieldMonsters(next).Select(entry => CalculateStatistics(entry.Binding, applied)).ToArray();
+        var last = LastTimingPoint(before, events);
         var deferred = current.DeferredTriggers.ToList();
-        if (next.Outcome is null)
-            deferred.AddRange(CollectTriggers(before, next, events.ToArray(), deferred.Count + 1));
-        else deferred.Clear(); // terminal damage keeps existing defeat-before-destruction semantics
+        if (next.Outcome is null) deferred.AddRange(CollectTriggers(before, next, events.ToArray(), deferred.Count + 1));
+        else deferred.Clear();
         var pending = current.PendingTriggers;
         if (next.Outcome is null && next.PendingChain is null && next.PendingDecision is null && pending is null && deferred.Count != 0)
         {
-            var eligible = deferred.Where(t => CanActivateTrigger(next, t)).ToArray();
-            foreach (var unavailable in deferred.Except(eligible)) events.Add(new TriggerUnavailable(unavailable));
+            var timedEligible = deferred.Where(t => HasTriggerTiming(t, last)).ToArray();
+            foreach (var missed in deferred.Except(timedEligible)) events.Add(new TriggerMissedTiming(missed));
+            var eligible = timedEligible.Where(t => CanActivateTrigger(next, t)).ToArray();
+            foreach (var unavailable in timedEligible.Except(eligible)) events.Add(new TriggerUnavailable(unavailable));
             deferred.Clear();
             if (eligible.Length != 0)
             {
@@ -98,75 +142,80 @@ public sealed partial class DuelEngine
                 events.Add(new TriggerOrderRequested(pending));
             }
         }
-        return next.WithEventEffects(new(pending, deferred, timed, applied, statistics));
-    }
-
-    private DuelActionResult OrderTriggers(ChooseTriggerOrder command)
-    {
-        var batch = State.EventEffects.PendingTriggers!;
-        if (command.DecisionId != batch.DecisionId) return Reject(DuelError.StaleTriggerDecision);
-        if (command.Player != batch.Player) return Reject(DuelError.NotTriggerPlayer);
-        var ids = command.TriggerIds?.ToArray();
-        if (ids is null || ids.Distinct().Count() != ids.Length || ids.Any(id => !batch.Options.Any(t => t.Id == id)) ||
-            batch.Mandatory && ids.Length != batch.Options.Count)
-            return Reject(DuelError.InvalidTriggerOrder);
-        var chosen = ids.Select(id => batch.Options.Single(t => t.Id == id)).ToArray();
-        var ordered = batch.Ordered.Concat(chosen).ToArray();
-        var remaining = batch.Remaining.Except(batch.Options).ToArray();
-        List<DuelEvent> events = [new TriggerOrderChosen(command.Player, Array.AsReadOnly(ids))];
-        if (remaining.Length != 0)
-        {
-            var pending = new PendingTriggerBatch(checked(State.Revision + 1), State.ActivePlayer, remaining, ordered);
-            events.Add(new TriggerOrderRequested(pending));
-            return Accept(State.WithEventEffects(new(pending, State.EventEffects.DeferredTriggers,
-                State.EventEffects.TimedModifiers, State.EventEffects.AppliedModifiers, State.EventEffects.Statistics)), events.ToArray());
-        }
-        var next = State.WithEventEffects(new(null, State.EventEffects.DeferredTriggers,
-            State.EventEffects.TimedModifiers, State.EventEffects.AppliedModifiers, State.EventEffects.Statistics));
-        if (ordered.Length == 0) return Accept(next, events.ToArray());
-        var links = ordered.Select((t, index) => new ChainLink(index + 1,
-            new(t.Player, t.Profile.EffectId, t.Source.Card, t.Source.Zone, null, null),
-            t.Source.PlacementId, ChainOperation.TriggerEffect, Trigger: t)).ToArray();
-        var chain = new PendingChain(checked(State.Revision + 1), links, Other(ordered[^1].Player),
-            freezeOnCompletion: State.ResearchSliceComplete);
-        foreach (var link in links)
-        {
-            events.Add(new TriggerActivated(link.Trigger!, link.Number));
-            events.Add(new ChainLinkAdded(link));
-        }
-        events.Add(new ChainResponseRequested(chain.Responder, chain.DecisionId));
-        return Accept(next.WithChain(chain), events.ToArray());
+        return next.WithEventEffects(current.WithTriggers(pending, current.PendingCommitment).WithDeferred(deferred, last)
+            .WithModifiers(timed, applied, statistics).WithNegations(negations, negated)
+            .WithUses(current.UsedTriggers.Where(u => u.Turn == next.TurnNumber)));
     }
 
     private DuelState ResolveTrigger(DuelState next, TriggerActivation trigger, List<DuelEvent> events)
     {
+        bool previousSucceeded = true;
+        int actionOrdinal = 0;
+        for (int index = 0; index < trigger.Profile.Steps.Count; index++)
+        {
+            var step = trigger.Profile.Steps[index];
+            if (step.RequiresPreviousStepSuccess && !previousSucceeded) continue;
+            int start = events.Count;
+            bool succeeded = true, previousActionSucceeded = true;
+            foreach (var action in step.Actions)
+            {
+                if (action.RequiresPreviousActionSuccess && !previousActionSucceeded) { succeeded = false; continue; }
+                var beforeAction = next;
+                next = ResolveTriggerAction(next, trigger, action, actionOrdinal++, events);
+                previousActionSucceeded = !ReferenceEquals(beforeAction, next);
+                succeeded &= previousActionSucceeded;
+            }
+            previousSucceeded = succeeded;
+            for (int i = start; i < events.Count; i++) events[i] = events[i] with { TimingGroup = index };
+        }
+        return next;
+    }
+
+    private DuelState ResolveTriggerAction(DuelState next, TriggerActivation trigger, TriggerEffectAction action, int actionOrdinal, List<DuelEvent> events)
+    {
         var profile = trigger.Profile;
-        if (profile.Operation == TriggerOperation.GainLifePoints)
+        if (action.Operation == TriggerOperation.GainLifePoints)
         {
             var player = next.GetPlayer(trigger.Player);
-            int after = (int)Math.Min(int.MaxValue, (long)player.LifePoints + profile.LifePointGain);
+            int after = (int)Math.Min(int.MaxValue, (long)player.LifePoints + action.LifePointGain);
             events.Add(new LifePointsGained(player.Id, after - player.LifePoints, player.LifePoints, after, profile.EffectId));
             return next.With(player: player.With(lifePoints: after));
         }
-        var subject = trigger.Occurrence.Subject;
-        if (!subject.IsStillPresent(next) || next.GetPlayer(subject.Player).MonsterZones[subject.Zone]!.Position == BattlePosition.FaceDownDefense)
+        var subject = action.Operation == TriggerOperation.ModifyEventMonsterUntilEndPhase ? trigger.Occurrence.Subject : trigger.Target!;
+        if (!subject.IsStillPresent(next) ||
+            (action.Operation != TriggerOperation.DestroyTargetMonster || profile.Target!.RequireFaceUpAtResolution) &&
+                next.GetPlayer(subject.Player).MonsterZones[subject.Zone]!.Position == BattlePosition.FaceDownDefense)
         {
             events.Add(new TriggerSubjectUnavailable(trigger));
             return next;
         }
-        var modifier = new StatModifier(profile.EffectId, trigger.Source, subject, profile.AttackDelta,
-            profile.DefenseDelta, checked(State.Revision + 1), State.TurnNumber);
+        if (action.Operation == TriggerOperation.DestroyTargetMonster)
+        {
+            var player = next.GetPlayer(subject.Player);
+            var monsters = player.MonsterZones.ToArray(); monsters[subject.Zone] = null;
+            events.Add(new MonsterDestroyed(player.Id, subject.Zone, subject.Card));
+            return next.With(player: player.With(monsters: monsters, graveyard: player.Graveyard.Append(subject.Card)));
+        }
         var effects = next.EventEffects;
-        return next.WithEventEffects(new(effects.PendingTriggers, effects.DeferredTriggers,
-            effects.TimedModifiers.Append(modifier), effects.AppliedModifiers, effects.Statistics));
+        if (action.Operation == TriggerOperation.NegateTargetMonsterUntilEndPhase)
+        {
+            var negation = new MonsterEffectNegation(profile.EffectId, trigger.Source, subject, checked(State.Revision + 1), State.TurnNumber, actionOrdinal);
+            events.Add(new MonsterEffectsNegated(negation));
+            return next.WithEventEffects(effects.WithNegations(effects.TimedNegations.Append(negation), effects.NegatedMonsters));
+        }
+        var modifier = new StatModifier(profile.EffectId, trigger.Source, subject, action.AttackDelta,
+            action.DefenseDelta, checked(State.Revision + 1), State.TurnNumber, actionOrdinal);
+        events.Add(new MonsterModifierCreated(modifier));
+        return next.WithEventEffects(effects.WithModifiers(effects.TimedModifiers.Append(modifier), effects.AppliedModifiers, effects.Statistics));
     }
 
-    private StatModifier[] CalculateModifiers(DuelState state, IEnumerable<StatModifier> timed)
+    private StatModifier[] CalculateModifiers(DuelState state, IEnumerable<StatModifier> timed, IReadOnlyList<MonsterBinding>? negated = null)
     {
         var monsters = FieldMonsters(state).Where(e => e.Monster.Position != BattlePosition.FaceDownDefense).ToArray();
+        negated ??= CalculateNegatedMonsters(state, state.EventEffects.TimedNegations);
         var result = timed.ToList();
         foreach (var (source, monster) in monsters)
-            foreach (var profile in continuousEffects.Where(p => p.CardId == monster.Card.GameCardId).OrderBy(p => p.EffectId, StringComparer.Ordinal))
+            foreach (var profile in continuousEffects.Where(p => p.CardId == monster.Card.GameCardId && !negated.Contains(source)).OrderBy(p => p.EffectId, StringComparer.Ordinal))
                 foreach (var (target, _) in monsters)
                     if (Relates(profile.Affects, source, target))
                         result.Add(new(profile.EffectId, source, target, profile.AttackDelta, profile.DefenseDelta));

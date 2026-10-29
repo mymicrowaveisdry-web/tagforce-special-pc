@@ -13,7 +13,8 @@ internal static class EventEffectScenario
         IEnumerable<ContinuousEffectProfile>? continuous = null, IEnumerable<ChainResponseProfile>? responses = null,
         PlayerId startingPlayer = PlayerId.One, int? attackA = 1000, int? defenseA = 1000,
         int? attackB = 2000, int? defenseB = 1000,
-        IEnumerable<uint>? playerOneDeck = null, IEnumerable<uint>? playerTwoDeck = null)
+        IEnumerable<uint>? playerOneDeck = null, IEnumerable<uint>? playerTwoDeck = null,
+        IEnumerable<ContinuousNegationProfile>? negations = null)
     {
         uint[] ids = [A, B, Filler, Trap, SummonSpell, 5217, 4909, 4818, 3905, 3903, 3902, 3904];
         var catalog = new CardCatalog(new(null, "synthetic-event-effects-v1"), ids.Select(id =>
@@ -31,7 +32,7 @@ internal static class EventEffectScenario
             experimentalActivationContracts: [ActivationResearch.LightningVortex([Filler, A]), ActivationResearch.MysticalSpaceTyphoon()],
             experimentalChainEffects: [ChainResearch.LightningVortex(), ChainResearch.MysticalSpaceTyphoon(), ChainResearch.Scapegoat()],
             experimentalChainResponses: responses,
-            experimentalTriggerEffects: triggers, experimentalContinuousEffects: continuous);
+            experimentalTriggerEffects: triggers, experimentalContinuousEffects: continuous, experimentalContinuousNegations: negations);
     }
 
     internal static TriggerEffectProfile Gain(string id, uint card, MonsterEventKind kind = MonsterEventKind.NormalSummoned,
@@ -114,7 +115,15 @@ internal static class EventEffectScenario
         List<DuelEvent> events = [];
         for (int step = 0; step < 100; step++)
         {
-            if (engine.State.EventEffects.PendingTriggers is not null) events.AddRange(Order(engine).Events);
+            if (engine.State.EventEffects.PendingCommitment is { } commitment)
+            {
+                var command = commitment.Kind == TriggerCommitmentKind.DiscardCost
+                    ? (DuelCommand)new ChooseTriggerCostCard(commitment.Player, commitment.DecisionId, commitment.CardOptions[0].InstanceId)
+                    : new ChooseTriggerMonsterTarget(commitment.Player, commitment.DecisionId, commitment.TargetOptions[0].Player,
+                        commitment.TargetOptions[0].Zone, commitment.TargetOptions[0].Card.InstanceId);
+                events.AddRange(Ok(engine, command).Events);
+            }
+            else if (engine.State.EventEffects.PendingTriggers is not null) events.AddRange(Order(engine).Events);
             else if (engine.State.PendingChain is { NextLink: 0 }) Pass(engine);
             else if (engine.State.PendingChain is not null) events.AddRange(Resolve(engine).Events);
             else return events;
