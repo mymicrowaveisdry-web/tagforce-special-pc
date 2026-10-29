@@ -17,6 +17,7 @@ public sealed partial class DuelEngine
     private readonly FrozenDictionary<uint, DeckSpecialSummonSpell> spellEffects;
     private readonly FrozenDictionary<uint, ActivationContract> activationContracts;
     private readonly FrozenDictionary<uint, ChainEffectProfile> chainEffects;
+    private readonly FrozenDictionary<uint, ChainResponseProfile> chainResponses;
     public DuelState State { get; private set; }
 
     /// <summary>
@@ -29,7 +30,8 @@ public sealed partial class DuelEngine
         IEnumerable<DecisionSequence>? decisionSequences = null,
         IEnumerable<DeckSpecialSummonSpell>? experimentalSpellEffects = null,
         IEnumerable<ActivationContract>? experimentalActivationContracts = null,
-        IEnumerable<ChainEffectProfile>? experimentalChainEffects = null)
+        IEnumerable<ChainEffectProfile>? experimentalChainEffects = null,
+        IEnumerable<ChainResponseProfile>? experimentalChainResponses = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(rules);
@@ -79,6 +81,19 @@ public sealed partial class DuelEngine
             chainProfiles.Select(p => p.EffectId).Distinct(StringComparer.Ordinal).Count() != chainProfiles.Length)
             throw new ArgumentException("Chain profiles require matching activation contracts or explicit token rules.", nameof(experimentalChainEffects));
         chainEffects = chainProfiles.ToFrozenDictionary(p => p.CardId);
+        var responses = (experimentalChainResponses ?? []).ToArray();
+        if (responses.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) ||
+                rule.Category is not (CardCategory.Spell or CardCategory.Trap) || !rule.AllowsSpellTrapSet ||
+                spellEffects.ContainsKey(p.CardId) ||
+                p.DiscardCardIds.Any(id => !knownIds.Contains(id)) ||
+                chainEffects.TryGetValue(p.CardId, out var existing) &&
+                    (existing.Operation != p.Operation || existing.EffectId != p.EffectId) ||
+                contracts.Any(c => c.EffectId == p.EffectId && c.SpellCardId != p.CardId) ||
+                chainProfiles.Any(c => c.EffectId == p.EffectId && c.CardId != p.CardId) ||
+                p.Decisions is { } decisions && this.decisionSequences.ContainsKey(decisions.Id)) ||
+            responses.Select(p => p.EffectId).Distinct(StringComparer.Ordinal).Count() != responses.Length)
+            throw new ArgumentException("Response profiles need explicit set rules, distinct IDs and catalog costs.", nameof(experimentalChainResponses));
+        chainResponses = responses.ToFrozenDictionary(p => p.CardId);
         int nextInstance = 1;
         DuelPlayerState CreatePlayer(PlayerId id, IEnumerable<uint> ids)
         {

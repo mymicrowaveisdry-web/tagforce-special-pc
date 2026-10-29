@@ -161,7 +161,7 @@ public enum DuelError
     WrongDecisionKind, InvalidDecisionChoice, DecisionUnavailable, ResearchSliceComplete,
     UnsupportedSpellEffect, InvalidEffectState, UnsupportedLifecycleContinuation,
     ChainPending, NoPendingChain, StaleChainDecision, NotChainResponder, ChainResolving,
-    UnsupportedChainResponse, UnsupportedChainResolution
+    UnsupportedChainResponse, UnsupportedChainResolution, ChainResponseSpeedNotAllowed, ChainLimitReached
 }
 
 public abstract record DuelEvent;

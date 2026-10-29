@@ -3,9 +3,9 @@ namespace TagForceSpecial.Core;
 public sealed partial class DuelEngine
 {
     private PendingDecision? CreateDecision(DecisionSequence sequence, int index, IEnumerable<DecisionAnswer> answers,
-        int? excludeInstanceId = null)
+        int? excludeInstanceId = null, PlayerId? decisionPlayer = null)
     {
-        var player = State.GetPlayer(State.ActivePlayer);
+        var player = State.GetPlayer(decisionPlayer ?? State.PendingSpellActivation?.Player ?? State.ActivePlayer);
         var step = sequence.Steps[index];
         CardInstance[] cards = step.Kind == DecisionKind.Card
             ? (step.CardSource == DecisionCardSource.Deck ? player.Deck : player.Hand)
@@ -70,6 +70,8 @@ public sealed partial class DuelEngine
         if (answer.Target is { } binding && !binding.IsStillPresent(State.GetPlayer(binding.Player).SpellTrapFields[binding.Zone]))
             return Reject(DuelError.InvalidDecisionChoice);
         var answers = pending.Answers.Append(answer).ToArray();
+        if (State.PendingChain is not null && State.PendingSpellActivation is { ResponseToLink: > 0 })
+            return AnswerChainResponse(pending, answer, answers);
         if (State.PendingSpellActivation is { } contractActivation &&
             activationContracts.TryGetValue(contractActivation.Spell.GameCardId, out var contract))
             return AnswerActivationContract(pending, answer, answers, contract);

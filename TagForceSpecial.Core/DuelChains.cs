@@ -1,7 +1,14 @@
 namespace TagForceSpecial.Core;
 
 /// <summary>Explicit research operations, not inferred from card text or category codes.</summary>
-public enum ChainOperation { DestroyOpposingFaceUpMonsters, DestroyBoundSpellTrap, SummonFourTokens }
+public enum ChainOperation
+{
+    DestroyOpposingFaceUpMonsters, DestroyBoundSpellTrap, SummonFourTokens,
+    NegateActivation, NegateEffect
+}
+public enum ChainSpellSpeed { One = 1, Two = 2, Three = 3 }
+public enum ChainNegation { None, Effect, Activation }
+public enum ChainSkipReason { ActivationNegated, EffectNegated, TargetUnavailable }
 
 public sealed class ChainEffectProfile
 {
@@ -15,7 +22,9 @@ public sealed class ChainEffectProfile
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(effectId);
         if (cardId is 0 or > 0x3fff) throw new ArgumentOutOfRangeException(nameof(cardId));
-        if (!Enum.IsDefined(operation)) throw new ArgumentOutOfRangeException(nameof(operation));
+        if (operation is not (ChainOperation.DestroyOpposingFaceUpMonsters or
+            ChainOperation.DestroyBoundSpellTrap or ChainOperation.SummonFourTokens))
+            throw new ArgumentOutOfRangeException(nameof(operation));
         var tokens = (tokenCardIds ?? []).ToArray();
         if (operation == ChainOperation.SummonFourTokens
             ? tokens.Length != 4 || tokens.Any(id => id is 0 or > 0x3fff) || tokens.Distinct().Count() != 4
@@ -29,11 +38,18 @@ public sealed class ChainEffectProfile
 }
 
 public sealed record ChainLink(int Number, CommittedActivation Activation, long SourcePlacementId,
-    ChainOperation Operation);
+    ChainOperation Operation, ChainSpellSpeed SpellSpeed = ChainSpellSpeed.One,
+    int? TargetLinkNumber = null, ChainNegation Negation = ChainNegation.None,
+    bool DestroyNegatedSource = false)
+{
+    public bool ActivationNegated => Negation == ChainNegation.Activation;
+    public bool EffectNegated => Negation != ChainNegation.None;
+}
 
 /// <summary>Full-information immutable slice. IDs are accepted-state revisions.</summary>
 public sealed class PendingChain
 {
+    public const int MaximumLinks = 16;
     public long DecisionId { get; }
     public IReadOnlyList<ChainLink> Links { get; }
     public PlayerId Responder { get; }
@@ -52,7 +68,7 @@ public sealed class PendingChain
 }
 
 public sealed record PassChainResponse(PlayerId Player, long DecisionId) : DuelCommand(Player);
-/// <summary>Only the retained, targeted, previously set four-token response is supported.</summary>
+/// <summary>Activate a previously set card through an explicitly registered response profile.</summary>
 public sealed record ActivateChainResponse(PlayerId Player, long DecisionId, int SpellTrapZone) : DuelCommand(Player);
 /// <summary>Explicit PC stepping boundary; the active turn player advances resolution.</summary>
 public sealed record ResolveNextChainLink(PlayerId Player, long DecisionId) : DuelCommand(Player);
@@ -61,6 +77,10 @@ public sealed record ChainResponseRequested(PlayerId Player, long DecisionId) : 
 public sealed record ChainResponsePassed(PlayerId Player) : DuelEvent;
 public sealed record ChainResolutionStarted(int LinkCount) : DuelEvent;
 public sealed record ChainLinkResolved(int Number, string EffectId) : DuelEvent;
+public sealed record ChainLinkNegated(int Number, int ByLinkNumber, ChainNegation Negation) : DuelEvent;
+public sealed record ChainLinkSkipped(int Number, ChainSkipReason Reason) : DuelEvent;
+public sealed record ChainResponseActivated(PlayerId Player, string EffectId, CardInstance Card, int Zone) : DuelEvent;
+public sealed record ChainTrapSentToGraveyard(PlayerId Player, CardInstance Card, int Zone) : DuelEvent;
 public sealed record ChainCompleted : DuelEvent;
 public sealed record SpellTrapDestroyed(PlayerId Player, int Zone, CardInstance Card) : DuelEvent;
 public sealed record TokenSpecialSummoned(PlayerId Player, int Zone, FieldMonster Monster) : DuelEvent;

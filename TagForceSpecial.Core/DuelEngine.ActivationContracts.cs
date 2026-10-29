@@ -54,7 +54,8 @@ public sealed partial class DuelEngine
         events.Add(new ActivationCommitted(committed));
         if (chainEffects.TryGetValue(committed.Spell.GameCardId, out var profile))
         {
-            var link = new ChainLink(1, committed, source.PlacementId, profile.Operation);
+            var speed = profile.Operation == ChainOperation.DestroyBoundSpellTrap ? ChainSpellSpeed.Two : ChainSpellSpeed.One;
+            var link = new ChainLink(1, committed, source.PlacementId, profile.Operation, speed);
             var chain = new PendingChain(checked(State.Revision + 1), [link], Other(player.Id));
             events.Add(new ChainLinkAdded(link));
             events.Add(new ChainResponseRequested(chain.Responder, chain.DecisionId));
