@@ -2,8 +2,8 @@
 
 Contains bounded Emergency Teleport profiles for **activation/resolution** and
 **direct End Phase banishment**, using the observed deck Krebons / attack-position
-branch. General costs, targets, chains, triggers and the broader effect system remain
-future work; see the [implemented scope](../README.md#implemented-scope).
+branch. Costs, targets, chains and event effects have separate bounded opt-ins;
+broader card support remains future work. See the [implemented scope](../README.md#implemented-scope).
 
 Enable only through explicit research configuration:
 
@@ -96,3 +96,13 @@ Bead and other real effect-only cards are not made playable by that primitive.
 Typhoon now continues without destruction if its bound target is absent/replaced,
 using the inspected native validator path. Re-entry and broader movement cases
 still need original gameplay replays. The slice freezes after chain cleanup.
+
+## Reusable event effects
+
+Core's separate `experimentalTriggerEffects` and `experimentalContinuousEffects`
+register rules-informed monster trigger and aura primitives. They are independent
+of the hard-coded original-card research profiles above. The synthetic test
+profiles exercise simultaneous ordering, follow-up chains, negation, LP gains,
+placement-bound temporary deltas and aura removal. No real trigger/continuous
+card profile is declared fully supported. See the [Core contract](../TagForceSpecial.Core/README.md#stage-7-event-driven-triggers-and-continuous-stats)
+for supported events, durations, response integration and remaining timing rules.
