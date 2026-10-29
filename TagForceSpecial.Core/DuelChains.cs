@@ -12,6 +12,7 @@ public enum ChainSkipReason { ActivationNegated, EffectNegated, TargetUnavailabl
 
 public sealed class ChainEffectProfile
 {
+    // Profiles reference catalog identities; PSP packed-ID limits belong to import validation.
     public string EffectId { get; }
     public uint CardId { get; }
     public ChainOperation Operation { get; }
@@ -21,13 +22,13 @@ public sealed class ChainEffectProfile
         IEnumerable<uint>? tokenCardIds = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(effectId);
-        if (cardId is 0 or > 0x3fff) throw new ArgumentOutOfRangeException(nameof(cardId));
+        if (cardId == 0) throw new ArgumentOutOfRangeException(nameof(cardId));
         if (operation is not (ChainOperation.DestroyOpposingFaceUpMonsters or
             ChainOperation.DestroyBoundSpellTrap or ChainOperation.SummonFourTokens))
             throw new ArgumentOutOfRangeException(nameof(operation));
         var tokens = (tokenCardIds ?? []).ToArray();
         if (operation == ChainOperation.SummonFourTokens
-            ? tokens.Length != 4 || tokens.Any(id => id is 0 or > 0x3fff) || tokens.Distinct().Count() != 4
+            ? tokens.Length != 4 || tokens.Any(id => id == 0) || tokens.Distinct().Count() != 4
             : tokens.Length != 0)
             throw new ArgumentException("Only the four-token response accepts exactly four distinct token IDs.", nameof(tokenCardIds));
         EffectId = effectId;
@@ -49,7 +50,6 @@ public sealed record ChainLink(int Number, CommittedActivation Activation, long 
 /// <summary>Full-information immutable slice. IDs are accepted-state revisions.</summary>
 public sealed class PendingChain
 {
-    public const int MaximumLinks = 16;
     public long DecisionId { get; }
     public IReadOnlyList<ChainLink> Links { get; }
     public PlayerId Responder { get; }

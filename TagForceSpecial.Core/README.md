@@ -130,6 +130,9 @@ instead of freezing. Existing activation-only callers keep their previous behavi
 The supported operations are opposing face-up monster destruction, bound back-row
 destruction, and the targeted, previously set four-token response. Registration
 validates matching commitment kinds and explicit Spell/Monster metadata.
+Profile IDs and decision choices are nonzero catalog identities, without PSP
+packed-ID bounds. Engine registration validates catalog membership; source-format
+validation stays outside Core.
 
 `PassChainResponse(player, decisionId)` alternates responders. Two consecutive
 passes close the response window. `ActivateChainResponse(player, decisionId, zone)`
@@ -169,7 +172,8 @@ activation negation; both suppress the effect, while only the latter sets
 `ActivationNegated`. Source destruction is a separate profile policy and checks
 the bound source placement. Paid costs stay in graveyard, even if a response is
 itself negated. Source cleanup appends each surviving source once and emits
-`ChainTrapSentToGraveyard` for Traps. At most 16 links may be committed.
+`ChainTrapSentToGraveyard` for Traps. Native array sizes do not impose a managed
+chain-length rule; currently supported response/placement rules still apply.
 
 The alternating-pass protocol, revision IDs, explicit resolution stepping, token
 instance/zone allocation and event ordering are PC design choices. Local reference

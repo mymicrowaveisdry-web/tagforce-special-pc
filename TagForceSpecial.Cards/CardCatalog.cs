@@ -2,24 +2,26 @@ using System.Collections.Frozen;
 
 namespace TagForceSpecial.Cards;
 
-/// <summary>Identity is local to this game's data, never an external card database ID.</summary>
+/// <summary>Catalog identity, independent of a source file's packed ID or external database ID.</summary>
 public sealed record CardDefinition(uint GameCardId, string Name, string Description,
-    CardStatistics Statistics, CardNumericCodes Codes, CardSourceRow SourceRow);
+    CardStatistics Statistics, CardNumericCodes? Codes = null, CardSourceRow? SourceRow = null,
+    CardDataSource? Source = null);
 
-/// <summary>Null stats preserve the game's variable-stat sentinel. Spell/trap zeros remain raw data.</summary>
+/// <summary>Nonnegative printed stats; null represents an unresolved/variable value.</summary>
 public sealed record CardStatistics(int? Attack, int? Defense, uint Level);
 
-/// <summary>Observed getter codes. Display enums and the two high fields remain uninterpreted.</summary>
+/// <summary>Optional imported numeric metadata. Gameplay classification uses explicit rule profiles.</summary>
 public sealed record CardNumericCodes(uint Attribute, uint Type, uint RawKind, uint GetterKind,
     uint Icon, uint Field23To26, uint Field27To30);
 
+/// <summary>Optional raw PSP provenance, retained without interpreting it as catalog identity.</summary>
 public sealed record CardSourceRow(int InternalIndex, uint PropertyWord0, uint PropertyWord1,
     uint DescriptionBitOffset);
 
-/// <summary>Provenance of locally imported data; does not attest ownership or visual verification.</summary>
-public sealed record CardDataSource(string ContainerSha256, string DecoderProfile);
+/// <summary>Origin profile and optional source-file hash. Authored cards need no invented container.</summary>
+public sealed record CardDataSource(string? ContainerSha256, string DecoderProfile);
 
-/// <summary>Immutable catalog for native consumers. Contains no bundled card data or effect behavior.</summary>
+/// <summary>Immutable, format-independent catalog. Contains no bundled card data or effect behavior.</summary>
 public sealed class CardCatalog
 {
     private readonly FrozenDictionary<uint, CardDefinition> byId;
@@ -32,32 +34,38 @@ public sealed class CardCatalog
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(cards);
-        if (source.ContainerSha256 is not { Length: 64 } || !source.ContainerSha256.All(Uri.IsHexDigit) ||
-            string.IsNullOrWhiteSpace(source.DecoderProfile))
-            throw new ArgumentException("Source hash and decoder profile are required.", nameof(source));
-        Source = source with { ContainerSha256 = source.ContainerSha256.ToLowerInvariant() };
+        Source = NormalizeSource(source);
         var snapshot = cards.ToArray();
         var ids = new HashSet<uint>();
         foreach (var card in snapshot)
         {
-            if (card is null || card.GameCardId is 0 or > 0x3fff || !ids.Add(card.GameCardId))
-                throw new ArgumentException("Cards require unique nonzero game-local IDs.", nameof(cards));
+            if (card is null || card.GameCardId == 0 || !ids.Add(card.GameCardId))
+                throw new ArgumentException("Cards require unique nonzero catalog IDs.", nameof(cards));
             if (string.IsNullOrWhiteSpace(card.Name) || card.Description is null ||
-                card.Statistics is null || card.Codes is null || card.SourceRow is null)
+                card.Statistics is null)
                 throw new ArgumentException("Card fields are required.", nameof(cards));
-            if (card.SourceRow.InternalIndex < 1 || (card.SourceRow.PropertyWord0 & 0x3fff) != card.GameCardId)
-                throw new ArgumentException("Source row does not match the card identity.", nameof(cards));
             var stats = card.Statistics;
-            if (!ValidStat(stats.Attack) || !ValidStat(stats.Defense) || stats.Level > 15)
-                throw new ArgumentException("Statistics exceed the observed profile.", nameof(cards));
-            var codes = card.Codes;
-            if (codes.Attribute > 15 || codes.Type > 31 || codes.RawKind > 63 || codes.GetterKind > 63 ||
-                codes.Icon > 7 || codes.Field23To26 > 15 || codes.Field27To30 > 15)
-                throw new ArgumentException("Numeric codes exceed the observed profile.", nameof(cards));
+            if (stats.Attack is < 0 || stats.Defense is < 0)
+                throw new ArgumentException("Printed statistics must be nonnegative or variable.", nameof(cards));
         }
-        Cards = Array.AsReadOnly(snapshot.OrderBy(c => c.GameCardId).ToArray());
-        byId = snapshot.ToFrozenDictionary(c => c.GameCardId);
+        var normalized = snapshot.Select(card => card with { Source = card.Source is { } origin ? NormalizeSource(origin) : Source })
+            .OrderBy(card => card.GameCardId).ToArray();
+        Cards = Array.AsReadOnly(normalized);
+        byId = normalized.ToFrozenDictionary(c => c.GameCardId);
     }
 
-    private static bool ValidStat(int? value) => value is null || value is >= 0 and <= 5100 && value % 10 == 0;
+    /// <summary>Combine immutable catalogs, preserving each card's origin and rejecting colliding IDs.</summary>
+    public CardCatalog Merge(CardCatalog additions)
+    {
+        ArgumentNullException.ThrowIfNull(additions);
+        return new(new(null, "merged-catalog-v1"), Cards.Concat(additions.Cards));
+    }
+
+    private static CardDataSource NormalizeSource(CardDataSource source)
+    {
+        if (string.IsNullOrWhiteSpace(source.DecoderProfile) ||
+            source.ContainerSha256 is { } hash && (hash.Length != 64 || !hash.All(Uri.IsHexDigit)))
+            throw new ArgumentException("An origin profile and, when supplied, a valid SHA-256 are required.", nameof(source));
+        return source with { ContainerSha256 = source.ContainerSha256?.ToLowerInvariant() };
+    }
 }

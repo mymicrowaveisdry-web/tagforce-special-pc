@@ -9,10 +9,9 @@ public static class SyntheticDuelDemo
     public static int Run(TextWriter output)
     {
         var ids = Enumerable.Range(1, 40).Select(i => (uint)i).ToArray();
-        var catalog = new CardCatalog(new(new string('0', 64), "synthetic-duel"), ids.Select(id =>
+        var catalog = new CardCatalog(new(null, "synthetic-duel"), ids.Select(id =>
             new CardDefinition(id, $"Synthetic Monster {id:00}", "Invented demonstration card.",
-                new(1000, 1000, 4), new(0, 0, 0, 0, 0, 0, 0),
-                new((int)id, id | 100u << 14 | 100u << 23, 4u << 11, 0))));
+                new(1000, 1000, 4))));
         var rules = ids.ToDictionary(id => id, _ => new DuelCardRules(CardCategory.Monster, true, AllowsBasicBattle: true));
         var duel = new DuelEngine(catalog, rules, ids, ids);
         output.WriteLine("Synthetic duel demo — invented cards, fixed deck order.");
@@ -61,7 +60,7 @@ public static class SyntheticDuelDemo
         Execute(new DeclareAttack(PlayerId.One, 1));
         if (duel.State.GetPlayer(PlayerId.Two).LifePoints != 7000)
             throw new InvalidOperationException("Direct attack did not deal 1000 damage.");
-        output.WriteLine("Demo complete. Basic battles resolve; chains and executable effects remain pending.");
+        output.WriteLine("Demo complete. This example exercises effect-free battles with authored cards.");
         return 0;
     }
 }

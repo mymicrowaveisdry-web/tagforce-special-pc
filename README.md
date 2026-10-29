@@ -51,6 +51,11 @@ handling, opponent AI, rendering, input and first-launch asset import remain
 unfinished. The next application milestone is a small supported duel with a
 deterministic opponent, player-specific visibility and a complete win/loss flow.
 
+The card catalog accepts authored additions with full-width IDs, direct stats
+and optional import metadata. Catalogs can be merged without losing each card's
+origin. PSP encoding constraints are checked at import; additional cards still
+need explicit gameplay support. See [Cards](TagForceSpecial.Cards/README.md).
+
 ## Validation and research
 
 [CI](.github/workflows/progress.yml) restores and builds the C# solution, runs
