@@ -25,6 +25,13 @@ public sealed partial class DuelEngine
             ? state.GetPlayer(trigger.Player).Graveyard.Contains(trigger.Source.Card)
             : trigger.Source.IsStillPresent(state) && state.GetPlayer(trigger.Player).MonsterZones[trigger.Source.Zone]!.Position != BattlePosition.FaceDownDefense;
         if (!location || IsTriggerUsed(state, trigger)) return false;
+        if (state.Battle?.Step == BattleStep.Damage && !(trigger.Profile.DamageStepAllowed ??
+            (trigger.Profile.Requirement == TriggerRequirement.Mandatory || trigger.Profile.SourceLocation != TriggerSourceLocation.FaceUpMonster ||
+             trigger.Profile.EventKind == MonsterEventKind.FlippedFaceUp ||
+             trigger.Profile.EventKind == MonsterEventKind.SpecialSummoned && trigger.Profile.Relation == EffectRelation.Self))) return false;
+        if (trigger.Profile.SourceLocation == TriggerSourceLocation.FaceUpMonster &&
+            state.GetPlayer(trigger.Player).MonsterZones[trigger.Source.Zone]!.BattleDestroyed &&
+            trigger.Profile.EventKind != MonsterEventKind.FlippedFaceUp) return false;
         if (trigger.DiscardedCost is not null || trigger.PaidLifePoints > 0) return true;
         var player = state.GetPlayer(trigger.Player);
         return player.LifePoints > trigger.Profile.LifePointCost &&
@@ -40,6 +47,7 @@ public sealed partial class DuelEngine
             MonsterSpecialSummoned e => new(e.Player, e.Zone, e.Monster.Card, e.Monster.PlacementId),
             TokenSpecialSummoned e => new(e.Player, e.Zone, e.Monster.Card, e.Monster.PlacementId),
             MonsterFlipSummoned e => new(e.Player, e.Zone, e.Monster.Card, e.Monster.PlacementId),
+            BattleFlipEffectWindowOpened e => e.Monster,
             MonsterDestroyed e when before.GetPlayer(e.Player).MonsterZones[e.Zone] is { } m => new(e.Player, e.Zone, e.Card, m.PlacementId),
             CardDiscarded e => new(e.Player, -1, e.Card, 0),
             ActivationCostPaid e => new(e.Player, -1, e.Card, 0),
@@ -54,11 +62,13 @@ public sealed partial class DuelEngine
             MonsterNormalSummoned => MonsterEventKind.NormalSummoned,
             MonsterSpecialSummoned or TokenSpecialSummoned => MonsterEventKind.SpecialSummoned,
             MonsterFlipSummoned => MonsterEventKind.FlipSummoned,
+            BattleFlipEffectWindowOpened => MonsterEventKind.FlippedFaceUp,
             MonsterDestroyed => MonsterEventKind.Destroyed,
             _ => MonsterEventKind.SentToGraveyard
         };
         yield return new(kind, subject, point, cost);
         if (kind == MonsterEventKind.Destroyed) yield return new(MonsterEventKind.SentToGraveyard, subject, point);
+        if (kind == MonsterEventKind.FlipSummoned) yield return new(MonsterEventKind.FlippedFaceUp, subject, point);
     }
 
     private IEnumerable<TriggerActivation> CollectTriggers(DuelState before, DuelState after, IReadOnlyList<DuelEvent> events, int firstId)
@@ -97,7 +107,7 @@ public sealed partial class DuelEngine
                 MonsterDestroyed or CardDiscarded or ActivationCostPaid or TriggerCostPaid or MonsterRevealed or SpellTrapDestroyed or
                 MonsterBanished or LifePointsGained or BattleDamageDealt or MonsterModifierCreated or MonsterEffectsNegated or
                 SpellActivated or ChainResponseActivated or MonsterPositionChanged or MonsterSet or SpellTrapSet or CardDrawn or
-                PhaseChanged or TurnStarted)
+                PhaseChanged or TurnStarted or AttackDeclared or BattleFlipEffectWindowOpened)
                 point = new(checked(State.Revision + 1), emitted.TimingGroup ?? 0);
         return point;
     }
@@ -108,11 +118,12 @@ public sealed partial class DuelEngine
 
     private DuelState PrepareEventEffects(DuelState before, DuelState next, List<DuelEvent> events)
     {
-        if (triggerEffects.Length == 0 && continuousEffects.Length == 0 && continuousNegations.Length == 0) return next;
+        if (triggerEffects.Length == 0 && continuousEffects.Length == 0 && continuousNegations.Length == 0 && battleResponses.Count == 0) return next;
         var current = next.EventEffects;
         var timed = current.TimedModifiers.Where(m => m.Target.IsStillPresent(next) &&
             next.GetPlayer(m.Target.Player).MonsterZones[m.Target.Zone]!.Position != BattlePosition.FaceDownDefense &&
-            m.ExpiresOnTurn == next.TurnNumber && next.Phase != DuelPhase.End).ToArray();
+            m.ExpiresOnTurn == next.TurnNumber && next.Phase != DuelPhase.End &&
+            (m.ExpiresAfterAttackId is null || m.ExpiresAfterAttackId == next.Battle?.Attack?.Id)).ToArray();
         var negations = current.TimedNegations.Where(n => n.ExpiresOnTurn == next.TurnNumber && next.Phase != DuelPhase.End &&
             n.Target.IsStillPresent(next) && next.GetPlayer(n.Target.Player).MonsterZones[n.Target.Zone]!.Position != BattlePosition.FaceDownDefense).ToArray();
         foreach (var ended in before.EventEffects.TimedNegations.Except(negations)) events.Add(new MonsterEffectNegationEnded(ended));
@@ -121,7 +132,8 @@ public sealed partial class DuelEngine
         foreach (var old in before.EventEffects.AppliedModifiers.Except(applied))
             events.Add(new StatModifierRemoved(old, old.ExpiresOnTurn is not null &&
                 (next.Phase == DuelPhase.End || old.ExpiresOnTurn != next.TurnNumber)
-                    ? ModifierRemovalReason.EndPhaseReached : ModifierRemovalReason.ConditionNoLongerMet));
+                    ? ModifierRemovalReason.EndPhaseReached : old.ExpiresAfterAttackId is not null && old.ExpiresAfterAttackId != next.Battle?.Attack?.Id
+                        ? ModifierRemovalReason.DamageStepEnded : ModifierRemovalReason.ConditionNoLongerMet));
         foreach (var added in applied.Except(before.EventEffects.AppliedModifiers)) events.Add(new StatModifierApplied(added));
         var statistics = FieldMonsters(next).Select(entry => CalculateStatistics(entry.Binding, applied)).ToArray();
         var last = LastTimingPoint(before, events);
@@ -211,7 +223,7 @@ public sealed partial class DuelEngine
 
     private StatModifier[] CalculateModifiers(DuelState state, IEnumerable<StatModifier> timed, IReadOnlyList<MonsterBinding>? negated = null)
     {
-        var monsters = FieldMonsters(state).Where(e => e.Monster.Position != BattlePosition.FaceDownDefense).ToArray();
+        var monsters = FieldMonsters(state).Where(e => e.Monster.Position != BattlePosition.FaceDownDefense && !e.Monster.BattleDestroyed).ToArray();
         negated ??= CalculateNegatedMonsters(state, state.EventEffects.TimedNegations);
         var result = timed.ToList();
         foreach (var (source, monster) in monsters)

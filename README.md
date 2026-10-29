@@ -53,6 +53,14 @@ timing. Continuous ATK/DEF auras, temporary modifiers and scoped monster-effect
 negation update immutable snapshots; basic battle consumes effective stats. These are rules-informed synthetic-tested primitives,
 with no new full-card or native timing support claim. See [Core](TagForceSpecial.Core/README.md#stage-7-event-driven-triggers-and-continuous-stats).
 
+The first Stage 8 slice follows Start, Battle, Damage and End steps, with five
+internal damage timings. The opt-in staged flow pauses for response/pass decisions,
+chain resolution and attack replays, applies damage before Graveyard cleanup,
+and supports scoped set responses and delayed Flip triggers. Retained PSP outcome
+comparisons pass; new window/replay behavior remains rules-informed. Direct PSP
+comparisons for Stages 6, 7 and 8 are deferred together in the research backlog.
+The atomic compatibility path remains available.
+
 General effects, broader response windows/chains, shuffle, delayed-effect
 handling, opponent AI, rendering, input and first-launch asset import remain
 unfinished. The next application milestone is a small supported duel with a

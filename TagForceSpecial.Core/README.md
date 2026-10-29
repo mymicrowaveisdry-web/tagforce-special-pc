@@ -243,8 +243,8 @@ placement. Additive deltas are summed before clamping to the managed nonnegative
 `int.MaxValue`. These are managed numeric policies, unrelated to PSP encoding.
 
 Basic battle consumes these effective stats. A defender's battle reveal enables
-its aura before damage calculation. Battle remains atomic; this adds no response,
-replay or damage-step windows. Continuous Spell/Trap activation/persistence,
+its aura before damage calculation. The default compatibility battle remains atomic; Stage 7 alone adds no response,
+replay or damage-step windows. The separate Stage 8 opt-in is described below. Continuous Spell/Trap activation/persistence,
 Field Spells, stat-setting/swap/layer rules and control
 changes remain outside this slice. Modifier application/removal emits explicit
 events and preserves previously published snapshots.
@@ -341,3 +341,122 @@ The selected scope is reusable profiles plus invented test examples. Representat
 PSP captures, native comparisons and real-card branch verification are recorded
 as future improvements; none is implied by passing synthetic tests. The separate
 Stage 6 comparison backlog remains deferred as requested.
+
+## Stage 8: interruptible battle flow
+
+Enable `experimentalBattleFlow: true` in the existing `DuelEngine` constructor.
+The default retains atomic battle for existing callers and reference regressions.
+Both paths use the same basic damage formula; the staged path publishes every
+supported boundary in `State.Battle`. It follows the user-supplied diagram:
+
+```mermaid
+flowchart LR
+    Start[Start Step] --> Battle[Battle Step]
+    Battle --> Damage[Damage Step]
+    Damage --> Battle
+    Battle --> End[End Step]
+    End --> Main2[Main Phase 2]
+```
+
+`BattleStep` is Start, Battle, Damage or End. During Damage, `DamageStep` is Start,
+BeforeCalculation, Calculation, AfterCalculation or End. These are managed states,
+not numeric PSP fields or a copy of the native memory layout.
+
+Entering Battle Phase starts its Start Step. `PassBattleResponse(player, id)`
+alternates responders; two consecutive passes close the current window.
+`AdvanceBattle(activePlayer, id)` moves a closed window to the next boundary.
+At the idle Battle Step it requests the End Step; after that step's offers close,
+`ChangePhase(activePlayer, Main2)` leaves battle. A skipped Battle Phase still uses
+the existing Main1-to-End transition. The first turn cannot enter Battle Phase.
+IDs are accepted-state revisions and refresh after intervening effects; stale IDs,
+wrong players and unrelated commands reject without mutation/events.
+
+After the Battle Step window closes, `DeclareAttack` binds the attacker, target
+and defender roster and consumes that attack allowance. It emits no damage.
+The other player receives the first attack-declaration response opportunity.
+`ActivateBattleResponse` starts an explicitly registered set-card chain;
+`ActivateChainResponse`, `PassChainResponse` and `ResolveNextChainLink` handle
+subsequent chain interaction. Trigger costs, target prompts and simultaneous
+ordering still block unrelated commands. Chains resume battle after cleanup
+instead of setting the research-stop flag. An attack-declaration-only timing is
+not offered again after a chain resolves; the continuation is a Battle Step window.
+
+A defender-roster change before Damage makes a replay necessary. This is sticky
+across chains/triggers even if a temporary change restores the original roster.
+Attacking-side additions and stat changes do not cause it. Once the window closes,
+`ChooseAttackReplay(activePlayer, id, targetZone)` chooses a currently legal target
+(or a direct attack when there are no defenders). `Cancel: true` declines the
+attack; the original attacker remains spent, and another eligible attacker may be
+selected later. A replay does not emit a second attack declaration. An unavailable
+attacker cancels the attack. Roster changes inside Damage do not replay: a missing
+combatant skips calculation and proceeds through the remaining damage boundaries.
+
+Face-down defenders stay hidden at Damage Start and turn face-up on entering
+BeforeCalculation; continuous effects update before comparing stats. Flip triggers
+are offered only in AfterCalculation, including supported flips of monsters
+marked for battle destruction. A revealed Flip trigger retains its delayed window
+if calculation is skipped. Generic source-location/revalidation limitations still
+apply when that source has already left the field.
+
+Calculation applies effective stats and LP damage once. At nonlethal resolution,
+`FieldMonster.BattleDestroyed` marks casualties still on the field; their continuous
+sources stop contributing and new target choices exclude them. Their eligible
+Flip effects can still activate and pay costs. Continuous negation can still
+suppress such a Flip effect while a surviving negator applies. The marked cards
+enter the Graveyard on entering Damage End, followed by destruction/graveyard
+trigger handling. LP defeat ends the duel before marking/sending casualties,
+preserving the prior observed defeat-before-destruction contract.
+
+### Explicit battle response profiles
+
+Register `experimentalBattleResponses` with immutable `BattleResponseProfile`
+objects. Sources require explicit ordinary Spell/Trap set rules and must have
+been set on an earlier turn. These profiles currently have no activation costs;
+existing cost-bearing `ChainResponseProfile` replies remain available when their
+new `battleWindows` metadata permits the current timing. Their default is None,
+so registration alone never grants battle/damage-step eligibility.
+
+Supported battle operations negate the current attack, destroy its bound attacker,
+Special Summon an allowed instance from the controller's hand, or modify a bound
+combatant's stats. The hand-summon command supplies `SummonedCardInstanceId` and
+`MonsterZone`; its profile declares allowed catalog IDs and face-up position.
+The choice is bound at activation and rechecked at resolution. It does not search
+or shuffle a deck. Negation of a battle-response activation/effect uses the shared
+chain mechanism, including source cleanup and preserved committed costs.
+
+A profile's `Windows` declares its supported timing. Attack negation is restricted
+to the Battle Step. The stat primitive supports Damage Start, BeforeCalculation,
+or a declared Calculation exception; `damageCalculationException: true` is required
+to opt into Calculation. This is trusted explicit eligibility metadata, not a
+blanket permission for all stat-changing cards. The modifier lasts until that
+attack's Damage Step ends and records its actual back-row source separately from
+monster-sourced modifiers. Source cleanup does not undo an already resolved delta.
+
+Trigger profiles now include `FlippedFaceUp` (manual flip summons and the delayed
+battle flip window) and optional `damageStepAllowed` metadata. With no override,
+mandatory triggers and supported self movement/summon/flip exceptions are allowed;
+broader optional field watchers fail closed. Original card text may require an
+explicit exclusion or exception. This is a bounded eligibility policy, not a
+complete Damage Step legality classifier.
+
+### Evidence and remaining scope
+
+The hierarchy comes from the supplied image and [official phase/replay rules](https://img.yugioh-card.com/en/downloads/rulebook/SD_RuleBook_EN_10.pdf).
+The five damage timings follow [Konami's Damage Step breakdown](https://www.yugioh-card.com/eu/play/damage-step-rules/).
+These sources inform the managed contract; they are not proof of original PSP
+behavior. REA/Ghidra inspection and a PSP Python audit checked retained module,
+RAM, controller exports and damage/destruction observations. Those observations
+start at damage application and do not establish declaration, replay or the new
+response boundaries. The staged final damage/field/graveyard-delta projections
+agree with both retained direct-attack and monster-battle observations. Dice-modified
+combat stats are substituted as observed; Dice itself is not reconstructed.
+
+Direct original-game comparisons for **Stages 6, 7 and 8 are deferred together**
+by user direction (2026-10-29). Stage 8's backlog covers declaration, response/pass,
+replay, reveal/Flip timing, interrupted damage and cleanup comparisons. Existing
+retained final-outcome comparisons remain in place. Hand
+responses, attack redirection, control changes, multiple attacks, direct-attack
+exceptions, piercing/reflect/prevention/replacement effects, token lifecycle,
+end-of-Battle effects, complete damage-step eligibility and other card-specific
+exceptions are outside this slice. No additional real card or full Stage 8 native
+support is advertised. The previously deferred Stage 6/7 comparison work stays pending.

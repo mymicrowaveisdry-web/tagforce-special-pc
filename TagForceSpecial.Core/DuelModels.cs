@@ -8,7 +8,7 @@ public enum DuelEndReason { UnableToDraw, LifePointsDepleted }
 
 /// <summary>
 /// Explicit, trusted gameplay metadata; never inferred from unverified binary kind codes.
-/// AllowsBasicBattle opts into atomic combat using registered effective statistics; callers must not
+/// AllowsBasicBattle opts into supported combat using registered effective statistics; callers must not
 /// enable it where omitted mandatory/continuous effects would change the result.
 /// AllowsSpellTrapSet opts into ordinary back-row placement, excluding Field Spells.
 /// </summary>
@@ -16,7 +16,7 @@ public sealed record DuelCardRules(CardCategory Category, bool AllowsNormalSummo
     bool AllowsBasicBattle = false, bool AllowsSpellTrapSet = false);
 public sealed record CardInstance(int InstanceId, uint GameCardId, PlayerId Owner);
 public sealed record FieldMonster(CardInstance Card, BattlePosition Position, int SummonedOnTurn = 0,
-    int PositionChangedOnTurn = 0, int LastAttackTurn = 0, long PlacementId = 0);
+    int PositionChangedOnTurn = 0, int LastAttackTurn = 0, long PlacementId = 0, bool BattleDestroyed = false);
 public sealed record DuelOutcome(PlayerId Winner, PlayerId Loser, DuelEndReason Reason);
 
 /// <summary>Immutable full-information engine snapshot. A future UI must hide private zones.</summary>
@@ -76,6 +76,7 @@ public sealed class DuelState
     public CommittedActivation? CommittedActivation { get; }
     public PendingChain? PendingChain { get; }
     public EventEffectState EventEffects { get; }
+    public BattleState? Battle { get; }
 
     internal DuelState(IEnumerable<DuelPlayerState> players, PlayerId activePlayer, int turnNumber = 1,
         DuelPhase phase = DuelPhase.Draw, bool normalSummonUsed = false, DuelOutcome? outcome = null,
@@ -84,7 +85,7 @@ public sealed class DuelState
         PendingSpellActivation? pendingSpellActivation = null,
         IEnumerable<PendingEndPhaseBanishment>? pendingEndPhaseBanishments = null,
         CommittedActivation? committedActivation = null, PendingChain? pendingChain = null,
-        EventEffectState? eventEffects = null)
+        EventEffectState? eventEffects = null, BattleState? battle = null)
     {
         Players = Array.AsReadOnly(players.ToArray());
         ActivePlayer = activePlayer;
@@ -101,6 +102,7 @@ public sealed class DuelState
         CommittedActivation = committedActivation;
         PendingChain = pendingChain;
         EventEffects = eventEffects ?? new();
+        Battle = battle;
     }
 
     public DuelPlayerState GetPlayer(PlayerId player) => player is PlayerId.One or PlayerId.Two
@@ -114,34 +116,39 @@ public sealed class DuelState
         if (player is not null) players[(int)player.Id] = player;
         return new(players, activePlayer ?? ActivePlayer, turnNumber ?? TurnNumber, phase ?? Phase,
             normalSummonUsed ?? NormalSummonUsed, outcome ?? Outcome, revision ?? Revision,
-            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments, CommittedActivation, PendingChain, EventEffects);
+            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments, CommittedActivation, PendingChain, EventEffects, Battle);
     }
 
     internal DuelState WithDecision(PendingDecision? pending, DecisionSequenceResult? result = null,
         bool researchSliceComplete = false) => new(Players, ActivePlayer, TurnNumber, Phase,
             NormalSummonUsed, Outcome, Revision, pending, result, researchSliceComplete, PendingSpellActivation,
-            PendingEndPhaseBanishments, CommittedActivation, PendingChain, EventEffects);
+            PendingEndPhaseBanishments, CommittedActivation, PendingChain, EventEffects, Battle);
 
     internal DuelState WithActivation(PendingSpellActivation? activation) => new(Players, ActivePlayer,
         TurnNumber, Phase, NormalSummonUsed, Outcome, Revision, PendingDecision, DecisionResult,
-        ResearchSliceComplete, activation, PendingEndPhaseBanishments, CommittedActivation, PendingChain, EventEffects);
+        ResearchSliceComplete, activation, PendingEndPhaseBanishments, CommittedActivation, PendingChain, EventEffects, Battle);
 
     internal DuelState WithEndPhaseBanishments(IEnumerable<PendingEndPhaseBanishment> banishments) =>
         new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
-            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, banishments, CommittedActivation, PendingChain, EventEffects);
+            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, banishments, CommittedActivation, PendingChain, EventEffects, Battle);
 
     internal DuelState WithChain(PendingChain? chain) =>
         new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
-            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments, CommittedActivation, chain, EventEffects);
+            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments, CommittedActivation, chain, EventEffects, Battle);
+
+    internal DuelState WithBattle(BattleState? battle) =>
+        new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
+            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation,
+            PendingEndPhaseBanishments, CommittedActivation, PendingChain, EventEffects, battle);
 
     internal DuelState WithEventEffects(EventEffectState eventEffects) =>
         new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
             PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation,
-            PendingEndPhaseBanishments, CommittedActivation, PendingChain, eventEffects);
+            PendingEndPhaseBanishments, CommittedActivation, PendingChain, eventEffects, Battle);
 
     internal DuelState WithCommittedActivation(CommittedActivation activation) =>
         new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
-            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments, activation, PendingChain, EventEffects);
+            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments, activation, PendingChain, EventEffects, Battle);
 }
 
 public abstract record DuelCommand(PlayerId Player);
@@ -151,7 +158,7 @@ public sealed record NormalSummon(PlayerId Player, int CardInstanceId, int Monst
 public sealed record SetMonster(PlayerId Player, int CardInstanceId, int MonsterZone) : DuelCommand(Player);
 public sealed record SetSpellTrap(PlayerId Player, int CardInstanceId, int SpellTrapZone) : DuelCommand(Player);
 public sealed record ChangeMonsterPosition(PlayerId Player, int MonsterZone, BattlePosition Target) : DuelCommand(Player);
-/// <summary>Null target declares a direct attack. Resolves battle atomically with registered stat modifiers.</summary>
+/// <summary>Null target declares a direct attack. Commits a declaration in staged mode; otherwise resolves compatibility combat atomically.</summary>
 public sealed record DeclareAttack(PlayerId Player, int AttackerZone, int? TargetZone = null) : DuelCommand(Player);
 public sealed record DiscardForHandLimit(PlayerId Player, int CardInstanceId) : DuelCommand(Player);
 public sealed record EndTurn(PlayerId Player) : DuelCommand(Player);
@@ -171,7 +178,10 @@ public enum DuelError
     ChainPending, NoPendingChain, StaleChainDecision, NotChainResponder, ChainResolving,
     UnsupportedChainResponse, UnsupportedChainResolution, ChainResponseSpeedNotAllowed,
     TriggerOrderPending, NoPendingTriggers, StaleTriggerDecision, NotTriggerPlayer, InvalidTriggerOrder,
-    TriggerCommitmentPending, NoPendingTriggerCommitment, WrongTriggerCommitment, InvalidTriggerCommitment
+    TriggerCommitmentPending, NoPendingTriggerCommitment, WrongTriggerCommitment, InvalidTriggerCommitment,
+    BattleFlowNotEnabled, NoBattleInProgress, BattleWindowPending, BattleWindowClosed,
+    StaleBattleDecision, NotBattleResponder, WrongBattleStep, AttackReplayPending,
+    NoAttackReplay, UnsupportedBattleResponse
 }
 
 public abstract record DuelEvent
