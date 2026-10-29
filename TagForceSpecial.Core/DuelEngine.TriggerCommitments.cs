@@ -16,7 +16,7 @@ public sealed partial class DuelEngine
     private static IEnumerable<MonsterBinding> TriggerTargets(DuelState state, TriggerActivation trigger)
     {
         var policy = trigger.Profile.Target!;
-        return FieldMonsters(state).Where(e => e.Monster.Position != BattlePosition.FaceDownDefense &&
+        return FieldMonsters(state).Where(e => e.Monster.Position != BattlePosition.FaceDownDefense && !e.Monster.BattleDestroyed &&
             Relates(policy.Relation, trigger.Source, e.Binding) &&
             (!policy.ExcludeSource || e.Binding != trigger.Source) &&
             (policy.AllowedCardIds.Count == 0 || policy.AllowedCardIds.Contains(e.Monster.Card.GameCardId)))

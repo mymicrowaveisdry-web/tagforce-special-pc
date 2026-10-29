@@ -14,11 +14,13 @@ public sealed class ChainResponseProfile
     public IReadOnlyList<uint> DiscardCardIds { get; }
     public CardCategory? RespondsToCategory { get; }
     public bool DestroyNegatedSource { get; }
+    public BattleTiming BattleWindows { get; }
     internal DecisionSequence? Decisions { get; }
 
     public ChainResponseProfile(string effectId, uint cardId, ChainOperation operation,
         ChainSpellSpeed spellSpeed, IEnumerable<uint>? discardCardIds = null,
-        CardCategory? respondsToCategory = null, bool destroyNegatedSource = false)
+        CardCategory? respondsToCategory = null, bool destroyNegatedSource = false,
+        BattleTiming battleWindows = BattleTiming.None)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(effectId);
         if (cardId == 0) throw new ArgumentOutOfRangeException(nameof(cardId));
@@ -30,6 +32,8 @@ public sealed class ChainResponseProfile
             throw new ArgumentOutOfRangeException(nameof(respondsToCategory));
         if (destroyNegatedSource && operation == ChainOperation.DestroyBoundSpellTrap)
             throw new ArgumentException("Source destruction is a separate negation policy.", nameof(destroyNegatedSource));
+        if ((battleWindows & ~BattleTiming.All) != 0) throw new ArgumentOutOfRangeException(nameof(battleWindows));
+        BattleWindows = battleWindows;
         List<DecisionStep> steps = [];
         if (discardCardIds is not null) steps.Add(DecisionStep.Card(DecisionCardSource.Hand, discardCardIds));
         if (operation == ChainOperation.DestroyBoundSpellTrap) steps.Add(DecisionStep.SpellTrapTarget());

@@ -46,8 +46,8 @@ public sealed class PendingTriggerBatch
     }
 }
 
-public sealed record StatModifier(string EffectId, MonsterBinding Source, MonsterBinding Target,
-    int AttackDelta, int DefenseDelta, long? ResolutionId = null, int? ExpiresOnTurn = null, int ActionOrdinal = 0);
+public sealed record StatModifier(string EffectId, MonsterBinding? Source, MonsterBinding Target,
+    int AttackDelta, int DefenseDelta, long? ResolutionId = null, int? ExpiresOnTurn = null, int ActionOrdinal = 0, long? ExpiresAfterAttackId = null, SpellTrapTarget? SpellTrapSource = null);
 public sealed record EffectiveMonsterStatistics(MonsterBinding Monster, int? Attack, int? Defense);
 
 public sealed record TriggerUse(PlayerId Player, int Turn, string Key, int? InstanceId, long? PlacementId);
@@ -117,7 +117,7 @@ public sealed record TriggerOrderChosen(PlayerId Player, IReadOnlyList<int> Trig
 public sealed record TriggerActivated(TriggerActivation Trigger, int LinkNumber) : DuelEvent;
 public sealed record LifePointsGained(PlayerId Player, int Amount, int Before, int After, string EffectId) : DuelEvent;
 public sealed record StatModifierApplied(StatModifier Modifier) : DuelEvent;
-public enum ModifierRemovalReason { ConditionNoLongerMet, EndPhaseReached }
+public enum ModifierRemovalReason { ConditionNoLongerMet, EndPhaseReached, DamageStepEnded }
 public sealed record StatModifierRemoved(StatModifier Modifier, ModifierRemovalReason Reason) : DuelEvent;
 
 public sealed record TriggerUnavailable(TriggerActivation Trigger) : DuelEvent;

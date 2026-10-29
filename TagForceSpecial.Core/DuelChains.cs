@@ -4,7 +4,7 @@ namespace TagForceSpecial.Core;
 public enum ChainOperation
 {
     DestroyOpposingFaceUpMonsters, DestroyBoundSpellTrap, SummonFourTokens,
-    NegateActivation, NegateEffect, TriggerEffect
+    NegateActivation, NegateEffect, TriggerEffect, BattleResponse
 }
 public enum ChainSpellSpeed { One = 1, Two = 2, Three = 3 }
 public enum ChainNegation { None, Effect, Activation }
@@ -41,7 +41,9 @@ public sealed class ChainEffectProfile
 public sealed record ChainLink(int Number, CommittedActivation Activation, long SourcePlacementId,
     ChainOperation Operation, ChainSpellSpeed SpellSpeed = ChainSpellSpeed.One,
     int? TargetLinkNumber = null, ChainNegation Negation = ChainNegation.None,
-    bool DestroyNegatedSource = false, TriggerActivation? Trigger = null)
+    bool DestroyNegatedSource = false, TriggerActivation? Trigger = null,
+    BattleResponseProfile? BattleEffect = null, long? BattleAttackId = null, MonsterBinding? BattleTarget = null,
+    CardInstance? BattleSummonCard = null, int? BattleMonsterZone = null)
 {
     public bool ActivationNegated => Negation == ChainNegation.Activation;
     public bool EffectNegated => Negation != ChainNegation.None;
@@ -71,7 +73,8 @@ public sealed class PendingChain
 
 public sealed record PassChainResponse(PlayerId Player, long DecisionId) : DuelCommand(Player);
 /// <summary>Activate a previously set card through an explicitly registered response profile.</summary>
-public sealed record ActivateChainResponse(PlayerId Player, long DecisionId, int SpellTrapZone) : DuelCommand(Player);
+public sealed record ActivateChainResponse(PlayerId Player, long DecisionId, int SpellTrapZone,
+    int? SummonedCardInstanceId = null, int? MonsterZone = null) : DuelCommand(Player);
 /// <summary>Explicit PC stepping boundary; the active turn player advances resolution.</summary>
 public sealed record ResolveNextChainLink(PlayerId Player, long DecisionId) : DuelCommand(Player);
 public sealed record ChainLinkAdded(ChainLink Link) : DuelEvent;
