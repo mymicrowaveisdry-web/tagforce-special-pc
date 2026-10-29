@@ -24,7 +24,7 @@ The demo uses synthetic card data; it is not the original game.
 
 `░░░░░░░░░░░░░░░░░░░░░░░░` **0.00%** — 0 / 5,547,712 bytes
 
-**0** native functions matched · **11,482** discovered candidates · **7,254** decoded cards · **93/93** C# tests (last recorded 2026-10-26)
+**0** native functions matched · **11,482** discovered candidates · **7,254** decoded cards · **145/145** C# tests (last recorded 2026-10-29)
 
 **Current milestone:** Docker PSP compiler comparison runs; first getter mismatch recorded
 
