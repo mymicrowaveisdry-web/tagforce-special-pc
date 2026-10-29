@@ -13,7 +13,7 @@ public sealed class ActivationContract
         IEnumerable<uint>? discardCardIds = null, bool requiresSpellTrapTarget = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(effectId);
-        if (spellCardId is 0 or > 0x3fff) throw new ArgumentOutOfRangeException(nameof(spellCardId));
+        if (spellCardId == 0) throw new ArgumentOutOfRangeException(nameof(spellCardId));
         var steps = new List<DecisionStep>();
         if (discardCardIds is not null) steps.Add(DecisionStep.Card(DecisionCardSource.Hand, discardCardIds));
         if (requiresSpellTrapTarget) steps.Add(DecisionStep.SpellTrapTarget());

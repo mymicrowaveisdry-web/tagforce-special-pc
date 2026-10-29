@@ -22,10 +22,10 @@ public sealed class DecisionStep
     public static DecisionStep Card(DecisionCardSource source, IEnumerable<uint> allowedCardIds)
     {
         ArgumentNullException.ThrowIfNull(allowedCardIds);
-        var ids = allowedCardIds.Take(0x4000).ToArray();
-        if (!Enum.IsDefined(source) || ids.Length == 0 || ids.Any(id => id is 0 or > 0x3fff) ||
+        var ids = allowedCardIds.ToArray();
+        if (!Enum.IsDefined(source) || ids.Length == 0 || ids.Any(id => id == 0) ||
             ids.Distinct().Count() != ids.Length)
-            throw new ArgumentException("Supply a valid source and distinct game-local card IDs.");
+            throw new ArgumentException("Supply a valid source and distinct nonzero catalog card IDs.");
         return new(DecisionKind.Card, source, ids, []);
     }
 

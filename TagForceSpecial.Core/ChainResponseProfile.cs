@@ -21,7 +21,7 @@ public sealed class ChainResponseProfile
         CardCategory? respondsToCategory = null, bool destroyNegatedSource = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(effectId);
-        if (cardId is 0 or > 0x3fff) throw new ArgumentOutOfRangeException(nameof(cardId));
+        if (cardId == 0) throw new ArgumentOutOfRangeException(nameof(cardId));
         if (operation is not (ChainOperation.DestroyBoundSpellTrap or ChainOperation.NegateActivation or ChainOperation.NegateEffect))
             throw new ArgumentOutOfRangeException(nameof(operation));
         if (spellSpeed is not (ChainSpellSpeed.Two or ChainSpellSpeed.Three))

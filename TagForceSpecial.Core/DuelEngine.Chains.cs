@@ -27,7 +27,6 @@ public sealed partial class DuelEngine
         if (command.Player != chain.Responder) return Reject(DuelError.NotChainResponder);
         if (command is ActivateChainResponse response)
         {
-            if (chain.Links.Count >= PendingChain.MaximumLinks) return Reject(DuelError.ChainLimitReached);
             if (response.SpellTrapZone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
             var source = State.GetPlayer(command.Player).SpellTrapFields[response.SpellTrapZone];
             if (source is not null && chainResponses.TryGetValue(source.Card.GameCardId, out var profile))

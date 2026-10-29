@@ -19,23 +19,71 @@ public sealed class CardCatalogTests
         Assert.Null(catalog[9].Statistics.Attack);
         Assert.Equal(0, catalog[9].Statistics.Defense);
         Assert.Equal("$unknown preserved", catalog[9].Description);
-        Assert.Equal(3u, catalog[9].Codes.RawKind);
-        Assert.Equal(11u, catalog[9].Codes.GetterKind);
+        var codes = Assert.IsType<CardNumericCodes>(catalog[9].Codes);
+        Assert.Equal(3u, codes.RawKind);
+        Assert.Equal(11u, codes.GetterKind);
         Assert.Throws<KeyNotFoundException>(() => catalog[8]);
     }
 
     [Fact]
-    public void CatalogRejectsDuplicateIdsAndMismatchedSourceIdentity()
+    public void CatalogRejectsDuplicateAndZeroIds()
     {
         Assert.Throws<ArgumentException>(() => new CardCatalog(Source, [Card(9), Card(9)]));
-        Assert.Throws<ArgumentException>(() => new CardCatalog(Source, [Card(9) with { GameCardId = 10 }]));
+        Assert.Throws<ArgumentException>(() => new CardCatalog(Source, [Card(0)]));
     }
 
     [Fact]
     public void CatalogRejectsInvalidStatsAndProvenance()
     {
-        Assert.Throws<ArgumentException>(() => new CardCatalog(Source, [Card(9) with { Statistics = new(5110, 0, 4) }]));
-        Assert.Throws<ArgumentException>(() => new CardCatalog(Source, [Card(9) with { Statistics = new(1, 0, 4) }]));
+        Assert.Throws<ArgumentException>(() => new CardCatalog(Source, [Card(9) with { Statistics = new(-1, 0, 4) }]));
+        Assert.Throws<ArgumentException>(() => new CardCatalog(Source, [Card(9) with { Statistics = new(0, -1, 4) }]));
         Assert.Throws<ArgumentException>(() => new CardCatalog(new("bad", "synthetic"), []));
+        Assert.Throws<ArgumentException>(() => new CardCatalog(new(null, " "), []));
+    }
+
+    [Fact]
+    public void AuthoredCardsNeedNoPackedRowsCodesOrFictitiousSourceHash()
+    {
+        var card = new CardDefinition(uint.MaxValue, "Additional card", "Authored text", new(9999, 5111, 16));
+        var catalog = new CardCatalog(new(null, "additional-cards-v1"), [card]);
+        var stored = catalog[uint.MaxValue];
+        Assert.Equal(card.Statistics, stored.Statistics);
+        Assert.Null(stored.Codes);
+        Assert.Null(stored.SourceRow);
+        Assert.Null(catalog.Source.ContainerSha256);
+        Assert.Equal(catalog.Source, stored.Source);
+        Assert.Null(card.Source);
+    }
+
+    [Fact]
+    public void MergePreservesEachOriginAndRawImportProvenance()
+    {
+        var imported = new CardCatalog(Source, [Card(9)]);
+        var extra = new CardCatalog(new(null, "authored-v1"),
+            [new(uint.MaxValue, "Additional", "", new(12345, 1, 20))]);
+        var merged = imported.Merge(extra);
+        Assert.Equal(new uint[] { 9, uint.MaxValue }, merged.Cards.Select(c => c.GameCardId));
+        Assert.Equal(imported[9], merged[9]);
+        Assert.Equal(extra[uint.MaxValue], merged[uint.MaxValue]);
+        Assert.Equal(Source, merged[9].Source);
+        Assert.Equal(imported[9].SourceRow, merged[9].SourceRow);
+        Assert.Equal(extra.Source, merged[uint.MaxValue].Source);
+        Assert.Null(merged.Source.ContainerSha256);
+        Assert.Single(imported.Cards);
+        Assert.Single(extra.Cards);
+        Assert.Throws<ArgumentException>(() => imported.Merge(new(Source, [Card(9)])));
+    }
+
+    [Fact]
+    public void OriginsAreNormalizedPerCardAndRejectMalformedExplicitHashes()
+    {
+        var source = new CardDataSource(new string('A', 64), "import-v1");
+        var card = new CardDefinition(40000, "Authored", "", new(null, int.MaxValue, uint.MaxValue),
+            Source: source);
+        var catalog = new CardCatalog(new(null, "collection-v1"), [card]);
+        Assert.Equal(new string('a', 64), catalog[40000].Source!.ContainerSha256);
+        Assert.Equal(new string('A', 64), card.Source!.ContainerSha256);
+        Assert.Throws<ArgumentException>(() => new CardCatalog(Source,
+            [card with { Source = new("bad", "authored-v1") }]));
     }
 }
