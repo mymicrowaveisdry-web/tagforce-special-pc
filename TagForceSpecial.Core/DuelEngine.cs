@@ -54,6 +54,8 @@ public sealed partial class DuelEngine
         foreach (var (id, profile) in rules)
             if (!knownIds.Contains(id) || profile is null || !Enum.IsDefined(profile.Category) ||
                 (profile.AllowsNormalSummon || profile.AllowsBasicBattle) && profile.Category != CardCategory.Monster ||
+                (profile.AllowsTributeSummon || profile.AllowsTributeForSummon) && profile.Category != CardCategory.Monster ||
+                profile.AllowsTributeSummon && !profile.AllowsNormalSummon ||
                 profile.AllowsSpellTrapSet && profile.Category is not (CardCategory.Spell or CardCategory.Trap))
                 throw new ArgumentException("Invalid explicit card rules.", nameof(rules));
         this.rules = rules.ToFrozenDictionary();
@@ -189,6 +191,7 @@ public sealed partial class DuelEngine
             ChangePhase phase => Advance(phase.Target),
             NormalSummon summon => Summon(summon.CardInstanceId, summon.MonsterZone, false),
             SetMonster set => Summon(set.CardInstanceId, set.MonsterZone, true),
+            TributeSummon tribute => SummonWithTributes(tribute),
             SetSpellTrap set => SetBackRow(set.CardInstanceId, set.SpellTrapZone),
             ChangeMonsterPosition change => ChangePosition(change.MonsterZone, change.Target),
             DeclareAttack attack => Attack(attack.AttackerZone, attack.TargetZone),

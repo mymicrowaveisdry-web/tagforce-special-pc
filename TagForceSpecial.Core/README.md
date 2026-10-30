@@ -1,6 +1,6 @@
 # Shared duel model
 
-Immutable two-player state and deterministic commands for draws, turns, eligible Level 1–4 summons, sets, positions, basic combat, discards and defeat.
+Immutable two-player state and deterministic commands for draws, turns, eligible Normal/Tribute Summons and sets, positions, basic combat, discards and defeat; `TributeSummon` requires explicit eligibility and revision-bound selections, excluding token/Pendulum departures and summon negation.
 
 Gameplay requires explicit metadata; snapshots expose full information. Rendering, visibility filtering, randomness and general card legality remain outside Core.
 
