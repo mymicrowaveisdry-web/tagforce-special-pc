@@ -11,9 +11,12 @@ public enum DuelEndReason { UnableToDraw, LifePointsDepleted }
 /// AllowsBasicBattle opts into supported combat using registered effective statistics; callers must not
 /// enable it where omitted mandatory/continuous effects would change the result.
 /// AllowsSpellTrapSet opts into ordinary back-row placement, excluding Field Spells.
+/// AllowsTributeSummon opts into the ordinary high-level procedure; AllowsTributeForSummon
+/// permits a donor's ordinary Graveyard departure, excluding token/Pendulum exceptions.
 /// </summary>
 public sealed record DuelCardRules(CardCategory Category, bool AllowsNormalSummon = false,
-    bool AllowsBasicBattle = false, bool AllowsSpellTrapSet = false);
+    bool AllowsBasicBattle = false, bool AllowsSpellTrapSet = false,
+    bool AllowsTributeSummon = false, bool AllowsTributeForSummon = false);
 public sealed record CardInstance(int InstanceId, uint GameCardId, PlayerId Owner);
 public sealed record FieldMonster(CardInstance Card, BattlePosition Position, int SummonedOnTurn = 0,
     int PositionChangedOnTurn = 0, int LastAttackTurn = 0, long PlacementId = 0, bool BattleDestroyed = false);
@@ -181,7 +184,8 @@ public enum DuelError
     TriggerCommitmentPending, NoPendingTriggerCommitment, WrongTriggerCommitment, InvalidTriggerCommitment,
     BattleFlowNotEnabled, NoBattleInProgress, BattleWindowPending, BattleWindowClosed,
     StaleBattleDecision, NotBattleResponder, WrongBattleStep, AttackReplayPending,
-    NoAttackReplay, UnsupportedBattleResponse
+    NoAttackReplay, UnsupportedBattleResponse,
+    StaleSummonSelection, InvalidTributeSelection, TributeNotAllowed
 }
 
 public abstract record DuelEvent
@@ -201,6 +205,8 @@ public sealed record AttackDeclared(PlayerId Player, int AttackerZone, int? Targ
 public sealed record MonsterRevealed(PlayerId Player, int Zone, CardInstance Card) : DuelEvent;
 public sealed record BattleDamageDealt(PlayerId Player, int Damage, int LifePointsBefore, int LifePointsAfter) : DuelEvent;
 public sealed record MonsterDestroyed(PlayerId Player, int Zone, CardInstance Card) : DuelEvent;
+/// <summary>Ordinary summon procedure, not destruction or an activation cost.</summary>
+public sealed record MonsterTributed(MonsterBinding Monster) : DuelEvent;
 public sealed record CardDiscarded(PlayerId Player, CardInstance Card) : DuelEvent;
 public sealed record TurnStarted(PlayerId Player, int TurnNumber) : DuelEvent;
 public sealed record DuelEnded(DuelOutcome Outcome) : DuelEvent;
