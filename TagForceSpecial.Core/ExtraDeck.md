@@ -1,6 +1,6 @@
 # Extra Deck and material movement
 
-This supports explicit generic material procedures; tests use authored scenarios.
+This supports explicit generic material procedures and bounded Synchro profiles; tests use authored scenarios. The retained Synchro projection is narrower than full material selection/movement/timing equivalence.
 
 ## Extra Deck
 
@@ -50,6 +50,16 @@ outside the field. On negation materials stay moved, the target enters its owner
 Graveyard without qualification, and no successful-summon event is emitted.
 Counter-negating the negator permits completion. Effect-driven summons do not use
 this procedure window.
+
+For a Synchro procedure, supply `SynchroMaterialRequirements` with disjoint,
+explicit Tuner and non-Tuner card IDs and the allowed non-Tuner count range.
+Exactly one Tuner and at least one non-Tuner must be face-up on the controller's
+field, and their nonzero printed levels must exactly equal the target's nonzero
+printed level. The profile uses the minimum total as `materialCount` and sends
+materials to the Graveyard. Selection, movement and negation use the shared flow.
+These authored profiles do not infer Tuner identity from card data. Field-level
+modifiers, multiple Tuners, card-specific material conditions and alternative
+material destinations are unsupported; do not register profiles that need them.
 
 This standalone procedure does not implement effect-driven Fusion/Ritual selection, opponent-controlled
 materials, tokens, Pendulum hybrid procedures, material replacement,

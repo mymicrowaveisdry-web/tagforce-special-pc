@@ -16,7 +16,8 @@ public sealed partial class DuelEngine
         if (target is null) return Reject(DuelError.SpecialSummonSourceUnavailable);
         if (!profile.TargetCardIds.Contains(target.GameCardId)) return Reject(DuelError.UnsupportedMaterialProcedure);
         var selected = command.Materials;
-        if (selected.Count != profile.MaterialCount ||
+        if ((profile.Synchro is null ? selected.Count != profile.MaterialCount :
+                selected.Count < profile.Synchro.MinimumNonTuners + 1 || selected.Count > profile.Synchro.MaximumNonTuners + 1) ||
             selected.Any(m => m is null || m.Player != player.Id || !m.IsStillPresent(State)) ||
             selected.Select(m => m.Zone).Distinct().Count() != selected.Count)
             return Reject(DuelError.InvalidSummonMaterials);
@@ -28,6 +29,14 @@ public sealed partial class DuelEngine
                 !rules.TryGetValue(material.Card.GameCardId, out var rule) || !rule.AllowsSummonMaterial ||
                 State.SummonHistory.Any(h => h.Card == material.Card && h.Method == SummonMethod.Token))
                 return Reject(DuelError.SummonMaterialNotAllowed);
+        }
+        if (profile.Synchro is { } synchro)
+        {
+            var targetLevel = catalog[target.GameCardId].Statistics.Level;
+            if (targetLevel == 0 || selected.Count(m => synchro.TunerCardIds.Contains(m.Card.GameCardId)) != 1 ||
+                selected.Any(m => catalog[m.Card.GameCardId].Statistics.Level == 0) ||
+                selected.Sum(m => (long)catalog[m.Card.GameCardId].Statistics.Level) != targetLevel)
+                return Reject(DuelError.InvalidSummonMaterials);
         }
         if (player.MonsterZones[command.MonsterZone] is not null && !selected.Any(m => m.Zone == command.MonsterZone))
             return Reject(DuelError.MonsterZoneOccupied);

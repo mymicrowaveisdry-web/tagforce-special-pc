@@ -11,10 +11,11 @@ public sealed class ExtraDeckMaterialProcedureProfile
     public int MaterialCount { get; }
     public MaterialDestination Destination { get; }
     public bool RequireFaceUp { get; }
+    public SynchroMaterialRequirements? Synchro { get; }
 
     public ExtraDeckMaterialProcedureProfile(string procedureId, IEnumerable<uint> targetCardIds,
         IEnumerable<uint> materialCardIds, int materialCount, MaterialDestination destination = MaterialDestination.Graveyard,
-        bool requireFaceUp = true)
+        bool requireFaceUp = true, SynchroMaterialRequirements? synchro = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(procedureId);
         ArgumentNullException.ThrowIfNull(targetCardIds);
@@ -24,8 +25,36 @@ public sealed class ExtraDeckMaterialProcedureProfile
             targets.Distinct().Count() != targets.Length || materials.Distinct().Count() != materials.Length ||
             materialCount is < 1 or > 5 || !Enum.IsDefined(destination))
             throw new ArgumentException("Supply distinct target and material IDs, one to five materials and a supported destination.");
+        if (synchro is not null && (!requireFaceUp || destination != MaterialDestination.Graveyard ||
+            materialCount != synchro.MinimumNonTuners + 1 ||
+            !materials.Order().SequenceEqual(synchro.TunerCardIds.Concat(synchro.NonTunerCardIds).Order())))
+            throw new ArgumentException("Synchro profiles require face-up Graveyard materials, a matching allowlist and minimum count.");
         ProcedureId = procedureId; TargetCardIds = Array.AsReadOnly(targets); MaterialCardIds = Array.AsReadOnly(materials);
-        MaterialCount = materialCount; Destination = destination; RequireFaceUp = requireFaceUp;
+        MaterialCount = materialCount; Destination = destination; RequireFaceUp = requireFaceUp; Synchro = synchro;
+    }
+}
+
+/// <summary>Explicit one-Tuner Synchro procedure using printed levels and designated material IDs.</summary>
+public sealed class SynchroMaterialRequirements
+{
+    public IReadOnlyList<uint> TunerCardIds { get; }
+    public IReadOnlyList<uint> NonTunerCardIds { get; }
+    public int MinimumNonTuners { get; }
+    public int MaximumNonTuners { get; }
+
+    public SynchroMaterialRequirements(IEnumerable<uint> tunerCardIds, IEnumerable<uint> nonTunerCardIds,
+        int minimumNonTuners = 1, int maximumNonTuners = 4)
+    {
+        ArgumentNullException.ThrowIfNull(tunerCardIds);
+        ArgumentNullException.ThrowIfNull(nonTunerCardIds);
+        var tuners = tunerCardIds.ToArray(); var others = nonTunerCardIds.ToArray();
+        var all = tuners.Concat(others).ToArray();
+        if (tuners.Length == 0 || others.Length == 0 || all.Any(id => id == 0) ||
+            all.Distinct().Count() != all.Length || minimumNonTuners < 1 ||
+            maximumNonTuners > 4 || minimumNonTuners > maximumNonTuners)
+            throw new ArgumentException("Supply distinct Tuner and non-Tuner IDs and one to four non-Tuners.");
+        TunerCardIds = Array.AsReadOnly(tuners); NonTunerCardIds = Array.AsReadOnly(others);
+        MinimumNonTuners = minimumNonTuners; MaximumNonTuners = maximumNonTuners;
     }
 }
 
