@@ -8,7 +8,7 @@ public sealed partial class DuelEngine
         var player = State.GetPlayer(chain.Responder);
         var preceding = chain.Links[^1];
         if (source.IsFaceUp || source.SetOnTurn >= State.TurnNumber ||
-            profile.RespondsToCategory is { } category && rules[preceding.Activation.Spell.GameCardId].Category != category)
+            profile.RespondsToCategory is { } category && (preceding.IsPendulumScale ? CardCategory.Spell : rules[preceding.Activation.Spell.GameCardId].Category) != category)
             return Reject(DuelError.UnsupportedChainResponse);
         if ((int)profile.SpellSpeed < (int)preceding.SpellSpeed)
             return Reject(DuelError.ChainResponseSpeedNotAllowed);

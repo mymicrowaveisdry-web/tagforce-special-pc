@@ -65,6 +65,10 @@ public sealed partial class DuelEngine
                 return RequestTriggerCommitment(next, remaining, committed, queue,
                     new(checked(State.Revision + 1), trigger, TriggerCommitmentKind.MonsterTarget,
                         targets: TriggerTargets(next, trigger)), events);
+            if (trigger.Profile.DetachMaterialCount != 0 && trigger.DetachedCost.Count == 0)
+                return RequestTriggerCommitment(next, remaining, committed, queue,
+                    new(checked(State.Revision + 1), trigger, TriggerCommitmentKind.DetachCost,
+                        cards: next.GetPlayer(trigger.Player).MonsterZones[trigger.Source.Zone]!.XyzMaterials), events);
             if (UseKey(next, trigger) is { } use)
             {
                 next = next.WithEventEffects(next.EventEffects.WithUses(next.EventEffects.UsedTriggers.Append(use)));
@@ -122,7 +126,8 @@ public sealed partial class DuelEngine
     {
         var pending = State.EventEffects.PendingCommitment!;
         var batch = State.EventEffects.PendingTriggers!;
-        var id = command switch { ChooseTriggerCostCard c => c.DecisionId, ChooseTriggerMonsterTarget t => t.DecisionId, _ => -1 };
+        var id = command switch { ChooseTriggerCostCard c => c.DecisionId, ChooseTriggerMonsterTarget t => t.DecisionId,
+            ChooseTriggerXyzMaterials x => x.DecisionId, _ => -1 };
         if (id == -1) return Reject(DuelError.TriggerCommitmentPending);
         if (id != pending.DecisionId) return Reject(DuelError.StaleTriggerDecision);
         if (command.Player != pending.Player) return Reject(DuelError.NotTriggerPlayer);
@@ -131,6 +136,24 @@ public sealed partial class DuelEngine
         List<DuelEvent> events = [];
         switch (command)
         {
+            case ChooseTriggerXyzMaterials detach:
+            {
+                if (pending.Kind != TriggerCommitmentKind.DetachCost) return Reject(DuelError.WrongTriggerCommitment);
+                if (!trigger.Source.IsStillPresent(State)) return Reject(DuelError.InvalidTriggerCommitment);
+                var player = State.GetPlayer(trigger.Player);
+                var monster = player.MonsterZones[trigger.Source.Zone]!;
+                var ids = detach.MaterialInstanceIds;
+                if (ids.Count != trigger.Profile.DetachMaterialCount || ids.Distinct().Count() != ids.Count ||
+                    ids.Any(id => !pending.CardOptions.Any(c => c.InstanceId == id) || !monster.XyzMaterials.Any(c => c.InstanceId == id)))
+                    return Reject(DuelError.InvalidTriggerCommitment);
+                var cards = monster.XyzMaterials.Where(c => ids.Contains(c.InstanceId)).ToArray();
+                var zones = player.MonsterZones.ToArray();
+                zones[trigger.Source.Zone] = monster with { XyzMaterials = Array.AsReadOnly(monster.XyzMaterials.Except(cards).ToArray()) };
+                next = next.With(player: player.With(monsters: zones));
+                next = SendXyzMaterials(next, monster.Card, cards, true, events);
+                trigger = trigger with { DetachedCost = Array.AsReadOnly(cards) };
+                break;
+            }
             case ChooseTriggerCostCard cost:
             {
                 if (pending.Kind != TriggerCommitmentKind.DiscardCost) return Reject(DuelError.WrongTriggerCommitment);
