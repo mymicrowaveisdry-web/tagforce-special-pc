@@ -35,11 +35,15 @@ public sealed partial class DuelEngine
                 return Reject(DuelError.InvalidDecisionChoice);
             if (source is not null && chainResponses.TryGetValue(source.Card.GameCardId, out var profile))
             {
+                if (State.PendingSummon is not null && (rules[source.Card.GameCardId].Category != CardCategory.Trap ||
+                    profile.Operation is not (ChainOperation.NegateActivation or ChainOperation.NegateEffect)))
+                    return Reject(DuelError.UnsupportedSummonResponse);
                 if (State.Battle is { } battle && !profile.BattleWindows.HasFlag(battle.Window.Timing))
                     return Reject(DuelError.UnsupportedBattleResponse);
                 return BeginChainResponse(chain, response.SpellTrapZone, source, profile);
             }
             if (State.Battle is not null) return Reject(DuelError.UnsupportedBattleResponse);
+            if (State.PendingSummon is not null) return Reject(DuelError.UnsupportedSummonResponse);
             return AddTokenResponse(chain, response.SpellTrapZone);
         }
         var passes = chain.ConsecutivePasses + 1;
@@ -136,11 +140,16 @@ public sealed partial class DuelEngine
                 for (int i = 0; i < 4; i++)
                 {
                     var card = new CardInstance(checked(++instance), profile.TokenCardIds[i], player.Id);
-                    var token = new FieldMonster(card, BattlePosition.FaceUpDefense, SummonedOnTurn: State.TurnNumber, PlacementId: checked(State.Revision + 1));
+                    var token = NewSummonedMonster(next, card, BattlePosition.FaceUpDefense);
                     zones[empty[i]] = token;
                     events.Add(new TokenSpecialSummoned(player.Id, empty[i], token));
                 }
                 next = next.With(player: player.With(monsters: zones));
+                break;
+            }
+            case ChainOperation.SummonNegation:
+            {
+                next = ResolveSummonNegation(next, link, events);
                 break;
             }
             case ChainOperation.BattleResponse:
@@ -214,6 +223,8 @@ public sealed partial class DuelEngine
                 : new SpellSentToGraveyard(player.Id, receipt.Spell, receipt.SpellTrapZone));
         }
         events.Add(new ChainCompleted());
-        return Accept(next.WithChain(null).WithDecision(null, State.DecisionResult, researchSliceComplete: chain.FreezeOnCompletion), events.ToArray());
+        next = next.WithChain(null).WithDecision(null, State.DecisionResult, researchSliceComplete: chain.FreezeOnCompletion);
+        if (next.PendingSummon is not null) next = CompletePendingSummon(next, events);
+        return Accept(next, events.ToArray());
     }
 }

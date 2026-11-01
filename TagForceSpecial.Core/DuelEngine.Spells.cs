@@ -12,6 +12,9 @@ public sealed partial class DuelEngine
         if (activationContracts.TryGetValue(card.GameCardId, out var contract)) return ActivateContract(card, zone, contract);
         if (!spellEffects.TryGetValue(card.GameCardId, out var effect)) return Reject(DuelError.UnsupportedSpellEffect);
         if (player.SpellTrapFields[zone] is not null) return Reject(DuelError.SpellTrapZoneOccupied);
+        if (!player.Deck.Any(c => effect.EligibleMonsterIds.Contains(c.GameCardId) && Enumerable.Range(0, 5).Any(z =>
+            CheckSpecialSummon(State, player.Id, c, z, BattlePosition.FaceUpAttack, DecisionCardSource.Deck) == DuelError.None)))
+            return Reject(DuelError.DecisionUnavailable);
         if (Enumerable.Range(0, effect.Decisions.Steps.Count).Any(i => CreateDecision(effect.Decisions, i, []) is null))
             return Reject(DuelError.DecisionUnavailable);
         var decision = CreateDecision(effect.Decisions, 0, [])!;
@@ -36,19 +39,17 @@ public sealed partial class DuelEngine
         var spell = player.SpellTrapFields[activation.SpellTrapZone];
         if (card is null || card.Owner != player.Id || !effect.EligibleMonsterIds.Contains(card.GameCardId) ||
             spell is null || !spell.IsFaceUp || spell.Card != activation.Spell ||
-            player.MonsterZones[zone] is not null)
+            CheckSpecialSummon(State, player.Id, card, zone, BattlePosition.FaceUpAttack, DecisionCardSource.Deck) != DuelError.None)
             return Reject(DuelError.InvalidEffectState);
-        var monsters = player.MonsterZones.ToArray();
-        var summoned = new FieldMonster(card, BattlePosition.FaceUpAttack, SummonedOnTurn: State.TurnNumber, PlacementId: checked(State.Revision + 1));
-        monsters[zone] = summoned;
+        List<DuelEvent> events = [];
+        var next = PlaceSpecialSummon(State, player.Id, card, zone, BattlePosition.FaceUpAttack, DecisionCardSource.Deck, events);
+        player = next.GetPlayer(player.Id);
         var slots = player.SpellTrapFields.ToArray();
         slots[activation.SpellTrapZone] = null;
-        var next = State.With(player: player.With(deck: player.Deck.Where(c => c.InstanceId != card.InstanceId),
-            monsters: monsters, spellTraps: slots, graveyard: player.Graveyard.Append(activation.Spell)))
+        next = next.With(player: player.With(spellTraps: slots, graveyard: player.Graveyard.Append(activation.Spell)))
             .WithDecision(null, result, researchSliceComplete: !effect.BanishAtEndPhase).WithActivation(null);
-        List<DuelEvent> events = [new MonsterSpecialSummoned(player.Id, summoned, zone, DecisionCardSource.Deck),
-            new SpellSentToGraveyard(player.Id, activation.Spell, activation.SpellTrapZone),
-            new EffectResolved(player.Id, effect.EffectId, activation.Spell)];
+        events.Add(new SpellSentToGraveyard(player.Id, activation.Spell, activation.SpellTrapZone));
+        events.Add(new EffectResolved(player.Id, effect.EffectId, activation.Spell));
         if (effect.BanishAtEndPhase)
         {
             var delayed = new PendingEndPhaseBanishment(player.Id, effect.EffectId, activation.Spell,

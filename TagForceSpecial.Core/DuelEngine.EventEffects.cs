@@ -50,6 +50,7 @@ public sealed partial class DuelEngine
             BattleFlipEffectWindowOpened e => e.Monster,
             MonsterDestroyed e when before.GetPlayer(e.Player).MonsterZones[e.Zone] is { } m => new(e.Player, e.Zone, e.Card, m.PlacementId),
             MonsterTributed e => e.Monster,
+            SummonNegated e => new(e.Attempt.Card.Owner, -1, e.Attempt.Card, 0),
             CardDiscarded e => new(e.Player, -1, e.Card, 0),
             ActivationCostPaid e => new(e.Player, -1, e.Card, 0),
             TriggerCostPaid { DiscardedCard: { } card } e => new(e.Trigger.Player, -1, card, 0),
@@ -64,7 +65,7 @@ public sealed partial class DuelEngine
             MonsterSpecialSummoned or TokenSpecialSummoned => MonsterEventKind.SpecialSummoned,
             MonsterFlipSummoned => MonsterEventKind.FlipSummoned,
             BattleFlipEffectWindowOpened => MonsterEventKind.FlippedFaceUp,
-            MonsterDestroyed => MonsterEventKind.Destroyed,
+            MonsterDestroyed or SummonNegated => MonsterEventKind.Destroyed,
             _ => MonsterEventKind.SentToGraveyard
         };
         yield return new(kind, subject, point, cost);
@@ -81,7 +82,8 @@ public sealed partial class DuelEngine
         foreach (var emitted in events)
             foreach (var occurrence in Occurrences(before, emitted))
             {
-                var sources = emitted is MonsterDestroyed or MonsterTributed ? destructionSources : FieldMonsters(after);
+                var sources = emitted is MonsterDestroyed or MonsterTributed
+                    ? destructionSources : FieldMonsters(after);
                 foreach (var profile in triggerEffects.Where(p => p.EventKind == occurrence.Kind).OrderBy(p => p.EffectId, StringComparer.Ordinal))
                 {
                     if (profile.SourceLocation != TriggerSourceLocation.FaceUpMonster)
@@ -105,7 +107,7 @@ public sealed partial class DuelEngine
             point = new(checked(State.Revision + 1), 0);
         foreach (var emitted in events)
             if (emitted is MonsterNormalSummoned or MonsterSpecialSummoned or TokenSpecialSummoned or MonsterFlipSummoned or
-                MonsterDestroyed or MonsterTributed or CardDiscarded or ActivationCostPaid or TriggerCostPaid or MonsterRevealed or SpellTrapDestroyed or
+                MonsterDestroyed or MonsterTributed or SummonAttempted or SummonNegated or CardDiscarded or ActivationCostPaid or TriggerCostPaid or MonsterRevealed or SpellTrapDestroyed or
                 MonsterBanished or LifePointsGained or BattleDamageDealt or MonsterModifierCreated or MonsterEffectsNegated or
                 SpellActivated or ChainResponseActivated or MonsterPositionChanged or MonsterSet or SpellTrapSet or CardDrawn or
                 PhaseChanged or TurnStarted or AttackDeclared or BattleFlipEffectWindowOpened)
@@ -142,7 +144,7 @@ public sealed partial class DuelEngine
         if (next.Outcome is null) deferred.AddRange(CollectTriggers(before, next, events.ToArray(), deferred.Count + 1));
         else deferred.Clear();
         var pending = current.PendingTriggers;
-        if (next.Outcome is null && next.PendingChain is null && next.PendingDecision is null && pending is null && deferred.Count != 0)
+        if (next.Outcome is null && next.PendingChain is null && next.PendingSummon is null && next.PendingDecision is null && pending is null && deferred.Count != 0)
         {
             var timedEligible = deferred.Where(t => HasTriggerTiming(t, last)).ToArray();
             foreach (var missed in deferred.Except(timedEligible)) events.Add(new TriggerMissedTiming(missed));

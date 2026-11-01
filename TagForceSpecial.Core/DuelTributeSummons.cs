@@ -11,15 +11,17 @@ public sealed record TributeSummon : DuelCommand
     public int MonsterZone { get; }
     public bool FaceDown { get; }
     public IReadOnlyList<MonsterBinding> Tributes { get; }
+    public string? ProcedureId { get; }
 
     public TributeSummon(PlayerId player, long expectedRevision, int cardInstanceId,
-        int monsterZone, IEnumerable<MonsterBinding> tributes, bool faceDown = false) : base(player)
+        int monsterZone, IEnumerable<MonsterBinding> tributes, bool faceDown = false, string? procedureId = null) : base(player)
     {
         ArgumentNullException.ThrowIfNull(tributes);
         ExpectedRevision = expectedRevision;
         CardInstanceId = cardInstanceId;
         MonsterZone = monsterZone;
         FaceDown = faceDown;
+        ProcedureId = procedureId;
         Tributes = Array.AsReadOnly(tributes.ToArray());
     }
 }

@@ -12,7 +12,8 @@ internal static class BattleFlowScenario
     internal static DuelEngine Engine(int attack = 1800, int defense = 1000, int opposingAttack = 1200, int opposingDefense = 2000,
         bool defender = true, bool faceDown = false, IEnumerable<BattleResponseProfile>? profiles = null,
         IEnumerable<ChainResponseProfile>? chains = null, IEnumerable<TriggerEffectProfile>? triggers = null,
-        IEnumerable<ContinuousEffectProfile>? continuous = null, bool staged = true, bool additionalAttacker = false, IEnumerable<ContinuousNegationProfile>? negations = null)
+        IEnumerable<ContinuousEffectProfile>? continuous = null, bool staged = true, bool additionalAttacker = false, IEnumerable<ContinuousNegationProfile>? negations = null,
+        IEnumerable<SpecialSummonCardProfile>? specialCards = null, IEnumerable<SummonWindowProfile>? summonWindows = null)
     {
         uint[] ids = [A, B, Filler, Negate, Destroy, Summon, Stats, Counter];
         var catalog = new CardCatalog(new(null, "synthetic-stage8-v1"), ids.Select(id => new CardDefinition(id, $"Probe {id}", "",
@@ -24,7 +25,8 @@ internal static class BattleFlowScenario
         uint[] second = [B, B, Negate, Destroy, Summon, Stats, Counter, .. Enumerable.Repeat(Filler, 33)];
         var engine = new DuelEngine(catalog, rules, first, second, experimentalChainResponses: chains,
             experimentalTriggerEffects: triggers, experimentalContinuousEffects: continuous, experimentalContinuousNegations: negations,
-            experimentalBattleFlow: staged, experimentalBattleResponses: profiles);
+            experimentalBattleFlow: staged, experimentalBattleResponses: profiles,
+            experimentalSpecialSummonCards: specialCards, experimentalSummonWindows: summonWindows);
         EnterMain(engine); Play(engine, A, 0); Set(engine, Stats, 0); Set(engine, Counter, 1); NextMain(engine);
         if (defender) Play(engine, B, 0, faceDown);
         Set(engine, Negate, 0); Set(engine, Destroy, 1); Set(engine, Summon, 2); Set(engine, Stats, 3);
