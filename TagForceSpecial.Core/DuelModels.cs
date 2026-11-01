@@ -23,7 +23,10 @@ public sealed record DuelCardRules(CardCategory Category, bool AllowsNormalSummo
     bool AllowsSummonMaterial = false);
 public sealed record CardInstance(int InstanceId, uint GameCardId, PlayerId Owner);
 public sealed record FieldMonster(CardInstance Card, BattlePosition Position, int SummonedOnTurn = 0,
-    int PositionChangedOnTurn = 0, int LastAttackTurn = 0, long PlacementId = 0, bool BattleDestroyed = false);
+    int PositionChangedOnTurn = 0, int LastAttackTurn = 0, long PlacementId = 0, bool BattleDestroyed = false)
+{
+    public IReadOnlyList<CardInstance> XyzMaterials { get; internal init; } = Array.AsReadOnly(Array.Empty<CardInstance>());
+}
 public sealed record DuelOutcome(PlayerId Winner, PlayerId Loser, DuelEndReason Reason);
 
 /// <summary>Immutable full-information engine snapshot. A future UI must hide private zones.</summary>

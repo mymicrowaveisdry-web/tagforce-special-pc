@@ -225,7 +225,7 @@ public sealed partial class DuelEngine
         if (State.Outcome is not null) return Reject(DuelError.DuelFinished);
         if (command.Player is not (PlayerId.One or PlayerId.Two)) return Reject(DuelError.InvalidPlayer);
         if (State.EventEffects.PendingCommitment is not null) return AnswerTriggerCommitment(command);
-        if (command is ChooseTriggerCostCard or ChooseTriggerMonsterTarget) return Reject(DuelError.NoPendingTriggerCommitment);
+        if (command is ChooseTriggerCostCard or ChooseTriggerMonsterTarget or ChooseTriggerXyzMaterials) return Reject(DuelError.NoPendingTriggerCommitment);
         if (State.EventEffects.PendingTriggers is not null)
             return command is ChooseTriggerOrder order ? OrderTriggers(order) : Reject(DuelError.TriggerOrderPending);
         if (command is ChooseTriggerOrder) return Reject(DuelError.NoPendingTriggers);
@@ -476,6 +476,7 @@ public sealed partial class DuelEngine
     {
         var emitted = events.ToList();
         state = PrepareBattleState(State, state, emitted);
+        state = PrepareXyzMaterials(State, state, emitted);
         state = PrepareSummonHistory(State, state, emitted);
         state = PrepareEventEffects(State, state, emitted);
         State = state.With(revision: checked(State.Revision + 1));

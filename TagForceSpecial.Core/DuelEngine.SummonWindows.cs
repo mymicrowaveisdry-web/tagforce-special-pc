@@ -39,7 +39,7 @@ public sealed partial class DuelEngine
         next = pending.IsSpecialSummon
             ? PlaceSpecialSummon(next, pending.Player, pending.Card, pending.MonsterZone, pending.Position,
                 pending.Source, events, pending.ProcedureId, pending.AttemptId, pending.ProperProcedureId, sourceAlreadyRemoved: true,
-                timingGroup: pending.Source == DecisionCardSource.ExtraDeck ? 1 : null)
+                timingGroup: pending.Source == DecisionCardSource.ExtraDeck ? 1 : null, xyzMaterials: pending.XyzMaterials)
             : PlaceSuccessfulSummon(next, pending.Player, pending.Card, pending.MonsterZone, false, events);
         return next.WithSummon(null);
     }
@@ -103,6 +103,7 @@ public sealed partial class DuelEngine
         var owner = next.GetPlayer(pending.Card.Owner);
         events.Add(new SummonNegated(pending) { TimingGroup = 1 });
         next = next.With(player: owner.With(graveyard: owner.Graveyard.Append(pending.Card)));
-        return next.WithSummon(pending with { Negated = true });
+        next = SendXyzMaterials(next, pending.Card, pending.XyzMaterials, false, events, 1);
+        return next.WithSummon(pending with { Negated = true, XyzMaterials = Array.AsReadOnly(Array.Empty<CardInstance>()) });
     }
 }

@@ -4,7 +4,10 @@ namespace TagForceSpecial.Core;
 public sealed record PendingSummon(long AttemptId, long DecisionId, PlayerId Player,
     CardInstance Card, int MonsterZone, PlayerId Responder, int ConsecutivePasses = 0,
     bool Negated = false, bool IsSpecialSummon = false, DecisionCardSource Source = DecisionCardSource.Hand,
-    BattlePosition Position = BattlePosition.FaceUpAttack, string? ProcedureId = null, string? ProperProcedureId = null);
+    BattlePosition Position = BattlePosition.FaceUpAttack, string? ProcedureId = null, string? ProperProcedureId = null)
+{
+    public IReadOnlyList<CardInstance> XyzMaterials { get; internal init; } = Array.AsReadOnly(Array.Empty<CardInstance>());
+}
 
 public sealed record PassSummonResponse(PlayerId Player, long DecisionId) : DuelCommand(Player);
 public sealed record ActivateSummonNegation(PlayerId Player, long DecisionId, int SpellTrapZone) : DuelCommand(Player);

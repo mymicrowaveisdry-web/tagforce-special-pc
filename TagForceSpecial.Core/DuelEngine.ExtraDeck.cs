@@ -33,16 +33,22 @@ public sealed partial class DuelEngine
         if (profile.Synchro is { } synchro)
         {
             var targetLevel = catalog[target.GameCardId].Statistics.Level;
-            if (targetLevel == 0 || selected.Count(m => synchro.TunerCardIds.Contains(m.Card.GameCardId)) != 1 ||
+            if (IsXyzCard(target) || selected.Any(m => IsXyzCard(m.Card)) || targetLevel == 0 || selected.Count(m => synchro.TunerCardIds.Contains(m.Card.GameCardId)) != 1 ||
                 selected.Any(m => catalog[m.Card.GameCardId].Statistics.Level == 0) ||
                 selected.Sum(m => (long)catalog[m.Card.GameCardId].Statistics.Level) != targetLevel)
                 return Reject(DuelError.InvalidSummonMaterials);
         }
+        if (profile.Xyz is { } xyz && selected.Any(m => IsXyzCard(m.Card) ||
+            catalog[m.Card.GameCardId].Statistics.Level != xyz.Rank))
+            return Reject(DuelError.InvalidSummonMaterials);
         if (player.MonsterZones[command.MonsterZone] is not null && !selected.Any(m => m.Zone == command.MonsterZone))
             return Reject(DuelError.MonsterZoneOccupied);
         var ordered = selected.OrderBy(m => m.Zone).ToArray();
         List<DuelEvent> events = [];
         var next = MoveSummonMaterials(State, player.Id, ordered, profile.Destination, profile.ProcedureId, events);
+        var attachments = Array.AsReadOnly(profile.Xyz is null ? Array.Empty<CardInstance>() : ordered.Select(m => m.Card).ToArray());
+        if (profile.Xyz is not null)
+            foreach (var material in ordered) events.Add(new XyzMaterialAttached(target, material, profile.ProcedureId) { TimingGroup = 0 });
         var error = CheckSpecialSummon(next, player.Id, target, command.MonsterZone, command.Position,
             DecisionCardSource.ExtraDeck, profile.ProcedureId);
         if (error != DuelError.None) return Reject(error);
@@ -50,14 +56,15 @@ public sealed partial class DuelEngine
         {
             var pending = new PendingSummon(checked(State.Revision + 1), checked(State.Revision + 1), player.Id,
                 target, command.MonsterZone, Other(player.Id), IsSpecialSummon: true, Source: DecisionCardSource.ExtraDeck,
-                Position: command.Position, ProcedureId: profile.ProcedureId, ProperProcedureId: profile.ProcedureId);
+                Position: command.Position, ProcedureId: profile.ProcedureId, ProperProcedureId: profile.ProcedureId)
+                { XyzMaterials = attachments };
             next = next.With(player: RemoveSpecialSource(next.GetPlayer(player.Id), target, DecisionCardSource.ExtraDeck)).WithSummon(pending);
             events.Add(new SummonAttempted(pending) { TimingGroup = 1 });
             events.Add(new SummonResponseRequested(pending));
             return Accept(next, events.ToArray());
         }
         next = PlaceSpecialSummon(next, player.Id, target, command.MonsterZone, command.Position, DecisionCardSource.ExtraDeck,
-            events, profile.ProcedureId, properProcedureId: profile.ProcedureId, timingGroup: 1);
+            events, profile.ProcedureId, properProcedureId: profile.ProcedureId, timingGroup: 1, xyzMaterials: attachments);
         return Accept(next, events.ToArray());
     }
 
@@ -69,6 +76,7 @@ public sealed partial class DuelEngine
         var zones = player.MonsterZones.ToArray();
         foreach (var material in ordered) zones[material.Zone] = null;
         var next = state.With(player: player.With(monsters: zones));
+        if (destination == MaterialDestination.Attached) return next;
         foreach (var ownerId in ordered.Select(m => m.Card.Owner).Distinct())
         {
             var owner = next.GetPlayer(ownerId);

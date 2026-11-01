@@ -32,7 +32,9 @@ public sealed partial class DuelEngine
         if (trigger.Profile.SourceLocation == TriggerSourceLocation.FaceUpMonster &&
             state.GetPlayer(trigger.Player).MonsterZones[trigger.Source.Zone]!.BattleDestroyed &&
             trigger.Profile.EventKind != MonsterEventKind.FlippedFaceUp) return false;
-        if (trigger.DiscardedCost is not null || trigger.PaidLifePoints > 0) return true;
+        if (trigger.Profile.DetachMaterialCount > 0 && trigger.DetachedCost.Count == 0 &&
+            state.GetPlayer(trigger.Player).MonsterZones[trigger.Source.Zone]!.XyzMaterials.Count < trigger.Profile.DetachMaterialCount) return false;
+        if (trigger.DiscardedCost is not null || trigger.PaidLifePoints > 0 || trigger.DetachedCost.Count > 0) return true;
         var player = state.GetPlayer(trigger.Player);
         return player.LifePoints > trigger.Profile.LifePointCost &&
             (trigger.Profile.DiscardCardIds.Count == 0 || player.Hand.Any(c => trigger.Profile.DiscardCardIds.Contains(c.GameCardId))) &&
@@ -51,6 +53,7 @@ public sealed partial class DuelEngine
             MonsterDestroyed e when before.GetPlayer(e.Player).MonsterZones[e.Zone] is { } m => new(e.Player, e.Zone, e.Card, m.PlacementId),
             MonsterTributed e => e.Monster,
             SummonMaterialSentToGraveyard e => e.Material,
+            XyzMaterialSentToGraveyard e => new(e.Material.Owner, -1, e.Material, 0),
             SummonNegated e => new(e.Attempt.Card.Owner, -1, e.Attempt.Card, 0),
             CardDiscarded e => new(e.Player, -1, e.Card, 0),
             ActivationCostPaid e => new(e.Player, -1, e.Card, 0),
@@ -58,7 +61,7 @@ public sealed partial class DuelEngine
             _ => null
         };
         if (subject is null || !rules.TryGetValue(subject.Card.GameCardId, out var rule) || rule.Category != CardCategory.Monster) yield break;
-        bool cost = emitted is ActivationCostPaid or TriggerCostPaid;
+        bool cost = emitted is ActivationCostPaid or TriggerCostPaid or XyzMaterialSentToGraveyard { IsCost: true };
         var point = new EffectTimingPoint(checked(State.Revision + 1), cost ? -1 : emitted.TimingGroup ?? 0);
         var kind = emitted switch
         {
@@ -83,7 +86,8 @@ public sealed partial class DuelEngine
         foreach (var emitted in events)
             foreach (var occurrence in Occurrences(before, emitted))
             {
-                var sources = emitted is MonsterDestroyed or MonsterTributed or SummonMaterialSentToGraveyard
+                var sources = emitted is MonsterDestroyed or MonsterTributed or SummonMaterialSentToGraveyard or
+                    XyzMaterialSentToGraveyard { IsCost: false }
                     ? destructionSources : FieldMonsters(after);
                 foreach (var profile in triggerEffects.Where(p => p.EventKind == occurrence.Kind).OrderBy(p => p.EffectId, StringComparer.Ordinal))
                 {
@@ -108,7 +112,7 @@ public sealed partial class DuelEngine
             point = new(checked(State.Revision + 1), 0);
         foreach (var emitted in events)
             if (emitted is MonsterNormalSummoned or MonsterSpecialSummoned or TokenSpecialSummoned or MonsterFlipSummoned or
-                MonsterDestroyed or MonsterTributed or SummonMaterialSentToGraveyard or SummonMaterialBanished or SummonAttempted or SummonNegated or CardDiscarded or ActivationCostPaid or TriggerCostPaid or MonsterRevealed or SpellTrapDestroyed or
+                MonsterDestroyed or MonsterTributed or SummonMaterialSentToGraveyard or SummonMaterialBanished or XyzMaterialAttached or XyzMaterialSentToGraveyard or SummonAttempted or SummonNegated or CardDiscarded or ActivationCostPaid or TriggerCostPaid or MonsterRevealed or SpellTrapDestroyed or
                 MonsterBanished or LifePointsGained or BattleDamageDealt or MonsterModifierCreated or MonsterEffectsNegated or
                 SpellActivated or ChainResponseActivated or MonsterPositionChanged or MonsterSet or SpellTrapSet or CardDrawn or
                 PhaseChanged or TurnStarted or AttackDeclared or BattleFlipEffectWindowOpened)
