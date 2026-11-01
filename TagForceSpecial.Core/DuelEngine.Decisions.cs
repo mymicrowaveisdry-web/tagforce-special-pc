@@ -8,9 +8,12 @@ public sealed partial class DuelEngine
         var player = State.GetPlayer(decisionPlayer ?? State.PendingSpellActivation?.Player ?? State.ActivePlayer);
         var step = sequence.Steps[index];
         CardInstance[] cards = step.Kind == DecisionKind.Card
-            ? (step.CardSource == DecisionCardSource.Deck ? player.Deck : player.Hand)
+            ? SpecialSourceCards(player, step.CardSource!.Value)
                 .Where(c => c.InstanceId != excludeInstanceId && step.AllowedCardIds.Contains(c.GameCardId)).ToArray()
             : [];
+        if (step.Kind == DecisionKind.Card && spellEffects.Values.FirstOrDefault(e => e.Decisions.Id == sequence.Id) is not null)
+            cards = cards.Where(c => Enumerable.Range(0, 5).Any(z => CheckSpecialSummon(State, player.Id, c, z,
+                BattlePosition.FaceUpAttack, DecisionCardSource.Deck) == DuelError.None)).ToArray();
         int[] zones = step.Kind == DecisionKind.MonsterZone
             ? Enumerable.Range(0, 5).Where(z => player.MonsterZones[z] is null).ToArray()
             : [];

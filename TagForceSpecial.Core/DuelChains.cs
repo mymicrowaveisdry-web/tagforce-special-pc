@@ -4,7 +4,7 @@ namespace TagForceSpecial.Core;
 public enum ChainOperation
 {
     DestroyOpposingFaceUpMonsters, DestroyBoundSpellTrap, SummonFourTokens,
-    NegateActivation, NegateEffect, TriggerEffect, BattleResponse
+    NegateActivation, NegateEffect, TriggerEffect, BattleResponse, SummonNegation
 }
 public enum ChainSpellSpeed { One = 1, Two = 2, Three = 3 }
 public enum ChainNegation { None, Effect, Activation }
@@ -43,7 +43,7 @@ public sealed record ChainLink(int Number, CommittedActivation Activation, long 
     int? TargetLinkNumber = null, ChainNegation Negation = ChainNegation.None,
     bool DestroyNegatedSource = false, TriggerActivation? Trigger = null,
     BattleResponseProfile? BattleEffect = null, long? BattleAttackId = null, MonsterBinding? BattleTarget = null,
-    CardInstance? BattleSummonCard = null, int? BattleMonsterZone = null)
+    CardInstance? BattleSummonCard = null, int? BattleMonsterZone = null, long? SummonAttemptId = null)
 {
     public bool ActivationNegated => Negation == ChainNegation.Activation;
     public bool EffectNegated => Negation != ChainNegation.None;
