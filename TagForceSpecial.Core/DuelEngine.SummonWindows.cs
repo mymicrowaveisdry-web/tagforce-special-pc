@@ -39,7 +39,7 @@ public sealed partial class DuelEngine
         next = pending.IsSpecialSummon
             ? PlaceSpecialSummon(next, pending.Player, pending.Card, pending.MonsterZone, pending.Position,
                 pending.Source, events, pending.ProcedureId, pending.AttemptId, pending.ProperProcedureId, sourceAlreadyRemoved: true,
-                timingGroup: null)
+                timingGroup: pending.Source == DecisionCardSource.ExtraDeck ? 1 : null)
             : PlaceSuccessfulSummon(next, pending.Player, pending.Card, pending.MonsterZone, false, events);
         return next.WithSummon(null);
     }

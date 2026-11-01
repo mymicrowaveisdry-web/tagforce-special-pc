@@ -30,11 +30,13 @@ public sealed partial class DuelEngine
     private readonly FrozenDictionary<uint, SummonNegationProfile> summonNegations;
     private readonly FrozenDictionary<uint, SpecialSummonCardProfile> specialSummonCards;
     private readonly FrozenDictionary<string, SpecialSummonProcedureProfile> specialSummonProcedures;
+    private readonly FrozenDictionary<string, ExtraDeckMaterialProcedureProfile> materialProcedures;
     public DuelState State { get; private set; }
 
     /// <summary>
     /// Decks are supplied top-first, after any external shuffle. Only size and catalog membership
-    /// are checked here. Banlists, copy limits and complete deck legality are later work.
+    /// are checked here. Extra Decks are separately supplied and explicitly eligible; banlists,
+    /// copy limits and complete deck legality are later work.
     /// Rule metadata is explicit; missing classifications fail closed when attempting to summon.
     /// </summary>
     public DuelEngine(CardCatalog catalog, IReadOnlyDictionary<uint, DuelCardRules> rules,
@@ -53,7 +55,9 @@ public sealed partial class DuelEngine
         IEnumerable<SummonWindowProfile>? experimentalSummonWindows = null,
         IEnumerable<SummonNegationProfile>? experimentalSummonNegations = null,
         IEnumerable<SpecialSummonCardProfile>? experimentalSpecialSummonCards = null,
-        IEnumerable<SpecialSummonProcedureProfile>? experimentalSpecialSummonProcedures = null)
+        IEnumerable<SpecialSummonProcedureProfile>? experimentalSpecialSummonProcedures = null,
+        IEnumerable<uint>? playerOneExtraDeck = null, IEnumerable<uint>? playerTwoExtraDeck = null,
+        IEnumerable<ExtraDeckMaterialProcedureProfile>? experimentalMaterialProcedures = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(rules);
@@ -67,6 +71,7 @@ public sealed partial class DuelEngine
             if (!knownIds.Contains(id) || profile is null || !Enum.IsDefined(profile.Category) ||
                 (profile.AllowsNormalSummon || profile.AllowsBasicBattle) && profile.Category != CardCategory.Monster ||
                 (profile.AllowsTributeSummon || profile.AllowsTributeForSummon) && profile.Category != CardCategory.Monster ||
+                (profile.AllowsExtraDeck || profile.AllowsSummonMaterial) && profile.Category != CardCategory.Monster ||
                 profile.AllowsTributeSummon && !profile.AllowsNormalSummon ||
                 profile.RequiresRegisteredTributeProcedure && !profile.AllowsTributeSummon ||
                 profile.AllowsSpellTrapSet && profile.Category is not (CardCategory.Spell or CardCategory.Trap))
@@ -163,6 +168,14 @@ public sealed partial class DuelEngine
             throw new ArgumentException("Special Summon procedures require distinct IDs and explicitly profiled catalog monsters.");
         specialSummonCards = specialCards.ToFrozenDictionary(p => p.CardId);
         specialSummonProcedures = specialProcedures.ToFrozenDictionary(p => p.ProcedureId, StringComparer.Ordinal);
+        var materialProfiles = (experimentalMaterialProcedures ?? []).ToArray();
+        if (materialProfiles.Any(p => p is null || p.TargetCardIds.Any(id => !specialSummonCards.ContainsKey(id) ||
+                !this.rules.TryGetValue(id, out var rule) || !rule.AllowsExtraDeck) ||
+                p.MaterialCardIds.Any(id => !this.rules.TryGetValue(id, out var rule) || !rule.AllowsSummonMaterial)) ||
+            materialProfiles.Select(p => p.ProcedureId).Distinct(StringComparer.Ordinal).Count() != materialProfiles.Length ||
+            materialProfiles.Any(p => specialSummonProcedures.ContainsKey(p.ProcedureId)))
+            throw new ArgumentException("Material procedures require distinct IDs and explicit Extra Deck, target and material eligibility.");
+        materialProcedures = materialProfiles.ToFrozenDictionary(p => p.ProcedureId, StringComparer.Ordinal);
         if (summonLevelModifiers.Any(p => p is null || !IsMonster(p.SourceCardId) || p.TargetCardIds.Any(id => !IsMonster(id))) ||
             procedures.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) || !rule.AllowsTributeSummon ||
                 p.AllowedTributeCardIds.Any(id => !this.rules.TryGetValue(id, out var donor) || !donor.AllowsTributeForSummon)) ||
@@ -195,7 +208,15 @@ public sealed partial class DuelEngine
         }
         var first = CreatePlayer(PlayerId.One, playerOneDeck);
         var second = CreatePlayer(PlayerId.Two, playerTwoDeck);
-        State = new([first, second], startingPlayer);
+        CardInstance[] CreateExtraDeck(PlayerId owner, IEnumerable<uint>? cards)
+        {
+            var ids = (cards ?? []).Take(16).ToArray();
+            if (ids.Length > 15 || ids.Any(id => !this.rules.TryGetValue(id, out var rule) || !rule.AllowsExtraDeck))
+                throw new ArgumentException("Each Extra Deck supports up to 15 explicitly eligible catalog monsters.");
+            return ids.Select(id => new CardInstance(nextInstance++, id, owner)).ToArray();
+        }
+        State = new([first.With(extraDeck: CreateExtraDeck(PlayerId.One, playerOneExtraDeck)),
+            second.With(extraDeck: CreateExtraDeck(PlayerId.Two, playerTwoExtraDeck))], startingPlayer);
     }
 
     public DuelActionResult Execute(DuelCommand command)
@@ -243,6 +264,7 @@ public sealed partial class DuelEngine
             SetMonster set => Summon(set.CardInstanceId, set.MonsterZone, true),
             TributeSummon tribute => SummonWithTributes(tribute),
             SpecialSummonByProcedure special => ExecuteSpecialProcedure(special),
+            SpecialSummonWithMaterials material => ExecuteMaterialProcedure(material),
             SetSpellTrap set => SetBackRow(set.CardInstanceId, set.SpellTrapZone),
             ChangeMonsterPosition change => ChangePosition(change.MonsterZone, change.Target),
             DeclareAttack attack => Attack(attack.AttackerZone, attack.TargetZone),

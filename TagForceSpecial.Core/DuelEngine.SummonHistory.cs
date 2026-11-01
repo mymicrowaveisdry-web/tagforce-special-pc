@@ -7,7 +7,7 @@ public sealed partial class DuelEngine
         var history = next.SummonHistory.ToList();
         long revision = checked(before.Revision + 1);
         string? Retained(CardInstance card, DecisionCardSource? source) =>
-            source is DecisionCardSource.Hand or DecisionCardSource.Deck ? null
+            source is DecisionCardSource.Hand or DecisionCardSource.Deck or DecisionCardSource.ExtraDeck ? null
                 : history.LastOrDefault(h => h.Card == card)?.ProperProcedureId;
         void Record(PlayerId player, CardInstance card, int zone, BattlePosition position, SummonMethod method,
             DecisionCardSource? source, SummonStatus status, long? placement, long? attempt = null,
@@ -57,7 +57,7 @@ public sealed partial class DuelEngine
                     break;
             }
         // A return to a private origin ends retained proper-summon eligibility, even before another summon.
-        var privateCards = next.Players.SelectMany(p => p.Hand.Concat(p.Deck)).ToHashSet();
+        var privateCards = next.Players.SelectMany(p => p.Hand.Concat(p.Deck).Concat(p.ExtraDeck)).ToHashSet();
         for (int i = 0; i < history.Count; i++)
             if (history[i].ProperProcedureId is not null && privateCards.Contains(history[i].Card))
                 history[i] = history[i] with { ProperProcedureId = null };

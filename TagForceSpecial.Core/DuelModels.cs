@@ -14,11 +14,13 @@ public enum DuelEndReason { UnableToDraw, LifePointsDepleted }
 /// AllowsTributeSummon opts into the ordinary high-level procedure; AllowsTributeForSummon
 /// permits a donor's ordinary Graveyard departure, excluding token/Pendulum exceptions.
 /// RequiresRegisteredTributeProcedure disables default procedures for this card.
+/// AllowsExtraDeck and AllowsSummonMaterial explicitly opt into the bounded material slice.
 /// </summary>
 public sealed record DuelCardRules(CardCategory Category, bool AllowsNormalSummon = false,
     bool AllowsBasicBattle = false, bool AllowsSpellTrapSet = false,
     bool AllowsTributeSummon = false, bool AllowsTributeForSummon = false,
-    bool RequiresRegisteredTributeProcedure = false);
+    bool RequiresRegisteredTributeProcedure = false, bool AllowsExtraDeck = false,
+    bool AllowsSummonMaterial = false);
 public sealed record CardInstance(int InstanceId, uint GameCardId, PlayerId Owner);
 public sealed record FieldMonster(CardInstance Card, BattlePosition Position, int SummonedOnTurn = 0,
     int PositionChangedOnTurn = 0, int LastAttackTurn = 0, long PlacementId = 0, bool BattleDestroyed = false);
@@ -32,6 +34,8 @@ public sealed class DuelPlayerState
     /// <summary>Top of deck is index zero. Setup accepts an already ordered deck.</summary>
     public IReadOnlyList<CardInstance> Deck { get; }
     public IReadOnlyList<CardInstance> Hand { get; }
+    /// <summary>Ordered full-information Extra Deck; all entries are face-down in this slice.</summary>
+    public IReadOnlyList<CardInstance> ExtraDeck { get; }
     public IReadOnlyList<FieldMonster?> MonsterZones { get; }
     /// <summary>Compatibility card view; inspect SpellTrapFields for face-up versus set state.</summary>
     public IReadOnlyList<CardInstance?> SpellTrapZones { get; }
@@ -43,12 +47,13 @@ public sealed class DuelPlayerState
     internal DuelPlayerState(PlayerId id, IEnumerable<CardInstance> deck, IEnumerable<CardInstance> hand,
         IEnumerable<FieldMonster?>? monsters = null, IEnumerable<CardInstance>? graveyard = null,
         IEnumerable<FieldSpellTrap?>? spellTraps = null, int lifePoints = 8000,
-        IEnumerable<CardInstance>? banished = null)
+        IEnumerable<CardInstance>? banished = null, IEnumerable<CardInstance>? extraDeck = null)
     {
         Id = id;
         LifePoints = lifePoints;
         Deck = Array.AsReadOnly(deck.ToArray());
         Hand = Array.AsReadOnly(hand.ToArray());
+        ExtraDeck = Array.AsReadOnly(extraDeck?.ToArray() ?? []);
         MonsterZones = Array.AsReadOnly(monsters?.ToArray() ?? new FieldMonster?[5]);
         SpellTrapFields = Array.AsReadOnly(spellTraps?.ToArray() ?? new FieldSpellTrap?[5]);
         SpellTrapZones = Array.AsReadOnly(SpellTrapFields.Select(s => s?.Card).ToArray());
@@ -59,9 +64,9 @@ public sealed class DuelPlayerState
     internal DuelPlayerState With(IEnumerable<CardInstance>? deck = null, IEnumerable<CardInstance>? hand = null,
         IEnumerable<FieldMonster?>? monsters = null, IEnumerable<CardInstance>? graveyard = null,
         IEnumerable<FieldSpellTrap?>? spellTraps = null, int? lifePoints = null,
-        IEnumerable<CardInstance>? banished = null) =>
+        IEnumerable<CardInstance>? banished = null, IEnumerable<CardInstance>? extraDeck = null) =>
         new(Id, deck ?? Deck, hand ?? Hand, monsters ?? MonsterZones, graveyard ?? Graveyard,
-            spellTraps ?? SpellTrapFields, lifePoints ?? LifePoints, banished ?? Banished);
+            spellTraps ?? SpellTrapFields, lifePoints ?? LifePoints, banished ?? Banished, extraDeck ?? ExtraDeck);
 }
 
 public sealed class DuelState
@@ -205,7 +210,8 @@ public enum DuelError
     StaleSummonSelection, InvalidTributeSelection, TributeNotAllowed,
     UnsupportedTributeProcedure, SummonWindowPending, NoPendingSummon, StaleSummonDecision,
     NotSummonResponder, UnsupportedSummonResponse, InsufficientLifePoints,
-    UnsupportedSpecialSummon, SpecialSummonSourceUnavailable, ProperSummonRequired, SpecialSummonConditionsNotMet
+    UnsupportedSpecialSummon, SpecialSummonSourceUnavailable, ProperSummonRequired, SpecialSummonConditionsNotMet,
+    UnsupportedMaterialProcedure, InvalidSummonMaterials, SummonMaterialNotAllowed
 }
 
 public abstract record DuelEvent
