@@ -22,7 +22,8 @@ public sealed partial class DuelEngine
     private bool CanActivateTrigger(DuelState state, TriggerActivation trigger)
     {
         bool location = trigger.Profile.SourceLocation != TriggerSourceLocation.FaceUpMonster
-            ? state.GetPlayer(trigger.Player).Graveyard.Contains(trigger.Source.Card)
+            ? state.GetPlayer(trigger.Player).Graveyard.Contains(trigger.Source.Card) ||
+                trigger.Profile.SourceLocation == TriggerSourceLocation.DestroyedSelf && state.GetPlayer(trigger.Player).FaceUpExtraDeck.Contains(trigger.Source.Card)
             : trigger.Source.IsStillPresent(state) && state.GetPlayer(trigger.Player).MonsterZones[trigger.Source.Zone]!.Position != BattlePosition.FaceDownDefense;
         if (!location || IsTriggerUsed(state, trigger)) return false;
         if (state.Battle?.Step == BattleStep.Damage && !(trigger.Profile.DamageStepAllowed ??
@@ -32,7 +33,9 @@ public sealed partial class DuelEngine
         if (trigger.Profile.SourceLocation == TriggerSourceLocation.FaceUpMonster &&
             state.GetPlayer(trigger.Player).MonsterZones[trigger.Source.Zone]!.BattleDestroyed &&
             trigger.Profile.EventKind != MonsterEventKind.FlippedFaceUp) return false;
-        if (trigger.DiscardedCost is not null || trigger.PaidLifePoints > 0) return true;
+        if (trigger.Profile.DetachMaterialCount > 0 && trigger.DetachedCost.Count == 0 &&
+            state.GetPlayer(trigger.Player).MonsterZones[trigger.Source.Zone]!.XyzMaterials.Count < trigger.Profile.DetachMaterialCount) return false;
+        if (trigger.DiscardedCost is not null || trigger.PaidLifePoints > 0 || trigger.DetachedCost.Count > 0) return true;
         var player = state.GetPlayer(trigger.Player);
         return player.LifePoints > trigger.Profile.LifePointCost &&
             (trigger.Profile.DiscardCardIds.Count == 0 || player.Hand.Any(c => trigger.Profile.DiscardCardIds.Contains(c.GameCardId))) &&
@@ -49,13 +52,19 @@ public sealed partial class DuelEngine
             MonsterFlipSummoned e => new(e.Player, e.Zone, e.Monster.Card, e.Monster.PlacementId),
             BattleFlipEffectWindowOpened e => e.Monster,
             MonsterDestroyed e when before.GetPlayer(e.Player).MonsterZones[e.Zone] is { } m => new(e.Player, e.Zone, e.Card, m.PlacementId),
+            MonsterTributed e => e.Monster,
+            SummonMaterialSentToGraveyard e => e.Material,
+            FusionMaterialSentToGraveyard e => e.Material.Field ?? new(e.Material.Card.Owner, -1, e.Material.Card, 0),
+            RitualMaterialTributed e => e.Material.Field ?? new(e.Material.Card.Owner, -1, e.Material.Card, 0),
+            XyzMaterialSentToGraveyard e => new(e.Material.Owner, -1, e.Material, 0),
+            SummonNegated e => new(e.Attempt.Card.Owner, -1, e.Attempt.Card, 0),
             CardDiscarded e => new(e.Player, -1, e.Card, 0),
             ActivationCostPaid e => new(e.Player, -1, e.Card, 0),
             TriggerCostPaid { DiscardedCard: { } card } e => new(e.Trigger.Player, -1, card, 0),
             _ => null
         };
         if (subject is null || !rules.TryGetValue(subject.Card.GameCardId, out var rule) || rule.Category != CardCategory.Monster) yield break;
-        bool cost = emitted is ActivationCostPaid or TriggerCostPaid;
+        bool cost = emitted is ActivationCostPaid or TriggerCostPaid or XyzMaterialSentToGraveyard { IsCost: true };
         var point = new EffectTimingPoint(checked(State.Revision + 1), cost ? -1 : emitted.TimingGroup ?? 0);
         var kind = emitted switch
         {
@@ -63,11 +72,13 @@ public sealed partial class DuelEngine
             MonsterSpecialSummoned or TokenSpecialSummoned => MonsterEventKind.SpecialSummoned,
             MonsterFlipSummoned => MonsterEventKind.FlipSummoned,
             BattleFlipEffectWindowOpened => MonsterEventKind.FlippedFaceUp,
-            MonsterDestroyed => MonsterEventKind.Destroyed,
+            MonsterDestroyed or SummonNegated => MonsterEventKind.Destroyed,
             _ => MonsterEventKind.SentToGraveyard
         };
+        if (kind == MonsterEventKind.SentToGraveyard && emitted.FieldDestination == FieldCardDestination.FaceUpExtraDeck) yield break;
         yield return new(kind, subject, point, cost);
-        if (kind == MonsterEventKind.Destroyed) yield return new(MonsterEventKind.SentToGraveyard, subject, point);
+        if (kind == MonsterEventKind.Destroyed && emitted.FieldDestination != FieldCardDestination.FaceUpExtraDeck)
+            yield return new(MonsterEventKind.SentToGraveyard, subject, point);
         if (kind == MonsterEventKind.FlipSummoned) yield return new(MonsterEventKind.FlippedFaceUp, subject, point);
     }
 
@@ -80,7 +91,9 @@ public sealed partial class DuelEngine
         foreach (var emitted in events)
             foreach (var occurrence in Occurrences(before, emitted))
             {
-                var sources = emitted is MonsterDestroyed ? destructionSources : FieldMonsters(after);
+                var sources = emitted is MonsterDestroyed or MonsterTributed or SummonMaterialSentToGraveyard or
+                    FusionMaterialSentToGraveyard or RitualMaterialTributed or XyzMaterialSentToGraveyard { IsCost: false }
+                    ? destructionSources : FieldMonsters(after);
                 foreach (var profile in triggerEffects.Where(p => p.EventKind == occurrence.Kind).OrderBy(p => p.EffectId, StringComparer.Ordinal))
                 {
                     if (profile.SourceLocation != TriggerSourceLocation.FaceUpMonster)
@@ -104,7 +117,7 @@ public sealed partial class DuelEngine
             point = new(checked(State.Revision + 1), 0);
         foreach (var emitted in events)
             if (emitted is MonsterNormalSummoned or MonsterSpecialSummoned or TokenSpecialSummoned or MonsterFlipSummoned or
-                MonsterDestroyed or CardDiscarded or ActivationCostPaid or TriggerCostPaid or MonsterRevealed or SpellTrapDestroyed or
+                MonsterDestroyed or MonsterTributed or SummonMaterialSentToGraveyard or SummonMaterialSentToFaceUpExtraDeck or FusionMaterialSentToGraveyard or FusionMaterialSentToFaceUpExtraDeck or RitualMaterialTributed or CardSentToFaceUpExtraDeck or PendulumScaleActivated or SummonMaterialBanished or XyzMaterialAttached or XyzMaterialSentToGraveyard or SummonAttempted or SummonNegated or CardDiscarded or ActivationCostPaid or TriggerCostPaid or MonsterRevealed or SpellTrapDestroyed or
                 MonsterBanished or LifePointsGained or BattleDamageDealt or MonsterModifierCreated or MonsterEffectsNegated or
                 SpellActivated or ChainResponseActivated or MonsterPositionChanged or MonsterSet or SpellTrapSet or CardDrawn or
                 PhaseChanged or TurnStarted or AttackDeclared or BattleFlipEffectWindowOpened)
@@ -141,7 +154,7 @@ public sealed partial class DuelEngine
         if (next.Outcome is null) deferred.AddRange(CollectTriggers(before, next, events.ToArray(), deferred.Count + 1));
         else deferred.Clear();
         var pending = current.PendingTriggers;
-        if (next.Outcome is null && next.PendingChain is null && next.PendingDecision is null && pending is null && deferred.Count != 0)
+        if (next.Outcome is null && next.PendingChain is null && next.PendingSummon is null && next.PendingDecision is null && pending is null && deferred.Count != 0)
         {
             var timedEligible = deferred.Where(t => HasTriggerTiming(t, last)).ToArray();
             foreach (var missed in deferred.Except(timedEligible)) events.Add(new TriggerMissedTiming(missed));
@@ -205,8 +218,8 @@ public sealed partial class DuelEngine
         {
             var player = next.GetPlayer(subject.Player);
             var monsters = player.MonsterZones.ToArray(); monsters[subject.Zone] = null;
-            events.Add(new MonsterDestroyed(player.Id, subject.Zone, subject.Card));
-            return next.With(player: player.With(monsters: monsters, graveyard: player.Graveyard.Append(subject.Card)));
+            next = next.With(player: player.With(monsters: monsters));
+            return SendFieldCardToGraveyard(next, subject.Card, new MonsterDestroyed(player.Id, subject.Zone, subject.Card), events);
         }
         var effects = next.EventEffects;
         if (action.Operation == TriggerOperation.NegateTargetMonsterUntilEndPhase)

@@ -28,6 +28,8 @@ public sealed partial class DuelEngine
             if (player.MonsterZones[monsterZone.Value] is not null) return Reject(DuelError.MonsterZoneOccupied);
             summon = player.Hand.SingleOrDefault(c => c.InstanceId == summonedInstance);
             if (summon is null || !profile.SummonableCardIds.Contains(summon.GameCardId)) return Reject(DuelError.InvalidDecisionChoice);
+            var error = CheckSpecialSummon(State, player.Id, summon, monsterZone.Value, profile.SummonPosition, DecisionCardSource.Hand);
+            if (error != DuelError.None) return Reject(error);
         }
         else if (summonedInstance is not null || monsterZone is not null) return Reject(DuelError.InvalidDecisionChoice);
         var fields = player.SpellTrapFields.ToArray(); fields[zone] = source with { IsFaceUp = true };
@@ -48,16 +50,11 @@ public sealed partial class DuelEngine
         if (profile.Operation == BattleResponseOperation.SpecialSummonFromHand)
         {
             var player = next.GetPlayer(link.Activation.Player); var card = link.BattleSummonCard!; int zone = link.BattleMonsterZone!.Value;
-            if (!player.Hand.Contains(card) || player.MonsterZones[zone] is not null)
+            if (CheckSpecialSummon(next, player.Id, card, zone, profile.SummonPosition, DecisionCardSource.Hand) != DuelError.None)
             {
                 events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable)); return next;
             }
-            var monsters = player.MonsterZones.ToArray();
-            var monster = new FieldMonster(card, profile.SummonPosition, SummonedOnTurn: State.TurnNumber,
-                PlacementId: checked(State.Revision + 1));
-            monsters[zone] = monster;
-            events.Add(new MonsterSpecialSummoned(player.Id, monster, zone, DecisionCardSource.Hand));
-            return next.With(player: player.With(hand: player.Hand.Where(c => c != card), monsters: monsters));
+            return PlaceSpecialSummon(next, player.Id, card, zone, profile.SummonPosition, DecisionCardSource.Hand, events);
         }
         if (attack is null || link.BattleAttackId != attack.Id || link.BattleTarget is not { } target || !target.IsStillPresent(next))
         {
@@ -75,8 +72,8 @@ public sealed partial class DuelEngine
             case BattleResponseOperation.DestroyAttacker:
             {
                 var player = next.GetPlayer(target.Player); var monsters = player.MonsterZones.ToArray(); monsters[target.Zone] = null;
-                events.Add(new MonsterDestroyed(player.Id, target.Zone, target.Card));
-                next = next.With(player: player.With(monsters: monsters, graveyard: player.Graveyard.Append(target.Card)));
+                next = next.With(player: player.With(monsters: monsters));
+                next = SendFieldCardToGraveyard(next, target.Card, new MonsterDestroyed(player.Id, target.Zone, target.Card), events);
                 break;
             }
             case BattleResponseOperation.ModifyCombatantStatistics:

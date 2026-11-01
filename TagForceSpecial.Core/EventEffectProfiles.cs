@@ -83,6 +83,7 @@ public sealed class TriggerEffectProfile
     public TriggerTurnLimit TurnLimit { get; }
     public string LimitKey { get; }
     public int LifePointCost { get; }
+    public int DetachMaterialCount { get; }
     public IReadOnlyList<uint> DiscardCardIds { get; }
     public MonsterTargetPolicy? Target { get; }
     public IReadOnlyList<TriggerEffectStep> Steps { get; }
@@ -93,17 +94,17 @@ public sealed class TriggerEffectProfile
         TriggerSourceLocation sourceLocation = TriggerSourceLocation.FaceUpMonster,
         TriggerTiming timing = TriggerTiming.If, TriggerTurnLimit turnLimit = TriggerTurnLimit.None,
         string? limitKey = null, int lifePointCost = 0, IEnumerable<uint>? discardCardIds = null,
-        MonsterTargetPolicy? target = null, bool? damageStepAllowed = null)
+        MonsterTargetPolicy? target = null, bool? damageStepAllowed = null, int detachMaterialCount = 0)
         : this(effectId, cardId, eventKind, relation, requirement,
             [new TriggerEffectStep([new TriggerEffectAction(operation, lifePointGain, attackDelta, defenseDelta)])],
-            sourceLocation, timing, turnLimit, limitKey, lifePointCost, discardCardIds, target, damageStepAllowed) { }
+            sourceLocation, timing, turnLimit, limitKey, lifePointCost, discardCardIds, target, damageStepAllowed, detachMaterialCount) { }
 
     public TriggerEffectProfile(string effectId, uint cardId, MonsterEventKind eventKind,
         EffectRelation relation, TriggerRequirement requirement, IEnumerable<TriggerEffectStep> steps,
         TriggerSourceLocation sourceLocation = TriggerSourceLocation.FaceUpMonster,
         TriggerTiming timing = TriggerTiming.If, TriggerTurnLimit turnLimit = TriggerTurnLimit.None,
         string? limitKey = null, int lifePointCost = 0, IEnumerable<uint>? discardCardIds = null,
-        MonsterTargetPolicy? target = null, bool? damageStepAllowed = null)
+        MonsterTargetPolicy? target = null, bool? damageStepAllowed = null, int detachMaterialCount = 0)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(effectId);
         ArgumentNullException.ThrowIfNull(steps);
@@ -116,6 +117,8 @@ public sealed class TriggerEffectProfile
             throw new ArgumentException("Graveyard sources require the matching self event.");
         if (lifePointCost < 0 || limitKey is not null && (turnLimit == TriggerTurnLimit.None || string.IsNullOrWhiteSpace(limitKey)))
             throw new ArgumentException("Invalid activation cost or turn-limit key.");
+        if (detachMaterialCount is < 0 or > 5 || detachMaterialCount != 0 && sourceLocation != TriggerSourceLocation.FaceUpMonster)
+            throw new ArgumentException("Detach costs require a field source and one to five materials.");
         var discards = discardCardIds is null ? [] : DecisionStep.Card(DecisionCardSource.Hand, discardCardIds).AllowedCardIds.ToArray();
         var copy = steps.ToArray();
         if (copy.Length == 0 || copy.Any(s => s is null) || copy[0].RequiresPreviousStepSuccess) throw new ArgumentException("A trigger requires nonnull resolution steps.");
@@ -128,6 +131,7 @@ public sealed class TriggerEffectProfile
         EffectId = effectId; CardId = cardId; EventKind = eventKind; Relation = relation;
         Requirement = requirement; SourceLocation = sourceLocation; Timing = timing; DamageStepAllowed = damageStepAllowed;
         TurnLimit = turnLimit; LimitKey = limitKey ?? effectId; LifePointCost = lifePointCost;
+        DetachMaterialCount = detachMaterialCount;
         DiscardCardIds = Array.AsReadOnly(discards); Target = target; Steps = Array.AsReadOnly(copy);
     }
 }
