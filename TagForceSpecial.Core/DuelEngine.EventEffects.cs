@@ -53,6 +53,8 @@ public sealed partial class DuelEngine
             MonsterDestroyed e when before.GetPlayer(e.Player).MonsterZones[e.Zone] is { } m => new(e.Player, e.Zone, e.Card, m.PlacementId),
             MonsterTributed e => e.Monster,
             SummonMaterialSentToGraveyard e => e.Material,
+            FusionMaterialSentToGraveyard e => e.Material.Field ?? new(e.Material.Card.Owner, -1, e.Material.Card, 0),
+            RitualMaterialTributed e => e.Material.Field ?? new(e.Material.Card.Owner, -1, e.Material.Card, 0),
             XyzMaterialSentToGraveyard e => new(e.Material.Owner, -1, e.Material, 0),
             SummonNegated e => new(e.Attempt.Card.Owner, -1, e.Attempt.Card, 0),
             CardDiscarded e => new(e.Player, -1, e.Card, 0),
@@ -87,7 +89,7 @@ public sealed partial class DuelEngine
             foreach (var occurrence in Occurrences(before, emitted))
             {
                 var sources = emitted is MonsterDestroyed or MonsterTributed or SummonMaterialSentToGraveyard or
-                    XyzMaterialSentToGraveyard { IsCost: false }
+                    FusionMaterialSentToGraveyard or RitualMaterialTributed or XyzMaterialSentToGraveyard { IsCost: false }
                     ? destructionSources : FieldMonsters(after);
                 foreach (var profile in triggerEffects.Where(p => p.EventKind == occurrence.Kind).OrderBy(p => p.EffectId, StringComparer.Ordinal))
                 {
@@ -112,7 +114,7 @@ public sealed partial class DuelEngine
             point = new(checked(State.Revision + 1), 0);
         foreach (var emitted in events)
             if (emitted is MonsterNormalSummoned or MonsterSpecialSummoned or TokenSpecialSummoned or MonsterFlipSummoned or
-                MonsterDestroyed or MonsterTributed or SummonMaterialSentToGraveyard or SummonMaterialBanished or XyzMaterialAttached or XyzMaterialSentToGraveyard or SummonAttempted or SummonNegated or CardDiscarded or ActivationCostPaid or TriggerCostPaid or MonsterRevealed or SpellTrapDestroyed or
+                MonsterDestroyed or MonsterTributed or SummonMaterialSentToGraveyard or FusionMaterialSentToGraveyard or RitualMaterialTributed or SummonMaterialBanished or XyzMaterialAttached or XyzMaterialSentToGraveyard or SummonAttempted or SummonNegated or CardDiscarded or ActivationCostPaid or TriggerCostPaid or MonsterRevealed or SpellTrapDestroyed or
                 MonsterBanished or LifePointsGained or BattleDamageDealt or MonsterModifierCreated or MonsterEffectsNegated or
                 SpellActivated or ChainResponseActivated or MonsterPositionChanged or MonsterSet or SpellTrapSet or CardDrawn or
                 PhaseChanged or TurnStarted or AttackDeclared or BattleFlipEffectWindowOpened)

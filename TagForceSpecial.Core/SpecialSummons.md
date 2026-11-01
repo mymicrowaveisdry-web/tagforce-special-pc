@@ -4,6 +4,8 @@ This is a bounded, explicitly profiled foundation; tests use authored scenarios 
 
 [Extra Deck/material procedures](ExtraDeck.md) reuse this foundation.
 
+[Fusion/Ritual effects](EffectSummons.md) use separate bounded profiles.
+
 ## Eligibility and procedures
 
 `experimentalSpecialSummonCards` registers immutable `SpecialSummonCardProfile`

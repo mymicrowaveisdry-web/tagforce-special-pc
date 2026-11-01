@@ -5,6 +5,9 @@ public sealed partial class DuelEngine
     private DuelActionResult ExecuteChain(DuelCommand command)
     {
         var chain = State.PendingChain!;
+        if (chain.SummonDecision is not null)
+            return command is ChooseEffectSummon summon ? AnswerEffectSummon(chain, summon) : Reject(DuelError.DecisionPending);
+        if (command is ChooseEffectSummon) return Reject(DuelError.NoPendingDecision);
         if (State.PendingDecision is not null)
             return command is DecisionCommand answer ? AnswerDecision(answer) : Reject(DuelError.DecisionPending);
         if (command is DecisionCommand) return Reject(DuelError.NoPendingDecision);
@@ -81,7 +84,7 @@ public sealed partial class DuelEngine
             new ChainResponseRequested(next.Responder, next.DecisionId));
     }
 
-    private DuelActionResult ResolveChainLink(PendingChain chain)
+    private DuelActionResult ResolveChainLink(PendingChain chain, ChooseEffectSummon? summonChoice = null)
     {
         var link = chain.Links[chain.NextLink - 1];
         var activation = link.Activation;
@@ -95,6 +98,31 @@ public sealed partial class DuelEngine
             events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.SourceEffectsNegated));
         else switch (link.Operation)
         {
+            case ChainOperation.EffectSummon:
+            {
+                var profile = summonEffects[activation.Spell.GameCardId];
+                if (summonChoice is null)
+                {
+                    var targets = LegalEffectSummonTargets(next, activation.Player, profile).ToArray();
+                    if (targets.Length == 0)
+                    {
+                        events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.SummonUnavailable));
+                        break;
+                    }
+                    var options = targets.SelectMany(t => EffectSummonMaterials(next, activation.Player, profile, t))
+                        .DistinctBy(m => m.Card.InstanceId);
+                    var decision = new PendingEffectSummon(checked(State.Revision + 1), activation.Player, profile, targets, options);
+                    return Accept(next.WithChain(new(decision.DecisionId, chain.Links, chain.Responder,
+                        chain.ConsecutivePasses, chain.NextLink, chain.FreezeOnCompletion, decision)), new EffectSummonRequested(decision));
+                }
+                var target = SpecialSourceCards(next.GetPlayer(activation.Player), EffectSummonSource(profile))
+                    .Single(c => c.InstanceId == summonChoice.TargetInstanceId);
+                var materials = chain.SummonDecision!.Materials.Where(m => summonChoice.MaterialInstanceIds.Contains(m.Card.InstanceId)).ToArray();
+                next = MoveEffectSummonMaterials(next, activation.Player, materials, profile, events);
+                next = PlaceSpecialSummon(next, activation.Player, target, summonChoice.MonsterZone, summonChoice.Position,
+                    EffectSummonSource(profile), events, properProcedureId: profile.ProperProcedureId, timingGroup: 1);
+                break;
+            }
             case ChainOperation.DestroyOpposingFaceUpMonsters:
             {
                 var opponent = next.GetPlayer(Other(activation.Player));
