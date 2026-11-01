@@ -1,7 +1,7 @@
 namespace TagForceSpecial.Core;
 
 public enum DecisionKind { Card, Position, MonsterZone, SpellTrapTarget }
-public enum DecisionCardSource { Hand, Deck, Graveyard, Banished }
+public enum DecisionCardSource { Hand, Deck, Graveyard, Banished, ExtraDeck }
 
 /// <summary>Trusted, immutable selection policy. It does not activate or resolve a card effect.</summary>
 public sealed class DecisionStep

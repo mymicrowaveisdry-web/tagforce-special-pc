@@ -1,7 +1,7 @@
 namespace TagForceSpecial.Core;
 
 [Flags]
-public enum SpecialSummonSources { None = 0, Hand = 1, Deck = 2, Graveyard = 4, Banished = 8, All = 15 }
+public enum SpecialSummonSources { None = 0, Hand = 1, Deck = 2, Graveyard = 4, Banished = 8, ExtraDeck = 16, All = 31 }
 public enum SummonMethod { Normal, Set, Flip, SpecialEffect, SpecialProcedure, Token }
 public enum SummonStatus { Pending, Completed, Negated }
 

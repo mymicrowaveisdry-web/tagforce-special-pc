@@ -2,6 +2,8 @@
 
 This is a bounded, explicitly profiled foundation; tests use authored scenarios and no new PSP gameplay comparison is claimed.
 
+[Extra Deck/material procedures](ExtraDeck.md) reuse this foundation.
+
 ## Eligibility and procedures
 
 `experimentalSpecialSummonCards` registers immutable `SpecialSummonCardProfile`
@@ -43,12 +45,14 @@ source, player, position, zone, attempt/completion revision, placement, status,
 procedure and retained proper-procedure ID. Normal/Set/Flip and legacy token
 placements also participate; a completed Set record does not emit a summon event.
 
-A matching hand procedure can establish initial proper
+A matching hand or Extra Deck material procedure can establish initial proper
 qualification; it does so only on successful completion. A restricted card cannot
 use an ordinary hand/deck effect to bypass that requirement. Graveyard/banished
 revival checks the same instance's retained proper ID and cannot borrow a copy's
 history. Public-zone revival preserves that qualification and creates a fresh
-placement. Negated first attempts never qualify. Returning a card to Hand/Deck clears retained qualification; those movement effects themselves remain future work.
+placement. Negated first attempts never qualify. Returning a card to Hand/Deck or
+this slice's face-down Extra Deck
+clears retained qualification; those movement effects themselves remain future work.
 The procedure ID is trusted configuration, not a card-family or PSP encoding code.
 
 Token creation records method Token with no source/proper ID; this preserves the
