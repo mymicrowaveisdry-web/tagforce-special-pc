@@ -4,11 +4,11 @@ namespace TagForceSpecial.Core;
 public enum ChainOperation
 {
     DestroyOpposingFaceUpMonsters, DestroyBoundSpellTrap, SummonFourTokens,
-    NegateActivation, NegateEffect, TriggerEffect, BattleResponse, SummonNegation
+    NegateActivation, NegateEffect, TriggerEffect, BattleResponse, SummonNegation, EffectSummon
 }
 public enum ChainSpellSpeed { One = 1, Two = 2, Three = 3 }
 public enum ChainNegation { None, Effect, Activation }
-public enum ChainSkipReason { ActivationNegated, EffectNegated, TargetUnavailable, SourceEffectsNegated }
+public enum ChainSkipReason { ActivationNegated, EffectNegated, TargetUnavailable, SourceEffectsNegated, SummonUnavailable }
 
 public sealed class ChainEffectProfile
 {
@@ -59,8 +59,10 @@ public sealed class PendingChain
     /// <summary>Zero means response window; otherwise the next link to resolve, in reverse order.</summary>
     public int NextLink { get; }
     public bool FreezeOnCompletion { get; }
+    public PendingEffectSummon? SummonDecision { get; }
     internal PendingChain(long decisionId, IEnumerable<ChainLink> links, PlayerId responder,
-        int consecutivePasses = 0, int nextLink = 0, bool freezeOnCompletion = true)
+        int consecutivePasses = 0, int nextLink = 0, bool freezeOnCompletion = true,
+        PendingEffectSummon? summonDecision = null)
     {
         DecisionId = decisionId;
         Links = Array.AsReadOnly(links.ToArray());
@@ -68,6 +70,7 @@ public sealed class PendingChain
         ConsecutivePasses = consecutivePasses;
         NextLink = nextLink;
         FreezeOnCompletion = freezeOnCompletion;
+        SummonDecision = summonDecision;
     }
 }
 

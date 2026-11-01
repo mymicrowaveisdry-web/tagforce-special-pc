@@ -4,11 +4,13 @@ public sealed partial class DuelEngine
 {
     private DuelActionResult Activate(int instanceId, int zone)
     {
-        if (State.Phase != DuelPhase.Main1) return Reject(DuelError.WrongPhase);
+        if (State.Phase is not (DuelPhase.Main1 or DuelPhase.Main2)) return Reject(DuelError.WrongPhase);
         if (zone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
         var player = State.GetPlayer(State.ActivePlayer);
         var card = player.Hand.SingleOrDefault(c => c.InstanceId == instanceId);
         if (card is null) return Reject(DuelError.CardNotInHand);
+        if (summonEffects.TryGetValue(card.GameCardId, out var summon)) return ActivateSummonEffect(card, zone, summon);
+        if (State.Phase != DuelPhase.Main1) return Reject(DuelError.WrongPhase);
         if (activationContracts.TryGetValue(card.GameCardId, out var contract)) return ActivateContract(card, zone, contract);
         if (!spellEffects.TryGetValue(card.GameCardId, out var effect)) return Reject(DuelError.UnsupportedSpellEffect);
         if (player.SpellTrapFields[zone] is not null) return Reject(DuelError.SpellTrapZoneOccupied);

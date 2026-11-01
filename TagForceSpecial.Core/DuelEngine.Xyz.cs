@@ -32,6 +32,8 @@ public sealed partial class DuelEngine
                     MonsterBanished b => b.Card == monster.Card,
                     SummonMaterialSentToGraveyard m => m.Material == binding,
                     SummonMaterialBanished m => m.Material == binding,
+                    FusionMaterialSentToGraveyard m => m.Material.Field == binding,
+                    RitualMaterialTributed m => m.Material.Field == binding,
                     _ => false
                 });
                 List<DuelEvent> released = [];

@@ -31,6 +31,7 @@ public sealed partial class DuelEngine
     private readonly FrozenDictionary<uint, SpecialSummonCardProfile> specialSummonCards;
     private readonly FrozenDictionary<string, SpecialSummonProcedureProfile> specialSummonProcedures;
     private readonly FrozenDictionary<string, ExtraDeckMaterialProcedureProfile> materialProcedures;
+    private readonly FrozenDictionary<uint, SummonEffectProfile> summonEffects;
     public DuelState State { get; private set; }
 
     /// <summary>
@@ -57,7 +58,8 @@ public sealed partial class DuelEngine
         IEnumerable<SpecialSummonCardProfile>? experimentalSpecialSummonCards = null,
         IEnumerable<SpecialSummonProcedureProfile>? experimentalSpecialSummonProcedures = null,
         IEnumerable<uint>? playerOneExtraDeck = null, IEnumerable<uint>? playerTwoExtraDeck = null,
-        IEnumerable<ExtraDeckMaterialProcedureProfile>? experimentalMaterialProcedures = null)
+        IEnumerable<ExtraDeckMaterialProcedureProfile>? experimentalMaterialProcedures = null,
+        IEnumerable<SummonEffectProfile>? experimentalSummonEffects = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(rules);
@@ -195,6 +197,8 @@ public sealed partial class DuelEngine
         tributeProcedures = procedures.ToFrozenDictionary(p => p.ProcedureId, StringComparer.Ordinal);
         summonWindows = windows.Select(p => p.CardId).ToFrozenSet();
         summonNegations = negators.ToFrozenDictionary(p => p.CardId);
+        summonEffects = ValidateSummonEffects(experimentalSummonEffects ?? [],
+            reservedIds.Concat(eventIds).Concat(summonIds).Concat(battleProfiles.Select(p => p.EffectId)));
         bool IsMonster(uint id) => this.rules.TryGetValue(id, out var rule) && rule.Category == CardCategory.Monster;
         int nextInstance = 1;
         DuelPlayerState CreatePlayer(PlayerId id, IEnumerable<uint> ids)
@@ -232,7 +236,7 @@ public sealed partial class DuelEngine
         if (State.PendingChain is not null) return ExecuteChain(command);
         if (State.PendingSummon is not null) return ExecuteSummonWindow(command);
         if (command is PassSummonResponse or ActivateSummonNegation) return Reject(DuelError.NoPendingSummon);
-        if (command is PassChainResponse or ActivateChainResponse or ResolveNextChainLink) return Reject(DuelError.NoPendingChain);
+        if (command is PassChainResponse or ActivateChainResponse or ResolveNextChainLink or ChooseEffectSummon) return Reject(DuelError.NoPendingChain);
         if (command is AdvanceBattle or PassBattleResponse or ChooseAttackReplay or ActivateBattleResponse)
         {
             if (!experimentalBattleFlow) return Reject(DuelError.BattleFlowNotEnabled);

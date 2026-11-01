@@ -1,6 +1,6 @@
 # Extra Deck and material movement
 
-This supports explicit generic material procedures and bounded Synchro profiles plus Xyz attachments and trigger detach costs; tests use authored scenarios. The retained Synchro projection is narrower than full material selection/movement/timing equivalence.
+This supports explicit generic material procedures and bounded Synchro profiles plus Xyz attachments and trigger detach costs; tests use authored scenarios. The retained Synchro projection is narrower than full material selection/movement/timing equivalence. [Fusion/Ritual effects](EffectSummons.md) use separate profiles.
 
 ## Extra Deck
 
