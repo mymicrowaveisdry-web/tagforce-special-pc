@@ -2,7 +2,7 @@ namespace TagForceSpecial.Core;
 
 /// <summary>
 /// Complete ordinary Tribute Summon/Set selection from one snapshot. Sources must
-/// explicitly support ordinary Graveyard departure; token/Pendulum rules are separate.
+/// explicitly support ordinary departure; authored Pendulum field departures route to face-up Extra Deck.
 /// </summary>
 public sealed record TributeSummon : DuelCommand
 {

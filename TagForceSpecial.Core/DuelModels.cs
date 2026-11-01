@@ -12,15 +12,16 @@ public enum DuelEndReason { UnableToDraw, LifePointsDepleted }
 /// enable it where omitted mandatory/continuous effects would change the result.
 /// AllowsSpellTrapSet opts into ordinary back-row placement, excluding Field Spells.
 /// AllowsTributeSummon opts into the ordinary high-level procedure; AllowsTributeForSummon
-/// permits a donor's ordinary Graveyard departure, excluding token/Pendulum exceptions.
+/// permits a donor's ordinary departure, with authored Pendulum field-to-Extra-Deck routing.
 /// RequiresRegisteredTributeProcedure disables default procedures for this card.
 /// AllowsExtraDeck and AllowsSummonMaterial explicitly opt into the bounded material slice.
+/// AllowsPendulumSummon permits ordinary hand targets independently of Pendulum scale identity.
 /// </summary>
 public sealed record DuelCardRules(CardCategory Category, bool AllowsNormalSummon = false,
     bool AllowsBasicBattle = false, bool AllowsSpellTrapSet = false,
     bool AllowsTributeSummon = false, bool AllowsTributeForSummon = false,
     bool RequiresRegisteredTributeProcedure = false, bool AllowsExtraDeck = false,
-    bool AllowsSummonMaterial = false);
+    bool AllowsSummonMaterial = false, bool AllowsPendulumSummon = false);
 public sealed record CardInstance(int InstanceId, uint GameCardId, PlayerId Owner);
 public sealed record FieldMonster(CardInstance Card, BattlePosition Position, int SummonedOnTurn = 0,
     int PositionChangedOnTurn = 0, int LastAttackTurn = 0, long PlacementId = 0, bool BattleDestroyed = false)
@@ -37,8 +38,11 @@ public sealed class DuelPlayerState
     /// <summary>Top of deck is index zero. Setup accepts an already ordered deck.</summary>
     public IReadOnlyList<CardInstance> Deck { get; }
     public IReadOnlyList<CardInstance> Hand { get; }
-    /// <summary>Ordered full-information Extra Deck; all entries are face-down in this slice.</summary>
+    /// <summary>Ordered face-down Extra Deck, separate from public FaceUpExtraDeck entries.</summary>
     public IReadOnlyList<CardInstance> ExtraDeck { get; }
+    public IReadOnlyList<CardInstance> FaceUpExtraDeck { get; }
+    public IReadOnlyList<FieldSpellTrap?> PendulumZones { get; }
+    public int LastPendulumSummonTurn { get; }
     public IReadOnlyList<FieldMonster?> MonsterZones { get; }
     /// <summary>Compatibility card view; inspect SpellTrapFields for face-up versus set state.</summary>
     public IReadOnlyList<CardInstance?> SpellTrapZones { get; }
@@ -50,13 +54,18 @@ public sealed class DuelPlayerState
     internal DuelPlayerState(PlayerId id, IEnumerable<CardInstance> deck, IEnumerable<CardInstance> hand,
         IEnumerable<FieldMonster?>? monsters = null, IEnumerable<CardInstance>? graveyard = null,
         IEnumerable<FieldSpellTrap?>? spellTraps = null, int lifePoints = 8000,
-        IEnumerable<CardInstance>? banished = null, IEnumerable<CardInstance>? extraDeck = null)
+        IEnumerable<CardInstance>? banished = null, IEnumerable<CardInstance>? extraDeck = null,
+        IEnumerable<CardInstance>? faceUpExtraDeck = null, IEnumerable<FieldSpellTrap?>? pendulumZones = null,
+        int lastPendulumSummonTurn = 0)
     {
         Id = id;
         LifePoints = lifePoints;
         Deck = Array.AsReadOnly(deck.ToArray());
         Hand = Array.AsReadOnly(hand.ToArray());
         ExtraDeck = Array.AsReadOnly(extraDeck?.ToArray() ?? []);
+        FaceUpExtraDeck = Array.AsReadOnly(faceUpExtraDeck?.ToArray() ?? []);
+        PendulumZones = Array.AsReadOnly(pendulumZones?.ToArray() ?? new FieldSpellTrap?[2]);
+        LastPendulumSummonTurn = lastPendulumSummonTurn;
         MonsterZones = Array.AsReadOnly(monsters?.ToArray() ?? new FieldMonster?[5]);
         SpellTrapFields = Array.AsReadOnly(spellTraps?.ToArray() ?? new FieldSpellTrap?[5]);
         SpellTrapZones = Array.AsReadOnly(SpellTrapFields.Select(s => s?.Card).ToArray());
@@ -67,9 +76,12 @@ public sealed class DuelPlayerState
     internal DuelPlayerState With(IEnumerable<CardInstance>? deck = null, IEnumerable<CardInstance>? hand = null,
         IEnumerable<FieldMonster?>? monsters = null, IEnumerable<CardInstance>? graveyard = null,
         IEnumerable<FieldSpellTrap?>? spellTraps = null, int? lifePoints = null,
-        IEnumerable<CardInstance>? banished = null, IEnumerable<CardInstance>? extraDeck = null) =>
+        IEnumerable<CardInstance>? banished = null, IEnumerable<CardInstance>? extraDeck = null,
+        IEnumerable<CardInstance>? faceUpExtraDeck = null, IEnumerable<FieldSpellTrap?>? pendulumZones = null,
+        int? lastPendulumSummonTurn = null) =>
         new(Id, deck ?? Deck, hand ?? Hand, monsters ?? MonsterZones, graveyard ?? Graveyard,
-            spellTraps ?? SpellTrapFields, lifePoints ?? LifePoints, banished ?? Banished, extraDeck ?? ExtraDeck);
+            spellTraps ?? SpellTrapFields, lifePoints ?? LifePoints, banished ?? Banished, extraDeck ?? ExtraDeck,
+            faceUpExtraDeck ?? FaceUpExtraDeck, pendulumZones ?? PendulumZones, lastPendulumSummonTurn ?? LastPendulumSummonTurn);
 }
 
 public sealed class DuelState
@@ -214,11 +226,13 @@ public enum DuelError
     UnsupportedTributeProcedure, SummonWindowPending, NoPendingSummon, StaleSummonDecision,
     NotSummonResponder, UnsupportedSummonResponse, InsufficientLifePoints,
     UnsupportedSpecialSummon, SpecialSummonSourceUnavailable, ProperSummonRequired, SpecialSummonConditionsNotMet,
-    UnsupportedMaterialProcedure, InvalidSummonMaterials, SummonMaterialNotAllowed
+    UnsupportedMaterialProcedure, InvalidSummonMaterials, SummonMaterialNotAllowed,
+    UnsupportedPendulumCard, InvalidPendulumZone, PendulumZoneOccupied, PendulumScalesUnavailable, PendulumSummonLimitReached
 }
 
 public abstract record DuelEvent
 {
+    public FieldCardDestination? FieldDestination { get; internal init; }
     // Rules timing, not renderer/log order. Absent means the transition's simultaneous group zero.
     internal int? TimingGroup { get; init; }
 }

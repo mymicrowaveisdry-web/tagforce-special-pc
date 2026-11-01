@@ -31,8 +31,10 @@ public sealed partial class DuelEngine
                     MonsterTributed t => t.Monster == binding,
                     MonsterBanished b => b.Card == monster.Card,
                     SummonMaterialSentToGraveyard m => m.Material == binding,
+                    SummonMaterialSentToFaceUpExtraDeck m => m.Material == binding,
                     SummonMaterialBanished m => m.Material == binding,
                     FusionMaterialSentToGraveyard m => m.Material.Field == binding,
+                    FusionMaterialSentToFaceUpExtraDeck m => m.Material.Field == binding,
                     RitualMaterialTributed m => m.Material.Field == binding,
                     _ => false
                 });

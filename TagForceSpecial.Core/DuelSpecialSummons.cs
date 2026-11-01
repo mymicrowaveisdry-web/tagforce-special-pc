@@ -1,8 +1,8 @@
 namespace TagForceSpecial.Core;
 
 [Flags]
-public enum SpecialSummonSources { None = 0, Hand = 1, Deck = 2, Graveyard = 4, Banished = 8, ExtraDeck = 16, All = 31 }
-public enum SummonMethod { Normal, Set, Flip, SpecialEffect, SpecialProcedure, Token }
+public enum SpecialSummonSources { None = 0, Hand = 1, Deck = 2, Graveyard = 4, Banished = 8, ExtraDeck = 16, FaceUpExtraDeck = 32, All = 63 }
+public enum SummonMethod { Normal, Set, Flip, SpecialEffect, SpecialProcedure, Token, Pendulum }
 public enum SummonStatus { Pending, Completed, Negated }
 
 /// <summary>Latest summon/placement attempt per instance, with retained proper-procedure eligibility.</summary>

@@ -9,6 +9,7 @@ public sealed partial class DuelEngine
         DecisionCardSource.Graveyard => player.Graveyard,
         DecisionCardSource.Banished => player.Banished,
         DecisionCardSource.ExtraDeck => player.ExtraDeck,
+        DecisionCardSource.FaceUpExtraDeck => player.FaceUpExtraDeck,
         _ => Array.Empty<CardInstance>()
     };
 
@@ -19,6 +20,7 @@ public sealed partial class DuelEngine
         DecisionCardSource.Graveyard => SpecialSummonSources.Graveyard,
         DecisionCardSource.Banished => SpecialSummonSources.Banished,
         DecisionCardSource.ExtraDeck => SpecialSummonSources.ExtraDeck,
+        DecisionCardSource.FaceUpExtraDeck => SpecialSummonSources.FaceUpExtraDeck,
         _ => SpecialSummonSources.None
     };
 
@@ -29,6 +31,7 @@ public sealed partial class DuelEngine
         DecisionCardSource.Graveyard => player.With(graveyard: player.Graveyard.Where(c => c != card)),
         DecisionCardSource.Banished => player.With(banished: player.Banished.Where(c => c != card)),
         DecisionCardSource.ExtraDeck => player.With(extraDeck: player.ExtraDeck.Where(c => c != card)),
+        DecisionCardSource.FaceUpExtraDeck => player.With(faceUpExtraDeck: player.FaceUpExtraDeck.Where(c => c != card)),
         _ => throw new ArgumentOutOfRangeException(nameof(source))
     };
 
@@ -49,7 +52,7 @@ public sealed partial class DuelEngine
                 return DuelError.UnsupportedSpecialSummon;
             if (policy.RequiredProperProcedureId is { } required &&
                 !(source is DecisionCardSource.Hand or DecisionCardSource.ExtraDeck && procedureId == required) &&
-                !(source is DecisionCardSource.Graveyard or DecisionCardSource.Banished &&
+                !(source is DecisionCardSource.Graveyard or DecisionCardSource.Banished or DecisionCardSource.FaceUpExtraDeck &&
                   state.SummonHistory.Any(h => h.Card == card && h.ProperProcedureId == required)))
                 return DuelError.ProperSummonRequired;
         }

@@ -1,7 +1,7 @@
 namespace TagForceSpecial.Core;
 
 public enum DecisionKind { Card, Position, MonsterZone, SpellTrapTarget }
-public enum DecisionCardSource { Hand, Deck, Graveyard, Banished, ExtraDeck }
+public enum DecisionCardSource { Hand, Deck, Graveyard, Banished, ExtraDeck, FaceUpExtraDeck }
 
 /// <summary>Trusted, immutable selection policy. It does not activate or resolve a card effect.</summary>
 public sealed class DecisionStep
@@ -125,7 +125,7 @@ public sealed record ChooseDecisionCard(PlayerId Player, long DecisionId, int Ca
 public sealed record ChooseDecisionPosition(PlayerId Player, long DecisionId, BattlePosition Position) : DecisionCommand(Player, DecisionId);
 public sealed record ChooseDecisionZone(PlayerId Player, long DecisionId, int MonsterZone) : DecisionCommand(Player, DecisionId);
 public sealed record ChooseDecisionTarget(PlayerId Player, long DecisionId, PlayerId TargetPlayer,
-    int SpellTrapZone, int CardInstanceId) : DecisionCommand(Player, DecisionId);
+    int SpellTrapZone, int CardInstanceId, bool IsPendulumZone = false) : DecisionCommand(Player, DecisionId);
 
 public sealed record DecisionRequested(PendingDecision Decision) : DuelEvent;
 public sealed record DecisionAnswered(PlayerId Player, string SequenceId, long DecisionId, DecisionAnswer Answer) : DuelEvent;

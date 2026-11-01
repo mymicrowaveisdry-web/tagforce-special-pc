@@ -72,8 +72,8 @@ public sealed partial class DuelEngine
             case BattleResponseOperation.DestroyAttacker:
             {
                 var player = next.GetPlayer(target.Player); var monsters = player.MonsterZones.ToArray(); monsters[target.Zone] = null;
-                events.Add(new MonsterDestroyed(player.Id, target.Zone, target.Card));
-                next = next.With(player: player.With(monsters: monsters, graveyard: player.Graveyard.Append(target.Card)));
+                next = next.With(player: player.With(monsters: monsters));
+                next = SendFieldCardToGraveyard(next, target.Card, new MonsterDestroyed(player.Id, target.Zone, target.Card), events);
                 break;
             }
             case BattleResponseOperation.ModifyCombatantStatistics:

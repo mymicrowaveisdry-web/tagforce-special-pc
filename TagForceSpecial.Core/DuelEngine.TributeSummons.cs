@@ -45,13 +45,9 @@ public sealed partial class DuelEngine
         foreach (var tribute in ordered) monsters[tribute.Zone] = null;
         var next = State.With(player: player.With(monsters: monsters,
             hand: player.Hand.Where(c => c.InstanceId != card.InstanceId)), normalSummonUsed: true);
-        foreach (var owner in ordered.Select(t => t.Card.Owner).Distinct())
-        {
-            var destination = next.GetPlayer(owner);
-            next = next.With(player: destination.With(graveyard: destination.Graveyard.Concat(
-                ordered.Where(t => t.Card.Owner == owner).Select(t => t.Card))));
-        }
-        List<DuelEvent> events = ordered.Select(t => (DuelEvent)new MonsterTributed(t) { TimingGroup = 0 }).ToList();
+        List<DuelEvent> events = [];
+        foreach (var tribute in ordered)
+            next = SendFieldCardToGraveyard(next, tribute.Card, new MonsterTributed(tribute) { TimingGroup = 0 }, events);
         return CommitSummon(next, player.Id, card, zone, command.FaceDown, events);
     }
 }

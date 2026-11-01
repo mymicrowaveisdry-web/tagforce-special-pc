@@ -147,22 +147,26 @@ public sealed partial class DuelEngine
     }
 
     // Shared movement operation: preflight every selection before calling; owner destinations differ from controllers.
-    private static DuelState MoveEffectSummonMaterials(DuelState state, PlayerId playerId,
+    private DuelState MoveEffectSummonMaterials(DuelState state, PlayerId playerId,
         IReadOnlyList<EffectSummonMaterial> materials, SummonEffectProfile profile, List<DuelEvent> events)
     {
         var player = state.GetPlayer(playerId); var zones = player.MonsterZones.ToArray();
         foreach (var material in materials)
             if (material.Field is { } field) zones[field.Zone] = null;
         var next = state.With(player: player.With(monsters: zones, hand: player.Hand.Where(c => !materials.Any(m => m.Card == c))));
-        foreach (var ownerId in materials.Select(m => m.Card.Owner).Distinct())
-        {
-            var owner = next.GetPlayer(ownerId);
-            next = next.With(player: owner.With(graveyard: owner.Graveyard.Concat(materials.Where(m => m.Card.Owner == ownerId).Select(m => m.Card))));
-        }
         foreach (var material in materials)
-            events.Add(profile.Kind == EffectSummonKind.Fusion
+        {
+            DuelEvent cause = profile.Kind == EffectSummonKind.Fusion
                 ? new FusionMaterialSentToGraveyard(material, profile.EffectId) { TimingGroup = 0 }
-                : new RitualMaterialTributed(material, profile.EffectId) { TimingGroup = 0 });
+                : new RitualMaterialTributed(material, profile.EffectId) { TimingGroup = 0 };
+            if (material.Field is not null) next = SendFieldCardToGraveyard(next, material.Card, cause, events);
+            else
+            {
+                var owner = next.GetPlayer(material.Card.Owner);
+                next = next.With(player: owner.With(graveyard: owner.Graveyard.Append(material.Card)));
+                events.Add(cause);
+            }
+        }
         return next;
     }
 }

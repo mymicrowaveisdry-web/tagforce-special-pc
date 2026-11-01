@@ -1,10 +1,8 @@
 # Shared Special Summon foundation
 
-This is a bounded, explicitly profiled foundation; tests use authored scenarios and no new PSP gameplay comparison is claimed.
-
-[Extra Deck/material procedures](ExtraDeck.md) reuse this foundation.
-
-[Fusion/Ritual effects](EffectSummons.md) use separate bounded profiles.
+This is a bounded, explicitly profiled foundation. [Extra Deck and material movement](ExtraDeck.md)
+use separate profiles; [Fusion/Ritual effects](EffectSummons.md) and [Pendulum](Pendulum.md) reuse this foundation, while complete card text remains separate work. Tests use authored scenarios;
+no new PSP gameplay comparison is claimed.
 
 ## Eligibility and procedures
 
@@ -82,4 +80,8 @@ These distinctions follow the [official Special Summon explanation](https://www.
 and [era rulebook](https://img.yugioh-card.com/ygo_cms/ygo/all/uploads/Rulebook_v9_en.pdf).
 They are rules references, not proof that each PSP branch has been reproduced.
 
-Own-source/own-field, single-monster, face-up placement is the supported foundation. General card restrictions and arbitrary card effects require separate profiles and tests.
+Own-source/own-field, single-monster, face-up placement is the supported slice.
+Opponent-source summons, simultaneous groups, material/cost procedures, protection,
+general Special Summon restrictions, and Ritual/Fusion/Synchro/Xyz/Pendulum proper
+methods need separate profiles and tests. They must not be simulated by overloading
+the main deck or by treating a card-type code as summon eligibility.

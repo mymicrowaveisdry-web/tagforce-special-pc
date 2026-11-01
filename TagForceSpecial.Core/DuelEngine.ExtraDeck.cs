@@ -69,7 +69,7 @@ public sealed partial class DuelEngine
     }
 
     // Only call after validating every binding and destination; the returned state is not published here.
-    private static DuelState MoveSummonMaterials(DuelState state, PlayerId controller, IReadOnlyList<MonsterBinding> ordered,
+    private DuelState MoveSummonMaterials(DuelState state, PlayerId controller, IReadOnlyList<MonsterBinding> ordered,
         MaterialDestination destination, string procedureId, List<DuelEvent> events)
     {
         var player = state.GetPlayer(controller);
@@ -77,6 +77,13 @@ public sealed partial class DuelEngine
         foreach (var material in ordered) zones[material.Zone] = null;
         var next = state.With(player: player.With(monsters: zones));
         if (destination == MaterialDestination.Attached) return next;
+        if (destination == MaterialDestination.Graveyard)
+        {
+            foreach (var material in ordered)
+                next = SendFieldCardToGraveyard(next, material.Card,
+                    new SummonMaterialSentToGraveyard(material, procedureId) { TimingGroup = 0 }, events);
+            return next;
+        }
         foreach (var ownerId in ordered.Select(m => m.Card.Owner).Distinct())
         {
             var owner = next.GetPlayer(ownerId);

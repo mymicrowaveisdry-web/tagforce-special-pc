@@ -32,6 +32,7 @@ public sealed partial class DuelEngine
     private readonly FrozenDictionary<string, SpecialSummonProcedureProfile> specialSummonProcedures;
     private readonly FrozenDictionary<string, ExtraDeckMaterialProcedureProfile> materialProcedures;
     private readonly FrozenDictionary<uint, SummonEffectProfile> summonEffects;
+    private readonly FrozenDictionary<uint, PendulumCardProfile> pendulumCards;
     public DuelState State { get; private set; }
 
     /// <summary>
@@ -59,7 +60,8 @@ public sealed partial class DuelEngine
         IEnumerable<SpecialSummonProcedureProfile>? experimentalSpecialSummonProcedures = null,
         IEnumerable<uint>? playerOneExtraDeck = null, IEnumerable<uint>? playerTwoExtraDeck = null,
         IEnumerable<ExtraDeckMaterialProcedureProfile>? experimentalMaterialProcedures = null,
-        IEnumerable<SummonEffectProfile>? experimentalSummonEffects = null)
+        IEnumerable<SummonEffectProfile>? experimentalSummonEffects = null,
+        IEnumerable<PendulumCardProfile>? experimentalPendulumCards = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(rules);
@@ -73,7 +75,7 @@ public sealed partial class DuelEngine
             if (!knownIds.Contains(id) || profile is null || !Enum.IsDefined(profile.Category) ||
                 (profile.AllowsNormalSummon || profile.AllowsBasicBattle) && profile.Category != CardCategory.Monster ||
                 (profile.AllowsTributeSummon || profile.AllowsTributeForSummon) && profile.Category != CardCategory.Monster ||
-                (profile.AllowsExtraDeck || profile.AllowsSummonMaterial) && profile.Category != CardCategory.Monster ||
+                (profile.AllowsExtraDeck || profile.AllowsSummonMaterial || profile.AllowsPendulumSummon) && profile.Category != CardCategory.Monster ||
                 profile.AllowsTributeSummon && !profile.AllowsNormalSummon ||
                 profile.RequiresRegisteredTributeProcedure && !profile.AllowsTributeSummon ||
                 profile.AllowsSpellTrapSet && profile.Category is not (CardCategory.Spell or CardCategory.Trap))
@@ -199,6 +201,14 @@ public sealed partial class DuelEngine
         summonNegations = negators.ToFrozenDictionary(p => p.CardId);
         summonEffects = ValidateSummonEffects(experimentalSummonEffects ?? [],
             reservedIds.Concat(eventIds).Concat(summonIds).Concat(battleProfiles.Select(p => p.EffectId)));
+        var pendulums = (experimentalPendulumCards ?? []).ToArray();
+        if (pendulums.Any(p => p is null || p.CardId == 0 || !IsMonster(p.CardId) ||
+                chainEffects.Values.Any(e => e.TokenCardIds.Contains(p.CardId)) ||
+                materialProcedures.Values.Any(m => (m.Xyz is not null || m.Synchro is not null) && m.TargetCardIds.Contains(p.CardId)) ||
+                summonEffects.Values.Any(s => s.FusionRecipes.Any(r => r.TargetCardId == p.CardId) || s.RitualRecipes.Any(r => r.TargetCardId == p.CardId))) ||
+            pendulums.Select(p => p.CardId).Distinct().Count() != pendulums.Length)
+            throw new ArgumentException("Pendulum identities require distinct explicitly classified ordinary monsters; hybrid families are unsupported.");
+        pendulumCards = pendulums.ToFrozenDictionary(p => p.CardId);
         bool IsMonster(uint id) => this.rules.TryGetValue(id, out var rule) && rule.Category == CardCategory.Monster;
         int nextInstance = 1;
         DuelPlayerState CreatePlayer(PlayerId id, IEnumerable<uint> ids)
@@ -262,6 +272,8 @@ public sealed partial class DuelEngine
         {
             BeginDecisionSequence begin => BeginDecisions(begin.SequenceId),
             ActivateSpell activate => Activate(activate.CardInstanceId, activate.SpellTrapZone),
+            ActivatePendulumScale scale => ActivateScale(scale),
+            PendulumSummon pendulum => ExecutePendulumSummon(pendulum),
             ResolveDrawStep => Draw(),
             ChangePhase phase => Advance(phase.Target),
             NormalSummon summon => Summon(summon.CardInstanceId, summon.MonsterZone, false),
@@ -447,8 +459,8 @@ public sealed partial class DuelEngine
             var zones = player.MonsterZones.ToArray();
             var card = zones[zone]!.Card;
             zones[zone] = null;
-            next = next.With(player: player.With(monsters: zones, graveyard: player.Graveyard.Append(card)));
-            events.Add(new MonsterDestroyed(playerId, zone, card));
+            next = next.With(player: player.With(monsters: zones));
+            next = SendFieldCardToGraveyard(next, card, new MonsterDestroyed(playerId, zone, card), events);
         }
         if (destroyAttacker) Destroy(attackerPlayer.Id, attackerZone);
         if (destroyDefender) Destroy(defenderPlayer.Id, targetZone!.Value);
