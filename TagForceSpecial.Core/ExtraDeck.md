@@ -1,6 +1,8 @@
 # Extra Deck and material movement
 
-This supports explicit generic material procedures and bounded Synchro profiles plus Xyz attachments and trigger detach costs; tests use authored scenarios. The retained Synchro projection is narrower than full material selection/movement/timing equivalence. [Fusion/Ritual effects](EffectSummons.md) use separate profiles.
+This supports explicit generic procedures and bounded Synchro/Xyz profiles;
+[Fusion/Ritual effects](EffectSummons.md) and [Pendulum](Pendulum.md) use separate profiles. Its tests are synthetic except for the retained narrow Synchro projection; original PSP material
+selection, movement and timing still need gameplay comparisons.
 
 ## Extra Deck
 
@@ -8,7 +10,7 @@ This supports explicit generic material procedures and bounded Synchro profiles 
 ordered lists. Each permits 0–15 explicitly `DuelCardRules.AllowsExtraDeck`
 catalog monsters. Their card instances have unique game-local instance IDs and
 owners, and are held in immutable `DuelPlayerState.ExtraDeck` snapshots. This
-list treats entries as face-down.
+list treats entries as face-down; Pendulum uses the separate `FaceUpExtraDeck` list.
 No monster type, level or ID is used to infer Extra Deck eligibility.
 
 ## Material procedure

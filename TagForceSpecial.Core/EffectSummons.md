@@ -50,7 +50,7 @@ pages 18–19; this is separate from PSP evidence.
 ## Limits
 
 No substitutes, contact Fusion, opposing/Deck/Graveyard materials, tokens,
-Pendulum departures, alternate destinations or replacements, Ritual overpayment,
+Pendulum hybrid procedures, alternate destinations or replacements beyond the shared Pendulum field rule, Ritual overpayment,
 effective-level modifiers, double-value Tributes, or arbitrary Spell instructions.
 Do not register cards requiring these branches. General card legality, shuffle
 and earlier research-stop restrictions remain outside this slice.

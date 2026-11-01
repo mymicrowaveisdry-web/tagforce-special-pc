@@ -21,7 +21,10 @@ public sealed partial class DuelEngine
         var targets = step.Kind == DecisionKind.SpellTrapTarget
             ? State.Players.SelectMany(p => p.SpellTrapFields.Select((field, zone) => (field, zone))
                 .Where(s => s.field is not null && s.field.Card.InstanceId != excluded)
-                .Select(s => new SpellTrapTarget(p.Id, s.zone, s.field!.Card, s.field.PlacementId))).ToArray() : [];
+                .Select(s => new SpellTrapTarget(p.Id, s.zone, s.field!.Card, s.field.PlacementId))
+                .Concat(p.PendulumZones.Select((field, zone) => (field, zone))
+                    .Where(s => s.field is not null && s.field.Card.InstanceId != excluded)
+                    .Select(s => new SpellTrapTarget(p.Id, s.zone, s.field!.Card, s.field.PlacementId, true)))).ToArray() : [];
         if (step.Kind == DecisionKind.Card && cards.Length == 0 ||
             step.Kind == DecisionKind.MonsterZone && zones.Length == 0 ||
             step.Kind == DecisionKind.SpellTrapTarget && targets.Length == 0)
@@ -64,13 +67,13 @@ public sealed partial class DuelEngine
             ChooseDecisionPosition c when pending.PositionOptions.Contains(c.Position) => new(kind, Position: c.Position),
             ChooseDecisionZone c when pending.MonsterZoneOptions.Contains(c.MonsterZone) => new(kind, MonsterZone: c.MonsterZone),
             ChooseDecisionTarget c when pending.TargetOptions.Any(t => t.Player == c.TargetPlayer &&
-                t.Zone == c.SpellTrapZone && t.Card.InstanceId == c.CardInstanceId) =>
+                t.Zone == c.SpellTrapZone && t.Card.InstanceId == c.CardInstanceId && t.IsPendulumZone == c.IsPendulumZone) =>
                 new(kind, Target: pending.TargetOptions.Single(t => t.Player == c.TargetPlayer &&
-                    t.Zone == c.SpellTrapZone && t.Card.InstanceId == c.CardInstanceId)),
+                    t.Zone == c.SpellTrapZone && t.Card.InstanceId == c.CardInstanceId && t.IsPendulumZone == c.IsPendulumZone)),
             _ => null
         };
         if (answer is null) return Reject(DuelError.InvalidDecisionChoice);
-        if (answer.Target is { } binding && !binding.IsStillPresent(State.GetPlayer(binding.Player).SpellTrapFields[binding.Zone]))
+        if (answer.Target is { } binding && !binding.IsStillPresent(binding.Current(State)))
             return Reject(DuelError.InvalidDecisionChoice);
         var answers = pending.Answers.Append(answer).ToArray();
         if (State.PendingChain is not null && State.PendingSpellActivation is { ResponseToLink: > 0 })

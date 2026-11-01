@@ -22,7 +22,8 @@ public sealed partial class DuelEngine
     private bool CanActivateTrigger(DuelState state, TriggerActivation trigger)
     {
         bool location = trigger.Profile.SourceLocation != TriggerSourceLocation.FaceUpMonster
-            ? state.GetPlayer(trigger.Player).Graveyard.Contains(trigger.Source.Card)
+            ? state.GetPlayer(trigger.Player).Graveyard.Contains(trigger.Source.Card) ||
+                trigger.Profile.SourceLocation == TriggerSourceLocation.DestroyedSelf && state.GetPlayer(trigger.Player).FaceUpExtraDeck.Contains(trigger.Source.Card)
             : trigger.Source.IsStillPresent(state) && state.GetPlayer(trigger.Player).MonsterZones[trigger.Source.Zone]!.Position != BattlePosition.FaceDownDefense;
         if (!location || IsTriggerUsed(state, trigger)) return false;
         if (state.Battle?.Step == BattleStep.Damage && !(trigger.Profile.DamageStepAllowed ??
@@ -74,8 +75,10 @@ public sealed partial class DuelEngine
             MonsterDestroyed or SummonNegated => MonsterEventKind.Destroyed,
             _ => MonsterEventKind.SentToGraveyard
         };
+        if (kind == MonsterEventKind.SentToGraveyard && emitted.FieldDestination == FieldCardDestination.FaceUpExtraDeck) yield break;
         yield return new(kind, subject, point, cost);
-        if (kind == MonsterEventKind.Destroyed) yield return new(MonsterEventKind.SentToGraveyard, subject, point);
+        if (kind == MonsterEventKind.Destroyed && emitted.FieldDestination != FieldCardDestination.FaceUpExtraDeck)
+            yield return new(MonsterEventKind.SentToGraveyard, subject, point);
         if (kind == MonsterEventKind.FlipSummoned) yield return new(MonsterEventKind.FlippedFaceUp, subject, point);
     }
 
@@ -114,7 +117,7 @@ public sealed partial class DuelEngine
             point = new(checked(State.Revision + 1), 0);
         foreach (var emitted in events)
             if (emitted is MonsterNormalSummoned or MonsterSpecialSummoned or TokenSpecialSummoned or MonsterFlipSummoned or
-                MonsterDestroyed or MonsterTributed or SummonMaterialSentToGraveyard or FusionMaterialSentToGraveyard or RitualMaterialTributed or SummonMaterialBanished or XyzMaterialAttached or XyzMaterialSentToGraveyard or SummonAttempted or SummonNegated or CardDiscarded or ActivationCostPaid or TriggerCostPaid or MonsterRevealed or SpellTrapDestroyed or
+                MonsterDestroyed or MonsterTributed or SummonMaterialSentToGraveyard or SummonMaterialSentToFaceUpExtraDeck or FusionMaterialSentToGraveyard or FusionMaterialSentToFaceUpExtraDeck or RitualMaterialTributed or CardSentToFaceUpExtraDeck or PendulumScaleActivated or SummonMaterialBanished or XyzMaterialAttached or XyzMaterialSentToGraveyard or SummonAttempted or SummonNegated or CardDiscarded or ActivationCostPaid or TriggerCostPaid or MonsterRevealed or SpellTrapDestroyed or
                 MonsterBanished or LifePointsGained or BattleDamageDealt or MonsterModifierCreated or MonsterEffectsNegated or
                 SpellActivated or ChainResponseActivated or MonsterPositionChanged or MonsterSet or SpellTrapSet or CardDrawn or
                 PhaseChanged or TurnStarted or AttackDeclared or BattleFlipEffectWindowOpened)
@@ -215,8 +218,8 @@ public sealed partial class DuelEngine
         {
             var player = next.GetPlayer(subject.Player);
             var monsters = player.MonsterZones.ToArray(); monsters[subject.Zone] = null;
-            events.Add(new MonsterDestroyed(player.Id, subject.Zone, subject.Card));
-            return next.With(player: player.With(monsters: monsters, graveyard: player.Graveyard.Append(subject.Card)));
+            next = next.With(player: player.With(monsters: monsters));
+            return SendFieldCardToGraveyard(next, subject.Card, new MonsterDestroyed(player.Id, subject.Zone, subject.Card), events);
         }
         var effects = next.EventEffects;
         if (action.Operation == TriggerOperation.NegateTargetMonsterUntilEndPhase)

@@ -4,7 +4,7 @@ namespace TagForceSpecial.Core;
 public enum ChainOperation
 {
     DestroyOpposingFaceUpMonsters, DestroyBoundSpellTrap, SummonFourTokens,
-    NegateActivation, NegateEffect, TriggerEffect, BattleResponse, SummonNegation, EffectSummon
+    NegateActivation, NegateEffect, TriggerEffect, BattleResponse, SummonNegation, EffectSummon, ActivatePendulumScale
 }
 public enum ChainSpellSpeed { One = 1, Two = 2, Three = 3 }
 public enum ChainNegation { None, Effect, Activation }
@@ -43,7 +43,8 @@ public sealed record ChainLink(int Number, CommittedActivation Activation, long 
     int? TargetLinkNumber = null, ChainNegation Negation = ChainNegation.None,
     bool DestroyNegatedSource = false, TriggerActivation? Trigger = null,
     BattleResponseProfile? BattleEffect = null, long? BattleAttackId = null, MonsterBinding? BattleTarget = null,
-    CardInstance? BattleSummonCard = null, int? BattleMonsterZone = null, long? SummonAttemptId = null)
+    CardInstance? BattleSummonCard = null, int? BattleMonsterZone = null, long? SummonAttemptId = null,
+    bool IsPendulumScale = false)
 {
     public bool ActivationNegated => Negation == ChainNegation.Activation;
     public bool EffectNegated => Negation != ChainNegation.None;
@@ -90,5 +91,5 @@ public sealed record ChainLinkSkipped(int Number, ChainSkipReason Reason) : Duel
 public sealed record ChainResponseActivated(PlayerId Player, string EffectId, CardInstance Card, int Zone) : DuelEvent;
 public sealed record ChainTrapSentToGraveyard(PlayerId Player, CardInstance Card, int Zone) : DuelEvent;
 public sealed record ChainCompleted : DuelEvent;
-public sealed record SpellTrapDestroyed(PlayerId Player, int Zone, CardInstance Card) : DuelEvent;
+public sealed record SpellTrapDestroyed(PlayerId Player, int Zone, CardInstance Card, bool IsPendulumZone = false) : DuelEvent;
 public sealed record TokenSpecialSummoned(PlayerId Player, int Zone, FieldMonster Monster) : DuelEvent;

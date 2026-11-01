@@ -365,7 +365,9 @@ public sealed class SpecialSummonFoundationTests
         Assert.Throws<ArgumentException>(() => Engine(procedures: [new("same", [Target]), new("same", [Target])]));
         Assert.Throws<ArgumentException>(() => new SpecialSummonProcedureProfile("deck", [Target], DecisionCardSource.Deck));
         Assert.Throws<ArgumentException>(() => new SpecialSummonProcedureProfile("set", [Target], positions: [BattlePosition.FaceDownDefense]));
-        Assert.Throws<ArgumentException>(() => new SpecialSummonCardProfile(Target, (SpecialSummonSources)32));
+        Assert.Throws<ArgumentException>(() => new SpecialSummonCardProfile(Target, (SpecialSummonSources)64));
+        Assert.Equal(SpecialSummonSources.FaceUpExtraDeck,
+            new SpecialSummonCardProfile(Target, SpecialSummonSources.FaceUpExtraDeck).EffectSources);
         uint[] cards = [Target]; BattlePosition[] positions = [BattlePosition.FaceUpAttack];
         var profile = new SpecialSummonProcedureProfile("copy", cards, positions: positions);
         cards[0] = Low; positions[0] = BattlePosition.FaceDownDefense;

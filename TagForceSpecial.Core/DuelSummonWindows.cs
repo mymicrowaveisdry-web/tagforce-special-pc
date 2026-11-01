@@ -7,6 +7,7 @@ public sealed record PendingSummon(long AttemptId, long DecisionId, PlayerId Pla
     BattlePosition Position = BattlePosition.FaceUpAttack, string? ProcedureId = null, string? ProperProcedureId = null)
 {
     public IReadOnlyList<CardInstance> XyzMaterials { get; internal init; } = Array.AsReadOnly(Array.Empty<CardInstance>());
+    public IReadOnlyList<PendingSummon> PendulumGroup { get; internal init; } = Array.AsReadOnly(Array.Empty<PendingSummon>());
 }
 
 public sealed record PassSummonResponse(PlayerId Player, long DecisionId) : DuelCommand(Player);

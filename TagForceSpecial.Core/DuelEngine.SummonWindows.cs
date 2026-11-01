@@ -33,6 +33,13 @@ public sealed partial class DuelEngine
     {
         var pending = next.PendingSummon!;
         if (pending.Negated) return next.WithSummon(null);
+        if (pending.PendulumGroup.Count != 0)
+        {
+            foreach (var entry in pending.PendulumGroup)
+                next = PlaceSpecialSummon(next, entry.Player, entry.Card, entry.MonsterZone, entry.Position,
+                    entry.Source, events, "pendulum", entry.AttemptId, sourceAlreadyRemoved: true, timingGroup: 1);
+            return next.WithSummon(null);
+        }
         // The supported negation chain cannot move monsters or occupy this reserved slot.
         if (next.GetPlayer(pending.Player).MonsterZones[pending.MonsterZone] is not null)
             throw new InvalidOperationException("A pending summon destination was occupied by an unsupported operation.");
@@ -74,6 +81,7 @@ public sealed partial class DuelEngine
         var source = player.SpellTrapFields[command.SpellTrapZone];
         if (command.Player == pending.Player || source is null || source.IsFaceUp || source.SetOnTurn >= State.TurnNumber ||
             !summonNegations.TryGetValue(source.Card.GameCardId, out var profile) ||
+            pending.PendulumGroup.Count > 1 && !profile.AllowsMultipleSummons ||
             !profile.Kinds.HasFlag(pending.IsSpecialSummon ? SummonNegationKinds.Special : SummonNegationKinds.Normal))
             return Reject(DuelError.UnsupportedSummonResponse);
         if (player.LifePoints <= profile.LifePointCost) return Reject(DuelError.InsufficientLifePoints);
@@ -99,6 +107,16 @@ public sealed partial class DuelEngine
         {
             events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
             return next;
+        }
+        if (pending.PendulumGroup.Count != 0)
+        {
+            foreach (var entry in pending.PendulumGroup)
+            {
+                var destination = next.GetPlayer(entry.Card.Owner);
+                next = next.With(player: destination.With(graveyard: destination.Graveyard.Append(entry.Card)));
+                events.Add(new SummonNegated(entry) { TimingGroup = 1 });
+            }
+            return next.WithSummon(pending with { Negated = true });
         }
         var owner = next.GetPlayer(pending.Card.Owner);
         events.Add(new SummonNegated(pending) { TimingGroup = 1 });

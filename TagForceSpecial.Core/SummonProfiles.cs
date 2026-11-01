@@ -67,12 +67,14 @@ public sealed class SummonNegationProfile
     public uint CardId { get; }
     public int LifePointCost { get; }
     public SummonNegationKinds Kinds { get; }
+    public bool AllowsMultipleSummons { get; }
     public SummonNegationProfile(string effectId, uint cardId, int lifePointCost = 0,
-        SummonNegationKinds kinds = SummonNegationKinds.Normal)
+        SummonNegationKinds kinds = SummonNegationKinds.Normal, bool allowsMultipleSummons = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(effectId);
         if (cardId == 0 || lifePointCost < 0 || kinds == 0 || (kinds & ~SummonNegationKinds.All) != 0)
             throw new ArgumentException("Invalid negation source, cost or summon kinds.");
         EffectId = effectId; CardId = cardId; LifePointCost = lifePointCost; Kinds = kinds;
+        AllowsMultipleSummons = allowsMultipleSummons;
     }
 }
