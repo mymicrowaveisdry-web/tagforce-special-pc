@@ -20,7 +20,7 @@ responses/resolution unless matching chain profiles are registered.
 Explicit source, discard and token rules are required; committed costs are not refunded.
 Shuffle, broader movement and general card legality remain unsupported.
 
-Trigger/aura primitives and staged battle use separate [Core opt-ins](../TagForceSpecial.Core/README.md).
+Trigger/aura primitives, staged battle and [bounded Fusion/Ritual effects](../TagForceSpecial.Core/EffectSummons.md) use separate [Core opt-ins](../TagForceSpecial.Core/README.md).
 Existing card factories do not automatically gain battle or Damage Step eligibility.
 Selected outcomes have optional local PSP fixtures; new timing comparisons remain deferred.
 CI runs synthetic tests without those fixtures.

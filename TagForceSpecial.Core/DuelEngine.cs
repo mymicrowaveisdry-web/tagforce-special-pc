@@ -24,11 +24,21 @@ public sealed partial class DuelEngine
     private readonly uint[] negationOrder;
     private readonly bool experimentalBattleFlow;
     private readonly FrozenDictionary<uint, BattleResponseProfile> battleResponses;
+    private readonly SummonLevelModifierProfile[] summonLevelModifiers;
+    private readonly FrozenDictionary<string, TributeProcedureProfile> tributeProcedures;
+    private readonly FrozenSet<uint> summonWindows;
+    private readonly FrozenDictionary<uint, SummonNegationProfile> summonNegations;
+    private readonly FrozenDictionary<uint, SpecialSummonCardProfile> specialSummonCards;
+    private readonly FrozenDictionary<string, SpecialSummonProcedureProfile> specialSummonProcedures;
+    private readonly FrozenDictionary<string, ExtraDeckMaterialProcedureProfile> materialProcedures;
+    private readonly FrozenDictionary<uint, SummonEffectProfile> summonEffects;
+    private readonly FrozenDictionary<uint, PendulumCardProfile> pendulumCards;
     public DuelState State { get; private set; }
 
     /// <summary>
     /// Decks are supplied top-first, after any external shuffle. Only size and catalog membership
-    /// are checked here; banlists, copy limits, extra decks and complete deck legality are later work.
+    /// are checked here. Extra Decks are separately supplied and explicitly eligible; banlists,
+    /// copy limits and complete deck legality are later work.
     /// Rule metadata is explicit; missing classifications fail closed when attempting to summon.
     /// </summary>
     public DuelEngine(CardCatalog catalog, IReadOnlyDictionary<uint, DuelCardRules> rules,
@@ -41,7 +51,17 @@ public sealed partial class DuelEngine
         IEnumerable<TriggerEffectProfile>? experimentalTriggerEffects = null,
         IEnumerable<ContinuousEffectProfile>? experimentalContinuousEffects = null,
         IEnumerable<ContinuousNegationProfile>? experimentalContinuousNegations = null,
-        bool experimentalBattleFlow = false, IEnumerable<BattleResponseProfile>? experimentalBattleResponses = null)
+        bool experimentalBattleFlow = false, IEnumerable<BattleResponseProfile>? experimentalBattleResponses = null,
+        IEnumerable<SummonLevelModifierProfile>? experimentalSummonLevelModifiers = null,
+        IEnumerable<TributeProcedureProfile>? experimentalTributeProcedures = null,
+        IEnumerable<SummonWindowProfile>? experimentalSummonWindows = null,
+        IEnumerable<SummonNegationProfile>? experimentalSummonNegations = null,
+        IEnumerable<SpecialSummonCardProfile>? experimentalSpecialSummonCards = null,
+        IEnumerable<SpecialSummonProcedureProfile>? experimentalSpecialSummonProcedures = null,
+        IEnumerable<uint>? playerOneExtraDeck = null, IEnumerable<uint>? playerTwoExtraDeck = null,
+        IEnumerable<ExtraDeckMaterialProcedureProfile>? experimentalMaterialProcedures = null,
+        IEnumerable<SummonEffectProfile>? experimentalSummonEffects = null,
+        IEnumerable<PendulumCardProfile>? experimentalPendulumCards = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(rules);
@@ -54,6 +74,10 @@ public sealed partial class DuelEngine
         foreach (var (id, profile) in rules)
             if (!knownIds.Contains(id) || profile is null || !Enum.IsDefined(profile.Category) ||
                 (profile.AllowsNormalSummon || profile.AllowsBasicBattle) && profile.Category != CardCategory.Monster ||
+                (profile.AllowsTributeSummon || profile.AllowsTributeForSummon) && profile.Category != CardCategory.Monster ||
+                (profile.AllowsExtraDeck || profile.AllowsSummonMaterial || profile.AllowsPendulumSummon) && profile.Category != CardCategory.Monster ||
+                profile.AllowsTributeSummon && !profile.AllowsNormalSummon ||
+                profile.RequiresRegisteredTributeProcedure && !profile.AllowsTributeSummon ||
                 profile.AllowsSpellTrapSet && profile.Category is not (CardCategory.Spell or CardCategory.Trap))
                 throw new ArgumentException("Invalid explicit card rules.", nameof(rules));
         this.rules = rules.ToFrozenDictionary();
@@ -135,6 +159,57 @@ public sealed partial class DuelEngine
             battleProfiles.Any(p => reservedIds.Contains(p.EffectId) || eventIds.Contains(p.EffectId)))
             throw new ArgumentException("Battle profiles need the staged flow, distinct source/effect IDs and explicit rules.", nameof(experimentalBattleResponses));
         battleResponses = battleProfiles.ToFrozenDictionary(p => p.CardId);
+        summonLevelModifiers = (experimentalSummonLevelModifiers ?? []).ToArray();
+        var procedures = (experimentalTributeProcedures ?? []).ToArray();
+        var windows = (experimentalSummonWindows ?? []).ToArray();
+        var negators = (experimentalSummonNegations ?? []).ToArray();
+        var specialCards = (experimentalSpecialSummonCards ?? []).ToArray();
+        var specialProcedures = (experimentalSpecialSummonProcedures ?? []).ToArray();
+        if (specialCards.Any(p => p is null || !IsMonster(p.CardId)) ||
+            specialCards.Select(p => p.CardId).Distinct().Count() != specialCards.Length ||
+            specialProcedures.Any(p => p is null || p.CardIds.Any(id => !specialCards.Any(c => c.CardId == id))) ||
+            specialProcedures.Select(p => p.ProcedureId).Distinct(StringComparer.Ordinal).Count() != specialProcedures.Length)
+            throw new ArgumentException("Special Summon procedures require distinct IDs and explicitly profiled catalog monsters.");
+        specialSummonCards = specialCards.ToFrozenDictionary(p => p.CardId);
+        specialSummonProcedures = specialProcedures.ToFrozenDictionary(p => p.ProcedureId, StringComparer.Ordinal);
+        var materialProfiles = (experimentalMaterialProcedures ?? []).ToArray();
+        if (materialProfiles.Any(p => p is null || p.TargetCardIds.Any(id => !specialSummonCards.ContainsKey(id) ||
+                !this.rules.TryGetValue(id, out var rule) || !rule.AllowsExtraDeck) ||
+                p.MaterialCardIds.Any(id => !this.rules.TryGetValue(id, out var rule) || !rule.AllowsSummonMaterial)) ||
+            materialProfiles.Select(p => p.ProcedureId).Distinct(StringComparer.Ordinal).Count() != materialProfiles.Length ||
+            materialProfiles.Any(p => specialSummonProcedures.ContainsKey(p.ProcedureId)))
+            throw new ArgumentException("Material procedures require distinct IDs and explicit Extra Deck, target and material eligibility.");
+        materialProcedures = materialProfiles.ToFrozenDictionary(p => p.ProcedureId, StringComparer.Ordinal);
+        if (summonLevelModifiers.Any(p => p is null || !IsMonster(p.SourceCardId) || p.TargetCardIds.Any(id => !IsMonster(id))) ||
+            procedures.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) || !rule.AllowsTributeSummon ||
+                p.AllowedTributeCardIds.Any(id => !this.rules.TryGetValue(id, out var donor) || !donor.AllowsTributeForSummon)) ||
+            windows.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) ||
+                !rule.AllowsNormalSummon && !specialSummonCards.ContainsKey(p.CardId)) ||
+            negators.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) || rule.Category != CardCategory.Trap ||
+                !rule.AllowsSpellTrapSet || chainResponses.ContainsKey(p.CardId) || battleResponses.ContainsKey(p.CardId) || chainEffects.ContainsKey(p.CardId)) ||
+            procedures.Select(p => p.ProcedureId).Distinct(StringComparer.Ordinal).Count() != procedures.Length ||
+            windows.Select(p => p.CardId).Distinct().Count() != windows.Length ||
+            negators.Select(p => p.CardId).Distinct().Count() != negators.Length ||
+            this.rules.Any(entry => entry.Value.RequiresRegisteredTributeProcedure && !procedures.Any(p => p.CardId == entry.Key)))
+            throw new ArgumentException("Summon profiles require explicit source/target eligibility, distinct registrations and procedures for restricted targets.");
+        var summonIds = summonLevelModifiers.Select(p => p.EffectId).Concat(negators.Select(p => p.EffectId)).ToArray();
+        if (summonIds.Distinct(StringComparer.Ordinal).Count() != summonIds.Length ||
+            summonIds.Any(id => reservedIds.Contains(id) || eventIds.Contains(id) || battleProfiles.Any(p => p.EffectId == id)))
+            throw new ArgumentException("Summon effect IDs must be distinct and unreserved.");
+        tributeProcedures = procedures.ToFrozenDictionary(p => p.ProcedureId, StringComparer.Ordinal);
+        summonWindows = windows.Select(p => p.CardId).ToFrozenSet();
+        summonNegations = negators.ToFrozenDictionary(p => p.CardId);
+        summonEffects = ValidateSummonEffects(experimentalSummonEffects ?? [],
+            reservedIds.Concat(eventIds).Concat(summonIds).Concat(battleProfiles.Select(p => p.EffectId)));
+        var pendulums = (experimentalPendulumCards ?? []).ToArray();
+        if (pendulums.Any(p => p is null || p.CardId == 0 || !IsMonster(p.CardId) ||
+                chainEffects.Values.Any(e => e.TokenCardIds.Contains(p.CardId)) ||
+                materialProcedures.Values.Any(m => (m.Xyz is not null || m.Synchro is not null) && m.TargetCardIds.Contains(p.CardId)) ||
+                summonEffects.Values.Any(s => s.FusionRecipes.Any(r => r.TargetCardId == p.CardId) || s.RitualRecipes.Any(r => r.TargetCardId == p.CardId))) ||
+            pendulums.Select(p => p.CardId).Distinct().Count() != pendulums.Length)
+            throw new ArgumentException("Pendulum identities require distinct explicitly classified ordinary monsters; hybrid families are unsupported.");
+        pendulumCards = pendulums.ToFrozenDictionary(p => p.CardId);
+        bool IsMonster(uint id) => this.rules.TryGetValue(id, out var rule) && rule.Category == CardCategory.Monster;
         int nextInstance = 1;
         DuelPlayerState CreatePlayer(PlayerId id, IEnumerable<uint> ids)
         {
@@ -145,7 +220,17 @@ public sealed partial class DuelEngine
             var instances = deck.Select(cardId => new CardInstance(nextInstance++, cardId, id)).ToArray();
             return new(id, instances.Skip(5), instances.Take(5));
         }
-        State = new([CreatePlayer(PlayerId.One, playerOneDeck), CreatePlayer(PlayerId.Two, playerTwoDeck)], startingPlayer);
+        var first = CreatePlayer(PlayerId.One, playerOneDeck);
+        var second = CreatePlayer(PlayerId.Two, playerTwoDeck);
+        CardInstance[] CreateExtraDeck(PlayerId owner, IEnumerable<uint>? cards)
+        {
+            var ids = (cards ?? []).Take(16).ToArray();
+            if (ids.Length > 15 || ids.Any(id => !this.rules.TryGetValue(id, out var rule) || !rule.AllowsExtraDeck))
+                throw new ArgumentException("Each Extra Deck supports up to 15 explicitly eligible catalog monsters.");
+            return ids.Select(id => new CardInstance(nextInstance++, id, owner)).ToArray();
+        }
+        State = new([first.With(extraDeck: CreateExtraDeck(PlayerId.One, playerOneExtraDeck)),
+            second.With(extraDeck: CreateExtraDeck(PlayerId.Two, playerTwoExtraDeck))], startingPlayer);
     }
 
     public DuelActionResult Execute(DuelCommand command)
@@ -154,12 +239,14 @@ public sealed partial class DuelEngine
         if (State.Outcome is not null) return Reject(DuelError.DuelFinished);
         if (command.Player is not (PlayerId.One or PlayerId.Two)) return Reject(DuelError.InvalidPlayer);
         if (State.EventEffects.PendingCommitment is not null) return AnswerTriggerCommitment(command);
-        if (command is ChooseTriggerCostCard or ChooseTriggerMonsterTarget) return Reject(DuelError.NoPendingTriggerCommitment);
+        if (command is ChooseTriggerCostCard or ChooseTriggerMonsterTarget or ChooseTriggerXyzMaterials) return Reject(DuelError.NoPendingTriggerCommitment);
         if (State.EventEffects.PendingTriggers is not null)
             return command is ChooseTriggerOrder order ? OrderTriggers(order) : Reject(DuelError.TriggerOrderPending);
         if (command is ChooseTriggerOrder) return Reject(DuelError.NoPendingTriggers);
         if (State.PendingChain is not null) return ExecuteChain(command);
-        if (command is PassChainResponse or ActivateChainResponse or ResolveNextChainLink) return Reject(DuelError.NoPendingChain);
+        if (State.PendingSummon is not null) return ExecuteSummonWindow(command);
+        if (command is PassSummonResponse or ActivateSummonNegation) return Reject(DuelError.NoPendingSummon);
+        if (command is PassChainResponse or ActivateChainResponse or ResolveNextChainLink or ChooseEffectSummon) return Reject(DuelError.NoPendingChain);
         if (command is AdvanceBattle or PassBattleResponse or ChooseAttackReplay or ActivateBattleResponse)
         {
             if (!experimentalBattleFlow) return Reject(DuelError.BattleFlowNotEnabled);
@@ -185,10 +272,15 @@ public sealed partial class DuelEngine
         {
             BeginDecisionSequence begin => BeginDecisions(begin.SequenceId),
             ActivateSpell activate => Activate(activate.CardInstanceId, activate.SpellTrapZone),
+            ActivatePendulumScale scale => ActivateScale(scale),
+            PendulumSummon pendulum => ExecutePendulumSummon(pendulum),
             ResolveDrawStep => Draw(),
             ChangePhase phase => Advance(phase.Target),
             NormalSummon summon => Summon(summon.CardInstanceId, summon.MonsterZone, false),
             SetMonster set => Summon(set.CardInstanceId, set.MonsterZone, true),
+            TributeSummon tribute => SummonWithTributes(tribute),
+            SpecialSummonByProcedure special => ExecuteSpecialProcedure(special),
+            SpecialSummonWithMaterials material => ExecuteMaterialProcedure(material),
             SetSpellTrap set => SetBackRow(set.CardInstanceId, set.SpellTrapZone),
             ChangeMonsterPosition change => ChangePosition(change.MonsterZone, change.Target),
             DeclareAttack attack => Attack(attack.AttackerZone, attack.TargetZone),
@@ -245,18 +337,14 @@ public sealed partial class DuelEngine
             return Reject(DuelError.UnknownCardRules);
         if (rule.Category != CardCategory.Monster) return Reject(DuelError.NotMonster);
         if (!rule.AllowsNormalSummon) return Reject(DuelError.NormalSummonNotAllowed);
-        uint level = catalog[card.GameCardId].Statistics.Level;
+        if (rule.RequiresRegisteredTributeProcedure) return Reject(DuelError.UnsupportedTributeProcedure);
+        uint level = ComputeHandSummonLevel(State, player.Id, card);
         if (level == 0) return Reject(DuelError.UnsupportedMonsterLevel);
         if (level > 4) return Reject(DuelError.TributeSummonNotSupported);
         if (player.MonsterZones[zone] is not null) return Reject(DuelError.MonsterZoneOccupied);
         if (State.NormalSummonUsed) return Reject(DuelError.NormalSummonLimitReached);
-        var monster = new FieldMonster(card, faceDown ? BattlePosition.FaceDownDefense : BattlePosition.FaceUpAttack,
-            SummonedOnTurn: State.TurnNumber, PlacementId: checked(State.Revision + 1));
-        var monsters = player.MonsterZones.ToArray();
-        monsters[zone] = monster;
-        var next = player.With(hand: player.Hand.Where(c => c.InstanceId != instanceId), monsters: monsters);
-        return Accept(State.With(player: next, normalSummonUsed: true), faceDown
-            ? new MonsterSet(player.Id, monster, zone) : new MonsterNormalSummoned(player.Id, monster, zone));
+        var next = State.With(player: player.With(hand: player.Hand.Where(c => c.InstanceId != instanceId)), normalSummonUsed: true);
+        return CommitSummon(next, player.Id, card, zone, faceDown, []);
     }
 
     private DuelActionResult SetBackRow(int instanceId, int zone)
@@ -371,8 +459,8 @@ public sealed partial class DuelEngine
             var zones = player.MonsterZones.ToArray();
             var card = zones[zone]!.Card;
             zones[zone] = null;
-            next = next.With(player: player.With(monsters: zones, graveyard: player.Graveyard.Append(card)));
-            events.Add(new MonsterDestroyed(playerId, zone, card));
+            next = next.With(player: player.With(monsters: zones));
+            next = SendFieldCardToGraveyard(next, card, new MonsterDestroyed(playerId, zone, card), events);
         }
         if (destroyAttacker) Destroy(attackerPlayer.Id, attackerZone);
         if (destroyDefender) Destroy(defenderPlayer.Id, targetZone!.Value);
@@ -404,6 +492,8 @@ public sealed partial class DuelEngine
     {
         var emitted = events.ToList();
         state = PrepareBattleState(State, state, emitted);
+        state = PrepareXyzMaterials(State, state, emitted);
+        state = PrepareSummonHistory(State, state, emitted);
         state = PrepareEventEffects(State, state, emitted);
         State = state.With(revision: checked(State.Revision + 1));
         return new(true, DuelError.None, State, emitted.AsReadOnly());

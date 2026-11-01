@@ -27,8 +27,10 @@ public sealed class ActivationContract
 }
 
 /// <summary>Identity of one uninterrupted back-row placement; face-up changes do not retarget it.</summary>
-public sealed record SpellTrapTarget(PlayerId Player, int Zone, CardInstance Card, long PlacementId)
+public sealed record SpellTrapTarget(PlayerId Player, int Zone, CardInstance Card, long PlacementId, bool IsPendulumZone = false)
 {
+    public FieldSpellTrap? Current(DuelState state) => IsPendulumZone
+        ? state.GetPlayer(Player).PendulumZones[Zone] : state.GetPlayer(Player).SpellTrapFields[Zone];
     public bool IsStillPresent(FieldSpellTrap? current) => current is not null &&
         current.Card == Card && current.PlacementId == PlacementId;
 }

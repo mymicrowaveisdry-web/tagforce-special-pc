@@ -15,6 +15,7 @@ public sealed record TriggerActivation(int Id, TriggerEffectProfile Profile, Mon
     MonsterBinding? Target = null)
 {
     public PlayerId Player => Source.Player;
+    public IReadOnlyList<CardInstance> DetachedCost { get; internal init; } = Array.AsReadOnly(Array.Empty<CardInstance>());
 }
 
 /// <summary>All trigger groups are ordered before either player may add a fast response.</summary>
@@ -53,7 +54,7 @@ public sealed record EffectiveMonsterStatistics(MonsterBinding Monster, int? Att
 public sealed record TriggerUse(PlayerId Player, int Turn, string Key, int? InstanceId, long? PlacementId);
 public sealed record MonsterEffectNegation(string EffectId, MonsterBinding Source, MonsterBinding Target,
     long ResolutionId, int ExpiresOnTurn, int ActionOrdinal = 0);
-public enum TriggerCommitmentKind { DiscardCost, MonsterTarget }
+public enum TriggerCommitmentKind { DiscardCost, MonsterTarget, DetachCost }
 public sealed class PendingTriggerCommitment
 {
     public long DecisionId { get; }

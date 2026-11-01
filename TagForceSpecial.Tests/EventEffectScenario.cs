@@ -117,7 +117,10 @@ internal static class EventEffectScenario
         {
             if (engine.State.EventEffects.PendingCommitment is { } commitment)
             {
-                var command = commitment.Kind == TriggerCommitmentKind.DiscardCost
+                var command = commitment.Kind == TriggerCommitmentKind.DetachCost
+                    ? (DuelCommand)new ChooseTriggerXyzMaterials(commitment.Player, commitment.DecisionId,
+                        commitment.CardOptions.Take(commitment.Trigger.Profile.DetachMaterialCount).Select(c => c.InstanceId))
+                    : commitment.Kind == TriggerCommitmentKind.DiscardCost
                     ? (DuelCommand)new ChooseTriggerCostCard(commitment.Player, commitment.DecisionId, commitment.CardOptions[0].InstanceId)
                     : new ChooseTriggerMonsterTarget(commitment.Player, commitment.DecisionId, commitment.TargetOptions[0].Player,
                         commitment.TargetOptions[0].Zone, commitment.TargetOptions[0].Card.InstanceId);
