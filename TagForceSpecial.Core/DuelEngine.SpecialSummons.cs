@@ -62,12 +62,14 @@ public sealed partial class DuelEngine
     // Callers preflight before committing costs/choices and revalidate against resolution state.
     private DuelState PlaceSpecialSummon(DuelState next, PlayerId playerId, CardInstance card, int zone,
         BattlePosition position, DecisionCardSource source, List<DuelEvent> events, string? procedureId = null,
-        long? attemptId = null, string? properProcedureId = null, bool sourceAlreadyRemoved = false, int? timingGroup = null)
+        long? attemptId = null, string? properProcedureId = null, bool sourceAlreadyRemoved = false, int? timingGroup = null,
+        IReadOnlyList<CardInstance>? xyzMaterials = null)
     {
         var player = next.GetPlayer(playerId);
         if (!sourceAlreadyRemoved) player = RemoveSpecialSource(player, card, source);
         var monsters = player.MonsterZones.ToArray();
         var monster = NewSummonedMonster(next, card, position);
+        if (xyzMaterials is not null) monster = monster with { XyzMaterials = Array.AsReadOnly(xyzMaterials.ToArray()) };
         monsters[zone] = monster;
         events.Add(new MonsterSpecialSummoned(playerId, monster, zone, source, procedureId, attemptId, properProcedureId)
             { TimingGroup = timingGroup });

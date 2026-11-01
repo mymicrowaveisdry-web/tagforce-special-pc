@@ -1,6 +1,6 @@
 # Extra Deck and material movement
 
-This supports explicit generic material procedures and bounded Synchro profiles; tests use authored scenarios. The retained Synchro projection is narrower than full material selection/movement/timing equivalence.
+This supports explicit generic material procedures and bounded Synchro profiles plus Xyz attachments and trigger detach costs; tests use authored scenarios. The retained Synchro projection is narrower than full material selection/movement/timing equivalence.
 
 ## Extra Deck
 
@@ -60,6 +60,21 @@ materials to the Graveyard. Selection, movement and negation use the shared flow
 These authored profiles do not infer Tuner identity from card data. Field-level
 modifiers, multiple Tuners, card-specific material conditions and alternative
 material destinations are unsupported; do not register profiles that need them.
+
+For Xyz, supply `xyz: new XyzMaterialRequirements(rank)` and
+`MaterialDestination.Attached` with two to five materials. Each selected face-up
+non-token must have a printed level equal to the authored rank; registered Xyz
+targets have no level for material checks. `FieldMonster.XyzMaterials` and
+`PendingSummon.XyzMaterials` retain immutable ordered attachments outside field
+zones and Graveyards. Negating the summon or removing the host sends attachments
+to their owners' Graveyards without destruction or field-departure events; revival
+does not restore them. A trigger's `detachMaterialCount` requests
+`ChooseTriggerXyzMaterials` through `PendingTriggerCommitment.CardOptions` before
+responses; paid materials stay detached if the activation/effect is negated.
+This covers trigger costs only, not general ignition/quick effects, attachment
+effects, alternate Xyz procedures, level modifiers or material replacement.
+The rules contract follows [official rulebook v9.0](https://www.yugioh-card.com/eu/wp-content/uploads/2022/07/Rulebook_v9_en.pdf),
+pages 14–15 and 47; Xyz original-game comparisons remain pending.
 
 This standalone procedure does not implement effect-driven Fusion/Ritual selection, opponent-controlled
 materials, tokens, Pendulum hybrid procedures, material replacement,

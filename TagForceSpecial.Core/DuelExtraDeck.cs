@@ -1,6 +1,6 @@
 namespace TagForceSpecial.Core;
 
-public enum MaterialDestination { Graveyard, Banished }
+public enum MaterialDestination { Graveyard, Banished, Attached }
 
 /// <summary>Explicit generic procedure; it does not infer a Synchro, Xyz or other card family.</summary>
 public sealed class ExtraDeckMaterialProcedureProfile
@@ -12,10 +12,11 @@ public sealed class ExtraDeckMaterialProcedureProfile
     public MaterialDestination Destination { get; }
     public bool RequireFaceUp { get; }
     public SynchroMaterialRequirements? Synchro { get; }
+    public XyzMaterialRequirements? Xyz { get; }
 
     public ExtraDeckMaterialProcedureProfile(string procedureId, IEnumerable<uint> targetCardIds,
         IEnumerable<uint> materialCardIds, int materialCount, MaterialDestination destination = MaterialDestination.Graveyard,
-        bool requireFaceUp = true, SynchroMaterialRequirements? synchro = null)
+        bool requireFaceUp = true, SynchroMaterialRequirements? synchro = null, XyzMaterialRequirements? xyz = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(procedureId);
         ArgumentNullException.ThrowIfNull(targetCardIds);
@@ -29,8 +30,11 @@ public sealed class ExtraDeckMaterialProcedureProfile
             materialCount != synchro.MinimumNonTuners + 1 ||
             !materials.Order().SequenceEqual(synchro.TunerCardIds.Concat(synchro.NonTunerCardIds).Order())))
             throw new ArgumentException("Synchro profiles require face-up Graveyard materials, a matching allowlist and minimum count.");
+        if ((destination == MaterialDestination.Attached) != (xyz is not null) ||
+            xyz is not null && (!requireFaceUp || materialCount < 2 || synchro is not null))
+            throw new ArgumentException("Xyz procedures require face-up attachment of two to five materials and no Synchro requirements.");
         ProcedureId = procedureId; TargetCardIds = Array.AsReadOnly(targets); MaterialCardIds = Array.AsReadOnly(materials);
-        MaterialCount = materialCount; Destination = destination; RequireFaceUp = requireFaceUp; Synchro = synchro;
+        MaterialCount = materialCount; Destination = destination; RequireFaceUp = requireFaceUp; Synchro = synchro; Xyz = xyz;
     }
 }
 
