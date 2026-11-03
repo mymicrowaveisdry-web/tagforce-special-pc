@@ -98,6 +98,11 @@ public sealed partial class DuelEngine
             events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.SourceEffectsNegated));
         else switch (link.Operation)
         {
+            case ChainOperation.NormalSpell:
+                next = ResolveNormalSpell(next, link, events);
+                // Defeat is terminal immediately, as in damage calculation. No later link or cleanup executes.
+                if (next.Outcome is not null) return Accept(next, events.ToArray());
+                break;
             case ChainOperation.ActivatePendulumScale: break; // Source already occupies its dedicated zone; never recreate it.
             case ChainOperation.EffectSummon:
             {
