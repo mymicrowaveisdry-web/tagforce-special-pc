@@ -1,3 +1,3 @@
-# PC foundations
+# PC application host
 
-Source/cache validation and immutable deck/collection legality are available through the foundation APIs. The native presentation and interactive importer/editor are later work. Original game data stays private.
+Initial MonoGame presentation provides a logical 480 x 272 canvas, player-authorized choices and a bounded preview duel. Run with `--cache <validated-private-cache>`; source preparation uses the foundation APIs. Original assets and PSP visual fidelity remain incomplete.
