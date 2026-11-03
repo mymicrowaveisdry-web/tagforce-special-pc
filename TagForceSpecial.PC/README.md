@@ -1,3 +1,3 @@
 # PC application host
 
-Initial MonoGame presentation provides a logical 480 x 272 canvas, player-authorized choices and a bounded preview duel. Run with `--cache <validated-private-cache>`; source preparation uses the [foundation APIs](Foundations.md). Original assets and PSP visual fidelity remain incomplete.
+MonoGame presentation uses player-authorized views and the [seeded opponent](../TagForceSpecial.AI/Contract.md). Launch with `--cache <private-cache> --seed 7`; choose one of three supported deck orders. Escape/B pauses/resumes. Native import/editor is later work.
