@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -7,4 +7,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\TagForceSpecial.Assets\TagForceSpecial.Assets.csproj" />
+    <ProjectReference Include="..\TagForceSpecial.Cards\TagForceSpecial.Cards.csproj" />
+    <ProjectReference Include="..\TagForceSpecial.Core\TagForceSpecial.Core.csproj" />
+  </ItemGroup>
 </Project>

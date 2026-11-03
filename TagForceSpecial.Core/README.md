@@ -2,7 +2,8 @@
 
 Immutable two-player state and deterministic commands for draws, turns, eligible Normal/Tribute Summons and sets, positions, basic combat, discards and defeat; [summon profiles](SummonProfiles.md), [Special Summons](SpecialSummons.md), [Extra Deck materials, Synchro and Xyz](ExtraDeck.md), [Fusion/Ritual effects](EffectSummons.md) and [Pendulum](Pendulum.md) use explicit eligibility; card-specific conditions and general token lifecycle remain unsupported.
 
-Gameplay requires explicit metadata; snapshots expose full information. Rendering, visibility filtering, randomness and general card legality remain outside Core.
+Gameplay requires explicit metadata; snapshots expose full information. Rendering, visibility filtering and randomness remain outside Core; card-specific gameplay uses explicit opt-ins.
+`Decks` adds immutable versioned deck/collection models and explicit legality policies; unknown original-era restrictions remain indeterminate ([13B contract](../TagForceSpecial.PC/Foundations.md)).
 
 See the [quick start](../README.md#quick-start).
 

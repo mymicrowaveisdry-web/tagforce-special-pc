@@ -8,6 +8,8 @@ if (args.Length > 0 && args[0] == "research-check") return ResearchValidation.Ru
 if (args.Length > 0 && args[0] == "card-support") return CardSupportInventory.Run(args[1..], Console.Out, Console.Error);
 if (args.Length > 0 && args[0] == "preview-duel") return PreviewDuelScenario.RunCommand(args[1..], Console.Out, Console.Error);
 if (args.Length > 0 && args[0] is "catalog-import" or "catalog-check") return CardCatalogCommands.Run(args[0], args[1..], Console.Out, Console.Error);
+if (args.Length > 0 && args[0] is "source-check" or "cache-create" or "cache-check" or "deck-check" or "foundation-examples")
+    return FoundationCommands.Run(args[0], args[1..], Console.Out, Console.Error);
 
 if (args.Length == 1 && args[0] == "duel-demo") return SyntheticDuelDemo.Run(Console.Out);
 
