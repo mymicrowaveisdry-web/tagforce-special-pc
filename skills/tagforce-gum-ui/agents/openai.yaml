@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tag Force Gum UI"
+  short_description: "Build editable Gum UI for the MonoGame PC host"
+  default_prompt: "Use $tagforce-gum-ui to create or refine editable Gum screens and integrate their controls with the existing MonoGame application."
