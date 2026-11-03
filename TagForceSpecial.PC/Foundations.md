@@ -1,6 +1,6 @@
 # 13A–13B: source/cache and deck foundations
 
-These APIs precede the native setup/editor. The supported input is the exact
+These APIs underpin the [native setup/editor](UsableSetup.md). The supported input is the exact
 user-supplied English v2.1 image recorded below; disc title or disc ID alone does
 not establish compatibility. Other builds/patches and CSO need separate reviewed
 profiles rather than relaxed validation.
@@ -29,7 +29,7 @@ while importing. A final source hash check precedes publication.
 package. It stages mapped raw cardinfo/cardh files and the catalog in a unique
 sibling directory, validates every output, then publishes by directory rename.
 This phase stores the card archive unchanged; texture/audio conversion remains separate.
-Interactive ISO setup is later work. No original executable becomes a runtime
+Interactive ISO setup is provided by `SetupStore`, which generates the input package directly from the ISO. No original executable becomes a runtime
 dependency or cache artifact. Existing caches are not overwritten. Cancellation
 and failure leave no completed destination. Valid caches can be reused without
 reopening the ISO after their trusted profile and artifacts validate.
