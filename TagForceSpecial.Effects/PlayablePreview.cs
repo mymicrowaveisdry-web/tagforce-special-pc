@@ -54,7 +54,7 @@ public static class PlayablePreview
     }
 
     /// <summary>Preview copy limit is three; original banlists and deck editing belong to later stages.</summary>
-    public static DuelEngine CreateEngine(CardCatalog catalog, IEnumerable<uint> first, IEnumerable<uint> second)
+    public static DuelEngine CreateEngine(CardCatalog catalog, IEnumerable<uint> first, IEnumerable<uint> second, bool stagedBattle = false)
     {
         ValidateCatalog(catalog);
         uint[] Deck(IEnumerable<uint> input)
@@ -65,7 +65,8 @@ public static class PlayablePreview
                 throw new ArgumentException("Preview decks need 40–60 cards from the named pool, at most three copies per ID.");
             return deck;
         }
-        return new(catalog, Rules, Deck(first), Deck(second), normalSpellProfiles: Cards.Select(c => c.Spell).OfType<NormalSpellProfile>());
+        return new(catalog, Rules, Deck(first), Deck(second), experimentalBattleFlow: stagedBattle,
+            normalSpellProfiles: Cards.Select(c => c.Spell).OfType<NormalSpellProfile>());
     }
 
     /// <summary>Ordered input for reproducible engine scenarios; the application will supply shuffling later.</summary>

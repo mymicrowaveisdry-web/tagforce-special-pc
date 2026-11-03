@@ -1,4 +1,3 @@
 # Opponent decisions
 
-Placeholder for opponent/tag-partner logic; no AI behavior is implemented.
-Planned opponents select legal actions from the [supported duel subset](../README.md#implemented-scope).
+[Initial opponent](Contract.md): versioned, seeded policy over authorized Core views and revision-bound legal actions, with bounded stepping and semantic replays. Supports the 14-card preview pool; original-character/tag AI fidelity remains separate.

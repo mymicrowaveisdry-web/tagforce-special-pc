@@ -1,5 +1,6 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using System.Text.Json;
 using TagForceSpecial.Effects;
 using TagForceSpecial.PC.DuelUI;
 using TagForceSpecial.PC.DuelUI.Input;
@@ -9,7 +10,7 @@ using TagForceSpecial.PC.Screens;
 
 namespace TagForceSpecial.PC.Game;
 
-public enum ScreenId { Title, MainMenu, DeckSelection, Setup, Duel, Result, Controls }
+public enum ScreenId { Title, MainMenu, DeckSelection, Setup, Duel, Result, Controls, Paused }
 
 public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
 {
@@ -22,7 +23,7 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
     private DuelController? duel;
     private ScreenId screen;
     private int menuIndex, choiceIndex, inspectIndex = -1, smokeCommands, frames;
-    private bool captured;
+    private bool captured, capturedResult, savedReplay, smokeFinished;
     private double opponentAt;
     private string setupMessage = "Local game data is required to start a duel.";
 
@@ -49,7 +50,7 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
         presenter = new(GraphicsDevice);
         canvas = new(GraphicsDevice, PspViewport.Width, PspViewport.Height, false,
             SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
-        if (options.Smoke && !StartDuel(0)) throw new InvalidOperationException(setupMessage);
+        if (options.Smoke && !StartDuel(options.DeckVariant)) throw new InvalidOperationException(setupMessage);
     }
 
     private bool StartDuel(int variant)
@@ -68,17 +69,7 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
             screen = ScreenId.Setup;
             return false;
         }
-        try
-        {
-            var first = InitialDeckPolicy.Example();
-            if (variant == 1) first = new(first.DeckId, first.Revision, first.OwnerId, first.CatalogId,
-                first.CatalogRevision, first.SourceBuild, first.PolicyId, first.PolicyRevision, first.Main.Reverse());
-            var selection = TagForceSpecial.PC.Decks.SelectedDecks.Validate(cache, InitialDeckPolicy.Create(),
-                first, InitialDeckPolicy.ExampleCollection(), InitialDeckPolicy.Example("local-opponent"),
-                InitialDeckPolicy.ExampleCollection("local-opponent"));
-            if (selection.Selection is not { } decks) throw new InvalidDataException("Deck selection is not valid.");
-            duel = new(PlayablePreview.CreateEngine(cache.Catalog.Catalog, decks.First.Main, decks.Second.Main), cache.Catalog.Catalog);
-        }
+        try { duel = SupportedDuelFactory.Create(cache, variant, options.Seed); }
         catch (InvalidDataException error)
         {
             setupMessage = error.Message;
@@ -107,21 +98,41 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
                     if (!moved || smokeCommands > 6000)
                         throw new InvalidOperationException($"GUI smoke stalled at revision {duel.View.Revision}: {duel.Notice}");
                 }
-            if (duel?.View.Outcome is { } outcome)
+            if (!smokeFinished && duel?.View.Outcome is { } outcome)
             {
-                Console.WriteLine($"GUI_SMOKE completed commands={smokeCommands} winner={outcome.Winner} reason={outcome.Reason}");
-                Exit();
+                smokeFinished = true;
+                screen = ScreenId.Result;
+                Console.WriteLine($"GUI_SMOKE completed commands={smokeCommands} frames={frames} winner={outcome.Winner} reason={outcome.Reason} policy={AI.DeterministicPolicy.Version} seed={options.Seed}");
             }
             return;
         }
         if (buttons.Back)
         {
+            if (screen == ScreenId.Duel && duel is not null)
+            {
+                duel.Paused = true; screen = ScreenId.Paused; menuIndex = 0; return;
+            }
+            if (screen == ScreenId.Paused && duel is not null)
+            {
+                duel.Paused = false; screen = ScreenId.Duel; opponentAt = gameTime.TotalGameTime.TotalSeconds + .35; return;
+            }
             screen = screen == ScreenId.MainMenu ? ScreenId.Title : ScreenId.MainMenu;
             menuIndex = 0;
             return;
         }
         switch (screen)
         {
+            case ScreenId.Paused:
+                MoveMenu(buttons, 2);
+                if (buttons.Confirm)
+                {
+                    if (menuIndex == 0 && duel is not null)
+                    {
+                        duel.Paused = false; screen = ScreenId.Duel; opponentAt = gameTime.TotalGameTime.TotalSeconds + .35;
+                    }
+                    else { duel = null; screen = ScreenId.MainMenu; menuIndex = 0; }
+                }
+                break;
             case ScreenId.Title:
                 if (buttons.Confirm) screen = ScreenId.MainMenu;
                 break;
@@ -135,7 +146,7 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
                 }
                 break;
             case ScreenId.DeckSelection:
-                MoveMenu(buttons, 2);
+                MoveMenu(buttons, InitialOpponentDecks.Names.Count);
                 if (buttons.Confirm) StartDuel(menuIndex);
                 break;
             case ScreenId.Duel when duel is not null:
@@ -155,7 +166,7 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
                 if (buttons.Inspect) inspectIndex++;
                 if (IsActive && gameTime.TotalGameTime.TotalSeconds >= opponentAt)
                 {
-                    if (duel.StepOpponent()) choiceIndex = 0;
+                    if (!duel.OpponentStopped && duel.StepOpponent()) choiceIndex = 0;
                     opponentAt = gameTime.TotalGameTime.TotalSeconds + .35;
                 }
                 if (duel.View.Outcome is not null) screen = ScreenId.Result;
@@ -202,6 +213,24 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
             Console.WriteLine("GUI_CAPTURE logical=480x272");
             if (!options.Smoke) Exit();
         }
+        if (screen == ScreenId.Result && duel is not null)
+        {
+            if (!capturedResult && options.ResultCapturePath is { } resultPath)
+            {
+                using var output = new FileStream(resultPath, FileMode.CreateNew, FileAccess.Write);
+                canvas.SaveAsPng(output, 480, 272);
+                capturedResult = true;
+            }
+            if (!savedReplay && options.ReplayPath is { } replayPath)
+            {
+                using var output = new FileStream(replayPath, FileMode.CreateNew, FileAccess.Write);
+                var replay = duel.ExportReplay(InitialOpponentDecks.ManifestId);
+                JsonSerializer.Serialize(output, replay, new JsonSerializerOptions { WriteIndented = true });
+                savedReplay = true;
+                Console.WriteLine($"GUI_REPLAY commands={replay.Steps.Count} digest={replay.CommandDigest()}");
+            }
+        }
+        if (smokeFinished) Exit();
         base.Draw(gameTime);
     }
 
@@ -225,8 +254,12 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
                 break;
             case ScreenId.DeckSelection:
                 renderer.Text("SUPPORTED DECK / 40 CARDS", 48, 109, gold);
-                Menu(["INITIAL PREVIEW", "INITIAL PREVIEW / REVERSE ORDER"], 132);
-                renderer.Wrapped("14 supported IDs. Ordered decks and an authored local collection.", 48, 211, 59, 3, muted);
+                Menu(InitialOpponentDecks.Names.ToArray(), 132);
+                renderer.Wrapped($"14 supported IDs. Opponent seed {options.Seed}. Ordered decks and an authored local collection.", 48, 211, 59, 3, muted);
+                break;
+            case ScreenId.Paused:
+                renderer.Text("DUEL PAUSED", 48, 108, gold);
+                Menu(["RESUME", "END DUEL"], 135);
                 break;
             case ScreenId.Setup:
                 renderer.Text("LOCAL DATA REQUIRED", 48, 109, gold);
