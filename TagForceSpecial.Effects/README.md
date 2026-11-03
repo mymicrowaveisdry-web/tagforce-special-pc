@@ -1,6 +1,6 @@
 # Card effects
 
-Default-off research profiles; none provides full card support.
+[`PlayablePreview`](PlayablePreview.cs) defines the tested 14-card [Stage 10B pool](Preview.md); the default-off research profiles below remain partial.
 
 | Profiles | Scope |
 | --- | --- |

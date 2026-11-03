@@ -9,6 +9,9 @@ dotnet run --project TagForceSpecial.Tools --no-build -- duel-demo
 `ehp-list`, `card-images-list`, `cardinfo-list`, `card-details` and `card-catalog`
 inspect local inputs and emit JSON. `CardCatalogImporter` validates PSP encoding
 before creating a format-independent catalog; authored cards use the Cards API directly.
+`catalog-import <file> <min> <max> <new-directory>` stores a versioned local package;
+`catalog-check <directory>` validates it. `card-support` emits per-source support
+manifests; `preview-duel` accepts either a package directory or the file/ID-range arguments.
 
 Legacy `progress` and `research-check` require ignored research configs, evidence
 and the former documentation layout. They are outside the clean-checkout workflow.

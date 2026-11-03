@@ -33,7 +33,8 @@ public static class CardCatalogImporter
             source.Position = 0;
             if (Convert.ToHexStringLower(SHA256.HashData(source)) != before)
                 throw new InvalidDataException("Source changed during import.");
-            return new(new(before, "tfsp-main-8087681f-stage4c-v1"), cards);
+            var catalog = new CardCatalog(new(before, "tfsp-main-8087681f-stage4c-v1"), cards);
+            return before == TfspCardMetadata.CardInfoSha256 ? TfspCardMetadata.Apply(catalog) : catalog;
         }
         finally { source.Position = original; }
     }

@@ -6,4 +6,11 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <!-- User-imported original data stays local and is never copied or packed by this library. -->
+  <ItemGroup>
+    <None Remove="Data\**\*" />
+    <Content Remove="Data\**\*" />
+    <EmbeddedResource Remove="Data\**\*" />
+  </ItemGroup>
+
 </Project>
