@@ -34,7 +34,7 @@ Targets bind controller, slot, instance and placement; paid costs remain paid.
 
 Two consecutive passes close a window; `ResolveNextChainLink` resolves in reverse order.
 
-Operations include destruction, scoped token creation and activation/effect negation. Missing bound targets skip destruction; cleanup handles surviving sources once.
+Operations include destruction, scoped token creation, activation/effect negation and explicit `normalSpellProfiles` for targetless recovery/damage (`ActivateSpell` or `ActivateSetSpell` in Main1/Main2). Missing bound targets skip destruction; cleanup handles surviving sources once.
 
 Responses require declared speed and earlier-turn sets. Broader timing/card legality is unsupported.
 
