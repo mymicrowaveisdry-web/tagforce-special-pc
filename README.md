@@ -1,11 +1,11 @@
 # Yu-Gi-Oh! ARC-V Tag Force Special PC
 
 C# reconstruction for native PC play, with extensible cards as a long-term goal.
-**Early engine development:** the PC host is a placeholder; game assets are not bundled.
+**Initial playable slice:** the MonoGame host supports a 14-card pool against a seeded opponent; game assets are not bundled.
 
 ## Quick start
 
-Requires .NET 10 SDK. These commands use synthetic inputs only.
+Requires .NET 10 SDK. Tests/demo use synthetic inputs; the [PC GUI](TagForceSpecial.PC/README.md) needs a validated private cache.
 
 ```powershell
 dotnet restore ygo-tag-force-special-decomp.slnx -p:RestorePackagesWithLockFile=false
@@ -21,8 +21,7 @@ dotnet run --project TagForceSpecial.Tools --no-build -- duel-demo
 - Experimental triggers, continuous stats/negation, staged battle and attack replays.
 - Immutable catalogs with authored cards and preserved import provenance.
 
-General card effects, shuffle, opponent AI, rendering, input and asset setup remain unfinished.
-Next milestone: a supported playable duel with private-information views and a win/loss flow.
+General card effects, shuffle, original texture/font/audio conversion and PSP screen matching remain unfinished; native setup/editor prepares supported decks and [opponent acceptance](TagForceSpecial.AI/Contract.md) covers their win/loss flow.
 
 ## Validation and research
 
@@ -39,7 +38,7 @@ new Stage 6–8 timing comparisons remain deferred. Synthetic tests do not estab
 | [Cards](TagForceSpecial.Cards/README.md) | Immutable card catalog |
 | [Core](TagForceSpecial.Core/README.md) | Duel state, commands and experimental contracts |
 | [Effects](TagForceSpecial.Effects/README.md) | Bounded card research profiles |
-| [AI](TagForceSpecial.AI/README.md) | Opponent logic placeholder |
-| [PC](TagForceSpecial.PC/README.md) | Application host placeholder |
+| [AI](TagForceSpecial.AI/README.md) | Seeded policy, bounded stepping and replays |
+| [PC](TagForceSpecial.PC/README.md) | MonoGame host with authorized player views |
 | [Tools](TagForceSpecial.Tools/README.md) | Demo, imports and local research commands |
 | `TagForceSpecial.Tests` | Synthetic and optional PSP reference tests |

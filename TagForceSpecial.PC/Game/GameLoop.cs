@@ -10,7 +10,7 @@ using TagForceSpecial.PC.Screens;
 
 namespace TagForceSpecial.PC.Game;
 
-public enum ScreenId { Title, MainMenu, DeckSelection, Setup, Duel, Result, Controls, Paused }
+public enum ScreenId { Title, MainMenu, DeckSelection, Setup, Duel, Result, Controls, Paused, DeckEditor, SavedDecks, Preferences }
 
 public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
 {
@@ -50,26 +50,27 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
         presenter = new(GraphicsDevice);
         canvas = new(GraphicsDevice, PspViewport.Width, PspViewport.Height, false,
             SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
-        if (options.Smoke && !StartDuel(options.DeckVariant)) throw new InvalidOperationException(setupMessage);
+        InitializeSetup();
+        if (options.Smoke && !SetupAutomation && !StartDuel(options.DeckVariant)) throw new InvalidOperationException(setupMessage);
     }
 
     private bool StartDuel(int variant)
     {
-        if (options.CachePath is null)
+        if (options.CachePath is null && setup?.Cache is null)
         {
-            setupMessage = "Launch with --cache pointing to your validated private cache.";
+            setupMessage = "Select your original ISO in Local Game Setup, then prepare a deck.";
             screen = ScreenId.Setup;
             return false;
         }
-        var validation = GameCache.Validate(options.CachePath);
-        var cache = validation.Cache;
+        var validation = options.CachePath is null ? null : GameCache.Validate(options.CachePath);
+        var cache = validation?.Cache ?? (options.CachePath is null ? setup?.Cache : null);
         if (cache is null)
         {
             setupMessage = "Game data could not be verified. Rebuild it in Local Game Setup.";
             screen = ScreenId.Setup;
             return false;
         }
-        try { duel = SupportedDuelFactory.Create(cache, variant, options.Seed); }
+        try { duel = SupportedDuelFactory.Create(cache, variant, CurrentSeed); }
         catch (InvalidDataException error)
         {
             setupMessage = error.Message;
@@ -84,9 +85,12 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
 
     protected override void Update(GameTime gameTime)
     {
+        PollSetupTask();
         var buttons = input.Poll(IsActive);
         if (options.Smoke)
         {
+            RunSetupSmoke();
+            if (duel is null && SetupAutomation) return;
             // Runs the actual window/render path and the same controller used by interactive play.
             // The human path chooses the first offered action; the opponent uses its seeded policy.
             if (frames > 1 && duel is not null)
@@ -102,7 +106,24 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
             {
                 smokeFinished = true;
                 screen = ScreenId.Result;
-                Console.WriteLine($"GUI_SMOKE completed commands={smokeCommands} frames={frames} winner={outcome.Winner} reason={outcome.Reason} policy={AI.DeterministicPolicy.Version} seed={options.Seed}");
+                Console.WriteLine($"GUI_SMOKE completed commands={smokeCommands} frames={frames} winner={outcome.Winner} reason={outcome.Reason} policy={AI.DeterministicPolicy.Version} seed={CurrentSeed}");
+            }
+            return;
+        }
+        if (screen is ScreenId.Setup or ScreenId.DeckEditor or ScreenId.SavedDecks or ScreenId.Preferences)
+        {
+            try
+            {
+                if (screen == ScreenId.Setup) UpdateSetupScreen(buttons);
+                else if (screen == ScreenId.DeckEditor) UpdateEditor(buttons);
+                else if (screen == ScreenId.SavedDecks) UpdateSavedDecks(buttons);
+                else UpdatePreferences(buttons);
+            }
+            catch (Exception e) when (Setup.SetupStore.Recoverable(e))
+            {
+                editorNotice = "The operation could not finish. Check storage and retry.";
+                if (screen == ScreenId.Preferences) preferencesNotice = "Preferences were not saved. Check access and free space.";
+                if (screen == ScreenId.SavedDecks) screen = ScreenId.DeckEditor;
             }
             return;
         }
@@ -137,11 +158,18 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
                 if (buttons.Confirm) screen = ScreenId.MainMenu;
                 break;
             case ScreenId.MainMenu:
-                MoveMenu(buttons, 3);
+                MoveMenu(buttons, 6);
                 if (buttons.Confirm)
                 {
-                    if (menuIndex == 2) Exit();
-                    else screen = menuIndex == 0 ? ScreenId.DeckSelection : ScreenId.Controls;
+                    switch (menuIndex)
+                    {
+                        case 0: OpenEditor(); break;
+                        case 1: screen = ScreenId.DeckSelection; break;
+                        case 2: screen = ScreenId.Setup; break;
+                        case 3: screen = ScreenId.Preferences; break;
+                        case 4: screen = ScreenId.Controls; break;
+                        case 5: Exit(); break;
+                    }
                     menuIndex = 0;
                 }
                 break;
@@ -174,7 +202,8 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
             case ScreenId.Result:
                 if (buttons.Confirm)
                 {
-                    screen = ScreenId.DeckSelection; menuIndex = 0;
+                    if (setup?.Cache is not null) OpenEditor();
+                    else { screen = ScreenId.DeckSelection; menuIndex = 0; }
                 }
                 break;
         }
@@ -200,11 +229,12 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
         GraphicsDevice.SetRenderTarget(null);
         GraphicsDevice.Clear(Color.Black);
         var target = PspViewport.Fit(GraphicsDevice.PresentationParameters.BackBufferWidth,
-            GraphicsDevice.PresentationParameters.BackBufferHeight, options.PixelExact);
+            GraphicsDevice.PresentationParameters.BackBufferHeight, options.PixelExact || setup?.Preferences.IntegerScaling == true);
         presenter.Begin(samplerState: SamplerState.PointClamp);
         presenter.Draw(canvas, new Rectangle(target.X, target.Y, target.Width, target.Height), Color.White);
         presenter.End();
         frames++;
+        CaptureEditor();
         if (!captured && options.CapturePath is { } path)
         {
             using var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write);
@@ -236,6 +266,9 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
 
     private void DrawMenu()
     {
+        if (screen == ScreenId.Setup) { DrawSetupScreen(); return; }
+        if (screen == ScreenId.DeckEditor) { DrawEditor(); return; }
+        if (screen is ScreenId.SavedDecks or ScreenId.Preferences) { DrawSetupLists(); return; }
         var gold = new Color(238, 196, 104);
         var muted = new Color(143, 162, 187);
         for (int i = 0; i < 8; i++)
@@ -250,7 +283,7 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
                 renderer.Text("PRESS ENTER / A", 48, 195);
                 break;
             case ScreenId.MainMenu:
-                Menu(["DUEL", "CONTROLS", "EXIT"]);
+                Menu(["DECKS", "QUICK DUEL", "LOCAL GAME SETUP", "PREFERENCES", "CONTROLS", "EXIT"], 100);
                 break;
             case ScreenId.DeckSelection:
                 renderer.Text("SUPPORTED DECK / 40 CARDS", 48, 109, gold);
@@ -288,6 +321,7 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
 
     protected override void UnloadContent()
     {
+        importCancellation?.Cancel();
         canvas.Dispose();
         renderer.Dispose();
         presenter.Dispose();
