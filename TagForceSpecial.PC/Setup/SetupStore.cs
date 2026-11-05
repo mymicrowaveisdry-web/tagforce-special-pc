@@ -16,6 +16,7 @@ public sealed class SetupStore
     public ValidatedGameCache? Cache { get; private set; }
     public SetupIssue? Issue { get; private set; }
     public ResourceIndex? Resources { get; private set; }
+    public string? PresentationNotice { get; private set; }
     private bool preferencesAccepted = true;
     public SetupStore(string root)
     {
@@ -139,6 +140,11 @@ public sealed class SetupStore
             // The old generation is retained. Only a completely validated generation becomes active.
             SavePreferences(Preferences with { ActiveGeneration = generation, SourcePath = Path.GetFullPath(sourcePath) });
             Cache = result.Cache; Resources = resources; Issue = null;
+            progress?.Report(new(95, "Preparing original title artwork"));
+            PresentationNotice = null;
+            try { TitlePresentationImport.Ensure(source, Storage); }
+            catch (Exception e) when (Recoverable(e))
+            { PresentationNotice = "Game data is ready; original title artwork could not be prepared. Retry setup to rebuild it."; }
             progress?.Report(new(100, "Import complete. You can prepare a supported deck."));
             return new(true);
         }
