@@ -2,7 +2,8 @@
 
 Immutable two-player state and deterministic commands for draws, turns, eligible Normal/Tribute Summons and sets, positions, basic combat, discards and defeat; [summon profiles](SummonProfiles.md), [Special Summons](SpecialSummons.md), [Extra Deck materials, Synchro and Xyz](ExtraDeck.md), [Fusion/Ritual effects](EffectSummons.md) and [Pendulum](Pendulum.md) use explicit eligibility; card-specific conditions and general token lifecycle remain unsupported.
 
-Gameplay requires explicit metadata; snapshots expose full information. Rendering, visibility filtering, randomness and general card legality remain outside Core.
+Gameplay requires explicit metadata; snapshots expose full information. Rendering, visibility filtering and randomness remain outside Core; card-specific gameplay uses explicit opt-ins.
+`Decks` adds immutable versioned deck/collection models and explicit legality policies; unknown original-era restrictions remain indeterminate.
 
 See the [quick start](../README.md#quick-start).
 
@@ -34,7 +35,7 @@ Targets bind controller, slot, instance and placement; paid costs remain paid.
 
 Two consecutive passes close a window; `ResolveNextChainLink` resolves in reverse order.
 
-Operations include destruction, scoped token creation and activation/effect negation. Missing bound targets skip destruction; cleanup handles surviving sources once.
+Operations include destruction, scoped token creation, activation/effect negation and explicit `normalSpellProfiles` for targetless recovery/damage (`ActivateSpell` or `ActivateSetSpell` in Main1/Main2). Missing bound targets skip destruction; cleanup handles surviving sources once.
 
 Responses require declared speed and earlier-turn sets. Broader timing/card legality is unsupported.
 

@@ -1,7 +1,23 @@
+using TagForceSpecial.PC.Game;
+
 namespace TagForceSpecial.PC;
 
-// Native presentation is a later stage; no game is launched by this placeholder host.
 internal static class PcHost
 {
-    public static int Main() => 0;
+    [STAThread]
+    public static int Main(string[] args)
+    {
+        try
+        {
+            using var game = new GameLoop(HostOptions.Parse(args));
+            game.Run();
+            return 0;
+        }
+        catch (Exception error) when (error is ArgumentException or IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine(error is IOException or UnauthorizedAccessException
+                ? "Local application data could not be accessed. Check storage access and free space." : error.Message);
+            return 1;
+        }
+    }
 }

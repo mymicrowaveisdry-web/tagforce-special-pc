@@ -5,6 +5,12 @@ using TagForceSpecial.Tools;
 
 if (args.Length > 0 && args[0] == "progress") return ProjectProgress.Run(args[1..], Console.Out, Console.Error);
 if (args.Length > 0 && args[0] == "research-check") return ResearchValidation.Run(args[1..], Console.Out, Console.Error);
+if (args.Length > 0 && args[0] == "card-support") return CardSupportInventory.Run(args[1..], Console.Out, Console.Error);
+if (args.Length > 0 && args[0] == "preview-duel") return PreviewDuelScenario.RunCommand(args[1..], Console.Out, Console.Error);
+if (args.Length > 0 && args[0] == "opponent-acceptance") return OpponentAcceptance.Run(args[1..], Console.Out, Console.Error);
+if (args.Length > 0 && args[0] is "catalog-import" or "catalog-check") return CardCatalogCommands.Run(args[0], args[1..], Console.Out, Console.Error);
+if (args.Length > 0 && args[0] is "source-check" or "cache-create" or "cache-check" or "deck-check" or "foundation-examples")
+    return FoundationCommands.Run(args[0], args[1..], Console.Out, Console.Error);
 
 if (args.Length == 1 && args[0] == "duel-demo") return SyntheticDuelDemo.Run(Console.Out);
 
@@ -17,6 +23,9 @@ if (!valid)
     Console.Error.WriteLine("Usage: TagForceSpecial.Tools ehp-list|card-images-list <file>\n" +
         "       TagForceSpecial.Tools cardinfo-list|card-details|card-catalog <cardinfo.ehp> <minimum-card-id> <maximum-card-id>\n" +
         "       TagForceSpecial.Tools duel-demo (invented cards; no ISO required)\n" +
+        "       TagForceSpecial.Tools card-support|preview-duel <cardinfo.ehp> <minimum-card-id> <maximum-card-id>\n" +
+        "       TagForceSpecial.Tools catalog-import <cardinfo.ehp> <minimum-card-id> <maximum-card-id> <new-package-directory>\n" +
+        "       TagForceSpecial.Tools catalog-check <package-directory>\n" +
         "       TagForceSpecial.Tools progress [--check | --test-results <run.trx>]\n" +
         "Read-only JSON output; cardinfo ID range must come from an inspected image index.");
     return 2;

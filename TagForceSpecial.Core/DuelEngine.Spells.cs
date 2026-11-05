@@ -9,6 +9,7 @@ public sealed partial class DuelEngine
         var player = State.GetPlayer(State.ActivePlayer);
         var card = player.Hand.SingleOrDefault(c => c.InstanceId == instanceId);
         if (card is null) return Reject(DuelError.CardNotInHand);
+        if (normalSpells.TryGetValue(card.GameCardId, out var normal)) return ActivateNormalSpell(card, zone, normal);
         if (summonEffects.TryGetValue(card.GameCardId, out var summon)) return ActivateSummonEffect(card, zone, summon);
         if (State.Phase != DuelPhase.Main1) return Reject(DuelError.WrongPhase);
         if (activationContracts.TryGetValue(card.GameCardId, out var contract)) return ActivateContract(card, zone, contract);

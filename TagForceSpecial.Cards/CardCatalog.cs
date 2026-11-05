@@ -5,7 +5,7 @@ namespace TagForceSpecial.Cards;
 /// <summary>Catalog identity, independent of a source file's packed ID or external database ID.</summary>
 public sealed record CardDefinition(uint GameCardId, string Name, string Description,
     CardStatistics Statistics, CardNumericCodes? Codes = null, CardSourceRow? SourceRow = null,
-    CardDataSource? Source = null);
+    CardDataSource? Source = null, CardKind Kind = CardKind.Unknown, CardEffectBinding? Effects = null);
 
 /// <summary>Nonnegative printed stats; null represents an unresolved/variable value.</summary>
 public sealed record CardStatistics(int? Attack, int? Defense, uint Level);
@@ -44,11 +44,14 @@ public sealed class CardCatalog
             if (string.IsNullOrWhiteSpace(card.Name) || card.Description is null ||
                 card.Statistics is null)
                 throw new ArgumentException("Card fields are required.", nameof(cards));
+            if (!Enum.IsDefined(card.Kind))
+                throw new ArgumentException("Unknown card classification value.", nameof(cards));
             var stats = card.Statistics;
             if (stats.Attack is < 0 || stats.Defense is < 0)
                 throw new ArgumentException("Printed statistics must be nonnegative or variable.", nameof(cards));
         }
-        var normalized = snapshot.Select(card => card with { Source = card.Source is { } origin ? NormalizeSource(origin) : Source })
+        var normalized = snapshot.Select(card => card with
+            { Source = card.Source is { } origin ? NormalizeSource(origin) : Source, Effects = card.Effects ?? CardEffectBinding.Unknown })
             .OrderBy(card => card.GameCardId).ToArray();
         Cards = Array.AsReadOnly(normalized);
         byId = normalized.ToFrozenDictionary(c => c.GameCardId);
