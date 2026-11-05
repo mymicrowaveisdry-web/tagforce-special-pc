@@ -31,5 +31,5 @@ revision, locale, source build/decoder and content SHA-256. Checksums detect
 corruption, not authenticity. Other imports require explicit `catalog-id revision locale`
 arguments; `Merge` rejects collisions rather than replacing a version implicitly.
 Original data stays in ignored `Data/Local`, excluded
-from build/publish/pack content; a later step will import each user's own lawfully
+from build/publish/pack content; the PC setup imports each user's own lawfully
 acquired ISO locally. Original assets/catalogs are not bundled without permission.
