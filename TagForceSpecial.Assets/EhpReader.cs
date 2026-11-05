@@ -6,6 +6,15 @@ namespace TagForceSpecial.Assets;
 public sealed record EhpEntry(int Index, string Name, long InfoOffset, long Offset, long Length);
 public sealed record EhpIndex(uint Version, long DeclaredLength, uint Marker,
     IReadOnlyList<EhpEntry> Entries, IReadOnlyList<string> Diagnostics);
+public sealed record EhpInspection(EhpIndex BoundedIndex, IReadOnlyList<EhpEntry> RejectedEntries);
+
+public enum EhpReadMode
+{
+    Strict,
+    // Reports header mismatches and payload overlaps; still enforces actual file bounds.
+    // Inspection does not establish source integrity or member usability.
+    InspectStoredRanges
+}
 
 /// <summary>Read-only EHP v3 index reader for ASCII names. Ranges describe stored bytes.</summary>
 public sealed class EhpReader
@@ -13,9 +22,19 @@ public sealed class EhpReader
     public const int MaximumEntries = 100_000;
     public const int MaximumNameBytes = 1024;
 
-    public EhpIndex ReadIndex(Stream source)
+    public EhpIndex ReadIndex(Stream source, EhpReadMode readMode = EhpReadMode.Strict)
+        => ReadCore(source, readMode, allowRejectedPayloads: false).BoundedIndex;
+
+    /// <summary>Research-only subset inspection. Invalid declared payloads are reported, never clipped.
+    /// Header/name/table corruption still rejects the inspection. Does not certify a complete archive.</summary>
+    public EhpInspection InspectBoundedMembers(Stream source)
+        => ReadCore(source, EhpReadMode.InspectStoredRanges, allowRejectedPayloads: true);
+
+    private EhpInspection ReadCore(Stream source, EhpReadMode readMode, bool allowRejectedPayloads)
     {
         ArgumentNullException.ThrowIfNull(source);
+        if (!Enum.IsDefined(readMode))
+            throw new ArgumentOutOfRangeException(nameof(readMode));
         if (!source.CanRead || !source.CanSeek)
             throw new ArgumentException("A readable, seekable stream is required.", nameof(source));
         long originalPosition = source.Position;
@@ -31,7 +50,8 @@ public sealed class EhpReader
             long declared = BinaryPrimitives.ReadUInt32LittleEndian(header[4..]);
             uint marker = BinaryPrimitives.ReadUInt32LittleEndian(header[8..]);
             uint count = BinaryPrimitives.ReadUInt32LittleEndian(header[12..]);
-            Require(declared == length, $"Declared length {declared} differs from actual length {length}.");
+            if (readMode == EhpReadMode.Strict)
+                Require(declared == length, $"Declared length {declared} differs from actual length {length}.");
             Require(count <= MaximumEntries, "Entry count exceeds the inspection limit.");
             long tableEnd = 16L + count * 8L;
             Range(16, count * 8L, length, "Entry table");
@@ -49,9 +69,13 @@ public sealed class EhpReader
                 firstData = Math.Min(firstData, data);
             }
             var entries = new List<EhpEntry>(pointers.Length);
+            var rejected = new List<EhpEntry>();
             var metadataRanges = new List<(long Start, long End)>(pointers.Length);
             var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var diagnostics = new List<string>();
+            if (declared != length)
+                diagnostics.Add($"Declared length {declared} differs from actual length {length}; " +
+                    "explicit inspection uses actual file bounds. Header semantics and source integrity are not verified by this reader.");
             if (marker != 0x20544f4e)
                 diagnostics.Add($"Secondary marker 0x{marker:x8} differs from NOT; preserved as uninterpreted metadata.");
             Span<byte> sizeBuffer = stackalloc byte[4];
@@ -79,16 +103,33 @@ public sealed class EhpReader
                 Range(source.Position, 4, firstData, $"Entry {i} size metadata");
                 source.ReadExactly(sizeBuffer);
                 long storedLength = BinaryPrimitives.ReadUInt32LittleEndian(sizeBuffer);
-                Range(data, storedLength, length, $"Entry {i} payload");
                 metadataRanges.Add((info, source.Position));
-                entries.Add(new EhpEntry(i, name, info, data, storedLength));
+                var entry = new EhpEntry(i, name, info, data, storedLength);
+                if (allowRejectedPayloads && storedLength > length - data)
+                {
+                    rejected.Add(entry);
+                    diagnostics.Add($"Entry {i} declared payload exceeds actual file bounds; rejected without clipping.");
+                    continue;
+                }
+                Range(data, storedLength, length, $"Entry {i} payload");
+                entries.Add(entry);
                 if (data % 16 != 0)
                     diagnostics.Add($"Entry {i} payload offset is not 16-byte aligned; no alignment assumption applied.");
             }
             RejectOverlaps(metadataRanges, "Metadata records overlap.");
-            RejectOverlaps(entries.Where(e => e.Length > 0).Select(e => (e.Offset, e.Offset + e.Length)),
-                "Payload ranges overlap; shared/aliased entries are unsupported.");
-            return new EhpIndex(3, declared, marker, entries.AsReadOnly(), diagnostics.AsReadOnly());
+            long payloadEnd = -1;
+            foreach (var entry in entries.Where(e => e.Length > 0).OrderBy(e => e.Offset))
+            {
+                if (entry.Offset < payloadEnd)
+                {
+                    Require(readMode == EhpReadMode.InspectStoredRanges,
+                        "Payload ranges overlap; shared/aliased entries are unsupported.");
+                    diagnostics.Add($"Entry {entry.Index} payload overlaps another declared payload range; " +
+                        "stored bytes are inspectable, member usability is unverified.");
+                }
+                payloadEnd = Math.Max(payloadEnd, entry.Offset + entry.Length);
+            }
+            return new(new EhpIndex(3, declared, marker, entries.AsReadOnly(), diagnostics.AsReadOnly()), rejected.AsReadOnly());
         }
         catch (EndOfStreamException error)
         {
