@@ -1,0 +1,76 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ComponentSave xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Name>OriginalScrollBar</Name>
+  <BaseType>Container</BaseType>
+  <State>
+    <Name>Default</Name>
+    <Variable Type="float" Name="Width" SetsValue="true">
+      <Value xsi:type="xsd:float">6</Value>
+    </Variable>
+    <Variable Type="float" Name="Height" SetsValue="true">
+      <Value xsi:type="xsd:float">96</Value>
+    </Variable>
+    <Variable Type="float" Name="Track.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Track.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Track.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">6</Value>
+    </Variable>
+    <Variable Type="float" Name="Track.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">96</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Track.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Track.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Track.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Track.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Track.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Track.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Thumb.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Thumb.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Thumb.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">6</Value>
+    </Variable>
+    <Variable Type="float" Name="Thumb.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">16</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Thumb.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Thumb.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Thumb.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Thumb.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Thumb.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Thumb.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+  </State>
+  <Instance Name="Track" BaseType="Rectangle" />
+  <Instance Name="Thumb" BaseType="Rectangle" />
+</ComponentSave>

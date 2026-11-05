@@ -1,0 +1,47 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ScreenSave xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Name>OriginalTitleFlow</Name>
+  <State>
+    <Name>Default</Name>
+    <Variable Type="DimensionUnitType" Name="FlowFrame.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="FlowFrame.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="FlowFrame.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="FlowFrame.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="FlowFrame.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="FlowFrame.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="FlowFrame.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">480</Value>
+    </Variable>
+    <Variable Type="float" Name="FlowFrame.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">272</Value>
+    </Variable>
+    <Variable Type="TextureAddress" Name="FlowFrame.TextureAddress" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="FlowFrame.TextureLeft" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="FlowFrame.TextureTop" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="FlowFrame.TextureWidth" SetsValue="true">
+      <Value xsi:type="xsd:int">480</Value>
+    </Variable>
+    <Variable Type="int" Name="FlowFrame.TextureHeight" SetsValue="true">
+      <Value xsi:type="xsd:int">272</Value>
+    </Variable>
+  </State>
+  <Instance Name="FlowFrame" BaseType="Sprite" />
+</ScreenSave>

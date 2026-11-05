@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<GumProjectSave xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <CustomProperties />
+  <FontRanges>32-126,160-255</FontRanges>
+  <FontSpacingVertical>1</FontSpacingVertical>
+  <FontSpacingHorizontal>1</FontSpacingHorizontal>
+  <UseFontCharacterFile>false</UseFontCharacterFile>
+  <AutoSizeFontOutputs>false</AutoSizeFontOutputs>
+  <FontGenerator>KernSmith</FontGenerator>
+  <Version>7</Version>
+  <DefaultCanvasWidth>480</DefaultCanvasWidth>
+  <DefaultCanvasHeight>272</DefaultCanvasHeight>
+  <CustomCanvasSizes />
+  <ShowOutlines>true</ShowOutlines>
+  <ShowCanvasOutline>true</ShowCanvasOutline>
+  <ShowRuler>true</ShowRuler>
+  <ShowCheckerBackground>true</ShowCheckerBackground>
+  <TextureFilter>Point</TextureFilter>
+  <ConvertVariablesOnUnitTypeChange>false</ConvertVariablesOnUnitTypeChange>
+  <RestrictToUnitValues>true</RestrictToUnitValues>
+  <SnapToGrid>false</SnapToGrid>
+  <GridSize>16</GridSize>
+  <RestrictFileNamesForAndroid>false</RestrictFileNamesForAndroid>
+  <Guides />
+  <ShowLocalizationInGum>true</ShowLocalizationInGum>
+  <CurrentLanguageIndex>0</CurrentLanguageIndex>
+  <ScreenReference Name="AssetDiagnostics" />
+  <ScreenReference Name="OriginalTitle" />
+  <ScreenReference Name="OriginalTitleStartMenu" />
+  <ScreenReference Name="OriginalTitleFlow" />
+  <ScreenReference Name="OriginalMainMenu" />
+  <ScreenReference Name="NativeToolsMenu" />
+  <ScreenReference Name="NativePreferences" />
+  <ScreenReference Name="OriginalOptions" />
+  <ScreenReference Name="OriginalDeckMenu" />
+  <ScreenReference Name="OriginalDeckEdit" />
+  <ScreenReference Name="OriginalFreeDuel" />
+  <ScreenReference Name="OriginalStorySelection" />
+  <ScreenReference Name="OriginalStoryDialogue" />
+  <ComponentReference Name="OriginalMenuBar" />
+  <ComponentReference Name="OriginalOptionRow" />
+  <ComponentReference Name="OriginalChoiceDialog" />
+  <ComponentReference Name="OriginalDialogButton" />
+  <ComponentReference Name="OriginalCardDetail" />
+  <ComponentReference Name="OriginalScrollBar" />
+  <ComponentReference Name="OriginalTextBox" />
+  <ComponentReference Name="OriginalStatusPanel" />
+  <StandardElementReference Name="Circle" />
+  <StandardElementReference Name="Component" />
+  <StandardElementReference Name="Container" />
+  <StandardElementReference Name="NineSlice" />
+  <StandardElementReference Name="Polygon" />
+  <StandardElementReference Name="Rectangle" />
+  <StandardElementReference Name="Sprite" />
+  <StandardElementReference Name="Text" />
+  <SinglePixelTextureTop xsi:nil="true" />
+  <SinglePixelTextureLeft xsi:nil="true" />
+  <SinglePixelTextureRight xsi:nil="true" />
+  <SinglePixelTextureBottom xsi:nil="true" />
+</GumProjectSave>

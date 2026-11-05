@@ -1,0 +1,54 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ComponentSave xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Name>OriginalTextBox</Name>
+  <BaseType>Container</BaseType>
+  <State>
+    <Name>Default</Name>
+    <Variable Type="float" Name="Width" SetsValue="true">
+      <Value xsi:type="xsd:float">456</Value>
+    </Variable>
+    <Variable Type="float" Name="Height" SetsValue="true">
+      <Value xsi:type="xsd:float">64</Value>
+    </Variable>
+    <Variable Type="float" Name="Content.X" SetsValue="true">
+      <Value xsi:type="xsd:float">8</Value>
+    </Variable>
+    <Variable Type="float" Name="Content.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">6</Value>
+    </Variable>
+    <Variable Type="float" Name="Content.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">430</Value>
+    </Variable>
+    <Variable Type="float" Name="Content.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">52</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Content.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Content.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Content.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Content.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Content.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Content.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="string" Name="Content.Text" SetsValue="true">
+      <Value xsi:type="xsd:string">Dialogue</Value>
+    </Variable>
+    <Variable IsFont="true" Type="string" Name="Content.Font" SetsValue="true">
+      <Value xsi:type="xsd:string">Fonts/LiberationSans-Regular.ttf</Value>
+    </Variable>
+    <Variable Type="int" Name="Content.FontSize" SetsValue="true">
+      <Value xsi:type="xsd:int">12</Value>
+    </Variable>
+  </State>
+  <Instance Name="Content" BaseType="Text" />
+</ComponentSave>
