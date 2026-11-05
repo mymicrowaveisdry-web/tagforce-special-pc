@@ -10,18 +10,18 @@ using TagForceSpecial.PC.Screens;
 
 namespace TagForceSpecial.PC.Game;
 
-public enum ScreenId { Title, MainMenu, DeckSelection, Setup, Duel, Result, Controls, Paused, DeckEditor, SavedDecks, Preferences }
+public enum ScreenId { Title, PcTools, DeckSelection, Setup, Duel, Result, Controls, Paused, DeckEditor, SavedDecks, Preferences, AssetDiagnostics, TitleStartMenu, TitleFlow }
 
 public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
 {
     private readonly GraphicsDeviceManager graphics;
     private readonly HostOptions options;
-    private readonly GuiInput input = new();
+    private readonly GameThreadGuard graphicsThread = new();
+    private readonly TagForceSpecial.PC.App.Input.PspInputMapper input = new();
     private SpriteRenderer renderer = null!;
     private RenderTarget2D canvas = null!;
     private SpriteBatch presenter = null!;
     private DuelController? duel;
-    private ScreenId screen;
     private int menuIndex, choiceIndex, inspectIndex = -1, smokeCommands, frames;
     private bool captured, capturedResult, savedReplay, smokeFinished;
     private double opponentAt;
@@ -46,11 +46,18 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
 
     protected override void LoadContent()
     {
+        graphicsThread.Check();
         renderer = new(GraphicsDevice);
         presenter = new(GraphicsDevice);
         canvas = new(GraphicsDevice, PspViewport.Width, PspViewport.Height, false,
             SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
         InitializeSetup();
+        InitializeRouting();
+        if (options.AssetDiagnostics)
+        {
+            diagnosticScreenIndex = Array.IndexOf(DiagnosticScreens, options.DiagnosticScreen);
+            OpenAssetDiagnostics();
+        }
         if (options.Smoke && !SetupAutomation && !StartDuel(options.DeckVariant)) throw new InvalidOperationException(setupMessage);
     }
 
@@ -86,7 +93,16 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
     protected override void Update(GameTime gameTime)
     {
         PollSetupTask();
-        var buttons = input.Poll(IsActive);
+        var frame = options.PresentationSmoke ? PresentationSmokeInput()
+            : options.RealtimeWalkRoot is not null ? RealtimeWalkInput(gameTime) : input.Poll(IsActive);
+        navigationTime = gameTime;
+        // Input is ignored while a fade runs; the change at black may also move to another screen.
+        bool fading = screenFade.Active;
+        screenFade.Tick(gameTime.ElapsedGameTime);
+        if (fading) frame = default;
+        // F12 is a host utility shortcut, separate from unsupported original PSP actions.
+        if (frame.UtilityRequested && screen is ScreenId.Title or ScreenId.TitleStartMenu or ScreenId.PcTools or ScreenId.TitleFlow)
+        { utilityReturn = screen; screen = ScreenId.Setup; return; }
         if (options.Smoke)
         {
             RunSetupSmoke();
@@ -110,103 +126,9 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
             }
             return;
         }
-        if (screen is ScreenId.Setup or ScreenId.DeckEditor or ScreenId.SavedDecks or ScreenId.Preferences)
-        {
-            try
-            {
-                if (screen == ScreenId.Setup) UpdateSetupScreen(buttons);
-                else if (screen == ScreenId.DeckEditor) UpdateEditor(buttons);
-                else if (screen == ScreenId.SavedDecks) UpdateSavedDecks(buttons);
-                else UpdatePreferences(buttons);
-            }
-            catch (Exception e) when (Setup.SetupStore.Recoverable(e))
-            {
-                editorNotice = "The operation could not finish. Check storage and retry.";
-                if (screen == ScreenId.Preferences) preferencesNotice = "Preferences were not saved. Check access and free space.";
-                if (screen == ScreenId.SavedDecks) screen = ScreenId.DeckEditor;
-            }
-            return;
-        }
-        if (buttons.Back)
-        {
-            if (screen == ScreenId.Duel && duel is not null)
-            {
-                duel.Paused = true; screen = ScreenId.Paused; menuIndex = 0; return;
-            }
-            if (screen == ScreenId.Paused && duel is not null)
-            {
-                duel.Paused = false; screen = ScreenId.Duel; opponentAt = gameTime.TotalGameTime.TotalSeconds + .35; return;
-            }
-            screen = screen == ScreenId.MainMenu ? ScreenId.Title : ScreenId.MainMenu;
-            menuIndex = 0;
-            return;
-        }
-        switch (screen)
-        {
-            case ScreenId.Paused:
-                MoveMenu(buttons, 2);
-                if (buttons.Confirm)
-                {
-                    if (menuIndex == 0 && duel is not null)
-                    {
-                        duel.Paused = false; screen = ScreenId.Duel; opponentAt = gameTime.TotalGameTime.TotalSeconds + .35;
-                    }
-                    else { duel = null; screen = ScreenId.MainMenu; menuIndex = 0; }
-                }
-                break;
-            case ScreenId.Title:
-                if (buttons.Confirm) screen = ScreenId.MainMenu;
-                break;
-            case ScreenId.MainMenu:
-                MoveMenu(buttons, 6);
-                if (buttons.Confirm)
-                {
-                    switch (menuIndex)
-                    {
-                        case 0: OpenEditor(); break;
-                        case 1: screen = ScreenId.DeckSelection; break;
-                        case 2: screen = ScreenId.Setup; break;
-                        case 3: screen = ScreenId.Preferences; break;
-                        case 4: screen = ScreenId.Controls; break;
-                        case 5: Exit(); break;
-                    }
-                    menuIndex = 0;
-                }
-                break;
-            case ScreenId.DeckSelection:
-                MoveMenu(buttons, InitialOpponentDecks.Names.Count);
-                if (buttons.Confirm) StartDuel(menuIndex);
-                break;
-            case ScreenId.Duel when duel is not null:
-                int count = duel.View.Choices.Count;
-                if (count > 0)
-                {
-                    int delta = buttons.Down ? 1 : buttons.Up ? -1 : buttons.Right ? 4 : buttons.Left ? -4 : 0;
-                    choiceIndex = (choiceIndex + delta % count + count) % count;
-                    if (delta != 0) inspectIndex = -1;
-                    if (buttons.Confirm)
-                    {
-                        duel.Choose(duel.View.Revision, choiceIndex);
-                        choiceIndex = 0;
-                        inspectIndex = -1;
-                    }
-                }
-                if (buttons.Inspect) inspectIndex++;
-                if (IsActive && gameTime.TotalGameTime.TotalSeconds >= opponentAt)
-                {
-                    if (!duel.OpponentStopped && duel.StepOpponent()) choiceIndex = 0;
-                    opponentAt = gameTime.TotalGameTime.TotalSeconds + .35;
-                }
-                if (duel.View.Outcome is not null) screen = ScreenId.Result;
-                break;
-            case ScreenId.Result:
-                if (buttons.Confirm)
-                {
-                    if (setup?.Cache is not null) OpenEditor();
-                    else { screen = ScreenId.DeckSelection; menuIndex = 0; }
-                }
-                break;
-        }
+        router!.Tick(frame, gameTime.ElapsedGameTime, PresentationTime);
+        animations.Update(PresentationTime);
+        audioCues.Update();
         base.Update(gameTime);
     }
 
@@ -218,14 +140,18 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
 
     protected override void Draw(GameTime gameTime)
     {
+        graphicsThread.Check();
         GraphicsDevice.SetRenderTarget(canvas);
         GraphicsDevice.Clear(new Color(9, 15, 27));
         renderer.Begin();
-        if (screen is ScreenId.Duel or ScreenId.Result && duel is not null)
-            DuelScreen.Draw(renderer, duel.View, choiceIndex, inspectIndex, duel.Notice,
-                options.PixelExact ? 0 : gameTime.TotalGameTime.TotalSeconds);
-        else DrawMenu();
+        router!.Draw(new(renderer, PresentationTime));
         renderer.End();
+        DrawDiagnosticPreviewTexture();
+        gum.Draw();
+        DrawFlowOverlay();
+        DrawTransitionOverlay();
+        if (options.PresentationSmoke) CheckPresentationSmokeFrame();
+        if (options.RealtimeWalkRoot is not null) CheckRealtimeWalkFrame(gameTime);
         GraphicsDevice.SetRenderTarget(null);
         GraphicsDevice.Clear(Color.Black);
         var target = PspViewport.Fit(GraphicsDevice.PresentationParameters.BackBufferWidth,
@@ -235,7 +161,7 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
         presenter.End();
         frames++;
         CaptureEditor();
-        if (!captured && options.CapturePath is { } path)
+        if (!captured && options.CapturePath is { } path && (!options.AssetDiagnostics || diagnosticTask is null))
         {
             using var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write);
             canvas.SaveAsPng(output, 480, 272);
@@ -264,64 +190,17 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
         base.Draw(gameTime);
     }
 
-    private void DrawMenu()
-    {
-        if (screen == ScreenId.Setup) { DrawSetupScreen(); return; }
-        if (screen == ScreenId.DeckEditor) { DrawEditor(); return; }
-        if (screen is ScreenId.SavedDecks or ScreenId.Preferences) { DrawSetupLists(); return; }
-        var gold = new Color(238, 196, 104);
-        var muted = new Color(143, 162, 187);
-        for (int i = 0; i < 8; i++)
-            renderer.Fill(new(12 + i * 10, 24 + i * 8, 456 - i * 20, 224 - i * 16), new Color(18 + i, 27 + i, 43 + i), SceneLayer.Background);
-        renderer.Text("TAG FORCE", 46, 43, gold, 3);
-        renderer.Text("SPECIAL / PC", 47, 71, muted, 2);
-        switch (screen)
-        {
-            case ScreenId.Title:
-                renderer.Text("LOCAL DUEL", 48, 112, gold);
-                renderer.Wrapped("Prepare your local game data, build a supported deck and challenge the initial opponent.", 48, 133, 59, 3, muted);
-                renderer.Text("PRESS ENTER / A", 48, 195);
-                break;
-            case ScreenId.MainMenu:
-                Menu(["DECKS", "QUICK DUEL", "LOCAL GAME SETUP", "PREFERENCES", "CONTROLS", "EXIT"], 100);
-                break;
-            case ScreenId.DeckSelection:
-                renderer.Text("SUPPORTED DECK / 40 CARDS", 48, 109, gold);
-                Menu(InitialOpponentDecks.Names.ToArray(), 132);
-                renderer.Wrapped($"14 supported IDs. Opponent seed {options.Seed}. Ordered decks and an authored local collection.", 48, 211, 59, 3, muted);
-                break;
-            case ScreenId.Paused:
-                renderer.Text("DUEL PAUSED", 48, 108, gold);
-                Menu(["RESUME", "END DUEL"], 135);
-                break;
-            case ScreenId.Setup:
-                renderer.Text("LOCAL DATA REQUIRED", 48, 109, gold);
-                renderer.Wrapped(setupMessage, 48, 130, 59, 5);
-                renderer.Wrapped("Use the source/cache import commands documented in Foundations.md, then relaunch with --cache. ESC returns to menu.", 48, 190, 59, 4, muted);
-                break;
-            case ScreenId.Controls:
-                renderer.Text("UP/DOWN OR D-PAD: CHOOSE ACTION", 48, 118);
-                renderer.Text("LEFT/RIGHT: PAGE ACTIONS", 48, 136);
-                renderer.Text("ENTER / A: CONFIRM", 48, 154);
-                renderer.Text("TAB / Y: INSPECT VISIBLE CARDS", 48, 172);
-                renderer.Text("ESC / B: RETURN TO MENU", 48, 190);
-                break;
-        }
-        renderer.Text("480 X 272   /   LOCAL ASSETS   /   INITIAL SLICE", 48, 242, muted);
-
-        void Menu(string[] items, int top = 120)
-        {
-            for (int i = 0; i < items.Length; i++)
-            {
-                if (menuIndex == i) renderer.Fill(new(42, top + i * 23 - 5, 390, 20), new Color(49, 65, 79));
-                renderer.Text((menuIndex == i ? "> " : "  ") + items[i], 48, top + i * 23, menuIndex == i ? gold : Color.White);
-            }
-        }
-    }
-
     protected override void UnloadContent()
     {
+        graphicsThread.Check();
         importCancellation?.Cancel();
+        diagnosticPreview?.Dispose();
+        diagnosticPreviewBlend?.Dispose();
+        router?.Dispose();
+        gum.Dispose();
+        flowVisuals?.Dispose();
+        originalTitle?.Dispose();
+        screenAssets.Dispose();
         canvas.Dispose();
         renderer.Dispose();
         presenter.Dispose();

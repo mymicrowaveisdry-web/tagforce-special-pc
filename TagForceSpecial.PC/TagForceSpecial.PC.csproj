@@ -9,6 +9,15 @@
 
   <ItemGroup>
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.6" />
+    <PackageReference Include="Gum.MonoGame" Version="2026.11.2.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="UI\Gum\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <EmbeddedResource Include="App\Screens\Title\title-frame.json" />
+    <EmbeddedResource Include="App\Screens\Title\title-flow-frames.json" />
+    <EmbeddedResource Include="App\Screens\Title\main-menu-animation.json" />
+    <EmbeddedResource Include="App\Screens\Title\options-frame.json" />
   </ItemGroup>
 
   <ItemGroup>
