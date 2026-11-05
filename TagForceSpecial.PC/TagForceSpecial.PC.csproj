@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -7,4 +7,15 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TagForceSpecial.AI\TagForceSpecial.AI.csproj" />
+    <ProjectReference Include="..\TagForceSpecial.Assets\TagForceSpecial.Assets.csproj" />
+    <ProjectReference Include="..\TagForceSpecial.Cards\TagForceSpecial.Cards.csproj" />
+    <ProjectReference Include="..\TagForceSpecial.Core\TagForceSpecial.Core.csproj" />
+    <ProjectReference Include="..\TagForceSpecial.Effects\TagForceSpecial.Effects.csproj" />
+  </ItemGroup>
 </Project>

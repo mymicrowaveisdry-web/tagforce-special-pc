@@ -118,7 +118,7 @@ public sealed partial class DuelEngine
         foreach (var emitted in events)
             if (emitted is MonsterNormalSummoned or MonsterSpecialSummoned or TokenSpecialSummoned or MonsterFlipSummoned or
                 MonsterDestroyed or MonsterTributed or SummonMaterialSentToGraveyard or SummonMaterialSentToFaceUpExtraDeck or FusionMaterialSentToGraveyard or FusionMaterialSentToFaceUpExtraDeck or RitualMaterialTributed or CardSentToFaceUpExtraDeck or PendulumScaleActivated or SummonMaterialBanished or XyzMaterialAttached or XyzMaterialSentToGraveyard or SummonAttempted or SummonNegated or CardDiscarded or ActivationCostPaid or TriggerCostPaid or MonsterRevealed or SpellTrapDestroyed or
-                MonsterBanished or LifePointsGained or BattleDamageDealt or MonsterModifierCreated or MonsterEffectsNegated or
+                MonsterBanished or LifePointsGained or BattleDamageDealt or EffectDamageDealt or MonsterModifierCreated or MonsterEffectsNegated or
                 SpellActivated or ChainResponseActivated or MonsterPositionChanged or MonsterSet or SpellTrapSet or CardDrawn or
                 PhaseChanged or TurnStarted or AttackDeclared or BattleFlipEffectWindowOpened)
                 point = new(checked(State.Revision + 1), emitted.TimingGroup ?? 0);

@@ -39,5 +39,6 @@
     <ProjectReference Include="..\TagForceSpecial.Core\TagForceSpecial.Core.csproj" />
     <ProjectReference Include="..\TagForceSpecial.Effects\TagForceSpecial.Effects.csproj" />
     <ProjectReference Include="..\TagForceSpecial.Tools\TagForceSpecial.Tools.csproj" />
+    <ProjectReference Include="..\TagForceSpecial.PC\TagForceSpecial.PC.csproj" />
   </ItemGroup>
 </Project>

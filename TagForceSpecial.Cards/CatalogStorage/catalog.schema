@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Immutable card catalog package, schema version 1",
+  "oneOf": [
+    { "$ref": "#/$defs/manifest" },
+    { "$ref": "#/$defs/catalog" }
+  ],
+  "$defs": {
+    "uint": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+    "hash": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "label": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["decoderProfile"],
+      "properties": {
+        "containerSha256": { "anyOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
+        "decoderProfile": { "type": "string", "minLength": 1 }
+      }
+    },
+    "identity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["catalogId", "revision", "locale", "sourceBuild"],
+      "properties": {
+        "catalogId": { "$ref": "#/$defs/label" },
+        "revision": { "$ref": "#/$defs/label" },
+        "locale": { "$ref": "#/$defs/label" },
+        "sourceBuild": { "$ref": "#/$defs/label" }
+      }
+    },
+    "manifest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schemaVersion", "identity", "source", "cardCount", "cardsFile", "cardsSha256"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "identity": { "$ref": "#/$defs/identity" },
+        "source": { "$ref": "#/$defs/source" },
+        "cardCount": { "type": "integer", "minimum": 1, "maximum": 100000 },
+        "cardsFile": { "const": "cards.json" },
+        "cardsSha256": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "statistics": {
+      "type": "object", "additionalProperties": false,
+      "required": ["attack", "defense", "level"],
+      "properties": {
+        "attack": { "type": ["integer", "null"], "minimum": 0, "maximum": 2147483647 },
+        "defense": { "type": ["integer", "null"], "minimum": 0, "maximum": 2147483647 },
+        "level": { "$ref": "#/$defs/uint" }
+      }
+    },
+    "codes": {
+      "type": "object", "additionalProperties": false,
+      "required": ["attribute", "type", "rawKind", "getterKind", "icon", "field23To26", "field27To30"],
+      "properties": {
+        "attribute": { "$ref": "#/$defs/uint" }, "type": { "$ref": "#/$defs/uint" },
+        "rawKind": { "$ref": "#/$defs/uint" }, "getterKind": { "$ref": "#/$defs/uint" },
+        "icon": { "$ref": "#/$defs/uint" }, "field23To26": { "$ref": "#/$defs/uint" },
+        "field27To30": { "$ref": "#/$defs/uint" }
+      }
+    },
+    "sourceRow": {
+      "type": "object", "additionalProperties": false,
+      "required": ["internalIndex", "propertyWord0", "propertyWord1", "descriptionBitOffset"],
+      "properties": {
+        "internalIndex": { "type": "integer", "minimum": -2147483648, "maximum": 2147483647 },
+        "propertyWord0": { "$ref": "#/$defs/uint" }, "propertyWord1": { "$ref": "#/$defs/uint" },
+        "descriptionBitOffset": { "$ref": "#/$defs/uint" }
+      }
+    },
+    "card": {
+      "type": "object", "additionalProperties": false,
+      "required": ["gameCardId", "name", "description", "statistics", "source", "kind", "effectState", "effectReferences"],
+      "properties": {
+        "gameCardId": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "description": { "type": "string", "maxLength": 16384 },
+        "statistics": { "$ref": "#/$defs/statistics" },
+        "codes": { "anyOf": [{ "$ref": "#/$defs/codes" }, { "type": "null" }] },
+        "sourceRow": { "anyOf": [{ "$ref": "#/$defs/sourceRow" }, { "type": "null" }] },
+        "source": { "$ref": "#/$defs/source" },
+        "kind": { "enum": ["Unknown", "Monster", "Spell", "Trap"] },
+        "effectState": { "enum": ["Unknown", "None", "Referenced"] },
+        "effectReferences": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "$ref": "#/$defs/label" } }
+      },
+      "allOf": [{
+        "if": { "properties": { "effectState": { "const": "Referenced" } } },
+        "then": { "properties": { "effectReferences": { "minItems": 1 } } },
+        "else": { "properties": { "effectReferences": { "maxItems": 0 } } }
+      }]
+    },
+    "catalog": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schemaVersion", "source", "cards"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "source": { "$ref": "#/$defs/source" },
+        "cards": { "type": "array", "minItems": 1, "maxItems": 100000, "items": { "$ref": "#/$defs/card" } }
+      }
+    }
+  }
+}
