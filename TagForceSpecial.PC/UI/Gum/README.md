@@ -1,0 +1,5 @@
+# Presentation layouts
+
+Open `GumProject.gumx` in the repository's Gum editor. The source-backed title binds eleven measured, separate layers from the validated private cache; the private review copy includes real layer PNGs. Start-menu typography/bars and save/transfer behavior remain pending. `OriginalMainMenu` repeats `OriginalMenuBar` eight times over a measured animated layer; its textures bind at runtime, so its sprites look blank here. `OriginalOptions` repeats `OriginalOptionRow` 13 times over measured layers, and its questions are `OriginalChoiceDialog` instances built from `OriginalDialogButton`. `NativeToolsMenu` and `NativePreferences` are PC utilities; remaining original screens and components are scaffolds. Original audio playback and unmeasured nine-slice caps remain pending.
+
+Use `gumcli check GumProject.gumx --json` and `gumcli fonts GumProject.gumx` from the repository-local CLI. Liberation Sans and its license live in `Fonts/`; runtime content also requires the generated `FontCache/*.fnt` and referenced PNG pages. These are authored fallback fonts, not original PSP typography.

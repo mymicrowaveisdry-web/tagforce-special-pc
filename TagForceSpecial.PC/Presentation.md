@@ -8,7 +8,7 @@ render target, keyboard and gamepad. DesktopGL is the established SDL/OpenGL
 backend; no emulator, Docker or research tools are runtime dependencies.
 The [MonoGame release](https://monogame.net/blog/2026-10-26-3.8.6-release-2026/)
 documents the distinction from its newer DesktopGL4 backend. Avalonia can be
-considered for separate tooling; it is not a second game renderer.
+considered for separate tooling; it is not a second game renderer. The private asset diagnostic screen reports presentation cache status without expanding gameplay support.
 
 The controller owns Core's `DuelActionSource`, shared by human and AI clients.
 The adapter generates candidates from the acting player's own cards and public zone addresses, checks them with Core's read-only
@@ -27,7 +27,9 @@ opponent action messages never reuse labels containing private hand names.
 
 ```mermaid
 flowchart LR
-  Input[Keyboard / gamepad] --> Controller[DuelController]
+  Input[Keyboard / gamepad] --> Mapper[PSP actions]
+  Mapper --> Router[ScreenRouter / top modal]
+  Router --> Controller[DuelController]
   Controller -->|CheckCommand / Execute| Core[DuelEngine]
   Core --> Projection[Player projection]
   Projection --> View[Immutable DuelView]
@@ -41,17 +43,18 @@ flowchart LR
 | Path | Responsibility |
 | --- | --- |
 | `PC/Game/` | Host options, native game loop, navigation, deck/cache gate |
+| `PC/App/` | Screen lifecycle/modal focus, PSP input, validated sprites/layouts and presentation events |
+| `PC/UI/Gum/` | Editable reference-size layouts; Title/Menu/Options retained at runtime, remaining bindings and source measurements pending |
 | `PC/Setup/` | Native first launch, private preferences, import/resume and recovery |
 | `PC/Rendering/` | Viewport, ordered sprite layers, atlas regions, fallback text |
-| `PC/Screens/` | Duel rendering from player views; menu scenes currently in GameLoop |
+| `PC/Screens/` | Duel rendering from player views; application navigation binds screen handlers |
 | `PC/DuelUI/` | Human/AI session controller, choices and `Input/` |
 | `Core/Views/` | Shared authorized projections and revision-bound action adapter |
 | `AI/` | Seeded policy, bounded opponent driver and replay contracts |
 | `PC/Decks/` | Existing versioned deck persistence and validated selections |
 | `PC/Import/` | Existing private cache creation/validation; retained API path |
 | `Assets/GameSource/` | Trusted input profiles, ISO validation and source provenance |
-| `PC/Assets/` (next) | Converted texture/font resolver over the validated cache |
-| `PC/Audio/` (next) | Audio playback after supported formats are verified |
+| `PC/App/Visual/` | Explicit atlas regions, pending/measured layouts, shared texture ownership, deterministic animation and queued audio cues; original audio playback pending |
 | `Core/` | Deterministic state, commands, rules and events |
 | `Effects/` | Explicit supported card profiles and initial deck policy |
 | `Tests/` | Synthetic portable contracts and opt-in private reference checks |
@@ -114,11 +117,11 @@ requirements complete.
 ## Run and verify
 
 ```powershell
-./rtk.ps1 dotnet restore ygo-tag-force-special-decomp.slnx --locked-mode
-./rtk.ps1 dotnet build ygo-tag-force-special-decomp.slnx --no-restore
-./rtk.ps1 bypass dotnet run --project TagForceSpecial.PC --no-build -- --cache <private-cache>
-./rtk.ps1 bypass dotnet run --project TagForceSpecial.PC --no-build -- --cache <private-cache> --pixel-exact --smoke --capture <new.png>
-./rtk.ps1 dotnet test TagForceSpecial.Tests --filter FullyQualifiedName~PresentationTests
+dotnet restore ygo-tag-force-special-decomp.slnx --locked-mode
+dotnet build ygo-tag-force-special-decomp.slnx --no-restore
+dotnet run --project TagForceSpecial.PC --no-build -- --cache <private-cache>
+dotnet run --project TagForceSpecial.PC --no-build -- --cache <private-cache> --pixel-exact --smoke --capture <new.png>
+dotnet test TagForceSpecial.Tests --filter FullyQualifiedName~PresentationTests
 ```
 
 `--capture` writes a new 480 x 272 PNG of the first frame and exits unless smoke

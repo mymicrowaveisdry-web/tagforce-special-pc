@@ -25,7 +25,7 @@ General card effects, shuffle, original texture/font/audio conversion and PSP sc
 
 ## Validation and research
 
-[CI](.github/workflows/progress.yml) builds and tests synthetic behavior; see its results for current counts.
+[CI](.github/workflows/progress.yml) builds and tests synthetic behavior; see its results for current counts. Screen reconstruction records and PC/reference gates stay local.
 `LocalReference` tests require ignored PSP fixtures and `IncludeReferenceFixtures=true`.
 Research tools/data stay local. Retained comparisons cover limited outcomes;
 new Stage 6–8 timing comparisons remain deferred. Synthetic tests do not establish full PSP equivalence.
