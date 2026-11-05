@@ -1,0 +1,261 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ScreenSave xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Name>NativePreferences</Name>
+  <State>
+    <Name>Default</Name>
+    <Variable Type="float" Name="Title.X" SetsValue="true">
+      <Value xsi:type="xsd:float">20</Value>
+    </Variable>
+    <Variable Type="float" Name="Title.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">14</Value>
+    </Variable>
+    <Variable Type="float" Name="Title.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">440</Value>
+    </Variable>
+    <Variable Type="float" Name="Title.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">24</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Title.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Title.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Title.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Title.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Title.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Title.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="string" Name="Title.Text" SetsValue="true">
+      <Value xsi:type="xsd:string">PC PREFERENCES</Value>
+    </Variable>
+    <Variable IsFont="true" Type="string" Name="Title.Font" SetsValue="true">
+      <Value xsi:type="xsd:string">Fonts/LiberationSans-Regular.ttf</Value>
+    </Variable>
+    <Variable Type="int" Name="Title.FontSize" SetsValue="true">
+      <Value xsi:type="xsd:int">12</Value>
+    </Variable>
+    <Variable Type="float" Name="Status.X" SetsValue="true">
+      <Value xsi:type="xsd:float">12</Value>
+    </Variable>
+    <Variable Type="float" Name="Status.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">236</Value>
+    </Variable>
+    <Variable Type="float" Name="Status.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">456</Value>
+    </Variable>
+    <Variable Type="float" Name="Status.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">32</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Status.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Status.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Status.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Status.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Status.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Status.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Row0.X" SetsValue="true">
+      <Value xsi:type="xsd:float">20</Value>
+    </Variable>
+    <Variable Type="float" Name="Row0.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">58</Value>
+    </Variable>
+    <Variable Type="float" Name="Row0.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">440</Value>
+    </Variable>
+    <Variable Type="float" Name="Row0.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">24</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Row0.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Row0.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Row0.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Row0.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Row0.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Row0.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="string" Name="Row0.Text" SetsValue="true">
+      <Value xsi:type="xsd:string">OPPONENT SEED</Value>
+    </Variable>
+    <Variable IsFont="true" Type="string" Name="Row0.Font" SetsValue="true">
+      <Value xsi:type="xsd:string">Fonts/LiberationSans-Regular.ttf</Value>
+    </Variable>
+    <Variable Type="int" Name="Row0.FontSize" SetsValue="true">
+      <Value xsi:type="xsd:int">12</Value>
+    </Variable>
+    <Variable Type="float" Name="Row1.X" SetsValue="true">
+      <Value xsi:type="xsd:float">20</Value>
+    </Variable>
+    <Variable Type="float" Name="Row1.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">90</Value>
+    </Variable>
+    <Variable Type="float" Name="Row1.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">440</Value>
+    </Variable>
+    <Variable Type="float" Name="Row1.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">24</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Row1.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Row1.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Row1.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Row1.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Row1.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Row1.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="string" Name="Row1.Text" SetsValue="true">
+      <Value xsi:type="xsd:string">INTEGER SCALING</Value>
+    </Variable>
+    <Variable IsFont="true" Type="string" Name="Row1.Font" SetsValue="true">
+      <Value xsi:type="xsd:string">Fonts/LiberationSans-Regular.ttf</Value>
+    </Variable>
+    <Variable Type="int" Name="Row1.FontSize" SetsValue="true">
+      <Value xsi:type="xsd:int">12</Value>
+    </Variable>
+    <Variable Type="float" Name="Row2.X" SetsValue="true">
+      <Value xsi:type="xsd:float">20</Value>
+    </Variable>
+    <Variable Type="float" Name="Row2.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">122</Value>
+    </Variable>
+    <Variable Type="float" Name="Row2.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">440</Value>
+    </Variable>
+    <Variable Type="float" Name="Row2.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">24</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Row2.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Row2.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Row2.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Row2.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Row2.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Row2.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="string" Name="Row2.Text" SetsValue="true">
+      <Value xsi:type="xsd:string">RESET</Value>
+    </Variable>
+    <Variable IsFont="true" Type="string" Name="Row2.Font" SetsValue="true">
+      <Value xsi:type="xsd:string">Fonts/LiberationSans-Regular.ttf</Value>
+    </Variable>
+    <Variable Type="int" Name="Row2.FontSize" SetsValue="true">
+      <Value xsi:type="xsd:int">12</Value>
+    </Variable>
+    <Variable Type="float" Name="Row3.X" SetsValue="true">
+      <Value xsi:type="xsd:float">20</Value>
+    </Variable>
+    <Variable Type="float" Name="Row3.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">154</Value>
+    </Variable>
+    <Variable Type="float" Name="Row3.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">440</Value>
+    </Variable>
+    <Variable Type="float" Name="Row3.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">24</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Row3.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Row3.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Row3.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Row3.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Row3.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Row3.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="string" Name="Row3.Text" SetsValue="true">
+      <Value xsi:type="xsd:string">BACK</Value>
+    </Variable>
+    <Variable IsFont="true" Type="string" Name="Row3.Font" SetsValue="true">
+      <Value xsi:type="xsd:string">Fonts/LiberationSans-Regular.ttf</Value>
+    </Variable>
+    <Variable Type="int" Name="Row3.FontSize" SetsValue="true">
+      <Value xsi:type="xsd:int">12</Value>
+    </Variable>
+    <Variable Type="float" Name="Notice.X" SetsValue="true">
+      <Value xsi:type="xsd:float">20</Value>
+    </Variable>
+    <Variable Type="float" Name="Notice.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">202</Value>
+    </Variable>
+    <Variable Type="float" Name="Notice.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">440</Value>
+    </Variable>
+    <Variable Type="float" Name="Notice.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">30</Value>
+    </Variable>
+    <Variable IsFont="true" Type="string" Name="Notice.Font" SetsValue="true">
+      <Value xsi:type="xsd:string">Fonts/LiberationSans-Regular.ttf</Value>
+    </Variable>
+    <Variable Type="int" Name="Notice.FontSize" SetsValue="true">
+      <Value xsi:type="xsd:int">12</Value>
+    </Variable>
+    <Variable Type="string" Name="Notice.Text" SetsValue="true">
+      <Value xsi:type="xsd:string">
+      </Value>
+    </Variable>
+  </State>
+  <Instance Name="Title" BaseType="Text" />
+  <Instance Name="Status" BaseType="OriginalStatusPanel" />
+  <Instance Name="Row0" BaseType="Text" />
+  <Instance Name="Row1" BaseType="Text" />
+  <Instance Name="Row2" BaseType="Text" />
+  <Instance Name="Row3" BaseType="Text" />
+  <Instance Name="Notice" BaseType="Text" />
+</ScreenSave>

@@ -1,0 +1,94 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ComponentSave xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Name>OriginalCardDetail</Name>
+  <BaseType>Container</BaseType>
+  <State>
+    <Name>Default</Name>
+    <Variable Type="float" Name="Width" SetsValue="true">
+      <Value xsi:type="xsd:float">220</Value>
+    </Variable>
+    <Variable Type="float" Name="Height" SetsValue="true">
+      <Value xsi:type="xsd:float">132</Value>
+    </Variable>
+    <Variable Type="float" Name="NameLabel.X" SetsValue="true">
+      <Value xsi:type="xsd:float">8</Value>
+    </Variable>
+    <Variable Type="float" Name="NameLabel.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">8</Value>
+    </Variable>
+    <Variable Type="float" Name="NameLabel.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">204</Value>
+    </Variable>
+    <Variable Type="float" Name="NameLabel.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">20</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="NameLabel.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="NameLabel.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="NameLabel.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="NameLabel.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="NameLabel.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="NameLabel.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="string" Name="NameLabel.Text" SetsValue="true">
+      <Value xsi:type="xsd:string">Card details</Value>
+    </Variable>
+    <Variable IsFont="true" Type="string" Name="NameLabel.Font" SetsValue="true">
+      <Value xsi:type="xsd:string">Fonts/LiberationSans-Regular.ttf</Value>
+    </Variable>
+    <Variable Type="int" Name="NameLabel.FontSize" SetsValue="true">
+      <Value xsi:type="xsd:int">12</Value>
+    </Variable>
+    <Variable Type="float" Name="AuthorizedDescription.X" SetsValue="true">
+      <Value xsi:type="xsd:float">8</Value>
+    </Variable>
+    <Variable Type="float" Name="AuthorizedDescription.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">34</Value>
+    </Variable>
+    <Variable Type="float" Name="AuthorizedDescription.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">204</Value>
+    </Variable>
+    <Variable Type="float" Name="AuthorizedDescription.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">90</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="AuthorizedDescription.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="AuthorizedDescription.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="AuthorizedDescription.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="AuthorizedDescription.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="AuthorizedDescription.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="AuthorizedDescription.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="string" Name="AuthorizedDescription.Text" SetsValue="true">
+      <Value xsi:type="xsd:string">Visible cards only</Value>
+    </Variable>
+    <Variable IsFont="true" Type="string" Name="AuthorizedDescription.Font" SetsValue="true">
+      <Value xsi:type="xsd:string">Fonts/LiberationSans-Regular.ttf</Value>
+    </Variable>
+    <Variable Type="int" Name="AuthorizedDescription.FontSize" SetsValue="true">
+      <Value xsi:type="xsd:int">12</Value>
+    </Variable>
+  </State>
+  <Instance Name="NameLabel" BaseType="Text" />
+  <Instance Name="AuthorizedDescription" BaseType="Text" />
+</ComponentSave>

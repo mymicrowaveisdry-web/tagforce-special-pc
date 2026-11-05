@@ -1,0 +1,315 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ScreenSave xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Name>OriginalTitle</Name>
+  <State>
+    <Name>Default</Name>
+    <Variable Type="float" Name="YuseiPanel.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="YuseiPanel.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="YuseiPanel.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">480</Value>
+    </Variable>
+    <Variable Type="float" Name="YuseiPanel.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">272</Value>
+    </Variable>
+    <Variable Type="TextureAddress" Name="YuseiPanel.TextureAddress" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="YuseiPanel.TextureLeft" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="YuseiPanel.TextureTop" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="YuseiPanel.TextureWidth" SetsValue="true">
+      <Value xsi:type="xsd:int">480</Value>
+    </Variable>
+    <Variable Type="int" Name="YuseiPanel.TextureHeight" SetsValue="true">
+      <Value xsi:type="xsd:int">272</Value>
+    </Variable>
+    <Variable Type="float" Name="YugiPanel.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="YugiPanel.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="YugiPanel.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">480</Value>
+    </Variable>
+    <Variable Type="float" Name="YugiPanel.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">272</Value>
+    </Variable>
+    <Variable Type="TextureAddress" Name="YugiPanel.TextureAddress" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="YugiPanel.TextureLeft" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="YugiPanel.TextureTop" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="YugiPanel.TextureWidth" SetsValue="true">
+      <Value xsi:type="xsd:int">480</Value>
+    </Variable>
+    <Variable Type="int" Name="YugiPanel.TextureHeight" SetsValue="true">
+      <Value xsi:type="xsd:int">272</Value>
+    </Variable>
+    <Variable Type="float" Name="JadenPanel.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="JadenPanel.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="JadenPanel.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">480</Value>
+    </Variable>
+    <Variable Type="float" Name="JadenPanel.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">272</Value>
+    </Variable>
+    <Variable Type="TextureAddress" Name="JadenPanel.TextureAddress" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="JadenPanel.TextureLeft" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="JadenPanel.TextureTop" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="JadenPanel.TextureWidth" SetsValue="true">
+      <Value xsi:type="xsd:int">480</Value>
+    </Variable>
+    <Variable Type="int" Name="JadenPanel.TextureHeight" SetsValue="true">
+      <Value xsi:type="xsd:int">272</Value>
+    </Variable>
+    <Variable Type="float" Name="YumaPanel.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="YumaPanel.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="YumaPanel.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">480</Value>
+    </Variable>
+    <Variable Type="float" Name="YumaPanel.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">272</Value>
+    </Variable>
+    <Variable Type="TextureAddress" Name="YumaPanel.TextureAddress" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="YumaPanel.TextureLeft" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="YumaPanel.TextureTop" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="YumaPanel.TextureWidth" SetsValue="true">
+      <Value xsi:type="xsd:int">480</Value>
+    </Variable>
+    <Variable Type="int" Name="YumaPanel.TextureHeight" SetsValue="true">
+      <Value xsi:type="xsd:int">272</Value>
+    </Variable>
+    <Variable Type="float" Name="PanelEdges.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="PanelEdges.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="PanelEdges.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">480</Value>
+    </Variable>
+    <Variable Type="float" Name="PanelEdges.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">272</Value>
+    </Variable>
+    <Variable Type="TextureAddress" Name="PanelEdges.TextureAddress" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="PanelEdges.TextureLeft" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="PanelEdges.TextureTop" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="PanelEdges.TextureWidth" SetsValue="true">
+      <Value xsi:type="xsd:int">480</Value>
+    </Variable>
+    <Variable Type="int" Name="PanelEdges.TextureHeight" SetsValue="true">
+      <Value xsi:type="xsd:int">272</Value>
+    </Variable>
+    <Variable Type="float" Name="Yuya.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Yuya.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Yuya.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">480</Value>
+    </Variable>
+    <Variable Type="float" Name="Yuya.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">272</Value>
+    </Variable>
+    <Variable Type="TextureAddress" Name="Yuya.TextureAddress" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="Yuya.TextureLeft" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="Yuya.TextureTop" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="Yuya.TextureWidth" SetsValue="true">
+      <Value xsi:type="xsd:int">480</Value>
+    </Variable>
+    <Variable Type="int" Name="Yuya.TextureHeight" SetsValue="true">
+      <Value xsi:type="xsd:int">272</Value>
+    </Variable>
+    <Variable Type="float" Name="LogoEffects.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="LogoEffects.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="LogoEffects.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">480</Value>
+    </Variable>
+    <Variable Type="float" Name="LogoEffects.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">272</Value>
+    </Variable>
+    <Variable Type="TextureAddress" Name="LogoEffects.TextureAddress" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="LogoEffects.TextureLeft" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="LogoEffects.TextureTop" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="LogoEffects.TextureWidth" SetsValue="true">
+      <Value xsi:type="xsd:int">480</Value>
+    </Variable>
+    <Variable Type="int" Name="LogoEffects.TextureHeight" SetsValue="true">
+      <Value xsi:type="xsd:int">272</Value>
+    </Variable>
+    <Variable Type="float" Name="Logo.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Logo.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Logo.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">480</Value>
+    </Variable>
+    <Variable Type="float" Name="Logo.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">272</Value>
+    </Variable>
+    <Variable Type="TextureAddress" Name="Logo.TextureAddress" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="Logo.TextureLeft" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="Logo.TextureTop" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="Logo.TextureWidth" SetsValue="true">
+      <Value xsi:type="xsd:int">480</Value>
+    </Variable>
+    <Variable Type="int" Name="Logo.TextureHeight" SetsValue="true">
+      <Value xsi:type="xsd:int">272</Value>
+    </Variable>
+    <Variable Type="float" Name="Copyright.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Copyright.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Copyright.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">480</Value>
+    </Variable>
+    <Variable Type="float" Name="Copyright.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">272</Value>
+    </Variable>
+    <Variable Type="TextureAddress" Name="Copyright.TextureAddress" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="Copyright.TextureLeft" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="Copyright.TextureTop" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="Copyright.TextureWidth" SetsValue="true">
+      <Value xsi:type="xsd:int">480</Value>
+    </Variable>
+    <Variable Type="int" Name="Copyright.TextureHeight" SetsValue="true">
+      <Value xsi:type="xsd:int">272</Value>
+    </Variable>
+    <Variable Type="float" Name="PromptShade.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="PromptShade.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="PromptShade.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">480</Value>
+    </Variable>
+    <Variable Type="float" Name="PromptShade.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">272</Value>
+    </Variable>
+    <Variable Type="TextureAddress" Name="PromptShade.TextureAddress" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="PromptShade.TextureLeft" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="PromptShade.TextureTop" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="PromptShade.TextureWidth" SetsValue="true">
+      <Value xsi:type="xsd:int">480</Value>
+    </Variable>
+    <Variable Type="int" Name="PromptShade.TextureHeight" SetsValue="true">
+      <Value xsi:type="xsd:int">272</Value>
+    </Variable>
+    <Variable Type="float" Name="PressStart.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="PressStart.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="PressStart.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">480</Value>
+    </Variable>
+    <Variable Type="float" Name="PressStart.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">272</Value>
+    </Variable>
+    <Variable Type="TextureAddress" Name="PressStart.TextureAddress" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="PressStart.TextureLeft" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="PressStart.TextureTop" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="PressStart.TextureWidth" SetsValue="true">
+      <Value xsi:type="xsd:int">480</Value>
+    </Variable>
+    <Variable Type="int" Name="PressStart.TextureHeight" SetsValue="true">
+      <Value xsi:type="xsd:int">272</Value>
+    </Variable>
+  <Variable Type="PositionUnitType" Name="YuseiPanel.XUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="PositionUnitType" Name="YuseiPanel.YUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="DimensionUnitType" Name="YuseiPanel.WidthUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="DimensionUnitType" Name="YuseiPanel.HeightUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="HorizontalAlignment" Name="YuseiPanel.XOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="VerticalAlignment" Name="YuseiPanel.YOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="PositionUnitType" Name="YugiPanel.XUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="PositionUnitType" Name="YugiPanel.YUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="DimensionUnitType" Name="YugiPanel.WidthUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="DimensionUnitType" Name="YugiPanel.HeightUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="HorizontalAlignment" Name="YugiPanel.XOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="VerticalAlignment" Name="YugiPanel.YOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="PositionUnitType" Name="JadenPanel.XUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="PositionUnitType" Name="JadenPanel.YUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="DimensionUnitType" Name="JadenPanel.WidthUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="DimensionUnitType" Name="JadenPanel.HeightUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="HorizontalAlignment" Name="JadenPanel.XOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="VerticalAlignment" Name="JadenPanel.YOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="PositionUnitType" Name="YumaPanel.XUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="PositionUnitType" Name="YumaPanel.YUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="DimensionUnitType" Name="YumaPanel.WidthUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="DimensionUnitType" Name="YumaPanel.HeightUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="HorizontalAlignment" Name="YumaPanel.XOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="VerticalAlignment" Name="YumaPanel.YOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="PositionUnitType" Name="PanelEdges.XUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="PositionUnitType" Name="PanelEdges.YUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="DimensionUnitType" Name="PanelEdges.WidthUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="DimensionUnitType" Name="PanelEdges.HeightUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="HorizontalAlignment" Name="PanelEdges.XOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="VerticalAlignment" Name="PanelEdges.YOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="PositionUnitType" Name="Yuya.XUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="PositionUnitType" Name="Yuya.YUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="DimensionUnitType" Name="Yuya.WidthUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="DimensionUnitType" Name="Yuya.HeightUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="HorizontalAlignment" Name="Yuya.XOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="VerticalAlignment" Name="Yuya.YOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="PositionUnitType" Name="LogoEffects.XUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="PositionUnitType" Name="LogoEffects.YUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="DimensionUnitType" Name="LogoEffects.WidthUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="DimensionUnitType" Name="LogoEffects.HeightUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="HorizontalAlignment" Name="LogoEffects.XOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="VerticalAlignment" Name="LogoEffects.YOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="PositionUnitType" Name="Logo.XUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="PositionUnitType" Name="Logo.YUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="DimensionUnitType" Name="Logo.WidthUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="DimensionUnitType" Name="Logo.HeightUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="HorizontalAlignment" Name="Logo.XOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="VerticalAlignment" Name="Logo.YOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="PositionUnitType" Name="Copyright.XUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="PositionUnitType" Name="Copyright.YUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="DimensionUnitType" Name="Copyright.WidthUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="DimensionUnitType" Name="Copyright.HeightUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="HorizontalAlignment" Name="Copyright.XOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="VerticalAlignment" Name="Copyright.YOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="PositionUnitType" Name="PromptShade.XUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="PositionUnitType" Name="PromptShade.YUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="DimensionUnitType" Name="PromptShade.WidthUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="DimensionUnitType" Name="PromptShade.HeightUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="HorizontalAlignment" Name="PromptShade.XOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="VerticalAlignment" Name="PromptShade.YOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="PositionUnitType" Name="PressStart.XUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="PositionUnitType" Name="PressStart.YUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="DimensionUnitType" Name="PressStart.WidthUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="DimensionUnitType" Name="PressStart.HeightUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="HorizontalAlignment" Name="PressStart.XOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable><Variable Type="VerticalAlignment" Name="PressStart.YOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable></State>
+  <Instance Name="YuseiPanel" BaseType="Sprite" />
+  <Instance Name="YugiPanel" BaseType="Sprite" />
+  <Instance Name="JadenPanel" BaseType="Sprite" />
+  <Instance Name="YumaPanel" BaseType="Sprite" />
+  <Instance Name="PanelEdges" BaseType="Sprite" />
+  <Instance Name="Yuya" BaseType="Sprite" />
+  <Instance Name="LogoEffects" BaseType="Sprite" />
+  <Instance Name="Logo" BaseType="Sprite" />
+  <Instance Name="Copyright" BaseType="Sprite" />
+  <Instance Name="PromptShade" BaseType="Sprite" />
+  <Instance Name="PressStart" BaseType="Sprite" />
+</ScreenSave>
