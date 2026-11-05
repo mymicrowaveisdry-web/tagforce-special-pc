@@ -1,6 +1,6 @@
-# Stage 12: first opponent
+# First opponent
 
-## Authorized action contract (12A)
+## Authorized action contract
 
 Core's `Views/DuelActionSource` is the trusted adapter shared by human input and
 the opponent. `Observe(player)` produces immutable `DuelObservation` values:
@@ -26,7 +26,7 @@ means an explicit unsupported continuation, never a win or successful no-op.
 Discovery and ranking are bounded at 4,096 candidates/actions. All access is on
 the owning game thread. Core's command probe relies on immutable engine storage.
 
-## Policy and decision matrix (12B-12D)
+## Policy and decision matrix
 
 `initial-opponent-v1` scans one authorized action list. Priorities: draw and
 mandatory choices; responses/pass/resolution; normal spells; strongest own normal
@@ -60,7 +60,7 @@ exhaustion and terminal states do not advance Core. The session caps total human
 and AI commands at 24,000; the native smoke caps the entire run at 6,000 commands.
 These are logical step bounds, not real-time performance guarantees.
 
-## Supported decks and PC integration (12E)
+## Supported decks and PC integration
 
 `Effects.InitialOpponentDecks` is manifest `tfsp-initial-opponent-decks-v1`.
 It contains three ordered variants of the same 40-card preview, each retaining
@@ -79,7 +79,7 @@ menu; resume retains state/seed and resets the next deadline, with no catch-up
 burst. Result screens use `DuelOutcome` exclusively. Public notifications name
 the action category without revealing a private hand card's name.
 
-## Replays and acceptance (12F)
+## Replays and acceptance
 
 `DuelReplay` schema 1 records the policy version, seed, action-contract version,
 deck manifest, exact input deck orders, battle mode, accepted command sequence
@@ -110,5 +110,5 @@ scripted human deck-out victory at seed 7. Both run through the real PC controll
 and window; automated smoke does not certify physical gamepad interaction.
 Replay/result output flags save the first completed duel per process; existing
 files are never overwritten. Original assets, texture/font conversion
-and exact PSP GUI matching remain Stage 11 work; original character/tag fidelity
-remains Stage 14 work.
+and exact PSP GUI matching remain unfinished, as does original character/tag
+fidelity.

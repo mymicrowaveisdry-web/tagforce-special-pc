@@ -1,4 +1,4 @@
-# Stage 11: initial presentation
+# Initial presentation
 
 ## Stack and boundaries
 
@@ -95,12 +95,12 @@ not a reconstructed PSP font, artwork or verified screen layout.
 
 ## Acceptance gates and next work
 
-| Stage | Current evidence | Remaining gate |
+| Area | Current evidence | Remaining gate |
 | --- | --- | --- |
-| 11A research | Retained PSP captures can be indexed with input/timestamp/hash provenance; local screen/state and interaction inventory | Verify frame buffers and state preconditions, fresh same-build captures/video, deck selection/results/transitions and original controls |
-| 11B importer | 13A validates the pinned source and reproducible catalog/raw-cardh cache; each source/output is mapped | Decode supported textures/card artwork/fonts/audio/dialogue into a versioned private manifest; resource samples and missing-format diagnostics |
-| 11C foundation | Native window, canvas/scaling, layers/atlas-region API, fallback text, retained logical screenshots | Original static screen reproduction, imported font/atlases, timed effects, approved regions/tolerances and Windows resize comparison |
-| 11D duel UI | Command controller, hidden-information views, legal choices, deterministic terminal preview | Original spatial navigation/prompt fidelity, deck/Graveyard inspection, dedicated advanced choices, original transition timing and manual controller acceptance |
+| Research | Retained PSP captures can be indexed with input/timestamp/hash provenance; local screen/state and interaction inventory | Verify frame buffers and state preconditions, fresh same-build captures/video, deck selection/results/transitions and original controls |
+| Importer | Setup validates the pinned source and reproducible catalog/raw-cardh cache; each source/output is mapped | Decode supported textures/card artwork/fonts/audio/dialogue into a versioned private manifest; resource samples and missing-format diagnostics |
+| Foundation | Native window, canvas/scaling, layers/atlas-region API, fallback text, retained logical screenshots | Original static screen reproduction, imported font/atlases, timed effects, approved regions/tolerances and Windows resize comparison |
+| Duel UI | Command controller, hidden-information views, legal choices, deterministic terminal preview | Original spatial navigation/prompt fidelity, deck/Graveyard inspection, dedicated advanced choices, original transition timing and manual controller acceptance |
 
 For authored static captures at a fixed revision in pixel-exact mode, require
 zero changed pixels on the same renderer/build. This verifies determinism only.
@@ -111,8 +111,8 @@ assign an arbitrary error tolerance to declare PSP visual parity.
 Keep the original ISO, private assets, decoded catalogs, captures and saves out
 of public source, CI inputs and packages. Extend trusted build/conversion
 manifests for supported formats rather than trusting a cache's own checksums.
-11E-11G remain separate roadmap stages; this initial GUI does not declare their
-requirements complete.
+Later roadmap work remains separate; this initial GUI does not declare it
+complete.
 
 ## Run and verify
 

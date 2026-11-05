@@ -4,7 +4,7 @@
 
 Run `dotnet run --project TagForceSpecial.PC`. The native first-run wizard imports the exact English v2.1 ISO, including title artwork; pass `--psp-font <ltn4.pgf>` once for PSP-font text. New Game/Continue reach the original Main Menu using a native profile; Options and Save Data work there, and other rows show an unavailable notice. F12 opens setup and PC tools, including deck editing and supported duels. Original PSP save import remains unfinished; Tag Force 6 transfer is deliberately unsupported. Controls: arrows/D-pad, F1/controller Start, Enter/A, Tab/Y and Escape/B; see the [opponent contract](../TagForceSpecial.AI/Contract.md).
 
-Presentation check: `dotnet run --project TagForceSpecial.PC -- --presentation-smoke --data-root <validated-private-root> --presentation-trace <new-private.json>` replays 5 cycles of every observed Continue/New Game and Main Menu route with fixed frames; add `--capture-flow <new-private-dir>` to save each state. `--data-root <private-copy> --presentation-realtime <new-private-dir>` walks New Game to the Main Menu and back at normal speed. Edit [GumProject.gumx](UI/Gum/GumProject.gumx); screen reconstruction phases 3 and 4 are closed with carried items.
+Presentation check: `dotnet run --project TagForceSpecial.PC -- --presentation-smoke --data-root <validated-private-root> --presentation-trace <new-private.json>` replays 5 cycles of every observed Continue/New Game and Main Menu route with fixed frames; add `--capture-flow <new-private-dir>` to save each state. `--data-root <private-copy> --presentation-realtime <new-private-dir>` walks New Game to the Main Menu and back at normal speed. Edit [GumProject.gumx](UI/Gum/GumProject.gumx).
 
 ## Private data and recovery
 

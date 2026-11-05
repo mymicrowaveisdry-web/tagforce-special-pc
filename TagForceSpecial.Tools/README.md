@@ -13,7 +13,7 @@ before creating a format-independent catalog; authored cards use the Cards API d
 `catalog-check <directory>` validates it. `card-support` emits per-source support
 manifests; `preview-duel` accepts either a package directory or the file/ID-range arguments.
 `source-check`, `cache-create`, `cache-check`, `foundation-examples` and `deck-check`
-exercise the 13A–13B foundations with deterministic diagnostics.
+exercise the source/cache and deck foundations with deterministic diagnostics.
 
 Legacy `progress` and `research-check` require ignored research configs, evidence
 and the former documentation layout. They are outside the clean-checkout workflow.
