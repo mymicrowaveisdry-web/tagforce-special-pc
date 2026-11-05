@@ -3,6 +3,21 @@ using System.Text.Json;
 using TagForceSpecial.Assets;
 using TagForceSpecial.Tools;
 
+if (args.Length > 0 && args[0] == "presentation-import") return PresentationCommands.Run(args[1..], Console.Out, Console.Error);
+if (args.Length > 0 && args[0] == "presentation-check") return PresentationCommands.Check(args[1..], Console.Out, Console.Error);
+if (args.Length > 0 && args[0] == "presentation-title-import") return PresentationCommands.ImportTitle(args[1..], Console.Out, Console.Error);
+if (args.Length == 1 && args[0] == "presentation-reference-cases")
+{
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        schemaVersion = 2,
+        sourceProfileFingerprint = TagForceSpecial.Assets.GameSource.GameBuildProfile.English21.Fingerprint,
+        scope = TagForceSpecial.Assets.Presentation.PresentationReferenceCases.Scope,
+        cases = TagForceSpecial.Assets.Presentation.PresentationReferenceCases.Cases
+    }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
+    return 0;
+}
+
 if (args.Length > 0 && args[0] == "progress") return ProjectProgress.Run(args[1..], Console.Out, Console.Error);
 if (args.Length > 0 && args[0] == "research-check") return ResearchValidation.Run(args[1..], Console.Out, Console.Error);
 if (args.Length > 0 && args[0] == "card-support") return CardSupportInventory.Run(args[1..], Console.Out, Console.Error);
