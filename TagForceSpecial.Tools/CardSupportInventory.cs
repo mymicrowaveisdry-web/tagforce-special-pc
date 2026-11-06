@@ -15,6 +15,12 @@ public static class CardSupportInventory
             !catalog.Cards.Select(c => c.SourceRow!.InternalIndex).Order().SequenceEqual(Enumerable.Range(1, catalog.Count)))
             throw new InvalidDataException("Inventory requires one zero sentinel and a complete unique source-row mapping.");
         var preview = PlayablePreview.Cards.ToDictionary(c => c.CardId);
+        var normalMonsters = NormalMonsterFamily.CardIds.ToHashSet();
+        var tokens = TfspTokens.Ids.ToHashSet();
+        // Family support is claimed only for a catalog holding the whole reviewed family (never a partial subset).
+        var catalogIds = catalog.Cards.Select(c => c.GameCardId).ToHashSet();
+        bool fullFamilyCatalog = normalMonsters.IsSubsetOf(catalogIds);
+        if (fullFamilyCatalog) NormalMonsterFamily.ValidateCatalog(catalog);
         var researchCards = new Dictionary<uint, string>
         {
             [7747] = "Emergency Teleport: bounded Deck Krebons lifecycle; hand targets, shuffle and general continuation remain incomplete.",
@@ -23,7 +29,38 @@ public static class CardSupportInventory
             [4818] = "Scapegoat: retained targeted-response experiment; general activation and token lifecycle incomplete.",
             [4862] = "Magic Jammer: explicit discard allowlist; full card contract and comparison not accepted."
         };
-        object Entry(CardDefinition c)
+        // Preview manifest entries keep the preview contract; the release manifest uses the wider family contract.
+        object Entry(CardDefinition c) => fullFamilyCatalog && normalMonsters.Contains(c.GameCardId) ? FamilyEntry(c) : PreviewEntry(c);
+        object FamilyEntry(CardDefinition c) => new
+        {
+            c.GameCardId, c.Name, c.Source, c.SourceRow, c.Statistics,
+            originalEraText = c.Description,
+            rulingBasis = "Imported local source text; default original-era basic duel rules. No later errata inferred.",
+            behaviorFamily = NormalMonsterFamily.FamilyId,
+            status = "supported",
+            scope = NormalMonsterFamily.BatchId,
+            operation = NormalMonsterFamily.Contract,
+            conditions = c.Statistics.Level switch
+            {
+                <= 4 => "Ordinary Level 1–4 Normal Summon/Set.",
+                <= 6 => "Level 5–6: Tribute Summon/Set with exactly one eligible Tribute.",
+                _ => "Level 7–8: Tribute Summon/Set with exactly two eligible Tributes."
+            },
+            costs = c.Statistics.Level <= 4 ? "none" : "Tributes for the summon procedure only.",
+            targets = "none",
+            choices = "Ordinary placement, position, Tribute selection and battle target commands only.",
+            limits = "Default turn, zone and summon/attack limits; no card-specific limits.",
+            exceptions = NormalMonsterFamily.Exception(c.GameCardId) ?? "none",
+            negationAndCleanup = "Ordinary battle destruction and Tribute departure; no effect to negate.",
+            tests = new[] { "NormalMonsterFamilyTests", "NormalMonsterFamilyLocalReferenceTests", "TributeSummonTests", "DuelBattleTests" },
+            pspVerified = false,
+            pspEvidenceIds = Array.Empty<string>(),
+            evidenceClass = "decoded-metadata; synthetic-rule-test",
+            staticEvidenceIds = new[] { "stage10-native-inventory-2026-11-01:no-handler-binding" },
+            missingEvidence = "Independent original-game runtime observations for this card and interaction scope.",
+            gaps = Array.Empty<string>()
+        };
+        object PreviewEntry(CardDefinition c)
         {
             preview.TryGetValue(c.GameCardId, out var profile);
             return new
@@ -58,10 +95,21 @@ public static class CardSupportInventory
             reconciliation = new { propertyRows, zeroSentinelRows = 1, catalogIds = catalog.Count,
                 countingRule = "Distinct nonzero game-local IDs; retain artwork variants; exclude row-zero sentinel." },
             scope = "Engine-level preview pool only; presentation, AI, tag/campaign and full PSP fidelity have separate gates.",
-            playablePreview = new { id = PlayablePreview.ManifestId, cards = catalog.Cards.Where(c => preview.ContainsKey(c.GameCardId)).Select(Entry).ToArray() },
-            pspFidelity10 = new { id = "tfsp-psp-fidelity-1.0", ready = false, cards = catalog.Cards.Select(Entry).ToArray() },
+            playablePreview = new { id = PlayablePreview.ManifestId, cards = catalog.Cards.Where(c => preview.ContainsKey(c.GameCardId)).Select(PreviewEntry).ToArray() },
+            pspFidelity10 = new
+            {
+                id = "tfsp-psp-fidelity-1.0", ready = false,
+                denominatorRule = "All distinct nonzero catalog IDs except reviewed effect-generated Tokens; unobtainable cards remain included.",
+                excludedTokens = catalog.Cards.Where(c => tokens.Contains(c.GameCardId))
+                    .Select(c => new { c.GameCardId, c.Name, reason = "effect-generated token" }).ToArray(),
+                cards = catalog.Cards.Where(c => !tokens.Contains(c.GameCardId)).Select(Entry).ToArray()
+            },
             families = PlayablePreview.Cards.GroupBy(c => c.Family).Select(g => new { family = g.Key, cardIds = g.Select(c => c.CardId).ToArray() }),
-            unclassifiedCardCount = catalog.Count - preview.Count,
+            familyBatches = fullFamilyCatalog
+                ? new[] { new { id = NormalMonsterFamily.BatchId, family = NormalMonsterFamily.FamilyId, cardIds = NormalMonsterFamily.CardIds.ToArray() } }
+                : [],
+            unclassifiedCardCount = catalog.Cards.Count(c => !tokens.Contains(c.GameCardId) && !preview.ContainsKey(c.GameCardId) &&
+                !(fullFamilyCatalog && normalMonsters.Contains(c.GameCardId))),
             exampleDeck = PlayablePreview.ExampleDeck
         };
     }
@@ -76,7 +124,7 @@ public static class CardSupportInventory
         try
         {
             using var stream = File.OpenRead(args[0]);
-            var catalog = CardCatalogImporter.Read(stream, minimum, maximum);
+            var catalog = ReviewedCardMetadata.Overlay(CardCatalogImporter.Read(stream, minimum, maximum));
             var properties = new EhpReader().ReadIndex(stream).Entries.Single(e => e.Name == "CARD_Prop.bin");
             var manifest = Build(catalog, checked((int)(properties.Length / 8)));
             output.WriteLine(JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));

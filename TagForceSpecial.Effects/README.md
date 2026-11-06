@@ -1,6 +1,8 @@
 # Card effects
 
 [`PlayablePreview`](PlayablePreview.cs) defines the tested 14-card [preview pool](Preview.md); the default-off research profiles below remain partial.
+[`NormalMonsterFamily`](NormalMonsterFamily.cs) supports all 665 reviewed Normal Monsters: Level 1–4 Normal Summon/Set, Level 5–8 Tribute Summon/Set, being Tributed, flip and basic battle; combine with other profiles through `RulesWith`. Tokens are excluded from release manifests.
+[`ReviewedCardMetadata`](ReviewedCardMetadata.cs) overlays reviewed metadata when a catalog is opened; converted packages keep the frozen Cards baseline, so review batches never change pinned cache bytes or artwork bindings.
 
 | Profiles | Scope |
 | --- | --- |

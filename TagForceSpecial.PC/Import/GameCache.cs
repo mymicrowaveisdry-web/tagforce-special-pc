@@ -66,7 +66,9 @@ public static class GameCache
             var catalog = CardCatalogPackage.Load(Path.Combine(directory, "catalog"));
             if (catalog.Catalog.Source.ContainerSha256 != profile.CatalogSourceSha256)
                 return Failure("CacheCatalogSourceMismatch", "catalog", "Catalog belongs to a different original source.");
-            return new(new(profile.BuildId, profile.ImageSha256, catalog), Array.Empty<SourceDiagnostic>());
+            // Pinned bytes are verified above; reviewed card metadata is code-owned and overlaid after validation.
+            var opened = catalog with { Catalog = Effects.ReviewedCardMetadata.Overlay(catalog.Catalog) };
+            return new(new(profile.BuildId, profile.ImageSha256, opened), Array.Empty<SourceDiagnostic>());
         }
         catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException or JsonException or ArgumentException)
         { return Failure("CacheUnreadable", "cache", "Cache structure or content cannot be fully validated."); }

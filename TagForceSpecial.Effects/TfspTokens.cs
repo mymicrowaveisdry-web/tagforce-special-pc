@@ -1,0 +1,21 @@
+namespace TagForceSpecial.Effects;
+
+/// <summary>
+/// Reviewed effect-generated Token IDs for cardinfo 6cd21aa6 (decoded getter kind 10; every text states the
+/// card that summons it; reviewed 2026-11-06). Tokens are not deck cards: they are excluded from release
+/// manifests as entries and exercised only through the effects that create them.
+/// </summary>
+public static class TfspTokens
+{
+    public static IReadOnlyList<uint> Ids { get; } = Array.AsReadOnly(new uint[]
+    {
+        3515, 3633, 3652, 3653, 3751, 3900, 3901, 3902, 3903, 3904, 3905, 3906,
+        3907, 3908, 3909, 3910, 3911, 3912, 3913, 3914, 3915, 3916, 3917, 3918,
+        3919, 3920, 3921, 3922, 3923, 3924, 3925, 3926, 3927, 3928, 3929, 3930,
+        3931, 3932, 3933, 3934, 3935, 3936, 3937, 3938, 3939, 3940, 3941, 3942,
+        3943, 3944, 3945, 3946, 3947, 3948, 3949, 3950, 3951, 3952, 3953, 3954,
+        3955, 3956, 3957, 3958, 3959, 3960, 3961, 3962, 3963, 3964, 3965, 3966,
+        3967, 3968, 3969, 3970, 3971, 3972, 3973, 3974, 3975, 3976, 3977, 3978,
+        3979, 3980, 3981, 3982, 3983, 3984, 3985, 3986, 3987, 3988, 3989
+    });
+}

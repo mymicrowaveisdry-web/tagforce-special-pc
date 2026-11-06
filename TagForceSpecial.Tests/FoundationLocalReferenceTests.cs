@@ -28,6 +28,9 @@ public sealed class FoundationLocalReferenceTests
             Assert.True(cache.IsValid, JsonSerializer.Serialize(cache.Diagnostics));
             Assert.True(source.IsUnchanged());
             Assert.Equal(7254, cache.Cache!.Catalog.Catalog.Count);
+            // Opened caches carry the reviewed overlay while their pinned bytes stay unchanged.
+            Assert.Equal(665, cache.Cache.Catalog.Catalog.Cards.Count(c => c.Effects!.State == Cards.CardEffectState.None));
+            NormalMonsterFamily.ValidateCatalog(cache.Cache.Catalog.Catalog);
             var policy = InitialDeckPolicy.Create();
             var first = InitialDeckPolicy.Example(); var second = InitialDeckPolicy.Example("local-opponent");
             var firstCollection = InitialDeckPolicy.ExampleCollection(); var secondCollection = InitialDeckPolicy.ExampleCollection("local-opponent");
