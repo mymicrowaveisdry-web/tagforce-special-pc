@@ -5,7 +5,7 @@ using TagForceSpecial.Core;
 namespace TagForceSpecial.Effects;
 
 public sealed record PreviewCard(uint CardId, string Family,
-    string Contract, NormalSpellProfile? Spell = null);
+    string Contract, EffectDefinition? Spell = null);
 
 /// <summary>Stage 10B's explicit original-card pool. Synthetic validation and PSP fidelity are separate.</summary>
 public static class PlayablePreview
@@ -16,12 +16,12 @@ public static class PlayablePreview
     {
         Monster(4012), Monster(4030), Monster(4032), Monster(4033),
         Monster(4071), Monster(4084), Monster(5644), Monster(6960),
-        Spell(4345, NormalSpellOperation.GainLifePoints, 500),
-        Spell(4348, NormalSpellOperation.GainLifePoints, 1000),
-        Spell(4349, NormalSpellOperation.DamageOpponent, 200),
-        Spell(4350, NormalSpellOperation.DamageOpponent, 500),
-        Spell(4352, NormalSpellOperation.DamageOpponent, 800),
-        Spell(4840, NormalSpellOperation.GainLifePoints, 400)
+        Spell(4345, gain: true, 500),
+        Spell(4348, gain: true, 1000),
+        Spell(4349, gain: false, 200),
+        Spell(4350, gain: false, 500),
+        Spell(4352, gain: false, 800),
+        Spell(4840, gain: true, 400)
     });
     public static IReadOnlyDictionary<uint, DuelCardRules> Rules { get; } = Cards.ToFrozenDictionary(c => c.CardId,
         c => c.Spell is null ? new DuelCardRules(CardCategory.Monster, AllowsNormalSummon: true, AllowsBasicBattle: true)
@@ -30,11 +30,17 @@ public static class PlayablePreview
     private static PreviewCard Monster(uint id) =>
         new(id, "ordinary-normal-monster",
             "Normal Summon/Set, flip, position change, basic battle and owner Graveyard movement; no card effect.");
-    private static PreviewCard Spell(uint id, NormalSpellOperation operation, int amount) =>
-        new(id, operation == NormalSpellOperation.GainLifePoints ? "fixed-lp-recovery" : "fixed-effect-damage",
-            $"{operation}: {amount}; targetless, no cost/choice/once-per-turn restriction; own Main1/Main2 from hand or set; " +
+    // Fixed LP Spells: one-step Normal Spell definitions. Amounts are authored from the static LP table.
+    private static PreviewCard Spell(uint id, bool gain, int amount) =>
+        new(id, gain ? "fixed-lp-recovery" : "fixed-effect-damage",
+            $"{(gain ? "GainLifePoints" : "DamageOpponent")}: {amount}; targetless, no cost/choice/once-per-turn restriction; own Main1/Main2 from hand or set; " +
             "Spell Speed 1 chain, negation skips effect, source destruction alone does not negate; ordinary chain cleanup.",
-            new(TfspCardMetadata.Reviewed[id].Effects.References.Single(), id, operation, amount));
+            new(TfspCardMetadata.Reviewed[id].Effects.References.Single(), id, EffectKind.NormalSpell,
+                [gain ? new GainLifePointsStep(amount) : new DealDamageStep(amount)]));
+
+    /// <summary>Effect definitions of the preview Spells, for engines that combine the preview with other families.</summary>
+    public static IReadOnlyList<EffectDefinition> Definitions { get; } =
+        Array.AsReadOnly(Cards.Select(c => c.Spell).OfType<EffectDefinition>().ToArray());
 
     public static void ValidateCatalog(CardCatalog catalog)
     {
@@ -66,7 +72,7 @@ public static class PlayablePreview
             return deck;
         }
         return new(catalog, Rules, Deck(first), Deck(second), experimentalBattleFlow: stagedBattle,
-            normalSpellProfiles: Cards.Select(c => c.Spell).OfType<NormalSpellProfile>());
+            effectDefinitions: Definitions);
     }
 
     /// <summary>Ordered input for reproducible engine scenarios; the application will supply shuffling later.</summary>

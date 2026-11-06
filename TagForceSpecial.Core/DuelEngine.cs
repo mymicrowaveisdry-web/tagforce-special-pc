@@ -33,7 +33,8 @@ public sealed partial class DuelEngine
     private readonly FrozenDictionary<string, ExtraDeckMaterialProcedureProfile> materialProcedures;
     private readonly FrozenDictionary<uint, SummonEffectProfile> summonEffects;
     private readonly FrozenDictionary<uint, PendulumCardProfile> pendulumCards;
-    private readonly FrozenDictionary<uint, NormalSpellProfile> normalSpells;
+    /// <summary>Definition-driven card effects, keyed by source card ID.</summary>
+    private readonly FrozenDictionary<uint, EffectDefinition> definitions;
     public DuelState State { get; private set; }
 
     /// <summary>
@@ -63,7 +64,7 @@ public sealed partial class DuelEngine
         IEnumerable<ExtraDeckMaterialProcedureProfile>? experimentalMaterialProcedures = null,
         IEnumerable<SummonEffectProfile>? experimentalSummonEffects = null,
         IEnumerable<PendulumCardProfile>? experimentalPendulumCards = null,
-        IEnumerable<NormalSpellProfile>? normalSpellProfiles = null)
+        IEnumerable<EffectDefinition>? effectDefinitions = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(rules);
@@ -211,18 +212,20 @@ public sealed partial class DuelEngine
             pendulums.Select(p => p.CardId).Distinct().Count() != pendulums.Length)
             throw new ArgumentException("Pendulum identities require distinct explicitly classified ordinary monsters; hybrid families are unsupported.");
         pendulumCards = pendulums.ToFrozenDictionary(p => p.CardId);
-        var normalProfiles = (normalSpellProfiles ?? []).ToArray();
+        var definitionList = (effectDefinitions ?? []).ToArray();
         var usedEffectIds = reservedIds.Concat(eventIds).Concat(summonIds)
             .Concat(battleProfiles.Select(p => p.EffectId)).Concat(summonEffects.Values.Select(p => p.EffectId)).ToHashSet(StringComparer.Ordinal);
-        if (normalProfiles.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) ||
+        // Only kinds whose activation timing is implemented are executable; others fail closed at construction.
+        if (definitionList.Any(d => d is null || d.Kind != EffectKind.NormalSpell ||
+                !this.rules.TryGetValue(d.CardId, out var rule) ||
                 rule.Category != CardCategory.Spell || !rule.AllowsSpellTrapSet ||
-                spellEffects.ContainsKey(p.CardId) || activationContracts.ContainsKey(p.CardId) ||
-                chainEffects.ContainsKey(p.CardId) || chainResponses.ContainsKey(p.CardId) ||
-                battleResponses.ContainsKey(p.CardId) || summonEffects.ContainsKey(p.CardId) || usedEffectIds.Contains(p.EffectId)) ||
-            normalProfiles.Select(p => p.CardId).Distinct().Count() != normalProfiles.Length ||
-            normalProfiles.Select(p => p.EffectId).Distinct(StringComparer.Ordinal).Count() != normalProfiles.Length)
-            throw new ArgumentException("Normal Spells require distinct, unreserved profiles and explicit settable Spell rules.", nameof(normalSpellProfiles));
-        normalSpells = normalProfiles.ToFrozenDictionary(p => p.CardId);
+                spellEffects.ContainsKey(d.CardId) || activationContracts.ContainsKey(d.CardId) ||
+                chainEffects.ContainsKey(d.CardId) || chainResponses.ContainsKey(d.CardId) ||
+                battleResponses.ContainsKey(d.CardId) || summonEffects.ContainsKey(d.CardId) || usedEffectIds.Contains(d.EffectId)) ||
+            definitionList.Select(d => d.CardId).Distinct().Count() != definitionList.Length ||
+            definitionList.Select(d => d.EffectId).Distinct(StringComparer.Ordinal).Count() != definitionList.Length)
+            throw new ArgumentException("Effect definitions require distinct, unreserved IDs, an executable kind and explicit settable card rules.", nameof(effectDefinitions));
+        definitions = definitionList.ToFrozenDictionary(d => d.CardId);
         bool IsMonster(uint id) => this.rules.TryGetValue(id, out var rule) && rule.Category == CardCategory.Monster;
         int nextInstance = 1;
         DuelPlayerState CreatePlayer(PlayerId id, IEnumerable<uint> ids)
@@ -286,7 +289,7 @@ public sealed partial class DuelEngine
         {
             BeginDecisionSequence begin => BeginDecisions(begin.SequenceId),
             ActivateSpell activate => Activate(activate.CardInstanceId, activate.SpellTrapZone),
-            ActivateSetSpell activate => ActivateSetNormalSpell(activate.SpellTrapZone),
+            ActivateSetSpell activate => ActivateSetDefinition(activate.SpellTrapZone),
             ActivatePendulumScale scale => ActivateScale(scale),
             PendulumSummon pendulum => ExecutePendulumSummon(pendulum),
             ResolveDrawStep => Draw(),

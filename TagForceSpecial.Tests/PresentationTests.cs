@@ -38,7 +38,7 @@ public sealed class PresentationTests
 
         var spellDeck = new uint[] { 4352, 4012, 4030, 4032, 4033 }.Concat(Enumerable.Repeat(4012u, 35));
         e = new(Catalog(), PlayablePreview.Rules, spellDeck, Enumerable.Repeat(4012u, 40),
-            normalSpellProfiles: PlayablePreview.Cards.Select(c => c.Spell).OfType<NormalSpellProfile>());
+            effectDefinitions: PlayablePreview.Definitions);
         EnterMain(e);
         Ok(e, new ActivateSpell(PlayerId.One, e.State.GetPlayer(PlayerId.One).Hand[0].InstanceId, 0));
         Ok(e, new PassChainResponse(PlayerId.Two, e.State.PendingChain!.DecisionId));

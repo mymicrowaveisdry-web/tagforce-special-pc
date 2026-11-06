@@ -34,7 +34,7 @@ public sealed class NormalMonsterFamilyTests
     private static DuelEngine Engine(IEnumerable<uint> first, CardCatalog? catalog = null, bool withSpells = false) =>
         new(catalog ?? FamilyCatalog(), withSpells ? NormalMonsterFamily.RulesWith(PlayablePreview.Rules) : NormalMonsterFamily.Rules,
             first, Enumerable.Repeat(Filler, 40),
-            normalSpellProfiles: withSpells ? PlayablePreview.Cards.Select(c => c.Spell).OfType<NormalSpellProfile>() : null);
+            effectDefinitions: withSpells ? PlayablePreview.Definitions : null);
 
     private static MonsterBinding Bound(DuelEngine e, int zone)
     {

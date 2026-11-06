@@ -5,7 +5,8 @@ public enum ChainOperation
 {
     DestroyOpposingFaceUpMonsters, DestroyBoundSpellTrap, SummonFourTokens,
     NegateActivation, NegateEffect, TriggerEffect, BattleResponse, SummonNegation, EffectSummon, ActivatePendulumScale,
-    NormalSpell
+    /// <summary>Resolves the ordered steps of the link's <see cref="EffectDefinition"/>.</summary>
+    Definition
 }
 public enum ChainSpellSpeed { One = 1, Two = 2, Three = 3 }
 public enum ChainNegation { None, Effect, Activation }
