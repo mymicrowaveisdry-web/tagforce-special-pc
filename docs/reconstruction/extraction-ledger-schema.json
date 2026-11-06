@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tfsp:private-extraction-ledger:v1",
+  "title": "Private extraction resource or exception row",
+  "oneOf": [{"$ref": "#/$defs/resource"}, {"$ref": "#/$defs/exception"}],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "stage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["state", "evidence"],
+      "allOf": [{"if": {"properties": {"state": {"enum": ["mapped", "runtime-approved", "reference-verified"]}}}, "then": {"properties": {"evidence": {"type": "array", "minItems": 1}}}}],
+      "properties": {
+        "state": {"enum": ["unverified", "retained", "decoded", "partial", "rejected", "classified", "candidate", "mapped", "runtime-approved", "reference-verified"]},
+        "evidence": {"type": "array", "items": {"type": "string", "pattern": "^private:"}}
+      }
+    },
+    "resource": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "record_id", "source", "origin", "family", "classification_basis", "stored_sha256", "evidence", "outputs", "details", "unknowns"],
+      "properties": {
+        "schema_version": {"const": 1}, "record_id": {"$ref": "#/$defs/sha256"},
+        "source": {
+          "type": "object", "additionalProperties": false,
+          "required": ["build_id", "iso_sha256", "profile_fingerprint"],
+          "properties": {"build_id": {"type": "string", "minLength": 1}, "iso_sha256": {"$ref": "#/$defs/sha256"}, "profile_fingerprint": {"$ref": "#/$defs/sha256"}}
+        },
+        "origin": {"type": "object", "required": ["kind", "source_path"], "properties": {"kind": {"enum": ["iso-file", "ehp-member", "card-slot", "hca-waveform", "text-pointer", "character-voice-table"]}, "source_path": {"type": "string", "pattern": "^[^\\\\:]+$"}}},
+        "family": {"type": "string", "minLength": 1}, "classification_basis": {"type": "string"},
+        "stored_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "evidence": {
+          "type": "object", "additionalProperties": false,
+          "required": ["raw", "decoded", "classified", "mapped", "runtime_approved", "reference_verified"],
+          "properties": {
+            "raw": {"allOf": [{"$ref": "#/$defs/stage"}, {"type": "object", "properties": {"state": {"enum": ["unverified", "retained", "rejected"]}}}]},
+            "decoded": {"allOf": [{"$ref": "#/$defs/stage"}, {"type": "object", "properties": {"state": {"enum": ["unverified", "decoded", "partial", "rejected"]}}}]},
+            "classified": {"allOf": [{"$ref": "#/$defs/stage"}, {"type": "object", "properties": {"state": {"enum": ["unverified", "classified", "candidate"]}}}]},
+            "mapped": {"allOf": [{"$ref": "#/$defs/stage"}, {"type": "object", "properties": {"state": {"enum": ["unverified", "mapped"]}}}]},
+            "runtime_approved": {"allOf": [{"$ref": "#/$defs/stage"}, {"type": "object", "properties": {"state": {"enum": ["unverified", "runtime-approved"]}}}]},
+            "reference_verified": {"allOf": [{"$ref": "#/$defs/stage"}, {"type": "object", "properties": {"state": {"enum": ["unverified", "reference-verified"]}}}]}
+          }
+        },
+        "outputs": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["path", "sha256", "kind"], "properties": {"path": {"type": "string", "pattern": "^private:"}, "sha256": {"$ref": "#/$defs/sha256"}, "kind": {"type": "string"}}}},
+        "details": {"type": "object"}, "unknowns": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^/"}}
+      }
+    },
+    "exception": {
+      "type": "object", "additionalProperties": false,
+      "required": ["exception_id", "record_id", "code", "fields", "detail"],
+      "properties": {"exception_id": {"$ref": "#/$defs/sha256"}, "record_id": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}, "code": {"type": "string", "minLength": 1}, "fields": {"type": "array", "items": {"type": "string"}}, "detail": {"type": "string", "minLength": 1}}
+    }
+  }
+}

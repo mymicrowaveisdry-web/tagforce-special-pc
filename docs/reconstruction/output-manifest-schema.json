@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Private semantic asset manifest v2",
+  "description": "A pinned array of mappings over a validated content package. Schema validity does not establish source identity or reference approval.",
+  "type": "array",
+  "minItems": 1,
+  "maxItems": 4096,
+  "items": { "$ref": "#/$defs/asset" },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "id": { "type": "string", "maxLength": 200, "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z0-9-]+)+$" },
+    "dimension": { "type": ["integer", "null"], "minimum": 1, "maximum": 4096 },
+    "asset": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schemaVersion", "buildId", "packageId", "assetKey", "resourceKey", "source", "output", "status", "evidenceIds"],
+      "properties": {
+        "schemaVersion": { "const": 2 },
+        "buildId": { "type": "string", "minLength": 1 },
+        "packageId": { "$ref": "#/$defs/hash" },
+        "assetKey": { "$ref": "#/$defs/id" },
+        "resourceKey": { "type": "string", "minLength": 1 },
+        "source": {
+          "type": "object", "additionalProperties": false,
+          "required": ["archive", "member", "offset", "sourceSha256", "storedSha256", "inputSha256"],
+          "properties": {
+            "archive": { "type": "string", "minLength": 1 },
+            "member": { "type": ["string", "null"] },
+            "offset": { "type": "integer", "minimum": 0 },
+            "sourceSha256": { "$ref": "#/$defs/hash" },
+            "storedSha256": { "$ref": "#/$defs/hash" },
+            "inputSha256": { "$ref": "#/$defs/hash" }
+          }
+        },
+        "output": {
+          "type": "object", "additionalProperties": false,
+          "required": ["relativePath", "contentSha256", "pixelSha256", "width", "height", "sourceRectangle"],
+          "properties": {
+            "relativePath": { "type": "string", "pattern": "^blobs/[a-f0-9]{64}\\.bin$" },
+            "contentSha256": { "$ref": "#/$defs/hash" },
+            "pixelSha256": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
+            "width": { "$ref": "#/$defs/dimension" },
+            "height": { "$ref": "#/$defs/dimension" },
+            "sourceRectangle": {
+              "description": "Measured source texture rectangle [x,y,width,height]; null means unverified. Never inferred from example dimensions.",
+              "oneOf": [
+                { "type": "null" },
+                { "type": "array", "minItems": 4, "maxItems": 4,
+                  "prefixItems": [
+                    { "type": "integer", "minimum": 0 }, { "type": "integer", "minimum": 0 },
+                    { "type": "integer", "minimum": 1 }, { "type": "integer", "minimum": 1 }
+                  ], "items": false }
+              ]
+            }
+          }
+        },
+        "status": { "enum": ["stored", "decoded", "mapped-unverified"] },
+        "evidenceIds": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
+      },
+      "allOf": [{
+        "if": { "properties": { "status": { "const": "mapped-unverified" } }, "required": ["status"] },
+        "then": { "properties": { "evidenceIds": { "type": "array", "minItems": 1 } } }
+      }]
+    }
+  }
+}

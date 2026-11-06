@@ -11,6 +11,7 @@ public sealed class SpriteRenderer : IDisposable
     private readonly SpriteBatch batch;
     private readonly Texture2D pixel;
     private readonly PixelFont font = new();
+    private readonly GameThreadGuard gameThread = new();
     public SpriteRenderer(GraphicsDevice device)
     {
         batch = new(device);
@@ -56,5 +57,5 @@ public sealed class SpriteRenderer : IDisposable
         }
         if (row < lines) Text(line, x, y + row * 9, color);
     }
-    public void Dispose() { pixel.Dispose(); batch.Dispose(); }
+    public void Dispose() { gameThread.Check(); pixel.Dispose(); batch.Dispose(); }
 }

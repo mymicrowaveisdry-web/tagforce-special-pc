@@ -1,0 +1,45 @@
+{
+  "phase": 2,
+  "status": "passed-for-required-sample-scope",
+  "scope": "Five Title/Main Menu source textures and one full-art native reference sample; not exhaustive corpus conversion or original screen reconstruction",
+  "pcTooling": {
+    "privatePresentationGenerations": "implemented",
+    "converterAndSchemaRebuildContract": "implemented",
+    "semanticPackageValidation": "implemented",
+    "diagnosticScreen": "render-captured",
+    "interactiveNavigation": "not-verified",
+    "gameplayEffectsExpandedByImport": false
+  },
+  "referenceAcceptance": {
+    "accurateFullArtSample": "passed-card-9863-captured-native-reference; not a general PSP-identical JPEG codec",
+    "originalTitleAndMainMenuSprites": "passed-for-five-complete-source-textures",
+    "alphaAndSwizzleAgainstMatchingPpsspp": "exact-complete-RGBA-for-accepted-cases",
+    "acceptedManifest": "schema-2-six-resources; integrity-signoff-and-local-reference-test-passed",
+    "acceptedOriginalScreenMappings": "unverified-outside-this-source-pixel-scope",
+    "acceptedSourcePixelResources": 6,
+    "runtimeApprovedOriginalGameScreenLayouts": 0,
+    "oneToOneSourceProvenanceForActivatedRuntimeAssets": "passed-for-all-six-accepted-tooling-resources",
+    "originalNarrowSwizzleCandidates": {
+      "identified": 19,
+      "unresolved": 19,
+      "activated": 0
+    },
+    "fullCatalogConversionComplete": false
+  },
+  "validation": {
+    "solutionBuild": "passed",
+    "gumProjectCheck": "passed",
+    "diagnosticMissingAndCandidateCaptures": "inspected",
+    "nonLocalDotnetTests": {
+      "passed": 786
+    },
+    "phase2PrivateReferenceTests": {
+      "passed": 1,
+      "publicCiArtifact": false
+    },
+    "verificationPythonTests": {
+      "passed": 23
+    },
+    "originalResourcesCommittedByThisWork": false
+  }
+}

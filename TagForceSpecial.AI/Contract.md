@@ -110,5 +110,5 @@ scripted human deck-out victory at seed 7. Both run through the real PC controll
 and window; automated smoke does not certify physical gamepad interaction.
 Replay/result output flags save the first completed duel per process; existing
 files are never overwritten. Original assets, texture/font conversion
-and exact PSP GUI matching remain future work; original character/tag fidelity
-remains future work.
+and exact PSP GUI matching remain unfinished, as does original character/tag
+fidelity.

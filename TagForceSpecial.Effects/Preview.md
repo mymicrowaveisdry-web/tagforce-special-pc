@@ -50,4 +50,4 @@ The six Spell amounts have static PRX corroboration from the pinned toolkit and
 Ghidra signed table at historical `0x09c98ec4`, through handler `0x0990d710`.
 This is a static interpretation (`reaEvidence=false`), not observed execution.
 Every preview card's PSP-verified flag is false. Tests prove the declared engine
-subset; full PSP compatibility and playability remain open.
+subset; full PSP compatibility and broader playability remain open.

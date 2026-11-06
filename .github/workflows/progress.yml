@@ -18,6 +18,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+      - name: Test verification command with synthetic inputs
+        run: python3 -m unittest discover -s Verification -p 'test_*.py' -v
       # Dependency locks and PSP reference fixtures remain local.
       - name: Restore the C# solution
         run: dotnet restore ygo-tag-force-special-decomp.slnx -p:RestorePackagesWithLockFile=false

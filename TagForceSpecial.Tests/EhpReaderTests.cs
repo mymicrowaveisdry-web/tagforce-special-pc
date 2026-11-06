@@ -111,4 +111,75 @@ public class EhpReaderTests
         byte[] bytes = Fixture(); Put(bytes, 16, 62); bytes[62] = (byte)'x'; bytes[63] = 0;
         Assert.Throws<InvalidDataException>(() => Read(bytes));
     }
+
+    [Theory]
+    [InlineData(70u)]
+    [InlineData(100u)]
+    public void ExplicitInspectionPreservesMismatchingHeaderAndUsesActualBounds(uint declared)
+    {
+        byte[] bytes = Fixture(); Put(bytes, 4, declared);
+        byte[] before = (byte[])bytes.Clone();
+        using var stream = new MemoryStream(bytes, writable: false);
+        stream.Position = 11;
+        var index = new EhpReader().ReadIndex(stream, EhpReadMode.InspectStoredRanges);
+        Assert.Equal((long)declared, index.DeclaredLength);
+        Assert.Equal(new EhpEntry(1, "b", 47, 80, 6), index.Entries[1]);
+        Assert.Contains("actual file bounds", Assert.Single(index.Diagnostics));
+        Assert.Equal(11, stream.Position);
+        Assert.Equal(before, bytes);
+        Assert.Throws<InvalidDataException>(() => Read(bytes));
+    }
+
+    [Theory]
+    [InlineData(16, uint.MaxValue)]
+    [InlineData(20, uint.MaxValue)]
+    [InlineData(42, uint.MaxValue)]
+    [InlineData(24, 40u)]
+    public void InspectionStillRejectsInvalidPointersLengthsAndMetadataOverlaps(int offset, uint value)
+    {
+        byte[] bytes = Fixture(); Put(bytes, 4, 70); Put(bytes, offset, value);
+        using var stream = new MemoryStream(bytes, writable: false);
+        stream.Position = 11;
+        Assert.Throws<InvalidDataException>(() =>
+            new EhpReader().ReadIndex(stream, EhpReadMode.InspectStoredRanges));
+        Assert.Equal(11, stream.Position);
+    }
+
+    [Fact]
+    public void InspectionRejectsTruncatedPayloadDespiteMismatchingHeader()
+    {
+        using var stream = new MemoryStream(Fixture()[..85], writable: false);
+        Assert.Throws<InvalidDataException>(() =>
+            new EhpReader().ReadIndex(stream, EhpReadMode.InspectStoredRanges));
+    }
+
+    [Theory]
+    [InlineData(64u)]
+    [InlineData(65u)]
+    public void InspectionReportsSharedAndPartiallyOverlappingPayloadsWithoutClipping(uint offset)
+    {
+        byte[] bytes = Fixture(); Put(bytes, 28, offset);
+        var index = new EhpReader().ReadIndex(new MemoryStream(bytes), EhpReadMode.InspectStoredRanges);
+        Assert.Equal((long)offset, index.Entries[1].Offset);
+        Assert.Equal(6, index.Entries[1].Length);
+        Assert.Contains(index.Diagnostics, d => d.Contains("payload overlaps"));
+        Assert.Throws<InvalidDataException>(() => Read(bytes));
+    }
+
+    [Fact]
+    public void ExplicitSubsetInspectionReportsBadPayloadWithoutChangingWholeArchiveAcceptance()
+    {
+        byte[] bytes = Fixture(); Put(bytes, 49, uint.MaxValue);
+        using var stream = new MemoryStream(bytes, writable: false); stream.Position = 9;
+        var subset = new EhpReader().InspectBoundedMembers(stream);
+        Assert.Equal("a", Assert.Single(subset.BoundedIndex.Entries).Name);
+        Assert.Equal("b", Assert.Single(subset.RejectedEntries).Name);
+        Assert.Equal((long)uint.MaxValue, subset.RejectedEntries[0].Length);
+        Assert.Contains(subset.BoundedIndex.Diagnostics, d => d.Contains("rejected without clipping"));
+        Assert.Equal(9, stream.Position);
+        Assert.Throws<InvalidDataException>(() => Read(bytes));
+        Assert.Throws<InvalidDataException>(() => new EhpReader().ReadIndex(stream, EhpReadMode.InspectStoredRanges));
+        Put(bytes, 16, 0);
+        Assert.Throws<InvalidDataException>(() => new EhpReader().InspectBoundedMembers(new MemoryStream(bytes)));
+    }
 }

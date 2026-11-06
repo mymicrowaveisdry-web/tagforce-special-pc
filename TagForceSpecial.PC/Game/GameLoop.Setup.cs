@@ -25,7 +25,7 @@ public sealed partial class GameLoop
     private bool editingName;
     private string editorNotice = "Right: add  Left: remove  Tab: section  Enter: menu";
     private string preferencesNotice = "Changes are saved locally.";
-    private static readonly string[] SetupActions = ["SELECT ORIGINAL ISO", "RESUME IMPORT", "VERIFY CURRENT CACHE", "REBUILD FROM ORIGINAL ISO", "RESTART INTERRUPTED WORK", "PREFERENCES", "RESTORE SETTINGS BACKUP", "RESOURCE STATUS", "BACK"];
+    private static readonly string[] SetupActions = ["SELECT ORIGINAL ISO", "RESUME IMPORT", "VERIFY CURRENT CACHE", "REBUILD FROM ORIGINAL ISO", "RESTART INTERRUPTED WORK", "PREFERENCES", "RESTORE SETTINGS BACKUP", "RESOURCE STATUS", "PC DUEL TOOLS"];
     private static readonly string[] EditorActions = ["SAVE NEW REVISION", "NAME DECK", "SEARCH CARDS", "CHANGE FILTER", "LOAD SAVED REVISION", "NEW EMPTY DECK", "INITIAL SUPPORTED DECK", "PLAY THIS DECK", "BACK"];
 
     private void InitializeSetup()
@@ -35,6 +35,7 @@ public sealed partial class GameLoop
         setup = new(root); library = new(setup.Storage);
         Window.TextInput += (_, e) =>
         {
+            if (titleFlow?.Editing == true) { titleFlow.TypeCharacter(e.Character); return; }
             if (editingText is null) return;
             if (e.Character == '\b') { if (editingText.Length > 0) editingText = editingText[..^1]; }
             else if (!char.IsControl(e.Character) && editingText.Length < 48) editingText += e.Character;
@@ -66,6 +67,11 @@ public sealed partial class GameLoop
         {
             var result = setupTask.GetAwaiter().GetResult();
             setupMessage = result.Success ? "Local game data is ready. Open Decks to prepare and play." : result.Issue!.Message;
+            if (result.Success)
+            {
+                if (setup?.PresentationNotice is { } notice) setupMessage = notice;
+                TryActivateImportedTitle();
+            }
         }
         catch (Exception e) when (SetupStore.Recoverable(e)) { setupMessage = "Setup could not finish. Retry or select your ISO again."; }
         setupTask = null;
@@ -110,7 +116,7 @@ public sealed partial class GameLoop
     {
         if (setupTask is not null)
         { if (buttons.Back) { importCancellation?.Cancel(); setupMessage = "Stopping safely..."; } return; }
-        if (buttons.Back) { screen = ScreenId.MainMenu; menuIndex = 0; return; }
+        if (buttons.Back) { screen = utilityReturn; return; }
         MoveMenu(buttons, SetupActions.Length);
         if (!buttons.Confirm || setup is null) return;
         try
@@ -127,10 +133,8 @@ public sealed partial class GameLoop
                 case 4: setup.RestartWork(); setupMessage = "Interrupted work retained separately. Select your ISO or resume to restart."; break;
                 case 5: screen = ScreenId.Preferences; menuIndex = 0; break;
                 case 6: setupMessage = setup.RestorePreferences().Issue?.Message ?? "Previous preferences restored."; draft = null; break;
-                case 7: setupMessage = setup.Resources is { } resources
-                    ? $"Imported {setup.Cache!.Catalog.Catalog.Count} card definitions and {resources.Cards.Count} image entries. Card art, fonts and audio are not yet available."
-                    : "No verified resource index is active. Import or rebuild from your original ISO."; break;
-                case 8: screen = ScreenId.MainMenu; menuIndex = 0; break;
+                case 7: OpenAssetDiagnostics(); break;
+                case 8: screen = ScreenId.PcTools; break;
             }
         }
         catch (Exception e) when (SetupStore.Recoverable(e)) { setupMessage = "The operation could not finish. Check local storage and retry."; }
@@ -138,14 +142,14 @@ public sealed partial class GameLoop
     private void UpdatePreferences(GuiButtons buttons)
     {
         if (setup is null) return;
-        if (buttons.Back) { screen = ScreenId.MainMenu; menuIndex = 0; return; }
+        if (buttons.Back) { screen = ScreenId.PcTools; menuIndex = 0; return; }
         MoveMenu(buttons, 4);
         if (!buttons.Confirm && !buttons.Left && !buttons.Right) return;
         var value = setup.Preferences;
         if (menuIndex == 0) value = value with { OpponentSeed = unchecked(value.OpponentSeed + (buttons.Left ? uint.MaxValue : 1u)) };
         if (menuIndex == 1) value = value with { IntegerScaling = !value.IntegerScaling };
         if (menuIndex == 2) value = value with { OpponentSeed = 7, IntegerScaling = false };
-        if (menuIndex == 3) { screen = ScreenId.MainMenu; menuIndex = 0; return; }
+        if (menuIndex == 3) { screen = ScreenId.PcTools; menuIndex = 0; return; }
         setup.SavePreferences(value);
         preferencesNotice = "Preferences saved.";
     }
@@ -180,7 +184,7 @@ public sealed partial class GameLoop
                 case 5: draft = new(draft.Catalog, InitialOpponentDecks.Create(0)); draft.Clear(); draft.Name = "New deck"; draftKey = null; break;
                 case 6: draft = new(draft.Catalog, InitialOpponentDecks.Create(0)); draftKey = null; break;
                 case 7: LaunchDraft(); break;
-                case 8: screen = ScreenId.MainMenu; menuIndex = 0; break;
+                case 8: screen = ScreenId.PcTools; menuIndex = 0; break;
             }
             return;
         }
@@ -224,7 +228,7 @@ public sealed partial class GameLoop
         else
             for (int i = 0; i < SetupActions.Length; i++)
                 renderer.Text((menuIndex == i ? "> " : "  ") + SetupActions[i], 12, 82 + i * 19, menuIndex == i ? gold : Color.White);
-        renderer.Text("ORIGINALS STAY READ-ONLY. ASSETS STAY LOCAL.", 12, 251, muted);
+        renderer.Text("ESC/B: BACK   ORIGINALS READ-ONLY. ASSETS LOCAL.", 12, 251, muted);
     }
     private void DrawEditor()
     {
