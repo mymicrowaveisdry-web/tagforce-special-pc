@@ -35,7 +35,7 @@ public sealed class PlayerProfileStoreTests : IDisposable
     public void SchemaOneProfileLoadsWithNewGameOptionDefaults()
     {
         var store = Create();
-        File.WriteAllText(Path.Combine(root, "profile.json"), "{\"schemaVersion\":1,\"name\":\"Yuya\",\"level\":\"BeenThere\",\"savedUtc\":\"2026-11-05T00:00:00Z\"}");
+        File.WriteAllText(Path.Combine(root, "profile.json"), "{\"schemaVersion\":1,\"name\":\"Yuya\",\"level\":1,\"savedUtc\":\"2026-11-05T00:00:00Z\"}"); // Numeric, as Save writes (1 = BeenThere).
         Assert.True(store.TryLoad());
         Assert.Equal(PlayerProfileStore.CurrentSchema, store.Current!.SchemaVersion);
         Assert.Equal(PlayerOptions.Defaults().Values, store.Current.Options!.Values);
