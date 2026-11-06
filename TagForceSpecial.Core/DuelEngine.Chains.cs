@@ -36,6 +36,13 @@ public sealed partial class DuelEngine
                 return BeginBattleResponse(command.Player, response.SpellTrapZone, response.SummonedCardInstanceId, response.MonsterZone, battleProfile);
             if (response.SummonedCardInstanceId is not null || response.MonsterZone is not null)
                 return Reject(DuelError.InvalidDecisionChoice);
+            if (source is not null && definitions.TryGetValue(source.Card.GameCardId, out var definition))
+            {
+                // Definition responses are open-chain responses only; battle and summon windows are later work.
+                if (State.Battle is not null) return Reject(DuelError.UnsupportedBattleResponse);
+                if (State.PendingSummon is not null) return Reject(DuelError.UnsupportedSummonResponse);
+                return BeginDefinitionResponse(chain, response.SpellTrapZone, source, definition);
+            }
             if (source is not null && chainResponses.TryGetValue(source.Card.GameCardId, out var profile))
             {
                 if (State.PendingSummon is not null && (rules[source.Card.GameCardId].Category != CardCategory.Trap ||

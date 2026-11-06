@@ -250,8 +250,9 @@ public sealed class NormalSpellTests
         Assert.Throws<ArgumentException>(() => Build([p, p]));
         Assert.Throws<ArgumentException>(() => Build([p, Burn("x", 4350, 500)]));
         Assert.Throws<ArgumentException>(() => Build([Burn("x", 4012, 500)]));
-        // Kinds whose activation timing is not implemented yet fail closed at construction.
-        Assert.Throws<ArgumentException>(() => Build([new("q", 4352, EffectKind.QuickPlaySpell, [new DealDamageStep(800)])]));
+        // A Trap kind needs Trap card rules (4352 is a Spell); a shuffle step needs a seeded engine.
+        Assert.Throws<ArgumentException>(() => Build([new("t", 4352, EffectKind.NormalTrap, [new DealDamageStep(800)])]));
+        Assert.Throws<ArgumentException>(() => Build([new("s", 4352, EffectKind.NormalSpell, [new ShuffleDeckStep()])]));
         var bad = PlayablePreview.Rules.ToDictionary(); bad[4352] = new(CardCategory.Spell);
         Assert.Throws<ArgumentException>(() => Build([p], bad));
     }

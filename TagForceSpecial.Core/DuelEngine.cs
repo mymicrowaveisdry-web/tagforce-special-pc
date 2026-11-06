@@ -64,7 +64,7 @@ public sealed partial class DuelEngine
         IEnumerable<ExtraDeckMaterialProcedureProfile>? experimentalMaterialProcedures = null,
         IEnumerable<SummonEffectProfile>? experimentalSummonEffects = null,
         IEnumerable<PendulumCardProfile>? experimentalPendulumCards = null,
-        IEnumerable<EffectDefinition>? effectDefinitions = null)
+        IEnumerable<EffectDefinition>? effectDefinitions = null, ulong? shuffleSeed = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(rules);
@@ -218,17 +218,18 @@ public sealed partial class DuelEngine
         var definitionList = (effectDefinitions ?? []).ToArray();
         var usedEffectIds = reservedIds.Concat(eventIds).Concat(summonIds)
             .Concat(battleProfiles.Select(p => p.EffectId)).Concat(summonEffects.Values.Select(p => p.EffectId)).ToHashSet(StringComparer.Ordinal);
-        // Only kinds whose activation timing is implemented are executable; others fail closed at construction.
-        if (definitionList.Any(d => d is null || d.Kind != EffectKind.NormalSpell ||
+        // Spell kinds need Spell rules and Trap kinds Trap rules; every source must be settable.
+        if (definitionList.Any(d => d is null ||
                 d.Steps.OfType<SummonTokensStep>().Any(s => s.TokenCardIds.Any(id => !IsTokenId(id))) ||
-                !this.rules.TryGetValue(d.CardId, out var rule) ||
-                rule.Category != CardCategory.Spell || !rule.AllowsSpellTrapSet ||
+                shuffleSeed is null && d.Steps.Any(s => s is ShuffleDeckStep) ||
+                !this.rules.TryGetValue(d.CardId, out var rule) || !rule.AllowsSpellTrapSet ||
+                rule.Category != (d.Kind is EffectKind.NormalSpell or EffectKind.QuickPlaySpell ? CardCategory.Spell : CardCategory.Trap) ||
                 spellEffects.ContainsKey(d.CardId) || activationContracts.ContainsKey(d.CardId) ||
                 chainEffects.ContainsKey(d.CardId) || chainResponses.ContainsKey(d.CardId) ||
                 battleResponses.ContainsKey(d.CardId) || summonEffects.ContainsKey(d.CardId) || usedEffectIds.Contains(d.EffectId)) ||
             definitionList.Select(d => d.CardId).Distinct().Count() != definitionList.Length ||
             definitionList.Select(d => d.EffectId).Distinct(StringComparer.Ordinal).Count() != definitionList.Length)
-            throw new ArgumentException("Effect definitions require distinct, unreserved IDs, an executable kind and explicit settable card rules.", nameof(effectDefinitions));
+            throw new ArgumentException("Effect definitions require distinct, unreserved IDs, matching settable card rules, Token rules for Token steps and a seed for shuffle steps.", nameof(effectDefinitions));
         definitions = definitionList.ToFrozenDictionary(d => d.CardId);
         bool IsMonster(uint id) => this.rules.TryGetValue(id, out var rule) && rule.Category == CardCategory.Monster;
         int nextInstance = 1;
@@ -254,7 +255,7 @@ public sealed partial class DuelEngine
         var firstExtra = CreateExtraDeck(PlayerId.One, playerOneExtraDeck);
         var secondExtra = CreateExtraDeck(PlayerId.Two, playerTwoExtraDeck);
         State = new([first.With(extraDeck: firstExtra), second.With(extraDeck: secondExtra)], startingPlayer,
-            nextInstanceId: nextInstance);
+            bookkeeping: new(nextInstance, shuffleSeed is { } seed ? DuelRandomState.FromSeed(seed) : null));
     }
 
     private bool IsTokenId(uint id) => rules.TryGetValue(id, out var rule) && rule.IsToken;
@@ -277,6 +278,7 @@ public sealed partial class DuelEngine
         if (State.EventEffects.PendingTriggers is not null)
             return command is ChooseTriggerOrder order ? OrderTriggers(order) : Reject(DuelError.TriggerOrderPending);
         if (command is ChooseTriggerOrder) return Reject(DuelError.NoPendingTriggers);
+        if (State.OpenWindow is not null) return ExecuteOpenWindow(command);
         if (State.PendingChain is not null) return ExecuteChain(command);
         if (State.PendingSummon is not null) return ExecuteSummonWindow(command);
         if (command is PassSummonResponse or ActivateSummonNegation) return Reject(DuelError.NoPendingSummon);
@@ -310,7 +312,7 @@ public sealed partial class DuelEngine
             ActivatePendulumScale scale => ActivateScale(scale),
             PendulumSummon pendulum => ExecutePendulumSummon(pendulum),
             ResolveDrawStep => Draw(),
-            ChangePhase phase => Advance(phase.Target),
+            ChangePhase phase => RequestPhase(phase.Target),
             NormalSummon summon => Summon(summon.CardInstanceId, summon.MonsterZone, false),
             SetMonster set => Summon(set.CardInstanceId, set.MonsterZone, true),
             TributeSummon tribute => SummonWithTributes(tribute),
@@ -343,22 +345,30 @@ public sealed partial class DuelEngine
             new PhaseChanged(DuelPhase.Draw, DuelPhase.Standby));
     }
 
-    private DuelActionResult Advance(DuelPhase target)
+    private DuelError PhaseChangeError(DuelPhase target)
     {
         if (State.Phase == DuelPhase.Main1 && target == DuelPhase.Battle && State.TurnNumber == 1)
-            return Reject(DuelError.FirstTurnBattleNotAllowed);
+            return DuelError.FirstTurnBattleNotAllowed;
         bool valid = (State.Phase, target) is
             (DuelPhase.Standby, DuelPhase.Main1) or
             (DuelPhase.Main1, DuelPhase.Battle) or (DuelPhase.Main1, DuelPhase.End) or
             (DuelPhase.Battle, DuelPhase.Main2) or (DuelPhase.Main2, DuelPhase.End);
-        if (!valid) return Reject(DuelError.InvalidPhaseTransition);
+        return valid ? DuelError.None : DuelError.InvalidPhaseTransition;
+    }
+
+    /// <summary>Applies a legal phase change, optionally from a prepared state and after a leading event.</summary>
+    private DuelActionResult Advance(DuelPhase target, DuelState? from = null, DuelEvent? lead = null)
+    {
+        if (PhaseChangeError(target) is not DuelError.None and var error) return Reject(error);
+        var state = from ?? State;
+        DuelEvent[] head = lead is null ? [] : [lead];
         if (target == DuelPhase.Battle && experimentalBattleFlow)
         {
             var battle = new BattleState(BattleStep.Start, null, NewBattleWindow(BattleTiming.Start, State.ActivePlayer));
-            return Accept(State.With(phase: target).WithBattle(battle), new PhaseChanged(State.Phase, target),
-                new BattleStepChanged(null, BattleStep.Start), new BattleResponseRequested(battle.Window));
+            return Accept(state.With(phase: target).WithBattle(battle), [.. head, new PhaseChanged(State.Phase, target),
+                new BattleStepChanged(null, BattleStep.Start), new BattleResponseRequested(battle.Window)]);
         }
-        return Accept(State.With(phase: target), new PhaseChanged(State.Phase, target));
+        return Accept(state.With(phase: target), [.. head, new PhaseChanged(State.Phase, target)]);
     }
 
     private DuelActionResult Summon(int instanceId, int zone, bool faceDown)

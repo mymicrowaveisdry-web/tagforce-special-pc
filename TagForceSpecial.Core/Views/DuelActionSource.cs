@@ -50,6 +50,7 @@ public sealed class DuelActionSource
         AuthorizedDecision? decision = state.PendingDecision is { } d && d.Player == player
             ? new(d.DecisionId, d.Kind.ToString(), PlayerProjection.Read(d.CardOptions.OrderBy(c => c.GameCardId).ThenBy(c => c.InstanceId)
                 .Select(c => PlayerProjection.Card(c, true, null, catalog))))
+            : state.OpenWindow is { } window && actor == player ? new(window.DecisionId, "OpenWindow", PlayerProjection.Read(Array.Empty<CardView>()))
             : state.PendingChain is { } chain && actor == player ? new(chain.DecisionId, "Chain", PlayerProjection.Read(Array.Empty<CardView>()))
             : state.Battle is { } battle && actor == player ? new(battle.Window.DecisionId,
                 battle.Attack?.ReplayRequired == true && battle.Window.Closed ? "AttackReplay" : "Battle", PlayerProjection.Read(Array.Empty<CardView>())) : null;
@@ -76,6 +77,7 @@ public sealed class DuelActionSource
 
     private static PlayerId Other(PlayerId player) => player == PlayerId.One ? PlayerId.Two : PlayerId.One;
     private static PlayerId Actor(DuelState state) => state.PendingDecision?.Player
+        ?? state.OpenWindow?.Responder
         ?? (state.PendingChain is { } chain ? chain.NextLink > 0 ? state.ActivePlayer : chain.Responder
             : state.Battle is { } battle && !battle.Window.Closed ? battle.Window.Responder : state.ActivePlayer);
 
@@ -100,6 +102,13 @@ public sealed class DuelActionSource
                     target.Card.InstanceId, target.IsPendulumZone), ActionKind.ChooseTarget,
                     $"Target P{(int)target.Player + 1} {(target.IsPendulumZone ? "scale" : "zone")} {target.Zone + 1}",
                     zone: target.IsPendulumZone ? 1 : 0, target: target.Zone, targetPlayer: target.Player);
+            yield break;
+        }
+        if (state.OpenWindow is { } window)
+        {
+            for (int z = 0; z < 5; z++)
+                yield return B(new ActivateChainResponse(player, window.DecisionId, z), ActionKind.ChainResponse, $"Activate set zone {z + 1}", zone: z);
+            yield return B(new PassChainResponse(player, window.DecisionId), ActionKind.ChainPass, "Pass");
             yield break;
         }
         if (state.PendingChain is { } chain)

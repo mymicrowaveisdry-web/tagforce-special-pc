@@ -19,6 +19,12 @@ public sealed record GainLifePointsStep(int Amount) : EffectStep;
 public sealed record DealDamageStep(int Amount) : EffectStep;
 
 /// <summary>
+/// Shuffles the activating player's Deck with the duel's seeded generator. The event carries no order; views
+/// expose only the Deck count. Definitions using it require an engine seed.
+/// </summary>
+public sealed record ShuffleDeckStep : EffectStep;
+
+/// <summary>
 /// Special Summons the listed Tokens (one per entry, in order) to the activating player's lowest free Monster
 /// Zones. All or nothing: with fewer free zones than Tokens at resolution, none are summoned (link skipped,
 /// <see cref="ChainSkipReason.SummonUnavailable"/>). Every ID needs explicit <c>IsToken</c> card rules.
@@ -74,6 +80,7 @@ public sealed class EffectDefinition
                     GainLifePointsStep s => s.Amount <= 0,
                     DealDamageStep s => s.Amount <= 0,
                     SummonTokensStep => false, // validated by its constructor; engine checks Token rules
+                    ShuffleDeckStep => false,
                     _ => true
                 })
                 throw new ArgumentException("Steps must be supported Core operations with positive amounts.", nameof(steps));
@@ -87,5 +94,7 @@ public sealed class EffectDefinition
 public sealed record ActivateSetSpell(PlayerId Player, int SpellTrapZone) : DuelCommand(Player);
 public sealed record EffectDamageDealt(PlayerId Player, int Damage, int LifePointsBefore,
     int LifePointsAfter, string EffectId) : DuelEvent;
+/// <summary>The player's Deck was shuffled. Deliberately carries no card order.</summary>
+public sealed record DeckShuffled(PlayerId Player, string EffectId) : DuelEvent;
 /// <summary>A Token left the field and ceased to exist; follows the departure's cause event.</summary>
 public sealed record TokenRemoved(PlayerId Owner, CardInstance Card) : DuelEvent;
