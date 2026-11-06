@@ -76,7 +76,7 @@ public sealed class SemanticAssetRegistry
             Require(output.RelativePath == "blobs/" + resource.ContentSha256 + ".bin" &&
                 output.ContentSha256 == resource.ContentSha256 && output.Width == resource.Width &&
                 output.Height == resource.Height && output.PixelSha256 ==
-                (resource.Conversion is "gim-rgba-v1" or "cpj-rgba-v1" or "cpj-native-rgba-v1" ? resource.ContentSha256 : null),
+                (resource.Conversion is "gim-rgba-v1" or "cpj-rgba-v1" or "cpj-native-rgba-v1" or CardThumbnailDecoder.ConversionId ? resource.ContentSha256 : null),
                 "Semantic output differs from validated package.");
             Require(entry.Status is "stored" or "decoded" or "mapped-unverified" &&
                 (entry.Status == "mapped-unverified" || entry.Status == resource.EvidenceStatus),

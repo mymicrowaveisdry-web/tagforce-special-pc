@@ -3,11 +3,15 @@ using System.Buffers.Binary;
 namespace TagForceSpecial.Assets.Presentation;
 
 public sealed record GimTexture(int Width, int Height, int Format, bool Swizzled,
-    byte[] Rgba, IReadOnlyList<string> Diagnostics);
+    byte[] Rgba, IReadOnlyList<string> Diagnostics, int Frames = 1);
+
+/// <summary>One frame of a multi-frame GIM, in stored order, decoded with the palette frame of the same index.</summary>
+public sealed record GimFrame(int Index, int Width, int Height, byte[] Rgba);
 
 /// <summary>Bounded PSP little-endian GIM decoder. Returns straight RGBA; never forces alpha.
-/// Supports one picture/frame/image level. Multiple CLUTs require explicit palette selection.
-/// Does not infer sprite rectangles.</summary>
+/// <see cref="Decode(ReadOnlySpan{byte}, int?)"/> supports one picture/frame/image level. Multi-frame files need an explicit
+/// frame (<see cref="DecodeFrame"/>, <see cref="DecodeAll"/>); image frame i uses palette frame i, and the frame counts must match.
+/// Multiple CLUT levels require explicit palette selection. Does not infer sprite rectangles.</summary>
 public sealed class GimTextureDecoder
 {
     public const int MaximumFileBytes = 64 * 1024 * 1024;
@@ -33,7 +37,29 @@ public sealed class GimTextureDecoder
         finally { source.Position = original; }
     }
 
-    public GimTexture Decode(ReadOnlySpan<byte> bytes, int? paletteLevel = null)
+    public GimTexture Decode(ReadOnlySpan<byte> bytes, int? paletteLevel = null) => Decode(bytes, paletteLevel, null);
+
+    /// <summary>Decodes frame <paramref name="frame"/> of a single- or multi-frame GIM.</summary>
+    public GimTexture DecodeFrame(ReadOnlySpan<byte> bytes, int frame)
+    {
+        if (frame < 0) throw new ArgumentOutOfRangeException(nameof(frame));
+        return Decode(bytes, null, frame);
+    }
+
+    /// <summary>Every frame in stored order.</summary>
+    public IReadOnlyList<GimFrame> DecodeAll(ReadOnlySpan<byte> bytes)
+    {
+        var first = DecodeFrame(bytes, 0);
+        var frames = new List<GimFrame>(first.Frames) { new(0, first.Width, first.Height, first.Rgba) };
+        for (int i = 1; i < first.Frames; i++)
+        {
+            var next = DecodeFrame(bytes, i);
+            frames.Add(new(i, next.Width, next.Height, next.Rgba));
+        }
+        return frames.AsReadOnly();
+    }
+
+    private GimTexture Decode(ReadOnlySpan<byte> bytes, int? paletteLevel, int? frame)
     {
         if (paletteLevel < 0) throw new ArgumentOutOfRangeException(nameof(paletteLevel));
         Require(bytes.Length <= MaximumFileBytes && bytes.Length >= 32, "Invalid GIM length.");
@@ -50,7 +76,7 @@ public sealed class GimTextureDecoder
         }
         Plane? image = null, palette = null;
         var diagnostics = new List<string>();
-        int pictures = 0, blocks = 0;
+        int pictures = 0, blocks = 0, imageFrames = 1, paletteFrames = 1;
         Plane ReadPlane(int at, int end, bool isPalette)
         {
             Bounds(at, 52, end);
@@ -64,14 +90,18 @@ public sealed class GimTextureDecoder
             int pitchAlign = U16(at + 14), heightAlign = U16(at + 16);
             Require(IsPowerOfTwo(pitchAlign) && pitchAlign <= 256 && IsPowerOfTwo(heightAlign) && heightAlign <= 256,
                 "Unsupported texture alignment.");
-            int levels = U16(at + 42);
-            Require(U16(at + 46) == 1 && levels >= 1 && levels <= 256,
-                "Invalid level count or multiple frames are unsupported.");
+            int levels = U16(at + 42), frames = U16(at + 46);
+            Require(frames >= 1 && frames <= 256 && levels >= 1 && levels <= 256, "Invalid level or frame count.");
+            Require(frames == 1 || frame.HasValue, "Multiple frames require an explicit frame selection.");
+            Require(frames == 1 || levels == 1, "Frames combined with levels are unsupported.");
             Require(isPalette || levels == 1, "Multiple image mip levels are unsupported.");
             Require(!isPalette || levels == 1 || (U16(at + 40) == 2 && paletteLevel.HasValue),
                 "Multiple palettes require an explicit paletteLevel selection.");
-            int selected = isPalette ? paletteLevel ?? 0 : 0;
-            Require(selected < levels, "Selected palette level is out of range.");
+            if (isPalette) paletteFrames = frames; else imageFrames = frames;
+            // Entries in the offset table are levels or frames; never both (checked above).
+            levels = Math.Max(levels, frames);
+            int selected = frames > 1 ? frame!.Value : isPalette ? paletteLevel ?? 0 : 0;
+            Require(selected < levels, "Selected palette level or frame is out of range.");
             int table = U32(at + 24), start = U32(at + 28), stop = U32(at + 32);
             Require(table >= 48 && table <= start - levels * 4, "Invalid frame-offset table.");
             Bounds(at, start, end);
@@ -136,6 +166,8 @@ public sealed class GimTextureDecoder
         Require(U16(16) == 2, "Missing root block.");
         int rootEnd = Walk(16, data.Length, 0);
         Require(pictures == 1 && image is not null, "Missing picture/image.");
+        Require(paletteFrames == 1 || paletteFrames == imageFrames, "Palette frames do not pair with image frames.");
+        Require(frame is null || frame < imageFrames, "Selected frame is out of range.");
         if (rootEnd != data.Length)
             diagnostics.Add($"{data.Length - rootEnd} trailing bytes outside GIM root were not decoded; resource boundaries remain unverified.");
         Plane img = image!;
@@ -177,7 +209,7 @@ public sealed class GimTextureDecoder
                         clut.AsSpan((int)index * 4, 4).CopyTo(color);
                     }
                 }
-        return new GimTexture(img.Width, img.Height, img.Format, img.Order == 1, rgba, diagnostics.AsReadOnly());
+        return new GimTexture(img.Width, img.Height, img.Format, img.Order == 1, rgba, diagnostics.AsReadOnly(), imageFrames);
     }
 
     private static byte[] Linear(byte[] file, Plane plane)

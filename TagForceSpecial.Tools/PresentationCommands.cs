@@ -78,7 +78,7 @@ public static class PresentationCommands
                         resource.AssetKey, new(resource.SourcePath, resource.MemberName, resource.Offset,
                             resource.SourceSha256, resource.StoredSha256, resource.InputSha256),
                         new("blobs/" + resource.ContentSha256 + ".bin", resource.ContentSha256,
-                            resource.Conversion is "gim-rgba-v1" or "cpj-rgba-v1" or "cpj-native-rgba-v1" ? resource.ContentSha256 : null,
+                            resource.Conversion is "gim-rgba-v1" or "cpj-rgba-v1" or "cpj-native-rgba-v1" or CardThumbnailDecoder.ConversionId ? resource.ContentSha256 : null,
                             resource.Width, resource.Height, asset.SourceRectangle),
                         asset.EvidenceIds.Length > 0 ? "mapped-unverified" : resource.EvidenceStatus,
                         asset.EvidenceIds);

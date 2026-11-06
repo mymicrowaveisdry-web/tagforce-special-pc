@@ -27,7 +27,7 @@ public sealed class CardArtworkProvider(PresentationPackage package)
         string key = ThumbnailKey(cardId);
         if (!package.Resources.TryGetValue(key, out var resource))
             throw new KeyNotFoundException("Missing resource: " + key);
-        if (resource.Conversion != "gim-rgba-v1" || resource.Width is null || resource.Height is null)
+        if (resource.Conversion is not ("gim-rgba-v1" or CardThumbnailDecoder.ConversionId) || resource.Width is null || resource.Height is null)
             throw new InvalidDataException("Thumbnail is not decoded RGBA: " + key);
         return new(key, resource.Width.Value, resource.Height.Value, package.ReadResource(key));
     }

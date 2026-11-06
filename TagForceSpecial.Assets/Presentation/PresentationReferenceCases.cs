@@ -4,7 +4,7 @@ namespace TagForceSpecial.Assets.Presentation;
 
 public sealed record PresentationReferenceCase(string Screen, string AssetKey, string EvidenceId,
     string SourcePath, string? Member, long Offset, long Length, string SourceSha256,
-    string InputSha256, string PixelSha256, int Width, int Height, bool NativeCard = false);
+    string InputSha256, string PixelSha256, int Width, int Height, bool NativeCard = false, int? Frame = null, int PaletteLevel = 0);
 
 /// <summary>Reviewed text-only pins derived from matching original-game scenarios.
 /// Scope is complete texture pixels, not screen placement, transitions or gameplay.</summary>
@@ -39,7 +39,8 @@ public static class PresentationReferenceCases
             "PSP_GAME/USRDIR/card/cardj256_j.cip", null, 204126208, 28672,
             CpjArtworkReferenceProfiles.ArchiveSha256, CpjArtworkReferenceProfiles.JpegSha256,
             CpjArtworkReferenceProfiles.RgbaSha256, 256, 256, true)
-    }.Concat(TitleReferenceResources.Cases).Concat(TitleFlowReferenceResources.Cases).Concat(OptionsReferenceResources.Cases).ToArray());
+    }.Concat(TitleReferenceResources.Cases).Concat(TitleFlowReferenceResources.Cases).Concat(OptionsReferenceResources.Cases)
+        .Concat(DeckEditReferenceResources.Cases).ToArray());
 
     internal static string? Match(AssetManifestEntry entry, PresentationResource resource, string profileFingerprint)
     {
@@ -52,7 +53,10 @@ public static class PresentationReferenceCases
             return null;
         if (reference.NativeCard)
             return resource.Conversion == CpjArtworkDecoder.NativeConversionId && CpjArtworkReferenceProfiles.Matches(resource) ? Scope : null;
+        // A multi-frame pin names its frame; single-frame pins name their palette level (0 unless the member has several).
+        bool selection = reference.Frame is { } frame ? resource.Frame == frame && resource.PaletteLevel is null
+            : resource.Frame is null && resource.PaletteLevel == reference.PaletteLevel;
         return resource.Conversion == "gim-rgba-v1" && resource.StoredSha256 == reference.InputSha256 &&
-            resource.PaletteLevel == 0 && resource.Artwork is null ? Scope : null;
+            selection && resource.Artwork is null ? Scope : null;
     }
 }

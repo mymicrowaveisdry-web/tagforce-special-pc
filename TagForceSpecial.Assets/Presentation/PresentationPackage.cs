@@ -6,16 +6,20 @@ using TagForceSpecial.Assets.GameSource;
 
 namespace TagForceSpecial.Assets.Presentation;
 
-public enum PresentationConversion { Stored, GimRgba, CpjRgba, CpjReferenceRgba }
+/// <summary>Values are serialized by number in private plans: append only.</summary>
+public enum PresentationConversion { Stored, GimRgba, CpjRgba, CpjReferenceRgba, CardThumbnailRgba }
+/// <param name="Frame">GimRgba only: the frame of a multi-frame GIM (image frame i with palette frame i).</param>
 public sealed record PresentationResourceRequest(string AssetKey, string SourcePath,
     string? MemberName = null, PresentationConversion Conversion = PresentationConversion.GimRgba,
-    int? PaletteLevel = null, EhpReadMode ArchiveMode = EhpReadMode.Strict, uint? CardId = null);
+    int? PaletteLevel = null, EhpReadMode ArchiveMode = EhpReadMode.Strict, uint? CardId = null, int? Frame = null);
 
 public sealed record PresentationResource(string AssetKey, string SourcePath, string SourceSha256,
     string? MemberName, long Offset, long StoredLength, string StoredSha256, string InputSha256,
     string Conversion, int? PaletteLevel, int? Width, int? Height, string ContentSha256, long ContentLength,
     string EvidenceStatus, IReadOnlyList<string> Diagnostics,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] CpjArtworkProvenance? Artwork = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] CpjArtworkProvenance? Artwork = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? Frame = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] uint? CardId = null);
 
 /// <summary>Content-addressed private resources with an externally supplied package identity.
 /// Immutable means no overwrite plus hash validation on open/read, not an OS write-protection guarantee.
@@ -65,7 +69,11 @@ public sealed class PresentationPackage
         Require(plan.All(r => r is not null && Key(r.AssetKey) && GameBuildProfile.SafePath(r.SourcePath) &&
             (r.MemberName is null || Member(r.MemberName)) && Enum.IsDefined(r.Conversion) && Enum.IsDefined(r.ArchiveMode) &&
             r.PaletteLevel is null or >= 0 && (r.Conversion != PresentationConversion.Stored || r.PaletteLevel is null) &&
-            (r.Conversion is PresentationConversion.CpjRgba or PresentationConversion.CpjReferenceRgba ? r.CardId is > 0 && r.PaletteLevel is null : r.CardId is null)),
+            (r.Conversion is PresentationConversion.CpjRgba or PresentationConversion.CpjReferenceRgba ? r.CardId is > 0 && r.PaletteLevel is null :
+             r.Conversion == PresentationConversion.CardThumbnailRgba ? r.CardId is > 0 && r.PaletteLevel is null && r.MemberName is null &&
+                 r.SourcePath == CardThumbnailDecoder.SourcePath && r.AssetKey == CardArtworkProvider.ThumbnailKey(r.CardId.Value) :
+             r.CardId is null) &&
+            (r.Frame is null || r.Frame >= 0 && r.Conversion == PresentationConversion.GimRgba && r.PaletteLevel is null)),
             "Invalid resource request.");
         Require(plan.Select(r => r.AssetKey).Distinct(StringComparer.Ordinal).Count() == plan.Length, "Duplicate asset key.");
         Require(!plan.Any(r => CardArtworkProvider.IsUnsupportedArtKey(r.AssetKey) &&
@@ -94,10 +102,12 @@ public sealed class PresentationPackage
                     selected.Stored.Length, Hash(selected.Stored), decoded.InputSha256,
                     request.Conversion == PresentationConversion.CpjReferenceRgba ? CpjArtworkDecoder.NativeConversionId :
                         request.Conversion == PresentationConversion.CpjRgba ? CpjArtworkDecoder.ConversionId :
+                        request.Conversion == PresentationConversion.CardThumbnailRgba ? CardThumbnailDecoder.ConversionId :
                         request.Conversion == PresentationConversion.GimRgba ? "gim-rgba-v1" : "stored-v1",
                     request.PaletteLevel, decoded.Width, decoded.Height, contentHash, content.Length,
                     request.Conversion != PresentationConversion.Stored ? "decoded" : "stored",
-                    Array.AsReadOnly(diagnostics.ToArray()), decoded.Artwork));
+                    Array.AsReadOnly(diagnostics.ToArray()), decoded.Artwork, request.Frame,
+                    request.Conversion == PresentationConversion.CardThumbnailRgba ? request.CardId : null));
             }
             Require(source.IsUnchanged(), "Validated source changed during normalization.");
             var manifest = new Manifest(SchemaVersion, scope, source.Profile.BuildId, source.Profile.ImageSha256,
@@ -159,9 +169,14 @@ public sealed class PresentationPackage
                 HashText(r.InputSha256) && HashText(r.ContentSha256) && (r.MemberName is null || Member(r.MemberName)) &&
                 r.Offset >= 0 && r.StoredLength is >= 0 and <= MaximumResourceBytes &&
                 r.ContentLength is >= 0 and <= MaximumResourceBytes && r.Diagnostics is not null &&
-                r.Diagnostics.All(d => d is not null) && r.PaletteLevel is null or >= 0, "Invalid resource provenance.");
+                r.Diagnostics.All(d => d is not null) && r.PaletteLevel is null or >= 0 &&
+                (r.Frame is null || r.Frame >= 0 && r.Conversion == "gim-rgba-v1") &&
+                (r.Conversion == CardThumbnailDecoder.ConversionId
+                    ? r.CardId is > 0 && r.AssetKey == CardArtworkProvider.ThumbnailKey(r.CardId.Value) && r.SourcePath == CardThumbnailDecoder.SourcePath &&
+                      r.Width == CardThumbnailDecoder.Width && r.Height == CardThumbnailDecoder.Height
+                    : r.CardId is null), "Invalid resource provenance.");
             Require(r.Conversion == "stored-v1" && r.EvidenceStatus == "stored" && r.Width is null && r.Height is null && r.PaletteLevel is null ||
-                r.Conversion is "gim-rgba-v1" or "cpj-rgba-v1" or "cpj-native-rgba-v1" && r.EvidenceStatus == "decoded" && r.Width is > 0 and <= GimTextureDecoder.MaximumDimension &&
+                r.Conversion is "gim-rgba-v1" or "cpj-rgba-v1" or "cpj-native-rgba-v1" or CardThumbnailDecoder.ConversionId && r.EvidenceStatus == "decoded" && r.Width is > 0 and <= GimTextureDecoder.MaximumDimension &&
                 r.Height is > 0 and <= GimTextureDecoder.MaximumDimension && r.ContentLength == (long)r.Width * r.Height * 4,
                 "Invalid normalized format/evidence status.");
             Require(r.Conversion is CpjArtworkDecoder.ConversionId or CpjArtworkDecoder.NativeConversionId ? r.Artwork is { CardId: > 0 } &&
