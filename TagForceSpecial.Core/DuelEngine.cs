@@ -81,7 +81,9 @@ public sealed partial class DuelEngine
                 (profile.AllowsExtraDeck || profile.AllowsSummonMaterial || profile.AllowsPendulumSummon) && profile.Category != CardCategory.Monster ||
                 profile.AllowsTributeSummon && !profile.AllowsNormalSummon ||
                 profile.RequiresRegisteredTributeProcedure && !profile.AllowsTributeSummon ||
-                profile.AllowsSpellTrapSet && profile.Category is not (CardCategory.Spell or CardCategory.Trap))
+                profile.AllowsSpellTrapSet && profile.Category is not (CardCategory.Spell or CardCategory.Trap) ||
+                profile.IsToken && (profile.Category != CardCategory.Monster || profile.AllowsNormalSummon ||
+                    profile.AllowsTributeSummon || profile.AllowsExtraDeck || profile.AllowsPendulumSummon))
                 throw new ArgumentException("Invalid explicit card rules.", nameof(rules));
         this.rules = rules.ToFrozenDictionary();
         var sequences = (decisionSequences ?? []).ToArray();
@@ -180,7 +182,8 @@ public sealed partial class DuelEngine
                 !this.rules.TryGetValue(id, out var rule) || !rule.AllowsExtraDeck) ||
                 p.MaterialCardIds.Any(id => !this.rules.TryGetValue(id, out var rule) || !rule.AllowsSummonMaterial)) ||
             materialProfiles.Select(p => p.ProcedureId).Distinct(StringComparer.Ordinal).Count() != materialProfiles.Length ||
-            materialProfiles.Any(p => specialSummonProcedures.ContainsKey(p.ProcedureId)))
+            materialProfiles.Any(p => specialSummonProcedures.ContainsKey(p.ProcedureId)) ||
+            materialProfiles.Any(p => p.Xyz is not null && p.MaterialCardIds.Any(IsTokenId)))
             throw new ArgumentException("Material procedures require distinct IDs and explicit Extra Deck, target and material eligibility.");
         materialProcedures = materialProfiles.ToFrozenDictionary(p => p.ProcedureId, StringComparer.Ordinal);
         if (summonLevelModifiers.Any(p => p is null || !IsMonster(p.SourceCardId) || p.TargetCardIds.Any(id => !IsMonster(id))) ||
@@ -217,6 +220,7 @@ public sealed partial class DuelEngine
             .Concat(battleProfiles.Select(p => p.EffectId)).Concat(summonEffects.Values.Select(p => p.EffectId)).ToHashSet(StringComparer.Ordinal);
         // Only kinds whose activation timing is implemented are executable; others fail closed at construction.
         if (definitionList.Any(d => d is null || d.Kind != EffectKind.NormalSpell ||
+                d.Steps.OfType<SummonTokensStep>().Any(s => s.TokenCardIds.Any(id => !IsTokenId(id))) ||
                 !this.rules.TryGetValue(d.CardId, out var rule) ||
                 rule.Category != CardCategory.Spell || !rule.AllowsSpellTrapSet ||
                 spellEffects.ContainsKey(d.CardId) || activationContracts.ContainsKey(d.CardId) ||
@@ -234,6 +238,7 @@ public sealed partial class DuelEngine
             var deck = ids.Take(61).ToArray();
             if (deck.Length is < 40 or > 60 || deck.Any(cardId => !knownIds.Contains(cardId)))
                 throw new ArgumentException("Each main deck needs 40–60 catalog IDs.");
+            if (deck.Any(IsTokenId)) throw new ArgumentException("Tokens are created by effects and cannot be in a Deck.");
             var instances = deck.Select(cardId => new CardInstance(nextInstance++, cardId, id)).ToArray();
             return new(id, instances.Skip(5), instances.Take(5));
         }
@@ -246,8 +251,20 @@ public sealed partial class DuelEngine
                 throw new ArgumentException("Each Extra Deck supports up to 15 explicitly eligible catalog monsters.");
             return ids.Select(id => new CardInstance(nextInstance++, id, owner)).ToArray();
         }
-        State = new([first.With(extraDeck: CreateExtraDeck(PlayerId.One, playerOneExtraDeck)),
-            second.With(extraDeck: CreateExtraDeck(PlayerId.Two, playerTwoExtraDeck))], startingPlayer);
+        var firstExtra = CreateExtraDeck(PlayerId.One, playerOneExtraDeck);
+        var secondExtra = CreateExtraDeck(PlayerId.Two, playerTwoExtraDeck);
+        State = new([first.With(extraDeck: firstExtra), second.With(extraDeck: secondExtra)], startingPlayer,
+            nextInstanceId: nextInstance);
+    }
+
+    private bool IsTokenId(uint id) => rules.TryGetValue(id, out var rule) && rule.IsToken;
+
+    /// <summary>Allocates a fresh, never-reused instance for a card created during the duel.</summary>
+    private static CardInstance AllocateInstance(ref DuelState state, uint gameCardId, PlayerId owner)
+    {
+        var card = new CardInstance(state.NextInstanceId, gameCardId, owner);
+        state = state.WithNextInstanceId(checked(state.NextInstanceId + 1));
+        return card;
     }
 
     public DuelActionResult Execute(DuelCommand command)

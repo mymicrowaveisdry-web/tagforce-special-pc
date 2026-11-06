@@ -1,6 +1,7 @@
 namespace TagForceSpecial.Core;
 
-public enum FieldCardDestination { Graveyard, FaceUpExtraDeck }
+/// <summary>Where a card that left the field went. <see cref="Removed"/>: a Token ceased to exist (no zone).</summary>
+public enum FieldCardDestination { Graveyard, FaceUpExtraDeck, Removed }
 public sealed record PendulumCardProfile(uint CardId, uint LeftScale, uint RightScale);
 public sealed record ActivatePendulumScale(PlayerId Player, int CardInstanceId, int PendulumZone) : DuelCommand(Player);
 public sealed record PendulumSummonSelection(int CardInstanceId, DecisionCardSource Source, int MonsterZone,

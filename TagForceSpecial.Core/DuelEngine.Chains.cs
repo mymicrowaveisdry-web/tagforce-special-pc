@@ -163,13 +163,9 @@ public sealed partial class DuelEngine
                 var empty = Enumerable.Range(0, 5).Where(z => zones[z] is null).Take(4).ToArray();
                 if (empty.Length != 4) return Reject(DuelError.UnsupportedChainResolution);
                 var profile = chainEffects[activation.Spell.GameCardId];
-                int instance = next.Players.SelectMany(p => p.Deck.Concat(p.Hand).Concat(p.Graveyard)
-                    .Concat(p.Banished).Concat(p.ExtraDeck).Concat(p.FaceUpExtraDeck)
-                    .Concat(p.MonsterZones.OfType<FieldMonster>().SelectMany(m => m.XyzMaterials.Prepend(m.Card)))
-                    .Concat(p.SpellTrapZones.OfType<CardInstance>()).Concat(p.PendulumZones.OfType<FieldSpellTrap>().Select(s => s.Card))).Max(c => c.InstanceId);
                 for (int i = 0; i < 4; i++)
                 {
-                    var card = new CardInstance(checked(++instance), profile.TokenCardIds[i], player.Id);
+                    var card = AllocateInstance(ref next, profile.TokenCardIds[i], player.Id);
                     var token = NewSummonedMonster(next, card, BattlePosition.FaceUpDefense);
                     zones[empty[i]] = token;
                     events.Add(new TokenSpecialSummoned(player.Id, empty[i], token));

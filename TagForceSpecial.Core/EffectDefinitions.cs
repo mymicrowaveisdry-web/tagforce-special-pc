@@ -19,6 +19,29 @@ public sealed record GainLifePointsStep(int Amount) : EffectStep;
 public sealed record DealDamageStep(int Amount) : EffectStep;
 
 /// <summary>
+/// Special Summons the listed Tokens (one per entry, in order) to the activating player's lowest free Monster
+/// Zones. All or nothing: with fewer free zones than Tokens at resolution, none are summoned (link skipped,
+/// <see cref="ChainSkipReason.SummonUnavailable"/>). Every ID needs explicit <c>IsToken</c> card rules.
+/// </summary>
+public sealed record SummonTokensStep : EffectStep
+{
+    public IReadOnlyList<uint> TokenCardIds { get; }
+    public BattlePosition Position { get; }
+
+    public SummonTokensStep(IEnumerable<uint> tokenCardIds, BattlePosition position)
+    {
+        ArgumentNullException.ThrowIfNull(tokenCardIds);
+        var ids = tokenCardIds.Take(6).ToArray();
+        if (ids.Length is 0 or > 5 || ids.Any(id => id == 0))
+            throw new ArgumentException("Summon 1–5 Tokens with nonzero IDs.", nameof(tokenCardIds));
+        if (position is not (BattlePosition.FaceUpAttack or BattlePosition.FaceUpDefense))
+            throw new ArgumentOutOfRangeException(nameof(position), "Tokens are summoned face-up.");
+        TokenCardIds = Array.AsReadOnly(ids);
+        Position = position;
+    }
+}
+
+/// <summary>
 /// Explicit, validated card effect: identity, kind and ordered steps. Activation (preflight, commit,
 /// response window) and resolution (last-first, negation, cleanup) are shared by every definition.
 /// </summary>
@@ -50,6 +73,7 @@ public sealed class EffectDefinition
                 {
                     GainLifePointsStep s => s.Amount <= 0,
                     DealDamageStep s => s.Amount <= 0,
+                    SummonTokensStep => false, // validated by its constructor; engine checks Token rules
                     _ => true
                 })
                 throw new ArgumentException("Steps must be supported Core operations with positive amounts.", nameof(steps));
@@ -63,3 +87,5 @@ public sealed class EffectDefinition
 public sealed record ActivateSetSpell(PlayerId Player, int SpellTrapZone) : DuelCommand(Player);
 public sealed record EffectDamageDealt(PlayerId Player, int Damage, int LifePointsBefore,
     int LifePointsAfter, string EffectId) : DuelEvent;
+/// <summary>A Token left the field and ceased to exist; follows the departure's cause event.</summary>
+public sealed record TokenRemoved(PlayerId Owner, CardInstance Card) : DuelEvent;

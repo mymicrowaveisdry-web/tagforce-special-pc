@@ -75,9 +75,11 @@ public sealed partial class DuelEngine
             MonsterDestroyed or SummonNegated => MonsterEventKind.Destroyed,
             _ => MonsterEventKind.SentToGraveyard
         };
-        if (kind == MonsterEventKind.SentToGraveyard && emitted.FieldDestination == FieldCardDestination.FaceUpExtraDeck) yield break;
+        // Neither the face-up Extra Deck nor a removed Token is "sent to the Graveyard"; destruction still counts.
+        bool notToGraveyard = emitted.FieldDestination is FieldCardDestination.FaceUpExtraDeck or FieldCardDestination.Removed;
+        if (kind == MonsterEventKind.SentToGraveyard && notToGraveyard) yield break;
         yield return new(kind, subject, point, cost);
-        if (kind == MonsterEventKind.Destroyed && emitted.FieldDestination != FieldCardDestination.FaceUpExtraDeck)
+        if (kind == MonsterEventKind.Destroyed && !notToGraveyard)
             yield return new(MonsterEventKind.SentToGraveyard, subject, point);
         if (kind == MonsterEventKind.FlipSummoned) yield return new(MonsterEventKind.FlippedFaceUp, subject, point);
     }

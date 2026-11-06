@@ -49,11 +49,33 @@ public sealed partial class DuelEngine
             {
                 GainLifePointsStep gain => GainLifePoints(state, link.Activation.Player, gain.Amount, definition.EffectId, events),
                 DealDamageStep damage => DealEffectDamage(state, Other(link.Activation.Player), damage.Amount, definition.EffectId, events),
+                SummonTokensStep tokens => SummonTokens(state, link, tokens, events),
                 _ => throw new InvalidOperationException("Unsupported effect step.")
             };
             if (state.Outcome is not null) break;
         }
         return state;
+    }
+
+    /// <summary>All or nothing, lowest free zones first (deliberate PC policy until a PSP observation exists).</summary>
+    private DuelState SummonTokens(DuelState state, ChainLink link, SummonTokensStep step, List<DuelEvent> events)
+    {
+        var controller = link.Activation.Player;
+        var free = Enumerable.Range(0, 5).Where(z => state.GetPlayer(controller).MonsterZones[z] is null).ToArray();
+        if (free.Length < step.TokenCardIds.Count)
+        {
+            events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.SummonUnavailable));
+            return state;
+        }
+        var zones = state.GetPlayer(controller).MonsterZones.ToArray();
+        for (int i = 0; i < step.TokenCardIds.Count; i++)
+        {
+            var card = AllocateInstance(ref state, step.TokenCardIds[i], controller);
+            var token = NewSummonedMonster(state, card, step.Position);
+            zones[free[i]] = token;
+            events.Add(new TokenSpecialSummoned(controller, free[i], token));
+        }
+        return state.With(player: state.GetPlayer(controller).With(monsters: zones));
     }
 
     private DuelState GainLifePoints(DuelState state, PlayerId recipient, int amount, string effectId, List<DuelEvent> events)

@@ -16,12 +16,14 @@ public enum DuelEndReason { UnableToDraw, LifePointsDepleted }
 /// RequiresRegisteredTributeProcedure disables default procedures for this card.
 /// AllowsExtraDeck and AllowsSummonMaterial explicitly opt into the bounded material slice.
 /// AllowsPendulumSummon permits ordinary hand targets independently of Pendulum scale identity.
+/// IsToken marks an effect-generated Token: never in a Deck or hand, never Normal Summoned, never Xyz
+/// Material, and it ceases to exist when it leaves the field.
 /// </summary>
 public sealed record DuelCardRules(CardCategory Category, bool AllowsNormalSummon = false,
     bool AllowsBasicBattle = false, bool AllowsSpellTrapSet = false,
     bool AllowsTributeSummon = false, bool AllowsTributeForSummon = false,
     bool RequiresRegisteredTributeProcedure = false, bool AllowsExtraDeck = false,
-    bool AllowsSummonMaterial = false, bool AllowsPendulumSummon = false);
+    bool AllowsSummonMaterial = false, bool AllowsPendulumSummon = false, bool IsToken = false);
 public sealed record CardInstance(int InstanceId, uint GameCardId, PlayerId Owner);
 public sealed record FieldMonster(CardInstance Card, BattlePosition Position, int SummonedOnTurn = 0,
     int PositionChangedOnTurn = 0, int LastAttackTurn = 0, long PlacementId = 0, bool BattleDestroyed = false)
@@ -104,6 +106,8 @@ public sealed class DuelState
     public BattleState? Battle { get; }
     public PendingSummon? PendingSummon { get; }
     public IReadOnlyList<SummonRecord> SummonHistory { get; }
+    /// <summary>Next card instance ID to allocate (e.g. for a Token). Monotonic: IDs are never reused.</summary>
+    public int NextInstanceId { get; }
 
     internal DuelState(IEnumerable<DuelPlayerState> players, PlayerId activePlayer, int turnNumber = 1,
         DuelPhase phase = DuelPhase.Draw, bool normalSummonUsed = false, DuelOutcome? outcome = null,
@@ -113,8 +117,10 @@ public sealed class DuelState
         IEnumerable<PendingEndPhaseBanishment>? pendingEndPhaseBanishments = null,
         CommittedActivation? committedActivation = null, PendingChain? pendingChain = null,
         EventEffectState? eventEffects = null, BattleState? battle = null, PendingSummon? pendingSummon = null,
-        IEnumerable<SummonRecord>? summonHistory = null)
+        IEnumerable<SummonRecord>? summonHistory = null, int nextInstanceId = 1)
     {
+        if (nextInstanceId < 1) throw new ArgumentOutOfRangeException(nameof(nextInstanceId));
+        NextInstanceId = nextInstanceId;
         Players = Array.AsReadOnly(players.ToArray());
         ActivePlayer = activePlayer;
         TurnNumber = turnNumber;
@@ -146,49 +152,55 @@ public sealed class DuelState
         if (player is not null) players[(int)player.Id] = player;
         return new(players, activePlayer ?? ActivePlayer, turnNumber ?? TurnNumber, phase ?? Phase,
             normalSummonUsed ?? NormalSummonUsed, outcome ?? Outcome, revision ?? Revision,
-            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments, CommittedActivation, PendingChain, EventEffects, Battle, PendingSummon, SummonHistory);
+            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments, CommittedActivation, PendingChain, EventEffects, Battle, PendingSummon, SummonHistory, NextInstanceId);
     }
 
     internal DuelState WithDecision(PendingDecision? pending, DecisionSequenceResult? result = null,
         bool researchSliceComplete = false) => new(Players, ActivePlayer, TurnNumber, Phase,
             NormalSummonUsed, Outcome, Revision, pending, result, researchSliceComplete, PendingSpellActivation,
-            PendingEndPhaseBanishments, CommittedActivation, PendingChain, EventEffects, Battle, PendingSummon, SummonHistory);
+            PendingEndPhaseBanishments, CommittedActivation, PendingChain, EventEffects, Battle, PendingSummon, SummonHistory, NextInstanceId);
 
     internal DuelState WithActivation(PendingSpellActivation? activation) => new(Players, ActivePlayer,
         TurnNumber, Phase, NormalSummonUsed, Outcome, Revision, PendingDecision, DecisionResult,
-        ResearchSliceComplete, activation, PendingEndPhaseBanishments, CommittedActivation, PendingChain, EventEffects, Battle, PendingSummon, SummonHistory);
+        ResearchSliceComplete, activation, PendingEndPhaseBanishments, CommittedActivation, PendingChain, EventEffects, Battle, PendingSummon, SummonHistory, NextInstanceId);
 
     internal DuelState WithEndPhaseBanishments(IEnumerable<PendingEndPhaseBanishment> banishments) =>
         new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
-            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, banishments, CommittedActivation, PendingChain, EventEffects, Battle, PendingSummon, SummonHistory);
+            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, banishments, CommittedActivation, PendingChain, EventEffects, Battle, PendingSummon, SummonHistory, NextInstanceId);
 
     internal DuelState WithChain(PendingChain? chain) =>
         new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
-            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments, CommittedActivation, chain, EventEffects, Battle, PendingSummon, SummonHistory);
+            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments, CommittedActivation, chain, EventEffects, Battle, PendingSummon, SummonHistory, NextInstanceId);
 
     internal DuelState WithBattle(BattleState? battle) =>
         new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
             PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation,
-            PendingEndPhaseBanishments, CommittedActivation, PendingChain, EventEffects, battle, PendingSummon, SummonHistory);
+            PendingEndPhaseBanishments, CommittedActivation, PendingChain, EventEffects, battle, PendingSummon, SummonHistory, NextInstanceId);
 
     internal DuelState WithEventEffects(EventEffectState eventEffects) =>
         new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
             PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation,
-            PendingEndPhaseBanishments, CommittedActivation, PendingChain, eventEffects, Battle, PendingSummon, SummonHistory);
+            PendingEndPhaseBanishments, CommittedActivation, PendingChain, eventEffects, Battle, PendingSummon, SummonHistory, NextInstanceId);
 
     internal DuelState WithCommittedActivation(CommittedActivation activation) =>
         new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
-            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments, activation, PendingChain, EventEffects, Battle, PendingSummon, SummonHistory);
+            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments, activation, PendingChain, EventEffects, Battle, PendingSummon, SummonHistory, NextInstanceId);
 
     internal DuelState WithSummon(PendingSummon? summon) =>
         new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
             PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments,
-            CommittedActivation, PendingChain, EventEffects, Battle, summon, SummonHistory);
+            CommittedActivation, PendingChain, EventEffects, Battle, summon, SummonHistory, NextInstanceId);
+
+    internal DuelState WithNextInstanceId(int next) =>
+        next <= NextInstanceId ? throw new InvalidOperationException("Instance IDs are monotonic.")
+        : new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
+            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments,
+            CommittedActivation, PendingChain, EventEffects, Battle, PendingSummon, SummonHistory, next);
 
     internal DuelState WithSummonHistory(IEnumerable<SummonRecord> history) =>
         new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
             PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments,
-            CommittedActivation, PendingChain, EventEffects, Battle, PendingSummon, history);
+            CommittedActivation, PendingChain, EventEffects, Battle, PendingSummon, history, NextInstanceId);
 }
 
 public abstract record DuelCommand(PlayerId Player);
