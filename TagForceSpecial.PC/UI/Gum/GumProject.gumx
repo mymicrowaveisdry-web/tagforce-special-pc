@@ -45,6 +45,10 @@
   <ComponentReference Name="OriginalScrollBar" />
   <ComponentReference Name="OriginalTextBox" />
   <ComponentReference Name="OriginalStatusPanel" />
+  <ComponentReference Name="CardInfoPanel" />
+  <ComponentReference Name="DeckCounts" />
+  <ComponentReference Name="DeckSectionTabs" />
+  <ComponentReference Name="DeckCardList" />
   <StandardElementReference Name="Circle" />
   <StandardElementReference Name="Component" />
   <StandardElementReference Name="Container" />

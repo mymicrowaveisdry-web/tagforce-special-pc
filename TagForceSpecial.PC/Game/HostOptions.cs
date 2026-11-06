@@ -5,7 +5,7 @@ public sealed record HostOptions(string? CachePath = null, bool PixelExact = fal
     string? DataRoot = null, string? SetupSource = null, string? EditorCapture = null, bool SeedSpecified = false,
     bool AssetDiagnostics = false, string DiagnosticScreen = "title", string? AssetPreview = null, bool PresentationSmoke = false,
     string? PresentationTracePath = null, string? TitleLayerCaptureRoot = null, string? PspFontPath = null, string? FlowCaptureRoot = null,
-    IReadOnlyDictionary<int, int>? MainMenuFrameByRow = null, int? MainMenuEntryFrame = null, string? RealtimeWalkRoot = null)
+    IReadOnlyDictionary<int, int>? MainMenuFrameByRow = null, int? MainMenuEntryFrame = null, string? RealtimeWalkRoot = null, int? DeckMenuFrame = null)
 {
     /// <summary>Pixel-exact game frame per focused Main Menu row, for same-instant comparisons with GE dumps.</summary>
     public IReadOnlyDictionary<int, int> MainMenuFrames => MainMenuFrameByRow ?? new Dictionary<int, int>();
@@ -19,7 +19,7 @@ public sealed record HostOptions(string? CachePath = null, bool PixelExact = fal
         string diagnosticScreen = "title";
         string? assetPreview = null, presentationTrace = null, titleLayers = null, pspFont = null, flowCapture = null;
         Dictionary<int, int>? menuFrames = null;
-        int? menuEntryFrame = null;
+        int? menuEntryFrame = null, deckMenuFrame = null;
         string? realtimeWalk = null;
         bool seedSpecified = false;
         bool pixel = false, smoke = false, assetDiagnostics = false, presentationSmoke = false;
@@ -37,6 +37,8 @@ public sealed record HostOptions(string? CachePath = null, bool PixelExact = fal
                 case "--capture-flow" when i + 1 < args.Length: flowCapture = Path.GetFullPath(args[++i]); break;
                 case "--main-menu-entry-frame" when i + 1 < args.Length:
                     menuEntryFrame = int.Parse(args[++i], System.Globalization.CultureInfo.InvariantCulture); break;
+                case "--deck-menu-frame" when i + 1 < args.Length:
+                    deckMenuFrame = int.Parse(args[++i], System.Globalization.CultureInfo.InvariantCulture); break;
                 case "--presentation-realtime" when i + 1 < args.Length: realtimeWalk = Path.GetFullPath(args[++i]); break;
                 case "--main-menu-frames" when i + 1 < args.Length:
                     menuFrames = args[++i].Split(',').Select(pair => pair.Split(':')).ToDictionary(
@@ -68,12 +70,13 @@ public sealed record HostOptions(string? CachePath = null, bool PixelExact = fal
         if (presentationSmoke && (smoke || assetDiagnostics || setupSource is not null || capture is not null || editorCapture is not null))
             throw new ArgumentException("--presentation-smoke requires an isolated presentation-only launch.");
         if (flowCapture is not null && !presentationSmoke) throw new ArgumentException("--capture-flow requires --presentation-smoke.");
-        if ((menuFrames is not null || menuEntryFrame is not null) && !presentationSmoke) throw new ArgumentException("--main-menu-frames and --main-menu-entry-frame require --presentation-smoke.");
+        if ((menuFrames is not null || menuEntryFrame is not null || deckMenuFrame is not null) && !presentationSmoke)
+            throw new ArgumentException("--main-menu-frames, --main-menu-entry-frame and --deck-menu-frame require --presentation-smoke.");
         if (realtimeWalk is not null && (pixel || presentationSmoke || smoke || assetDiagnostics || setupSource is not null || capture is not null || editorCapture is not null))
             throw new ArgumentException("--presentation-realtime requires an isolated normal-speed launch.");
         if (presentationTrace is not null && !presentationSmoke) throw new ArgumentException("--presentation-trace requires --presentation-smoke.");
         if (titleLayers is not null && (capture is null || presentationSmoke || smoke || assetDiagnostics))
             throw new ArgumentException("--capture-title-layers requires a title --capture launch.");
-        return new(cache, pixel, capture, smoke, seed, replay, resultCapture, deckVariant, dataRoot, setupSource, editorCapture, seedSpecified, assetDiagnostics, diagnosticScreen, assetPreview, presentationSmoke, presentationTrace, titleLayers, pspFont, flowCapture, menuFrames, menuEntryFrame, realtimeWalk);
+        return new(cache, pixel, capture, smoke, seed, replay, resultCapture, deckVariant, dataRoot, setupSource, editorCapture, seedSpecified, assetDiagnostics, diagnosticScreen, assetPreview, presentationSmoke, presentationTrace, titleLayers, pspFont, flowCapture, menuFrames, menuEntryFrame, realtimeWalk, deckMenuFrame);
     }
 }

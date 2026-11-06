@@ -4,6 +4,8 @@ using TagForceSpecial.PC.App.Input;
 using TagForceSpecial.PC.App.Screens;
 using TagForceSpecial.PC.App.Screens.Title;
 using TagForceSpecial.PC.Setup;
+using TagForceSpecial.PC.Decks;
+using TagForceSpecial.Effects;
 
 namespace TagForceSpecial.PC.Game;
 
@@ -16,6 +18,7 @@ public sealed partial class GameLoop
     private bool smokeProfile;
     private string? renderedFlowKey;
     private int renderedMenuFrame = -1, renderedOptionsFrame = -1;
+    private string? renderedDeckEditKey;
     private readonly ScreenFade screenFade = new();
 
     /// <summary>The flow is presented only when every source texture and text reference validates.</summary>
@@ -31,6 +34,7 @@ public sealed partial class GameLoop
             try
             {
                 next.ValidateText(); gum.BindFlowLayer(next.Layer); next.RenderMainMenuLabels(); gum.BindMainMenu(next);
+                next.RenderDeckMenuLabels(); gum.BindDeckMenu(next); gum.BindDeckEdit(next.DeckEditLayer);
                 next.RenderOptionsLayers(); next.RenderDialogLayers(); gum.BindOptions(next);
             }
             catch { next.Dispose(); throw; }
@@ -99,7 +103,7 @@ public sealed partial class GameLoop
     private void DrawTransitionOverlay()
     {
         int alpha = screenFade.Alpha;
-        if (activeScreen == ScreenId.TitleFlow && titleFlow is { Step: TitleFlowStep.MainMenu or TitleFlowStep.MainMenuUnavailable or TitleFlowStep.Options } flow)
+        if (activeScreen == ScreenId.TitleFlow && titleFlow is { Step: TitleFlowStep.MainMenu or TitleFlowStep.MainMenuUnavailable or TitleFlowStep.Options or TitleFlowStep.DeckMenu } flow)
             alpha = Math.Max(alpha, MainMenuEntry.OverlayAlpha(MainMenuEntryFrame(flow)));
         if (alpha == 0) return;
         renderer.Begin();
@@ -115,9 +119,20 @@ public sealed partial class GameLoop
         // After the entry sequence only the background frame can change what the layer holds.
         int key = frame * 64 + Math.Min(entry, MainMenuEntry.ReadyFrame);
         if (key != renderedMenuFrame) { visuals.RenderMainMenuBackground(frame, entry); renderedMenuFrame = key; }
-        gum.UpdateMainMenu(flow.MenuFocus, visuals.MainMenuMotion.ScalarsAt(frame).Pulse, entry);
+        // Measured: after the submenu closes, the menu's focus pulse restarts on the submenu's curve; exact runs hold its first value.
+        int pulse = flow.MenuFocusRestartFrame is { } restart
+            ? flow.DeckMenuProfile.PulseSinceFocus(options.PixelExact ? 0 : restart) : visuals.MainMenuMotion.ScalarsAt(frame).Pulse;
+        gum.UpdateMainMenu(flow.MenuFocus, pulse, entry, flow.MainMenuDimmed ? flow.DeckMenuProfile.MenuDim : 255);
         gum.ShowMainMenuNotice(flow.Step == TitleFlowStep.MainMenuUnavailable ? flow.FocusedDestination : null);
-        visuals.SetMainMenuFallback(flow.MenuFocus);
+        if (flow.DeckMenu is { } deckMenu)
+        {
+            // Exact runs fix the submenu's own frame as well as the background's.
+            int deckFrame = options.PixelExact ? options.DeckMenuFrame ?? flow.DeckMenuProfile.ReadyFrame : deckMenu.Frame;
+            gum.UpdateDeckMenu(flow.DeckMenuProfile, deckMenu.Focus, deckFrame, deckMenu.FocusVisible(deckFrame));
+            gum.ShowDeckMenuNotice(deckMenu.NoticeOpen ? deckMenu.Focused : null);
+            visuals.SetDeckMenuFallback(flow.MenuFocus, deckMenu.FocusVisible(deckFrame) ? deckMenu.Focus : null);
+        }
+        else visuals.SetMainMenuFallback(flow.MenuFocus);
     }
 
     private void RefreshOptions(TitleFlow flow, TitleFlowVisuals visuals)
@@ -136,12 +151,49 @@ public sealed partial class GameLoop
         visuals.SetOptionsFallback(session.Values, session.Focus);
     }
 
+    /// <summary>The native draft, as the PC deck editor opens it: the selected saved revision, else the built-in deck.</summary>
+    private void EnsureDraft()
+    {
+        if (draft is not null || setup?.Cache is null) return;
+        if (setup.Preferences.SelectedDeck is { } key)
+        {
+            try { draft = new(setup.Cache.Catalog.Catalog, library!.Load(key)); draftKey = key; }
+            catch (Exception e) when (SetupStore.Recoverable(e)) { editorNotice = "Saved revision is unreadable. Load an earlier revision or use a new deck."; }
+        }
+        draft ??= new(setup.Cache.Catalog.Catalog, InitialOpponentDecks.Create(0));
+    }
+
+    private void RefreshDeckEdit(TitleFlow flow, TitleFlowVisuals visuals, DeckEditSession edit)
+    {
+        gum.Show("OriginalMainMenu", false); gum.Show("OriginalDeckMenu", false); gum.Show("OriginalTitleFlow", false);
+        if (edit.Prompt == DeckEditPrompt.SaveQuestion)
+        {
+            // Observed after OK: "Save all contents acquired so far?" over the bare animated background, as from Options.
+            int bare = MainMenuFrame(flow, visuals);
+            if (bare * 64 != renderedOptionsFrame) { visuals.RenderOptionsBackground(bare, 0); renderedOptionsFrame = bare * 64; }
+            gum.Show("OriginalOptions", true);
+            gum.ShowOptionsDialog(null);
+            gum.ShowOptionsSaveQuestion(edit.PromptFocus, visuals.OptionsProfile.Rows.Length, visuals.OptionsProfile.Groups.Length);
+            renderedDeckEditKey = null;
+            return;
+        }
+        gum.Show("OriginalOptions", false);
+        gum.Show("OriginalDeckEdit", true);
+        string key = $"{edit.Tab}/{edit.Cursor}/{edit.Scroll}/{edit.Prompt}/{edit.PromptFocus}/{edit.Count(DeckEditTab.Deck)}/{edit.Count(DeckEditTab.Extra)}/{edit.Count(DeckEditTab.Side)}/{edit.Count(DeckEditTab.Trunk)}";
+        if (key == renderedDeckEditKey) return;
+        visuals.RenderDeckEdit(edit, edit.Draft.Name);
+        renderedDeckEditKey = key;
+    }
+
     private void RefreshFlow()
     {
         if (titleFlow is null || flowVisuals is null) return;
-        bool menu = titleFlow.Step is TitleFlowStep.MainMenu or TitleFlowStep.MainMenuUnavailable;
+        bool menu = titleFlow.Step is TitleFlowStep.MainMenu or TitleFlowStep.MainMenuUnavailable or TitleFlowStep.DeckMenu;
         bool optionsScreen = titleFlow.Step == TitleFlowStep.Options && titleFlow.Options is not null;
         gum.Show("OriginalMainMenu", menu);
+        gum.Show("OriginalDeckMenu", titleFlow.DeckMenu is not null);
+        gum.Show("OriginalDeckEdit", false);
+        if (titleFlow.Step == TitleFlowStep.DeckEdit && titleFlow.DeckEdit is { } edit) { RefreshDeckEdit(titleFlow, flowVisuals, edit); return; }
         gum.Show("OriginalOptions", optionsScreen);
         string? frame = FrameFor(titleFlow.Step);
         gum.Show("OriginalTitleFlow", frame is not null);
@@ -224,6 +276,20 @@ public sealed partial class GameLoop
         {
             if (!owner.options.PresentationSmoke) owner.profiles!.Save(name, level, options);
         }
+        /// <summary>Deck Edit works on the native draft (the same one the PC deck tools edit). The Trunk is the supported card pool.
+        /// Presentation checks start each visit from a fresh built-in deck so repeated cycles stay identical, and never save.</summary>
+        public DeckEditSession? OpenDeckEdit()
+        {
+            if (owner.setup?.Cache?.Catalog.Catalog is not { } catalog || owner.flowVisuals is null) return null;
+            DeckDraft draft;
+            if (owner.options.PresentationSmoke) draft = new(catalog, InitialOpponentDecks.Create(0));
+            else { owner.EnsureDraft(); draft = owner.draft!; }
+            return new DeckEditSession(draft, PlayablePreview.Cards.Select(c => catalog[c.CardId]), owner.flowVisuals.DeckEditProfile.VisibleRows);
+        }
+        public void SaveDeckEdit(DeckEditSession session)
+        {
+            if (!owner.options.PresentationSmoke && ReferenceEquals(session.Draft, owner.draft)) owner.SaveDraft();
+        }
     }
 
     private void LeaveFlowIfDone(ScreenContext context)
@@ -269,6 +335,8 @@ public sealed partial class GameLoop
         {
             owner.gum.Show("OriginalTitleFlow", false);
             owner.gum.Show("OriginalMainMenu", false);
+            owner.gum.Show("OriginalDeckMenu", false);
+            owner.gum.Show("OriginalDeckEdit", false);
             owner.renderedMenuFrame = -1;
         }
     }

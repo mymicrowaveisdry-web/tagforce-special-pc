@@ -8,7 +8,8 @@ public enum TitleFlowStep
     NameEntry, NameKeyboard,
     RulesQuestion, ConfidenceQuestion, DuelistLevel, CreateQuestion, SystemSavePrompt, SystemSaveDone,
     MainMenu, MainMenuUnavailable, QuitQuestion, ExitToTitle,
-    Options, OptionsSaveQuestion
+    Options, OptionsSaveQuestion,
+    DeckMenu, DeckEdit
 }
 
 public enum DuelistLevelChoice { FirstTimer, BeenThere, BringItOn }
@@ -24,13 +25,21 @@ public interface ITitleFlowHost
     void CreateProfile(string name, DuelistLevelChoice level, PlayerOptions options);
     /// <summary>Main Menu Save Data and the Options save question: rewrites the profile with the session's name, level and options.</summary>
     void SaveProfile(string name, DuelistLevelChoice level, PlayerOptions options);
+    /// <summary>Opens Deck Edit over the PC's selected deck, or null when no card catalog is available (the row then shows its notice).</summary>
+    DeckEditSession? OpenDeckEdit() => null;
+    /// <summary>Saves the session's deck as a new native revision (Deck Edit's YES to "Save all contents acquired so far?").</summary>
+    void SaveDeckEdit(DeckEditSession session) { }
 }
 
-/// <summary>Observed Continue/New Game routes (config/reference/title-flow.json) and Main Menu/Options routes (main-menu.json, options.json).
-/// PC confirm is PSP Circle in the original and PSP Cross here; PC back is the reverse.
+/// <summary>Observed Continue/New Game routes (config/reference/title-flow.json) and Main Menu/Options/Deck Menu routes (main-menu.json,
+/// options.json, deck-menu.json). PC confirm is PSP Circle in the original and PSP Cross here; PC back is the reverse.
 /// Tag Force 6 data transfer is deliberately unsupported: New Game opens name entry directly.</summary>
-public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool instantTransitions = false)
+public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool instantTransitions = false, DeckMenuProfile? deckMenuProfile = null)
 {
+    private readonly DeckMenuProfile deckMenuProfile = deckMenuProfile ?? DeckMenuProfile.LoadEmbedded();
+    private TimeSpan? sinceSubmenuClosed;
+    private DeckEditSession? pendingDeckEdit;
+    private bool deckMenuSettled;
     public const int NameLimit = 8;
     /// <summary>Measured from the first panel appearing to black. The original shows two panels here; the PC shows only the first.</summary>
     public static readonly TimeSpan StorageCheckDuration = TimeSpan.FromSeconds(2.37);
@@ -61,6 +70,16 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
     /// <summary>Options values held for this session: accepted changes stay here until a save writes them, as observed.</summary>
     public PlayerOptions SessionOptions { get; private set; } = PlayerOptions.Defaults();
     public OptionsSession? Options { get; private set; }
+    /// <summary>The submenu drawn over the dimmed Main Menu while <see cref="TitleFlowStep.DeckMenu"/> is active.</summary>
+    public DeckMenuSession? DeckMenu { get; private set; }
+    public DeckMenuProfile DeckMenuProfile => deckMenuProfile;
+    /// <summary>The Deck Edit core screen while <see cref="TitleFlowStep.DeckEdit"/> is active.</summary>
+    public DeckEditSession? DeckEdit { get; private set; }
+    /// <summary>Measured: the Main Menu is dimmed, without focus, for as long as the submenu is drawn, including its close frames.</summary>
+    public bool MainMenuDimmed => Step == TitleFlowStep.DeckMenu;
+    /// <summary>Game frames since the Main Menu focus reappeared after the submenu closed; measured, its pulse restarts there.
+    /// Null otherwise, when the pulse follows the menu's own background clock.</summary>
+    public int? MenuFocusRestartFrame => sinceSubmenuClosed is { } t ? (int)Math.Floor(t.TotalSeconds * MainMenuEntry.GameFramesPerSecond) : null;
     public int ButtonCount => Step switch
     {
         TitleFlowStep.NoData or TitleFlowStep.DuelistLevel or TitleFlowStep.SystemSaveDone or TitleFlowStep.MainMenuUnavailable => 1,
@@ -99,6 +118,13 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
     public void Update(TimeSpan delta)
     {
         menuClock += delta;
+        if (sinceSubmenuClosed is { } since) sinceSubmenuClosed = since + delta;
+        if (Step == TitleFlowStep.DeckMenu)
+        {
+            DeckMenu!.Update(delta);
+            if (DeckMenu.Closed) ReturnFromDeckMenu();
+            return;
+        }
         if (Step == TitleFlowStep.MainMenu && heldDirection != 0)
         {
             // Measured: repeats walk toward the end row and stop there; only a fresh press wraps.
@@ -136,6 +162,8 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
         }
         if (Step == TitleFlowStep.MainMenu) { HandleMainMenu(input); return; }
         if (Step == TitleFlowStep.Options) { HandleOptions(input); return; }
+        if (Step == TitleFlowStep.DeckMenu) { HandleDeckMenu(input); return; }
+        if (Step == TitleFlowStep.DeckEdit) { HandleDeckEdit(input); return; }
         if (ButtonCount == 2 && (input.IsPressed(PspAction.Left) || input.IsPressed(PspAction.Right))) ButtonFocus = 1 - ButtonFocus;
         if (input.IsPressed(PspAction.Cross)) Confirm();
         else if (input.IsPressed(PspAction.Circle)) Back();
@@ -162,8 +190,40 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
             case MainMenuRoute.NativeSave: saveSource = SaveSource.MainMenu; Enter(TitleFlowStep.SystemSavePrompt); break;
             // Measured: the menu fades out at once, with no dialog lead.
             case MainMenuRoute.Options: EnterFaded(TitleFlowStep.Options, keepMenuFocus: true, lead: 0); break;
+            // Observed: the submenu opens over the live, dimmed menu with no fade.
+            case MainMenuRoute.DeckMenu: Enter(TitleFlowStep.DeckMenu, keepMenuFocus: true); break;
             default: Enter(TitleFlowStep.MainMenuUnavailable); break;
         }
+    }
+
+    private void HandleDeckMenu(PspInputFrame input)
+    {
+        // Observed: back hides the submenu's focus, then returns to the Main Menu on the Deck Menu row after the close frames.
+        var outcome = DeckMenu!.Handle(input);
+        if (outcome == DeckMenuOutcome.Closing && instantTransitions) ReturnFromDeckMenu();
+        // Deck Edit is recreated; its row opens the screen when the host can build a session, and otherwise keeps the PC notice.
+        if (outcome == DeckMenuOutcome.Notice && DeckMenu.Focused.Id == "deck-edit" && host.OpenDeckEdit() is { } session)
+        {
+            DeckMenu.CloseNotice();
+            pendingDeckEdit = session;
+            EnterFaded(TitleFlowStep.DeckEdit, keepMenuFocus: true, lead: 0);
+        }
+    }
+
+    private void HandleDeckEdit(PspInputFrame input)
+    {
+        var outcome = DeckEdit!.Handle(input);
+        if (outcome == DeckEditOutcome.None) return;
+        if (outcome == DeckEditOutcome.LeaveAndSave) host.SaveDeckEdit(DeckEdit);
+        // Observed: after the save question the Deck Menu submenu is back, Deck Edit focused.
+        deckMenuSettled = true;
+        EnterFaded(TitleFlowStep.DeckMenu, keepMenuFocus: true, lead: 0);
+    }
+
+    private void ReturnFromDeckMenu()
+    {
+        Enter(TitleFlowStep.MainMenu, keepMenuFocus: true);
+        sinceSubmenuClosed = TimeSpan.Zero;
     }
 
     private void HandleOptions(PspInputFrame input)
@@ -293,6 +353,13 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
             menuClock = TimeSpan.Zero;
         if (next == TitleFlowStep.Options) Options = new OptionsSession(SessionOptions.WithLevel(Level));
         else if (next is not TitleFlowStep.OptionsSaveQuestion) Options = null;
+        // Observed: every opening starts on Deck Edit with its fade-in; exact runs show the settled submenu.
+        DeckMenu = next == TitleFlowStep.DeckMenu ? new DeckMenuSession(deckMenuProfile) : null;
+        if (DeckMenu is not null && (instantTransitions || deckMenuSettled)) DeckMenu.SkipTo(deckMenuProfile.ReadyFrame);
+        deckMenuSettled = false;
+        DeckEdit = next == TitleFlowStep.DeckEdit ? pendingDeckEdit : null;
+        pendingDeckEdit = null;
+        sinceSubmenuClosed = null;
     }
 
     private static string Clip(string value) => value.Length <= NameLimit ? value : value[..NameLimit];

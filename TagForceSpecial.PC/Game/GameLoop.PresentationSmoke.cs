@@ -11,7 +11,9 @@ public sealed partial class GameLoop
     private const int SmokeCycles = 5, HoldDraws = 90;
     private const string AnyState = "*";
     // Every observed Continue/New Game branch, in PC keys: Enter = confirm, Escape = back, F1 = Start.
-    private static readonly (Keys? Key, string Expected)[] PresentationSteps = BuildPresentationSteps();
+    // Built on first use, after setup: Deck Edit is only reachable when the data root holds a card cache.
+    private (Keys? Key, string Expected)[]? presentationSteps;
+    private (Keys? Key, string Expected)[] PresentationSteps => presentationSteps ??= BuildPresentationSteps(setup?.Cache is not null);
     private readonly Dictionary<int, string> presentationHashes = [];
     private byte[]? presentationPixels;
     private int? presentationTextureCount;
@@ -19,7 +21,7 @@ public sealed partial class GameLoop
     private PspInputFrame presentationInput;
     private int presentationInputFrame = -1;
 
-    private static (Keys?, string)[] BuildPresentationSteps()
+    private static (Keys?, string)[] BuildPresentationSteps(bool deckEdit)
     {
         var steps = new List<(Keys?, string)> { (null, "title") };
         void Press(Keys key, string expected, string? settled = null)
@@ -59,6 +61,7 @@ public sealed partial class GameLoop
         {
             Press(Keys.Up, $"MainMenu/0/{row}");
             if (MainMenuDestinations.All[row].Route == MainMenuRoute.Options) { OptionsRoute(Press); continue; }
+            if (MainMenuDestinations.All[row].Route == MainMenuRoute.DeckMenu) { DeckMenuRoute(Press, Hold, row, deckEdit); continue; }
             Press(Keys.Enter, $"MainMenuUnavailable/0/{row}"); Press(Keys.Escape, $"MainMenu/0/{row}");
             Press(Keys.Enter, $"MainMenuUnavailable/0/{row}"); Press(Keys.Enter, $"MainMenu/0/{row}");
         }
@@ -108,6 +111,49 @@ public sealed partial class GameLoop
         Press(Keys.Enter, "MainMenu/0/6");
     }
 
+    /// <summary>Deck Menu over the dimmed Main Menu: every row, press wrap both ways, ignored buttons, each destination's PC notice with
+    /// both exits keeping focus, back to the menu row, focus reset on reopening, and hold-to-clamp both ways.</summary>
+    private static void DeckMenuRoute(Action<Keys, string, string?> press, Action<Keys, int, string> hold, int menuRow, bool deckEdit)
+    {
+        void Press(Keys key, string expected) => press(key, expected, null);
+        string Open(int focus) => $"DeckMenu/L/{focus}/{menuRow}";
+        Press(Keys.Enter, Open(0));
+        Press(Keys.Down, Open(1)); Press(Keys.Down, Open(2)); Press(Keys.Down, Open(0)); Press(Keys.Up, Open(2));
+        foreach (var ignored in new[] { Keys.Left, Keys.Right, Keys.Tab, Keys.Space, Keys.Q, Keys.E, Keys.F1, Keys.F2 }) Press(ignored, Open(2));
+        for (int focus = DeckMenuDestinations.All.Count - 1; focus >= 0; focus--)
+        {
+            if (focus < DeckMenuDestinations.All.Count - 1) Press(Keys.Up, Open(focus));
+            if (focus == 0 && deckEdit) { DeckEditRoute(Press, menuRow); continue; }
+            Press(Keys.Enter, $"DeckMenu/N/{focus}/{menuRow}"); Press(Keys.Escape, Open(focus));
+            Press(Keys.Enter, $"DeckMenu/N/{focus}/{menuRow}"); Press(Keys.Enter, Open(focus));
+        }
+        Press(Keys.Down, Open(1)); Press(Keys.Escape, $"MainMenu/0/{menuRow}");
+        Press(Keys.Enter, Open(0));
+        hold(Keys.Down, HoldDraws, Open(2));
+        hold(Keys.Up, HoldDraws, Open(0));
+        Press(Keys.Escape, $"MainMenu/0/{menuRow}");
+    }
+
+    /// <summary>Deck Edit core screen from the Deck Menu: cursor and wrap, every tab, a move both ways, a cancelled move, the exit question
+    /// both ways and the save question answered NO, back on the submenu. Counts depend on the built-in deck, so states are matched by prefix.</summary>
+    private static void DeckEditRoute(Action<Keys, string> press, int menuRow)
+    {
+        // The built-in deck uses most supported cards, so cursor and wrap are exercised on the 40-card Deck tab.
+        press(Keys.Enter, "DeckEdit/Trunk/0/None/0/*");
+        press(Keys.Space, "DeckEdit/Deck/0/None/0/*");
+        press(Keys.Down, "DeckEdit/Deck/1/None/0/*"); press(Keys.Down, "DeckEdit/Deck/2/None/0/*"); press(Keys.Up, "DeckEdit/Deck/1/None/0/*");
+        press(Keys.Up, "DeckEdit/Deck/0/None/0/*"); press(Keys.Up, "DeckEdit/Deck/*"); press(Keys.Down, "DeckEdit/Deck/0/None/0/*");
+        for (int i = 0; i < 8; i++) press(Keys.Down, $"DeckEdit/Deck/{i + 1}/None/0/*");
+        press(Keys.Space, "DeckEdit/Extra/0/None/0/*");
+        press(Keys.Space, "DeckEdit/Side/0/None/0/*"); press(Keys.Space, "DeckEdit/Trunk/0/None/0/*");
+        press(Keys.Enter, "DeckEdit/Trunk/0/Move/0/*"); press(Keys.Escape, "DeckEdit/Trunk/0/None/0/*");
+        press(Keys.Enter, "DeckEdit/Trunk/0/Move/0/*"); press(Keys.Enter, "DeckEdit/Trunk/0/None/0/*");
+        press(Keys.Space, "DeckEdit/Deck/0/None/0/*"); press(Keys.Enter, "DeckEdit/Deck/0/Move/0/*"); press(Keys.Enter, "DeckEdit/Deck/0/None/0/*");
+        press(Keys.Escape, "DeckEdit/Deck/0/ExitQuestion/0/*"); press(Keys.Right, "DeckEdit/Deck/0/ExitQuestion/1/*"); press(Keys.Enter, "DeckEdit/Deck/0/None/0/*");
+        press(Keys.Escape, "DeckEdit/Deck/0/ExitQuestion/0/*"); press(Keys.Enter, "DeckEdit/Deck/0/SaveQuestion/0/*");
+        press(Keys.Right, "DeckEdit/Deck/0/SaveQuestion/1/*"); press(Keys.Enter, $"DeckMenu/L/0/{menuRow}");
+    }
+
     private PspInputFrame PresentationSmokeInput()
     {
         var key = PresentationSteps[frames % PresentationSteps.Length].Key;
@@ -129,6 +175,10 @@ public sealed partial class GameLoop
         ScreenId.TitleStartMenu => "start:" + titleState.Choice,
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.Options, Options: { } session } =>
             $"Options/{(session.CancelQuestion ? "Q" + session.CancelFocus : "L")}/{session.Focus}/{session.Values[session.Focus]}",
+        ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.DeckEdit, DeckEdit: { } edit } =>
+            $"DeckEdit/{edit.Tab}/{edit.Cursor}/{edit.Prompt}/{edit.PromptFocus}/{edit.Count(DeckEditTab.Deck)}/{edit.Count(DeckEditTab.Trunk)}",
+        ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.DeckMenu, DeckMenu: { } deck } flow =>
+            $"DeckMenu/{(deck.NoticeOpen ? "N" : "L")}/{deck.Focus}/{flow.MenuFocus}",
         ScreenId.TitleFlow when titleFlow is { } flow => $"{flow.Step}/{flow.ButtonFocus}/{flow.MenuFocus}",
         _ => activeScreen.ToString()
     };
@@ -138,11 +188,12 @@ public sealed partial class GameLoop
         int step = frames % PresentationSteps.Length;
         string expected = PresentationSteps[step].Expected, label = PresentationLabel();
         bool asserted = expected != AnyState;
-        if (asserted && label != expected)
+        bool matches = expected.EndsWith('*') ? label.StartsWith(expected[..^1], StringComparison.Ordinal) : label == expected;
+        if (asserted && !matches)
             throw new InvalidOperationException($"Presentation route/focus mismatch at frame {frames}, step {step}: expected {expected}, got {label}.");
         if (duel is not null || smokeCommands != 0 || router!.ModalDepth != 0)
             throw new InvalidOperationException("Presentation navigation changed gameplay or modal ownership.");
-        if (gum.RootCount != 7 || gum.AttachedRootCount != 7 || originalTitle?.Layers.Count != 11)
+        if (gum.RootCount != 9 || gum.AttachedRootCount != 9 || originalTitle?.Layers.Count != 11)
             throw new InvalidOperationException("Presentation root/layer count changed.");
         presentationTextureCount ??= gum.CachedTextureCount;
         if (gum.CachedTextureCount != presentationTextureCount)
@@ -186,9 +237,11 @@ public sealed partial class GameLoop
         (1, Keys.F1), (2, Keys.Enter), (4, Keys.F1), (5, Keys.Escape), (6, Keys.Enter), (7, Keys.Enter),
         // Options: open it, change a value, accept, answer No to the save question, and come back to the replayed menu.
         (10.5, Keys.Up), (10.8, Keys.Up), (11.2, Keys.Enter), (13.4, Keys.Right), (13.8, Keys.Enter), (15.0, Keys.Right), (15.4, Keys.Enter),
-        (18.4, Keys.Escape), (19.2, Keys.Left), (19.6, Keys.Enter)
+        // Deck Menu: open over the dimmed menu, move, open a notice and close it, then close the submenu.
+        (18.4, Keys.Up), (18.7, Keys.Up), (19.0, Keys.Enter), (20.5, Keys.Down), (21.0, Keys.Enter), (22.0, Keys.Escape), (22.6, Keys.Escape),
+        (23.4, Keys.Escape), (24.2, Keys.Left), (24.6, Keys.Enter)
     ];
-    private const double RealtimeEnd = 23, RealtimeCaptureStep = .1;
+    private const double RealtimeEnd = 28, RealtimeCaptureStep = .1;
     private readonly List<object> realtimeTrace = [];
     private double nextRealtimeCapture = 1.5;
 

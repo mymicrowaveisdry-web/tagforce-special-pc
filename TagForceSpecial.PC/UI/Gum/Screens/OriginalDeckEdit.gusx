@@ -1,109 +1,105 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <ScreenSave xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <Name>OriginalDeckEdit</Name>
   <State>
     <Name>Default</Name>
-    <Variable Type="float" Name="Title.X" SetsValue="true">
+    <Variable Type="float" Name="Layer.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Layer.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Layer.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">480</Value>
+    </Variable>
+    <Variable Type="float" Name="Layer.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">272</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Layer.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Layer.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Layer.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Layer.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Layer.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Layer.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="TextureAddress" Name="Layer.TextureAddress" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="Layer.TextureLeft" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="Layer.TextureTop" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="Layer.TextureWidth" SetsValue="true">
+      <Value xsi:type="xsd:int">480</Value>
+    </Variable>
+    <Variable Type="int" Name="Layer.TextureHeight" SetsValue="true">
+      <Value xsi:type="xsd:int">272</Value>
+    </Variable>
+    <Variable Type="float" Name="Info.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Info.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Info.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Info.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Counts.X" SetsValue="true">
+      <Value xsi:type="xsd:float">96</Value>
+    </Variable>
+    <Variable Type="float" Name="Counts.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Counts.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Counts.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Tabs.X" SetsValue="true">
+      <Value xsi:type="xsd:float">146</Value>
+    </Variable>
+    <Variable Type="float" Name="Tabs.Y" SetsValue="true">
       <Value xsi:type="xsd:float">20</Value>
     </Variable>
-    <Variable Type="float" Name="Title.Y" SetsValue="true">
-      <Value xsi:type="xsd:float">14</Value>
-    </Variable>
-    <Variable Type="float" Name="Title.Width" SetsValue="true">
-      <Value xsi:type="xsd:float">440</Value>
-    </Variable>
-    <Variable Type="float" Name="Title.Height" SetsValue="true">
-      <Value xsi:type="xsd:float">24</Value>
-    </Variable>
-    <Variable Type="GeneralUnitType" Name="Title.XUnits" SetsValue="true">
+    <Variable Type="GeneralUnitType" Name="Tabs.XUnits" SetsValue="true">
       <Value xsi:type="xsd:int">0</Value>
     </Variable>
-    <Variable Type="GeneralUnitType" Name="Title.YUnits" SetsValue="true">
+    <Variable Type="GeneralUnitType" Name="Tabs.YUnits" SetsValue="true">
       <Value xsi:type="xsd:int">0</Value>
     </Variable>
-    <Variable Type="DimensionUnitType" Name="Title.WidthUnits" SetsValue="true">
+    <Variable Type="float" Name="List.X" SetsValue="true">
+      <Value xsi:type="xsd:float">147</Value>
+    </Variable>
+    <Variable Type="float" Name="List.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">36</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="List.XUnits" SetsValue="true">
       <Value xsi:type="xsd:int">0</Value>
     </Variable>
-    <Variable Type="DimensionUnitType" Name="Title.HeightUnits" SetsValue="true">
-      <Value xsi:type="xsd:int">0</Value>
-    </Variable>
-    <Variable Type="HorizontalAlignment" Name="Title.XOrigin" SetsValue="true">
-      <Value xsi:type="xsd:int">0</Value>
-    </Variable>
-    <Variable Type="VerticalAlignment" Name="Title.YOrigin" SetsValue="true">
-      <Value xsi:type="xsd:int">0</Value>
-    </Variable>
-    <Variable Type="string" Name="Title.Text" SetsValue="true">
-      <Value xsi:type="xsd:string">DECKEDIT</Value>
-    </Variable>
-    <Variable IsFont="true" Type="string" Name="Title.Font" SetsValue="true">
-      <Value xsi:type="xsd:string">Fonts/LiberationSans-Regular.ttf</Value>
-    </Variable>
-    <Variable Type="int" Name="Title.FontSize" SetsValue="true">
-      <Value xsi:type="xsd:int">12</Value>
-    </Variable>
-    <Variable Type="float" Name="Status.X" SetsValue="true">
-      <Value xsi:type="xsd:float">12</Value>
-    </Variable>
-    <Variable Type="float" Name="Status.Y" SetsValue="true">
-      <Value xsi:type="xsd:float">236</Value>
-    </Variable>
-    <Variable Type="float" Name="Status.Width" SetsValue="true">
-      <Value xsi:type="xsd:float">456</Value>
-    </Variable>
-    <Variable Type="float" Name="Status.Height" SetsValue="true">
-      <Value xsi:type="xsd:float">32</Value>
-    </Variable>
-    <Variable Type="GeneralUnitType" Name="Status.XUnits" SetsValue="true">
-      <Value xsi:type="xsd:int">0</Value>
-    </Variable>
-    <Variable Type="GeneralUnitType" Name="Status.YUnits" SetsValue="true">
-      <Value xsi:type="xsd:int">0</Value>
-    </Variable>
-    <Variable Type="DimensionUnitType" Name="Status.WidthUnits" SetsValue="true">
-      <Value xsi:type="xsd:int">0</Value>
-    </Variable>
-    <Variable Type="DimensionUnitType" Name="Status.HeightUnits" SetsValue="true">
-      <Value xsi:type="xsd:int">0</Value>
-    </Variable>
-    <Variable Type="HorizontalAlignment" Name="Status.XOrigin" SetsValue="true">
-      <Value xsi:type="xsd:int">0</Value>
-    </Variable>
-    <Variable Type="VerticalAlignment" Name="Status.YOrigin" SetsValue="true">
-      <Value xsi:type="xsd:int">0</Value>
-    </Variable>
-    <Variable Type="float" Name="Content.X" SetsValue="true">
-      <Value xsi:type="xsd:float">12</Value>
-    </Variable>
-    <Variable Type="float" Name="Content.Y" SetsValue="true">
-      <Value xsi:type="xsd:float">48</Value>
-    </Variable>
-    <Variable Type="float" Name="Content.Width" SetsValue="true">
-      <Value xsi:type="xsd:float">456</Value>
-    </Variable>
-    <Variable Type="float" Name="Content.Height" SetsValue="true">
-      <Value xsi:type="xsd:float">180</Value>
-    </Variable>
-    <Variable Type="GeneralUnitType" Name="Content.XUnits" SetsValue="true">
-      <Value xsi:type="xsd:int">0</Value>
-    </Variable>
-    <Variable Type="GeneralUnitType" Name="Content.YUnits" SetsValue="true">
-      <Value xsi:type="xsd:int">0</Value>
-    </Variable>
-    <Variable Type="DimensionUnitType" Name="Content.WidthUnits" SetsValue="true">
-      <Value xsi:type="xsd:int">0</Value>
-    </Variable>
-    <Variable Type="DimensionUnitType" Name="Content.HeightUnits" SetsValue="true">
-      <Value xsi:type="xsd:int">0</Value>
-    </Variable>
-    <Variable Type="HorizontalAlignment" Name="Content.XOrigin" SetsValue="true">
-      <Value xsi:type="xsd:int">0</Value>
-    </Variable>
-    <Variable Type="VerticalAlignment" Name="Content.YOrigin" SetsValue="true">
+    <Variable Type="GeneralUnitType" Name="List.YUnits" SetsValue="true">
       <Value xsi:type="xsd:int">0</Value>
     </Variable>
   </State>
-  <Instance Name="Title" BaseType="Text" />
-  <Instance Name="Status" BaseType="OriginalStatusPanel" />
-  <Instance Name="Content" BaseType="Container" />
+  <Instance Name="Layer" BaseType="Sprite" />
+  <Instance Name="Info" BaseType="CardInfoPanel" />
+  <Instance Name="Counts" BaseType="DeckCounts" />
+  <Instance Name="Tabs" BaseType="DeckSectionTabs" />
+  <Instance Name="List" BaseType="DeckCardList" />
 </ScreenSave>

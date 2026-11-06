@@ -18,11 +18,19 @@ public sealed class OriginalScreenAssetResolver : IDisposable
     public OriginalScreenAssetResolver(GraphicsDevice? device = null, SemanticAssetRegistry? registry = null)
     { this.device = device; this.registry = registry; }
     public int TextureCount => textures.Count;
-    public ResolvedScreenSprite Resolve(string key, SpriteSizing sizing = SpriteSizing.Native, string? stretchEvidenceId = null)
+    public ResolvedScreenSprite Resolve(string key, SpriteSizing sizing = SpriteSizing.Native, string? stretchEvidenceId = null) =>
+        Resolve(key, sizing, stretchEvidenceId, allowUnverified: false);
+
+    /// <summary>Decoded resources that have no original-reference pin yet (card thumbnails, Deck Edit supplements). The returned scope says
+    /// so; callers must keep such resources labelled and never present them as verified.</summary>
+    public ResolvedScreenSprite ResolveUnverified(string key) => Resolve(key, SpriteSizing.Native, null, allowUnverified: true);
+    public const string UnverifiedScope = "decoded-unverified";
+
+    private ResolvedScreenSprite Resolve(string key, SpriteSizing sizing, string? stretchEvidenceId, bool allowUnverified)
     {
         thread.Check(); ObjectDisposedException.ThrowIf(disposed, this);
         if (device is null || registry is null) throw new InvalidOperationException("No validated presentation generation is available.");
-        string scope = registry.VerifiedReferenceScope(key) ?? throw new InvalidDataException("Reference approval pending: " + key);
+        string scope = registry.VerifiedReferenceScope(key) ?? (allowUnverified ? UnverifiedScope : throw new InvalidDataException("Reference approval pending: " + key));
         var asset = registry.Resolve(key);
         int width = asset.Manifest.Output.Width ?? throw new InvalidDataException("Asset is not a decoded texture.");
         int height = asset.Manifest.Output.Height ?? throw new InvalidDataException("Asset is not a decoded texture.");

@@ -100,7 +100,9 @@ public sealed partial class TitleFlowVisuals : IDisposable
         }
         Layer = new(device, 480, 272, false, SurfaceFormat.Color, DepthFormat.Depth24Stencil8);
         InitializeMainMenu();
+        InitializeDeckMenu();
         InitializeOptions(assets);
+        InitializeDeckEdit(assets);
         effect = new(device) { VertexColorEnabled = true, Projection = Matrix.CreateOrthographicOffCenter(0, 480, 272, 0, 0, 1) };
         alpha = new()
         {
@@ -140,7 +142,7 @@ public sealed partial class TitleFlowVisuals : IDisposable
 
     private string Source(string source, int offset, int start, int chars) => TitleFlowText.Read(source switch
     {
-        "eboot" => eboot, "title-menu" => titleMenu, _ => throw new InvalidDataException("Unknown text source.")
+        "eboot" => eboot, "title-menu" => titleMenu, "deck" => deckArchive, _ => throw new InvalidDataException("Unknown text source.")
     }, offset, start, chars);
 
     public void Render(string frameId, int buttonFocus = 0, int menuFocus = 0, string? name = null, DuelistLevelChoice level = DuelistLevelChoice.FirstTimer, int? menuBackgroundFrame = null)
@@ -399,7 +401,7 @@ public sealed partial class TitleFlowVisuals : IDisposable
     {
         foreach (var texture in owned) texture.Dispose();
         owned.Clear();
-        MainMenuBackground.Dispose(); MainMenuLabels.Dispose();
+        MainMenuBackground.Dispose(); MainMenuLabels.Dispose(); DeckMenuLabels.Dispose(); DeckEditLayer.Dispose();
         OptionsBackground.Dispose(); OptionsStatic.Dispose(); OptionsText.Dispose(); OptionsPieces.Dispose();
         DialogText?.Dispose(); DialogPieces?.Dispose();
         foreach (var back in dialogBacks.Values) back.Dispose();
