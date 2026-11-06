@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ComponentSave xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Name>OriginalOptionRow</Name>
+  <BaseType>Container</BaseType>
+  <State>
+    <Name>Default</Name>
+    <Variable Type="float" Name="Width" SetsValue="true">
+      <Value xsi:type="xsd:float">480</Value>
+    </Variable>
+    <Variable Type="float" Name="Height" SetsValue="true">
+      <Value xsi:type="xsd:float">14</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Focus.X" SetsValue="true">
+      <Value xsi:type="xsd:float">120</Value>
+    </Variable>
+    <Variable Type="float" Name="Focus.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Focus.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">240</Value>
+    </Variable>
+    <Variable Type="float" Name="Focus.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">14</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Focus.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Focus.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Focus.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Focus.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Focus.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Focus.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="TextureAddress" Name="Focus.TextureAddress" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="Focus.TextureLeft" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="Focus.TextureTop" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="Focus.TextureWidth" SetsValue="true">
+      <Value xsi:type="xsd:int">240</Value>
+    </Variable>
+    <Variable Type="int" Name="Focus.TextureHeight" SetsValue="true">
+      <Value xsi:type="xsd:int">14</Value>
+    </Variable>
+    <Variable Type="bool" Name="Focus.Visible" SetsValue="true">
+      <Value xsi:type="xsd:boolean">false</Value>
+    </Variable>
+    <Variable Type="float" Name="Label.X" SetsValue="true">
+      <Value xsi:type="xsd:float">110</Value>
+    </Variable>
+    <Variable Type="float" Name="Label.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">-1</Value>
+    </Variable>
+    <Variable Type="float" Name="Label.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">180</Value>
+    </Variable>
+    <Variable Type="float" Name="Label.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">16</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Label.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Label.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Label.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Label.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Label.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Label.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="TextureAddress" Name="Label.TextureAddress" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="Label.TextureLeft" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="Label.TextureTop" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="Label.TextureWidth" SetsValue="true">
+      <Value xsi:type="xsd:int">180</Value>
+    </Variable>
+    <Variable Type="int" Name="Label.TextureHeight" SetsValue="true">
+      <Value xsi:type="xsd:int">16</Value>
+    </Variable>
+    <Variable Type="float" Name="Value.X" SetsValue="true">
+      <Value xsi:type="xsd:float">250</Value>
+    </Variable>
+    <Variable Type="float" Name="Value.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">-1</Value>
+    </Variable>
+    <Variable Type="float" Name="Value.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">112</Value>
+    </Variable>
+    <Variable Type="float" Name="Value.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">16</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Value.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Value.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Value.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Value.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Value.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Value.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="TextureAddress" Name="Value.TextureAddress" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="Value.TextureLeft" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="Value.TextureTop" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="Value.TextureWidth" SetsValue="true">
+      <Value xsi:type="xsd:int">112</Value>
+    </Variable>
+    <Variable Type="int" Name="Value.TextureHeight" SetsValue="true">
+      <Value xsi:type="xsd:int">16</Value>
+    </Variable>
+    <Variable Type="float" Name="ArrowLeft.X" SetsValue="true">
+      <Value xsi:type="xsd:float">276</Value>
+    </Variable>
+    <Variable Type="float" Name="ArrowLeft.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">4</Value>
+    </Variable>
+    <Variable Type="float" Name="ArrowLeft.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">8</Value>
+    </Variable>
+    <Variable Type="float" Name="ArrowLeft.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">8</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="ArrowLeft.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="ArrowLeft.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="ArrowLeft.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="ArrowLeft.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="ArrowLeft.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="ArrowLeft.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="TextureAddress" Name="ArrowLeft.TextureAddress" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="ArrowLeft.TextureLeft" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="ArrowLeft.TextureTop" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="ArrowLeft.TextureWidth" SetsValue="true">
+      <Value xsi:type="xsd:int">8</Value>
+    </Variable>
+    <Variable Type="int" Name="ArrowLeft.TextureHeight" SetsValue="true">
+      <Value xsi:type="xsd:int">8</Value>
+    </Variable>
+    <Variable Type="float" Name="ArrowRight.X" SetsValue="true">
+      <Value xsi:type="xsd:float">352</Value>
+    </Variable>
+    <Variable Type="float" Name="ArrowRight.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">4</Value>
+    </Variable>
+    <Variable Type="float" Name="ArrowRight.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">8</Value>
+    </Variable>
+    <Variable Type="float" Name="ArrowRight.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">8</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="ArrowRight.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="ArrowRight.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="ArrowRight.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="ArrowRight.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="ArrowRight.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="ArrowRight.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="TextureAddress" Name="ArrowRight.TextureAddress" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="ArrowRight.TextureLeft" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="ArrowRight.TextureTop" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="ArrowRight.TextureWidth" SetsValue="true">
+      <Value xsi:type="xsd:int">8</Value>
+    </Variable>
+    <Variable Type="int" Name="ArrowRight.TextureHeight" SetsValue="true">
+      <Value xsi:type="xsd:int">8</Value>
+    </Variable>
+    <Variable Type="float" Name="SlotsEmpty.X" SetsValue="true">
+      <Value xsi:type="xsd:float">253</Value>
+    </Variable>
+    <Variable Type="float" Name="SlotsEmpty.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">2</Value>
+    </Variable>
+    <Variable Type="float" Name="SlotsEmpty.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">90</Value>
+    </Variable>
+    <Variable Type="float" Name="SlotsEmpty.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">10</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="SlotsEmpty.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="SlotsEmpty.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="SlotsEmpty.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="SlotsEmpty.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="SlotsEmpty.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="SlotsEmpty.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="TextureAddress" Name="SlotsEmpty.TextureAddress" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="SlotsEmpty.TextureLeft" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="SlotsEmpty.TextureTop" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="SlotsEmpty.TextureWidth" SetsValue="true">
+      <Value xsi:type="xsd:int">90</Value>
+    </Variable>
+    <Variable Type="int" Name="SlotsEmpty.TextureHeight" SetsValue="true">
+      <Value xsi:type="xsd:int">10</Value>
+    </Variable>
+    <Variable Type="bool" Name="SlotsEmpty.Visible" SetsValue="true">
+      <Value xsi:type="xsd:boolean">false</Value>
+    </Variable>
+    <Variable Type="float" Name="SlotsFull.X" SetsValue="true">
+      <Value xsi:type="xsd:float">253</Value>
+    </Variable>
+    <Variable Type="float" Name="SlotsFull.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">2</Value>
+    </Variable>
+    <Variable Type="float" Name="SlotsFull.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">90</Value>
+    </Variable>
+    <Variable Type="float" Name="SlotsFull.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">10</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="SlotsFull.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="SlotsFull.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="SlotsFull.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="SlotsFull.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="SlotsFull.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="SlotsFull.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="TextureAddress" Name="SlotsFull.TextureAddress" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="SlotsFull.TextureLeft" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="SlotsFull.TextureTop" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="SlotsFull.TextureWidth" SetsValue="true">
+      <Value xsi:type="xsd:int">90</Value>
+    </Variable>
+    <Variable Type="int" Name="SlotsFull.TextureHeight" SetsValue="true">
+      <Value xsi:type="xsd:int">10</Value>
+    </Variable>
+    <Variable Type="bool" Name="SlotsFull.Visible" SetsValue="true">
+      <Value xsi:type="xsd:boolean">false</Value>
+    </Variable>
+  </State>
+  <Instance Name="Focus" BaseType="Sprite" />
+  <Instance Name="Label" BaseType="Sprite" />
+  <Instance Name="Value" BaseType="Sprite" />
+  <Instance Name="ArrowLeft" BaseType="Sprite" />
+  <Instance Name="ArrowRight" BaseType="Sprite" />
+  <Instance Name="SlotsEmpty" BaseType="Sprite" />
+  <Instance Name="SlotsFull" BaseType="Sprite" />
+</ComponentSave>

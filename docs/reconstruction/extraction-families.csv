@@ -1,0 +1,13 @@
+family,raw_family,extraction_path,expected_output,caution
+ehp,.ehp,EHP index to bounded member bytes,classified member resources,"Detect gzip and nested members separately; never assume every member is a GIM"
+gzip,.gz,Gzip signature and bounded inner signature then separate inventory,decoded inner container or binary,"Prefix detection is classification only; recursively indexed members remain unverified until recorded"
+gim,.gim,Selected managed format palette surface and swizzle decoder,original-size straight RGBA plus optional PNG,"Preserve alpha; palette and multiple surfaces require explicit selection; no guessed sprite geometry"
+card-thumbnails,cardh_j.cip,Existing card slot reader,partial thumbnails only,"4096 stored bytes versus observed 4208-byte root block plus 16-byte GIM file header; never synthesize missing pixels"
+card-artwork-cpj,cardj*_j.cip,CPJ header reconstruction and full artwork research,full-size card artwork,"Verify actual archive signature/name and per-card TFSP dimensions; no thumbnail alias"
+card-field-icons,other card archives,Index and classify separately,field icons backs or thumbnails as established,"Confirm number-to-card mapping orientation and alpha; archive naming alone is not semantics"
+adx2,.acb/.awb,ACB cue and waveform IDs to AFS2/HCA plus external licensed sample decoder,cue-indexed BGM SFX and voices,"Record cue IDs durations source banks and unresolved graphs; bare filenames do not establish usage"
+other-audio,.at3 and other audio,Identify and validate actual codec,WAV or OGG when runtime policy approves,"Preserve sample rate channels loops and encoder trim/padding metadata"
+psmf-movie,.pmf/PSMF,Inspect bounded packets and optionally decode full streams,source-cadence video and audio,"Record PTS aspect scaling and A/V sync; stock probing may miss PSP private audio"
+font,original font resources,Identify font binary glyph maps and metrics,glyph atlas and metrics,"Require Japanese and English-patch coverage; text strings or a font PRX are not extracted glyphs"
+indexed-text,dialogue/story tables,Read verified indexed strings and separate event metadata,localized text and source metadata,"Preserve aliases and row IDs; text alone does not implement routes branches triggers or maps"
+model-animation-candidate,TMS/TMT/TMA/GMO candidates,Classify native structures before conversion,mesh skeleton clips or explicit unresolved status,"Partial format knowledge is not conversion; image decoding cannot approve models"

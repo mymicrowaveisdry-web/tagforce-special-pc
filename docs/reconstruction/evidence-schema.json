@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PSP UI reconstruction evidence metadata (no media)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["evidence_id", "screen_id", "status", "pc_acceptance", "source_profile", "scenario", "private_artifact_ref", "geometry", "comparison", "reviewer"],
+  "properties": {
+    "evidence_id": { "$ref": "#/$defs/id" },
+    "screen_id": { "$ref": "#/$defs/id" },
+    "status": { "enum": ["unverified", "decoded", "captured", "mapped", "reference-verified"] },
+    "pc_acceptance": { "enum": ["not-tested", "passed", "failed"] },
+    "source_profile": {
+      "oneOf": [
+        { "const": "unverified" },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["build_id", "image_sha256", "image_length", "identity_verified"],
+          "properties": {
+            "build_id": { "$ref": "#/$defs/id" },
+            "image_sha256": { "$ref": "#/$defs/hash" },
+            "image_length": { "type": "integer", "minimum": 1 },
+            "identity_verified": { "type": "boolean" }
+          }
+        }
+      ]
+    },
+    "scenario": {
+      "oneOf": [
+        { "const": "unverified" },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["scenario_id", "ppsspp_version", "configuration_ref", "language", "options_ref", "state_ref", "state_sha256", "inputs_ref", "capture_point"],
+          "properties": {
+            "scenario_id": { "$ref": "#/$defs/id" },
+            "ppsspp_version": { "$ref": "#/$defs/knownText" },
+            "configuration_ref": { "$ref": "#/$defs/privateRef" },
+            "language": { "$ref": "#/$defs/knownText" },
+            "options_ref": { "$ref": "#/$defs/privateRef" },
+            "state_ref": { "$ref": "#/$defs/privateRef" },
+            "state_sha256": { "$ref": "#/$defs/hash" },
+            "inputs_ref": { "$ref": "#/$defs/privateRef" },
+            "capture_point": { "$ref": "#/$defs/knownText" }
+          }
+        }
+      ]
+    },
+    "private_artifact_ref": { "oneOf": [{ "const": "unverified" }, { "$ref": "#/$defs/privateRef" }] },
+    "geometry": {
+      "type": "object", "additionalProperties": false,
+      "required": ["native_rectangles", "source_textures", "nine_slice_guides", "text_layout", "z_order", "transitions"],
+      "properties": {
+        "native_rectangles": { "$ref": "#/$defs/measurement" },
+        "source_textures": { "$ref": "#/$defs/measurement" },
+        "nine_slice_guides": { "$ref": "#/$defs/measurement" },
+        "text_layout": { "$ref": "#/$defs/measurement" },
+        "z_order": { "$ref": "#/$defs/measurement" },
+        "transitions": { "$ref": "#/$defs/measurement" }
+      }
+    },
+    "comparison": {
+      "oneOf": [
+        { "const": "unverified" },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["reference_scenario", "pc_scenario", "method", "result", "report_ref"],
+          "properties": {
+            "reference_scenario": { "$ref": "#/$defs/id" },
+            "pc_scenario": { "$ref": "#/$defs/id" },
+            "method": { "$ref": "#/$defs/knownText" },
+            "result": { "enum": ["passed", "failed"] },
+            "report_ref": { "$ref": "#/$defs/privateRef" }
+          }
+        }
+      ]
+    },
+    "reviewer": { "oneOf": [{ "const": "unassigned" }, { "$ref": "#/$defs/knownText" }] }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "reference-verified" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "source_profile": { "type": "object", "properties": { "identity_verified": { "const": true } } },
+          "scenario": { "type": "object" },
+          "private_artifact_ref": { "$ref": "#/$defs/privateRef" },
+          "geometry": { "type": "object", "properties": {
+            "native_rectangles": { "$ref": "#/$defs/privateRef" },
+            "source_textures": { "$ref": "#/$defs/privateRef" },
+            "nine_slice_guides": { "$ref": "#/$defs/privateRef" },
+            "text_layout": { "$ref": "#/$defs/privateRef" },
+            "z_order": { "$ref": "#/$defs/privateRef" },
+            "transitions": { "$ref": "#/$defs/privateRef" }
+          } },
+          "comparison": { "type": "object", "properties": { "result": { "const": "passed" } } },
+          "reviewer": { "not": { "const": "unassigned" } }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$", "not": { "const": "unverified" } },
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "knownText": { "type": "string", "minLength": 1, "not": { "enum": ["unverified", "unassigned"] } },
+    "privateRef": { "type": "string", "pattern": "^private:[a-zA-Z0-9][a-zA-Z0-9_./#-]*$", "not": { "pattern": "\\.\\." } },
+    "measurement": { "oneOf": [{ "const": "unverified" }, { "$ref": "#/$defs/privateRef" }] }
+  }
+}

@@ -1,0 +1,408 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScreenSave xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Name>OriginalMainMenu</Name>
+  <State>
+    <Name>Default</Name>
+    <Variable Type="float" Name="Background.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Background.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Background.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">480</Value>
+    </Variable>
+    <Variable Type="float" Name="Background.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">272</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Background.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Background.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Background.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Background.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Background.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Background.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="TextureAddress" Name="Background.TextureAddress" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="Background.TextureLeft" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="Background.TextureTop" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="Background.TextureWidth" SetsValue="true">
+      <Value xsi:type="xsd:int">480</Value>
+    </Variable>
+    <Variable Type="int" Name="Background.TextureHeight" SetsValue="true">
+      <Value xsi:type="xsd:int">272</Value>
+    </Variable>
+    <Variable Type="float" Name="Bar0.X" SetsValue="true">
+      <Value xsi:type="xsd:float">114</Value>
+    </Variable>
+    <Variable Type="float" Name="Bar0.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">58</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Bar0.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Bar0.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Bar1.X" SetsValue="true">
+      <Value xsi:type="xsd:float">114</Value>
+    </Variable>
+    <Variable Type="float" Name="Bar1.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">81</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Bar1.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Bar1.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Bar2.X" SetsValue="true">
+      <Value xsi:type="xsd:float">114</Value>
+    </Variable>
+    <Variable Type="float" Name="Bar2.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">104</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Bar2.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Bar2.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Bar3.X" SetsValue="true">
+      <Value xsi:type="xsd:float">114</Value>
+    </Variable>
+    <Variable Type="float" Name="Bar3.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">127</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Bar3.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Bar3.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Bar4.X" SetsValue="true">
+      <Value xsi:type="xsd:float">114</Value>
+    </Variable>
+    <Variable Type="float" Name="Bar4.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">150</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Bar4.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Bar4.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Bar5.X" SetsValue="true">
+      <Value xsi:type="xsd:float">114</Value>
+    </Variable>
+    <Variable Type="float" Name="Bar5.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">173</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Bar5.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Bar5.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Bar6.X" SetsValue="true">
+      <Value xsi:type="xsd:float">114</Value>
+    </Variable>
+    <Variable Type="float" Name="Bar6.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">196</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Bar6.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Bar6.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Bar7.X" SetsValue="true">
+      <Value xsi:type="xsd:float">114</Value>
+    </Variable>
+    <Variable Type="float" Name="Bar7.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">219</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Bar7.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Bar7.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Notice.X" SetsValue="true">
+      <Value xsi:type="xsd:float">70</Value>
+    </Variable>
+    <Variable Type="float" Name="Notice.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">84</Value>
+    </Variable>
+    <Variable Type="float" Name="Notice.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">340</Value>
+    </Variable>
+    <Variable Type="float" Name="Notice.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">104</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Notice.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Notice.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Notice.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Notice.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Notice.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Notice.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="bool" Name="Notice.Visible" SetsValue="true">
+      <Value xsi:type="xsd:boolean">false</Value>
+    </Variable>
+    <Variable Type="float" Name="NoticeShade.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="NoticeShade.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="NoticeShade.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">340</Value>
+    </Variable>
+    <Variable Type="float" Name="NoticeShade.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">104</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="NoticeShade.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="NoticeShade.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="NoticeShade.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="NoticeShade.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="NoticeShade.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="NoticeShade.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="TextureAddress" Name="NoticeShade.TextureAddress" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="NoticeShade.TextureLeft" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="NoticeShade.TextureTop" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="NoticeShade.TextureWidth" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="NoticeShade.TextureHeight" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="string" Name="NoticeShade.Parent" SetsValue="true">
+      <Value xsi:type="xsd:string">Notice</Value>
+    </Variable>
+    <Variable Type="int" Name="NoticeShade.Red" SetsValue="true">
+      <Value xsi:type="xsd:int">12</Value>
+    </Variable>
+    <Variable Type="int" Name="NoticeShade.Green" SetsValue="true">
+      <Value xsi:type="xsd:int">18</Value>
+    </Variable>
+    <Variable Type="int" Name="NoticeShade.Blue" SetsValue="true">
+      <Value xsi:type="xsd:int">32</Value>
+    </Variable>
+    <Variable Type="int" Name="NoticeShade.Alpha" SetsValue="true">
+      <Value xsi:type="xsd:int">235</Value>
+    </Variable>
+    <Variable Type="float" Name="NoticeTitle.X" SetsValue="true">
+      <Value xsi:type="xsd:float">12</Value>
+    </Variable>
+    <Variable Type="float" Name="NoticeTitle.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">8</Value>
+    </Variable>
+    <Variable Type="float" Name="NoticeTitle.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">316</Value>
+    </Variable>
+    <Variable Type="float" Name="NoticeTitle.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">20</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="NoticeTitle.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="NoticeTitle.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="NoticeTitle.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="NoticeTitle.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="NoticeTitle.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="NoticeTitle.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="string" Name="NoticeTitle.Text" SetsValue="true">
+      <Value xsi:type="xsd:string">Mode name</Value>
+    </Variable>
+    <Variable IsFont="true" Type="string" Name="NoticeTitle.Font" SetsValue="true">
+      <Value xsi:type="xsd:string">Fonts/LiberationSans-Regular.ttf</Value>
+    </Variable>
+    <Variable Type="int" Name="NoticeTitle.FontSize" SetsValue="true">
+      <Value xsi:type="xsd:int">12</Value>
+    </Variable>
+    <Variable Type="int" Name="NoticeTitle.Red" SetsValue="true">
+      <Value xsi:type="xsd:int">238</Value>
+    </Variable>
+    <Variable Type="int" Name="NoticeTitle.Green" SetsValue="true">
+      <Value xsi:type="xsd:int">196</Value>
+    </Variable>
+    <Variable Type="int" Name="NoticeTitle.Blue" SetsValue="true">
+      <Value xsi:type="xsd:int">104</Value>
+    </Variable>
+    <Variable Type="string" Name="NoticeTitle.Parent" SetsValue="true">
+      <Value xsi:type="xsd:string">Notice</Value>
+    </Variable>
+    <Variable Type="float" Name="NoticeBody.X" SetsValue="true">
+      <Value xsi:type="xsd:float">12</Value>
+    </Variable>
+    <Variable Type="float" Name="NoticeBody.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">32</Value>
+    </Variable>
+    <Variable Type="float" Name="NoticeBody.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">316</Value>
+    </Variable>
+    <Variable Type="float" Name="NoticeBody.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">40</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="NoticeBody.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="NoticeBody.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="NoticeBody.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="NoticeBody.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="NoticeBody.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="NoticeBody.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="string" Name="NoticeBody.Text" SetsValue="true">
+      <Value xsi:type="xsd:string">Availability message.</Value>
+    </Variable>
+    <Variable IsFont="true" Type="string" Name="NoticeBody.Font" SetsValue="true">
+      <Value xsi:type="xsd:string">Fonts/LiberationSans-Regular.ttf</Value>
+    </Variable>
+    <Variable Type="int" Name="NoticeBody.FontSize" SetsValue="true">
+      <Value xsi:type="xsd:int">12</Value>
+    </Variable>
+    <Variable Type="int" Name="NoticeBody.Red" SetsValue="true">
+      <Value xsi:type="xsd:int">255</Value>
+    </Variable>
+    <Variable Type="int" Name="NoticeBody.Green" SetsValue="true">
+      <Value xsi:type="xsd:int">255</Value>
+    </Variable>
+    <Variable Type="int" Name="NoticeBody.Blue" SetsValue="true">
+      <Value xsi:type="xsd:int">255</Value>
+    </Variable>
+    <Variable Type="string" Name="NoticeBody.Parent" SetsValue="true">
+      <Value xsi:type="xsd:string">Notice</Value>
+    </Variable>
+    <Variable Type="float" Name="NoticeHint.X" SetsValue="true">
+      <Value xsi:type="xsd:float">12</Value>
+    </Variable>
+    <Variable Type="float" Name="NoticeHint.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">80</Value>
+    </Variable>
+    <Variable Type="float" Name="NoticeHint.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">316</Value>
+    </Variable>
+    <Variable Type="float" Name="NoticeHint.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">18</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="NoticeHint.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="NoticeHint.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="NoticeHint.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="NoticeHint.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="NoticeHint.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="NoticeHint.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="string" Name="NoticeHint.Text" SetsValue="true">
+      <Value xsi:type="xsd:string">PC notice. Enter / A or Esc / B: back</Value>
+    </Variable>
+    <Variable IsFont="true" Type="string" Name="NoticeHint.Font" SetsValue="true">
+      <Value xsi:type="xsd:string">Fonts/LiberationSans-Regular.ttf</Value>
+    </Variable>
+    <Variable Type="int" Name="NoticeHint.FontSize" SetsValue="true">
+      <Value xsi:type="xsd:int">12</Value>
+    </Variable>
+    <Variable Type="int" Name="NoticeHint.Red" SetsValue="true">
+      <Value xsi:type="xsd:int">170</Value>
+    </Variable>
+    <Variable Type="int" Name="NoticeHint.Green" SetsValue="true">
+      <Value xsi:type="xsd:int">180</Value>
+    </Variable>
+    <Variable Type="int" Name="NoticeHint.Blue" SetsValue="true">
+      <Value xsi:type="xsd:int">200</Value>
+    </Variable>
+    <Variable Type="string" Name="NoticeHint.Parent" SetsValue="true">
+      <Value xsi:type="xsd:string">Notice</Value>
+    </Variable>
+  </State>
+  <Instance Name="Background" BaseType="Sprite" />
+  <Instance Name="Bar0" BaseType="OriginalMenuBar" />
+  <Instance Name="Bar1" BaseType="OriginalMenuBar" />
+  <Instance Name="Bar2" BaseType="OriginalMenuBar" />
+  <Instance Name="Bar3" BaseType="OriginalMenuBar" />
+  <Instance Name="Bar4" BaseType="OriginalMenuBar" />
+  <Instance Name="Bar5" BaseType="OriginalMenuBar" />
+  <Instance Name="Bar6" BaseType="OriginalMenuBar" />
+  <Instance Name="Bar7" BaseType="OriginalMenuBar" />
+  <Instance Name="Notice" BaseType="Container" />
+  <Instance Name="NoticeShade" BaseType="Sprite" />
+  <Instance Name="NoticeTitle" BaseType="Text" />
+  <Instance Name="NoticeBody" BaseType="Text" />
+  <Instance Name="NoticeHint" BaseType="Text" />
+</ScreenSave>

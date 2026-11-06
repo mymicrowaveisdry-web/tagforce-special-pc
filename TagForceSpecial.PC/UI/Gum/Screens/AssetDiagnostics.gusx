@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScreenSave xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Name>AssetDiagnostics</Name>
+  <State><Name>Default</Name>
+    <Variable Type="float" Name="Title.X" SetsValue="true"><Value xsi:type="xsd:float">12</Value></Variable>
+    <Variable Type="float" Name="Title.Y" SetsValue="true"><Value xsi:type="xsd:float">10</Value></Variable>
+    <Variable Type="float" Name="Title.Width" SetsValue="true"><Value xsi:type="xsd:float">456</Value></Variable>
+    <Variable Type="float" Name="Title.Height" SetsValue="true"><Value xsi:type="xsd:float">20</Value></Variable>
+    <Variable Type="GeneralUnitType" Name="Title.XUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="GeneralUnitType" Name="Title.YUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="DimensionUnitType" Name="Title.WidthUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="DimensionUnitType" Name="Title.HeightUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="HorizontalAlignment" Name="Title.XOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="VerticalAlignment" Name="Title.YOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="string" Name="Title.Text" SetsValue="true"><Value xsi:type="xsd:string">ASSET DIAGNOSTICS</Value></Variable>
+    <Variable Type="float" Name="ScreenLabel.X" SetsValue="true"><Value xsi:type="xsd:float">12</Value></Variable>
+    <Variable Type="float" Name="ScreenLabel.Y" SetsValue="true"><Value xsi:type="xsd:float">36</Value></Variable>
+    <Variable Type="float" Name="ScreenLabel.Width" SetsValue="true"><Value xsi:type="xsd:float">456</Value></Variable>
+    <Variable Type="float" Name="ScreenLabel.Height" SetsValue="true"><Value xsi:type="xsd:float">16</Value></Variable>
+    <Variable Type="GeneralUnitType" Name="ScreenLabel.XUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="GeneralUnitType" Name="ScreenLabel.YUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="DimensionUnitType" Name="ScreenLabel.WidthUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="DimensionUnitType" Name="ScreenLabel.HeightUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="HorizontalAlignment" Name="ScreenLabel.XOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="VerticalAlignment" Name="ScreenLabel.YOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="string" Name="ScreenLabel.Text" SetsValue="true"><Value xsi:type="xsd:string">SCREEN: TITLE</Value></Variable>
+    <Variable Type="float" Name="Summary.X" SetsValue="true"><Value xsi:type="xsd:float">12</Value></Variable>
+    <Variable Type="float" Name="Summary.Y" SetsValue="true"><Value xsi:type="xsd:float">57</Value></Variable>
+    <Variable Type="float" Name="Summary.Width" SetsValue="true"><Value xsi:type="xsd:float">456</Value></Variable>
+    <Variable Type="float" Name="Summary.Height" SetsValue="true"><Value xsi:type="xsd:float">30</Value></Variable>
+    <Variable Type="GeneralUnitType" Name="Summary.XUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="GeneralUnitType" Name="Summary.YUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="DimensionUnitType" Name="Summary.WidthUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="DimensionUnitType" Name="Summary.HeightUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="HorizontalAlignment" Name="Summary.XOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="VerticalAlignment" Name="Summary.YOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="string" Name="Summary.Text" SetsValue="true"><Value xsi:type="xsd:string">VERIFIED 0 / DECODED 0 / UNRESOLVED 0 / MISSING 1 / INVALID 0</Value></Variable>
+    <Variable Type="float" Name="Rows.X" SetsValue="true"><Value xsi:type="xsd:float">12</Value></Variable>
+    <Variable Type="float" Name="Rows.Y" SetsValue="true"><Value xsi:type="xsd:float">94</Value></Variable>
+    <Variable Type="float" Name="Rows.Width" SetsValue="true"><Value xsi:type="xsd:float">456</Value></Variable>
+    <Variable Type="float" Name="Rows.Height" SetsValue="true"><Value xsi:type="xsd:float">63</Value></Variable>
+    <Variable Type="GeneralUnitType" Name="Rows.XUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="GeneralUnitType" Name="Rows.YUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="DimensionUnitType" Name="Rows.WidthUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="DimensionUnitType" Name="Rows.HeightUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="HorizontalAlignment" Name="Rows.XOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="VerticalAlignment" Name="Rows.YOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="float" Name="Source.X" SetsValue="true"><Value xsi:type="xsd:float">12</Value></Variable>
+    <Variable Type="float" Name="Source.Y" SetsValue="true"><Value xsi:type="xsd:float">163</Value></Variable>
+    <Variable Type="float" Name="Source.Width" SetsValue="true"><Value xsi:type="xsd:float">456</Value></Variable>
+    <Variable Type="float" Name="Source.Height" SetsValue="true"><Value xsi:type="xsd:float">70</Value></Variable>
+    <Variable Type="GeneralUnitType" Name="Source.XUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="GeneralUnitType" Name="Source.YUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="DimensionUnitType" Name="Source.WidthUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="DimensionUnitType" Name="Source.HeightUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="HorizontalAlignment" Name="Source.XOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="VerticalAlignment" Name="Source.YOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="string" Name="Source.Text" SetsValue="true"><Value xsi:type="xsd:string">SOURCE: UNAVAILABLE</Value></Variable>
+    <Variable Type="float" Name="Footer.X" SetsValue="true"><Value xsi:type="xsd:float">12</Value></Variable>
+    <Variable Type="float" Name="Footer.Y" SetsValue="true"><Value xsi:type="xsd:float">241</Value></Variable>
+    <Variable Type="float" Name="Footer.Width" SetsValue="true"><Value xsi:type="xsd:float">456</Value></Variable>
+    <Variable Type="float" Name="Footer.Height" SetsValue="true"><Value xsi:type="xsd:float">22</Value></Variable>
+    <Variable Type="GeneralUnitType" Name="Footer.XUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="GeneralUnitType" Name="Footer.YUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="DimensionUnitType" Name="Footer.WidthUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="DimensionUnitType" Name="Footer.HeightUnits" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="HorizontalAlignment" Name="Footer.XOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="VerticalAlignment" Name="Footer.YOrigin" SetsValue="true"><Value xsi:type="xsd:int">0</Value></Variable>
+    <Variable Type="string" Name="Footer.Text" SetsValue="true"><Value xsi:type="xsd:string">LEFT/RIGHT SCREEN  UP/DOWN ASSET  ENTER REFRESH  ESC BACK</Value></Variable>
+    <Variable Type="float" Name="Title.FontScale" SetsValue="true"><Value xsi:type="xsd:float">0.5</Value></Variable>
+    <Variable Type="float" Name="ScreenLabel.FontScale" SetsValue="true"><Value xsi:type="xsd:float">0.5</Value></Variable>
+    <Variable Type="float" Name="Summary.FontScale" SetsValue="true"><Value xsi:type="xsd:float">0.5</Value></Variable>
+    <Variable Type="float" Name="Source.FontScale" SetsValue="true"><Value xsi:type="xsd:float">0.5</Value></Variable>
+    <Variable Type="float" Name="Footer.FontScale" SetsValue="true"><Value xsi:type="xsd:float">0.5</Value></Variable>
+  </State>
+  <Instance Name="Title" BaseType="Text" />
+  <Instance Name="ScreenLabel" BaseType="Text" />
+  <Instance Name="Summary" BaseType="Text" />
+  <Instance Name="Rows" BaseType="Container" />
+  <Instance Name="Source" BaseType="Text" />
+  <Instance Name="Footer" BaseType="Text" />
+</ScreenSave>
