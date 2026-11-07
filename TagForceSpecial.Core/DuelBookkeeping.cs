@@ -1,7 +1,14 @@
 namespace TagForceSpecial.Core;
 
-/// <summary>Engine bookkeeping carried by every state snapshot: instance allocation, shuffle RNG, open window.</summary>
-internal sealed record DuelBookkeeping(int NextInstanceId = 1, DuelRandomState? Random = null, PendingOpenWindow? OpenWindow = null);
+/// <summary>
+/// Engine bookkeeping carried by every state snapshot: instance allocation, shuffle RNG, open window and
+/// turn-scoped summon locks.
+/// </summary>
+internal sealed record DuelBookkeeping(int NextInstanceId = 1, DuelRandomState? Random = null, PendingOpenWindow? OpenWindow = null,
+    IReadOnlyList<SummonLock>? SummonLocks = null)
+{
+    public IReadOnlyList<SummonLock> SummonLocks { get; init; } = SummonLocks ?? Array.AsReadOnly(Array.Empty<SummonLock>());
+}
 
 /// <summary>
 /// A phase-change request by the turn player paused so the non-turn player can activate a set Quick-Play

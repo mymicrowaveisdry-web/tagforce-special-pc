@@ -124,7 +124,7 @@ public sealed class TriggerTimingTests
         Assert.Equal("if", Assert.Single(engine.State.EventEffects.PendingTriggers!.Options).Profile.EffectId);
         Drain(engine);
         Assert.Equal(8100, engine.State.GetPlayer(PlayerId.One).LifePoints);
-        Assert.True(engine.State.ResearchSliceComplete);
+        Assert.False(engine.State.ResearchSliceComplete);
     }
 
     [Fact]

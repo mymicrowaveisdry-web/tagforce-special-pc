@@ -12,7 +12,7 @@ public sealed class PendulumTests
         Low = 200_005, High = 200_006, Negator = 200_007, Response = 200_008, FusionSpell = 200_009,
         RitualSpell = 200_010, Fusion = 200_011, Ritual = 200_012, Tribute = 200_013, Xyz = 200_014;
 
-    private static DuelEngine Make(IEnumerable<uint>? opening = null, ChainOperation response = ChainOperation.NegateEffect,
+    private static DuelEngine Make(IEnumerable<uint>? opening = null, ChainOperation? response = ChainOperation.NegateEffect,
         bool groupNegator = true, bool triggers = false, uint leftScale = 1, uint rightScale = 8,
         MaterialDestination genericDestination = MaterialDestination.Graveyard, bool xyzDetach = false)
     {
@@ -41,7 +41,9 @@ public sealed class PendulumTests
         return new(catalog, rules, first.Concat(Enumerable.Repeat(Ordinary, 40 - first.Length)), second,
             playerOneExtraDeck: [Fusion, Xyz], experimentalPendulumCards: [new(Left, leftScale, 99), new(Right, 99, rightScale), new(Pend, 0, 9)],
             experimentalSummonNegations: [new("group-negator", Negator, kinds: SummonNegationKinds.Special, allowsMultipleSummons: groupNegator)],
-            experimentalChainResponses: [new("response", Response, response, ChainSpellSpeed.Three, respondsToCategory: CardCategory.Spell)],
+            // No operation: the response is a targeted destruction definition (Normal Trap) instead of a negation probe.
+            experimentalChainResponses: response is { } negation ? [new("response", Response, negation, ChainSpellSpeed.Three, respondsToCategory: CardCategory.Spell)] : [],
+            effectDefinitions: response is null ? [new("response-destroy", Response, EffectKind.NormalTrap, [new DestroyTargetStep()], target: new SpellTrapOnFieldTarget())] : [],
             experimentalTriggerEffects: effects,
             experimentalSpecialSummonCards: [new(Fusion), new(Ritual, SpecialSummonSources.None, "ritual-proper"), new(Xyz)],
             experimentalMaterialProcedures: [new("generic", [Fusion], [Pend, Ordinary], 2, genericDestination),
@@ -121,8 +123,8 @@ public sealed class PendulumTests
     }
 
     [Theory]
-    [InlineData(ChainOperation.NegateActivation)] [InlineData(ChainOperation.NegateEffect)] [InlineData(ChainOperation.DestroyBoundSpellTrap)]
-    public void ScaleActivationUsesSpellResponsesAndDistinctNegationDepartureRules(ChainOperation operation)
+    [InlineData(ChainOperation.NegateActivation)] [InlineData(ChainOperation.NegateEffect)] [InlineData(null)]
+    public void ScaleActivationUsesSpellResponsesAndDistinctNegationDepartureRules(ChainOperation? operation)
     {
         var e = Make(response: operation); EnterMain(e); NextMain(e); Set(e, Response); NextMain(e);
         var card = e.State.GetPlayer(PlayerId.One).Hand.First(c => c.GameCardId == Left);
@@ -130,7 +132,7 @@ public sealed class PendulumTests
         Assert.NotNull(e.State.GetPlayer(PlayerId.One).PendulumZones[0]);
         Reject(e, SummonCommand(e, Pend), DuelError.ChainPending);
         Ok(e, new ActivateChainResponse(PlayerId.Two, e.State.PendingChain!.DecisionId, 0));
-        if (operation == ChainOperation.DestroyBoundSpellTrap)
+        if (operation is null) // targeted destruction
         {
             var p = e.State.PendingDecision!; var target = p.TargetOptions.Single(t => t.Card == card);
             Assert.True(target.IsPendulumZone);

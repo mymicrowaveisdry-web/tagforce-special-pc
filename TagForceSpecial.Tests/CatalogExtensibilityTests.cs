@@ -16,13 +16,20 @@ public sealed class CatalogExtensibilityTests
     {
         var player = engine.State.ActivePlayer;
         Ok(engine, new ResolveDrawStep(player));
-        Ok(engine, new ChangePhase(player, DuelPhase.Main1));
+        Phase(engine, DuelPhase.Main1);
+    }
+
+    /// <summary>A phase change that passes any open window offered to the non-turn player.</summary>
+    private static void Phase(DuelEngine engine, DuelPhase target)
+    {
+        Ok(engine, new ChangePhase(engine.State.ActivePlayer, target));
+        if (engine.State.OpenWindow is { } window) Ok(engine, new PassChainResponse(window.Responder, window.DecisionId));
     }
 
     private static void Next(DuelEngine engine)
     {
         var player = engine.State.ActivePlayer;
-        Ok(engine, new ChangePhase(player, DuelPhase.End));
+        Phase(engine, DuelPhase.End);
         Ok(engine, new EndTurn(player));
         EnterMain(engine);
     }
@@ -110,14 +117,13 @@ public sealed class CatalogExtensibilityTests
         {
             [1] = new(CardCategory.Monster, AllowsNormalSummon: true),
             [cost] = new(CardCategory.Monster, AllowsNormalSummon: true),
-            [spell] = new(CardCategory.Spell), [response] = new(CardCategory.Trap, AllowsSpellTrapSet: true)
+            [spell] = new(CardCategory.Spell, AllowsSpellTrapSet: true), [response] = new(CardCategory.Trap, AllowsSpellTrapSet: true)
         };
         uint[] first = [spell, cost, cost, 1, 1, .. Enumerable.Repeat(cost, 35)];
         uint[] second = [response, cost, cost, 1, 1, .. Enumerable.Repeat(cost, 35)];
         var engine = new DuelEngine(catalog, rules, first, second,
-            experimentalActivationContracts: [new("custom-spell", spell, [cost])],
-            experimentalChainEffects: [new("custom-spell", spell, ChainOperation.DestroyOpposingFaceUpMonsters)],
-            experimentalChainResponses: [new("custom-negate", response, ChainOperation.NegateEffect, ChainSpellSpeed.Two, [cost])]);
+            experimentalChainResponses: [new("custom-negate", response, ChainOperation.NegateEffect, ChainSpellSpeed.Two, [cost])],
+            effectDefinitions: [new("custom-spell", spell, EffectKind.NormalSpell, [new DestroyOpponentFaceUpMonstersStep()], cost: new DiscardCost())]);
         EnterMain(engine);
         Next(engine);
         Ok(engine, new SetSpellTrap(PlayerId.Two, engine.State.GetPlayer(PlayerId.Two).Hand[0].InstanceId, 0));
@@ -150,12 +156,12 @@ public sealed class CatalogExtensibilityTests
         var catalog = new CardCatalog(new(null, "custom-tokens-v1"), ids.Select(id =>
             new CardDefinition(id, $"Custom {id}", "", new(0, 0, 1))));
         var rules = ids.ToDictionary(id => id, id => new DuelCardRules(id is spell or tokenSource ? CardCategory.Spell : CardCategory.Monster,
-            AllowsSpellTrapSet: id == tokenSource));
+            AllowsSpellTrapSet: id is spell or tokenSource, IsToken: tokenIds.Contains(id)));
         var engine = new DuelEngine(catalog, rules,
             [spell, .. Enumerable.Repeat(1u, 39)], [tokenSource, .. Enumerable.Repeat(1u, 39)],
-            experimentalActivationContracts: [new("custom-target", spell, requiresSpellTrapTarget: true)],
-            experimentalChainEffects: [new("custom-target", spell, ChainOperation.DestroyBoundSpellTrap),
-                new("custom-tokens", tokenSource, ChainOperation.SummonFourTokens, tokenIds)]);
+            effectDefinitions: [
+                new("custom-target", spell, EffectKind.NormalSpell, [new DestroyTargetStep()], target: new SpellTrapOnFieldTarget()),
+                new("custom-tokens", tokenSource, EffectKind.QuickPlaySpell, [new SummonTokensStep(tokenIds, BattlePosition.FaceUpDefense)])]);
         EnterMain(engine);
         Next(engine);
         Ok(engine, new SetSpellTrap(PlayerId.Two, engine.State.GetPlayer(PlayerId.Two).Hand[0].InstanceId, 1));

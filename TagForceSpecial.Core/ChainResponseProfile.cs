@@ -1,9 +1,9 @@
 namespace TagForceSpecial.Core;
 
 /// <summary>
-/// Trusted, default-off research metadata for previously set responses in the
-/// activation slice and registered trigger chains. This is not a card-text interpreter or a complete
-/// native legality/protection contract. Effect-only probes require explicit configuration.
+/// Trusted, default-off research negation probes for previously set cards: open chains, registered trigger
+/// chains, battle windows and summon windows. Card effects use <see cref="EffectDefinition"/>; these probes stay
+/// until definitions cover battle and summon windows. Not a card-text interpreter or protection contract.
 /// </summary>
 public sealed class ChainResponseProfile
 {
@@ -24,19 +24,16 @@ public sealed class ChainResponseProfile
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(effectId);
         if (cardId == 0) throw new ArgumentOutOfRangeException(nameof(cardId));
-        if (operation is not (ChainOperation.DestroyBoundSpellTrap or ChainOperation.NegateActivation or ChainOperation.NegateEffect))
+        if (operation is not (ChainOperation.NegateActivation or ChainOperation.NegateEffect))
             throw new ArgumentOutOfRangeException(nameof(operation));
         if (spellSpeed is not (ChainSpellSpeed.Two or ChainSpellSpeed.Three))
             throw new ArgumentOutOfRangeException(nameof(spellSpeed));
         if (respondsToCategory is not (null or CardCategory.Monster or CardCategory.Spell or CardCategory.Trap))
             throw new ArgumentOutOfRangeException(nameof(respondsToCategory));
-        if (destroyNegatedSource && operation == ChainOperation.DestroyBoundSpellTrap)
-            throw new ArgumentException("Source destruction is a separate negation policy.", nameof(destroyNegatedSource));
         if ((battleWindows & ~BattleTiming.All) != 0) throw new ArgumentOutOfRangeException(nameof(battleWindows));
         BattleWindows = battleWindows;
         List<DecisionStep> steps = [];
         if (discardCardIds is not null) steps.Add(DecisionStep.Card(DecisionCardSource.Hand, discardCardIds));
-        if (operation == ChainOperation.DestroyBoundSpellTrap) steps.Add(DecisionStep.SpellTrapTarget());
         EffectId = effectId;
         CardId = cardId;
         Operation = operation;

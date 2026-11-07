@@ -90,7 +90,7 @@ public sealed partial class DuelEngine
         var receipt = new CommittedActivation(player.Id, profile.EffectId, source.Card, command.SpellTrapZone, null, null);
         var link = new ChainLink(1, receipt, source.PlacementId, ChainOperation.SummonNegation, ChainSpellSpeed.Three,
             SummonAttemptId: pending.AttemptId);
-        var chain = new PendingChain(checked(State.Revision + 1), [link], Other(player.Id), freezeOnCompletion: false);
+        var chain = new PendingChain(checked(State.Revision + 1), [link], Other(player.Id));
         var next = State.With(player: player.With(spellTraps: slots, lifePoints: player.LifePoints - profile.LifePointCost)).WithChain(chain);
         List<DuelEvent> events = [new ChainResponseActivated(player.Id, profile.EffectId, source.Card, command.SpellTrapZone)];
         if (profile.LifePointCost != 0) events.Add(new SummonNegationCostPaid(player.Id, profile.EffectId, profile.LifePointCost));

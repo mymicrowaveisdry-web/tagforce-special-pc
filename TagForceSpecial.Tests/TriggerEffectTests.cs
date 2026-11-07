@@ -27,7 +27,6 @@ public sealed class TriggerEffectTests
         var chain = engine.State.PendingChain!;
         Assert.Equal(ChainOperation.TriggerEffect, Assert.Single(chain.Links).Operation);
         Assert.Equal(starting == PlayerId.One ? PlayerId.Two : PlayerId.One, chain.Responder);
-        Assert.False(chain.FreezeOnCompletion);
         Pass(engine); Pass(engine);
         var resolved = Resolve(engine);
         Assert.IsType<LifePointsGained>(resolved.Events[0]);
@@ -170,27 +169,24 @@ public sealed class TriggerEffectTests
     }
 
     [Fact]
-    public void SpecialSummonTriggerWaitsForDecisionCompletionAndPreservesLifecycleGate()
+    public void SpecialSummonTriggerWaitsForTheResolutionChoiceAndChainEnd()
     {
         var engine = Engine(triggers: [Gain("special", A, MonsterEventKind.SpecialSummoned)]);
         EnterMain(engine);
-        var player = engine.State.GetPlayer(PlayerId.One);
-        Ok(engine, new ActivateSpell(PlayerId.One, player.Hand.First(c => c.GameCardId == SummonSpell).InstanceId, 0));
-        var pending = engine.State.PendingDecision!;
-        Ok(engine, new ChooseDecisionCard(PlayerId.One, pending.DecisionId, pending.CardOptions[0].InstanceId));
-        pending = engine.State.PendingDecision!;
-        Ok(engine, new ChooseDecisionPosition(PlayerId.One, pending.DecisionId, BattlePosition.FaceUpAttack));
-        pending = engine.State.PendingDecision!;
-        var result = Ok(engine, new ChooseDecisionZone(PlayerId.One, pending.DecisionId, 1));
-        Assert.Null(engine.State.PendingDecision);
-        Assert.Single(result.Events.OfType<TriggerOrderRequested>());
+        var result = SummonWithProbe(engine);
+        Assert.Null(engine.State.PendingChain);
+        // The summon happens inside the link; its trigger is collected once the chain has completed.
+        Assert.True(result.Events.ToList().FindIndex(e => e is ChainCompleted) <
+            result.Events.ToList().FindIndex(e => e is TriggerOrderRequested));
         Assert.Single(engine.State.PendingEndPhaseBanishments);
+        Assert.Single(result.Events.OfType<DeckShuffled>());
         Drain(engine);
         Assert.Single(engine.State.PendingEndPhaseBanishments);
-        Ok(engine, new ChangePhase(PlayerId.One, DuelPhase.End));
-        Assert.True(engine.State.ResearchSliceComplete);
+        Phase(engine, DuelPhase.End);
+        Assert.False(engine.State.ResearchSliceComplete);
         Assert.Single(engine.State.GetPlayer(PlayerId.One).Banished);
         Assert.Equal(8100, engine.State.GetPlayer(PlayerId.One).LifePoints);
+        Ok(engine, new EndTurn(PlayerId.One)); // the duel continues past the lifecycle
     }
 
     [Fact]
@@ -246,12 +242,11 @@ public sealed class TriggerEffectTests
         Assert.Equal(4, saved.EventEffects.DeferredTriggers.Count);
         Assert.Empty(engine.State.EventEffects.DeferredTriggers);
         Order(engine, reverse: true);
-        Assert.True(engine.State.PendingChain!.FreezeOnCompletion);
         Drain(engine);
         Assert.Equal(8400, engine.State.GetPlayer(PlayerId.One).LifePoints);
-        Assert.True(engine.State.ResearchSliceComplete);
+        Assert.False(engine.State.ResearchSliceComplete);
         Assert.NotNull(engine.State.GetPlayer(PlayerId.One).MonsterZones[0]);
-        Reject(engine, new ChangePhase(PlayerId.One, DuelPhase.End), DuelError.ResearchSliceComplete);
+        Phase(engine, DuelPhase.End); // the duel continues after the Scapegoat chain
     }
 
     [Fact]

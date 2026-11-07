@@ -20,19 +20,42 @@ internal static class EventEffectScenario
         var catalog = new CardCatalog(new(null, "synthetic-event-effects-v1"), ids.Select(id =>
             new CardDefinition(id, $"Probe {id}", "", new(id == A ? attackA : id == B ? attackB : 1000,
                 id == A ? defenseA : id == B ? defenseB : 1000, 2))));
-        var rules = ids.ToDictionary(id => id, id => new DuelCardRules(
-            id is Trap ? CardCategory.Trap : id is SummonSpell or 5217 or 4909 or 4818 ? CardCategory.Spell : CardCategory.Monster,
-            AllowsNormalSummon: id is A or B or Filler,
-            AllowsBasicBattle: id is A or B or Filler or 3905 or 3903 or 3902 or 3904,
-            AllowsSpellTrapSet: id is Trap or SummonSpell or 5217 or 4909 or 4818));
+        var rules = ids.ToDictionary(id => id, id => ChainCardFamily.Rules.TryGetValue(id, out var shared) ? shared :
+            new DuelCardRules(id is Trap ? CardCategory.Trap : id is SummonSpell ? CardCategory.Spell : CardCategory.Monster,
+                AllowsNormalSummon: id is A or B or Filler, AllowsBasicBattle: id is A or B or Filler,
+                AllowsSpellTrapSet: id is Trap or SummonSpell));
         uint[] first = [A, A, Trap, 5217, SummonSpell, A, 4909, .. Enumerable.Repeat(Filler, 33)];
         uint[] second = [B, B, Trap, 4818, Filler, .. Enumerable.Repeat(Filler, 35)];
         return new(catalog, rules, playerOneDeck ?? first, playerTwoDeck ?? second, startingPlayer,
-            experimentalSpellEffects: [new("special-probe", SummonSpell, [A], banishAtEndPhase: true)],
-            experimentalActivationContracts: [ActivationResearch.LightningVortex([Filler, A]), ActivationResearch.MysticalSpaceTyphoon()],
-            experimentalChainEffects: [ChainResearch.LightningVortex(), ChainResearch.MysticalSpaceTyphoon(), ChainResearch.Scapegoat()],
             experimentalChainResponses: responses,
-            experimentalTriggerEffects: triggers, experimentalContinuousEffects: continuous, experimentalContinuousNegations: negations);
+            experimentalTriggerEffects: triggers, experimentalContinuousEffects: continuous, experimentalContinuousNegations: negations,
+            effectDefinitions: [SpecialProbe, .. ChainCards(5217, 4909, 4818)], shuffleSeed: 1);
+    }
+
+    /// <summary>Synthetic Normal Spell: Special Summon A from the Deck, banished in the End Phase.</summary>
+    internal static EffectDefinition SpecialProbe { get; } = new("special-probe", SummonSpell, EffectKind.NormalSpell,
+        [new SpecialSummonStep(SpecialSummonSources.Deck, [A], banishAtEndPhase: true)]);
+
+    internal static EffectDefinition[] ChainCards(params uint[] ids) =>
+        ChainCardFamily.Definitions.Where(d => ids.Contains(d.CardId)).ToArray();
+
+    /// <summary>Activates the special probe from hand, closes the window and summons the first option.</summary>
+    internal static DuelActionResult SummonWithProbe(DuelEngine engine, int spellZone = 0, int monsterZone = 1)
+    {
+        var actor = engine.State.ActivePlayer;
+        Ok(engine, new ActivateSpell(actor, engine.State.GetPlayer(actor).Hand.First(c => c.GameCardId == SummonSpell).InstanceId, spellZone));
+        Pass(engine); Pass(engine);
+        var paused = Resolve(engine);
+        var choice = Assert.IsType<DefinitionSummonRequested>(paused.Events[^1]).Decision;
+        return Ok(engine, new ChooseDefinitionSummon(actor, choice.DecisionId, choice.Options[0].Card.InstanceId, monsterZone,
+            BattlePosition.FaceUpAttack));
+    }
+
+    /// <summary>A phase change that passes any open window offered to the non-turn player.</summary>
+    internal static void Phase(DuelEngine engine, DuelPhase target)
+    {
+        Ok(engine, new ChangePhase(engine.State.ActivePlayer, target));
+        if (engine.State.OpenWindow is { } window) Ok(engine, new PassChainResponse(window.Responder, window.DecisionId));
     }
 
     internal static TriggerEffectProfile Gain(string id, uint card, MonsterEventKind kind = MonsterEventKind.NormalSummoned,
@@ -66,14 +89,14 @@ internal static class EventEffectScenario
     {
         var player = engine.State.ActivePlayer;
         Ok(engine, new ResolveDrawStep(player));
-        Ok(engine, new ChangePhase(player, DuelPhase.Main1));
+        Phase(engine, DuelPhase.Main1);
     }
 
     internal static void NextMain(DuelEngine engine)
     {
         var player = engine.State.ActivePlayer;
-        if (engine.State.Phase == DuelPhase.Battle) Ok(engine, new ChangePhase(player, DuelPhase.Main2));
-        if (engine.State.Phase != DuelPhase.End) Ok(engine, new ChangePhase(player, DuelPhase.End));
+        if (engine.State.Phase == DuelPhase.Battle) Phase(engine, DuelPhase.Main2);
+        if (engine.State.Phase != DuelPhase.End) Phase(engine, DuelPhase.End);
         while (engine.State.GetPlayer(player).Hand.Count > 6)
             Ok(engine, new DiscardForHandLimit(player, engine.State.GetPlayer(player).Hand[^1].InstanceId));
         Ok(engine, new EndTurn(player));

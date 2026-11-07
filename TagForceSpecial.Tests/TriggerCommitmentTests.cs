@@ -170,15 +170,7 @@ public sealed class TriggerCommitmentTests
         Assert.Equal(uses, engine.State.EventEffects.UsedTriggers.Count);
     }
 
-    internal static void SummonFromDeck(DuelEngine engine)
-    {
-        var actor = engine.State.ActivePlayer;
-        Ok(engine, new ActivateSpell(actor, engine.State.GetPlayer(actor).Hand.First(c => c.GameCardId == SummonSpell).InstanceId, 4));
-        var p = engine.State.PendingDecision!;
-        Ok(engine, new ChooseDecisionCard(p.Player, p.DecisionId, p.CardOptions[0].InstanceId));
-        p = engine.State.PendingDecision!; Ok(engine, new ChooseDecisionPosition(p.Player, p.DecisionId, BattlePosition.FaceUpAttack));
-        p = engine.State.PendingDecision!; Ok(engine, new ChooseDecisionZone(p.Player, p.DecisionId, 1));
-    }
+    internal static void SummonFromDeck(DuelEngine engine) => SummonWithProbe(engine, spellZone: 4);
 
     [Fact]
     public void MultipleMandatoryEffectsCompetingForOneDiscardDoNotStrandTheBatch()

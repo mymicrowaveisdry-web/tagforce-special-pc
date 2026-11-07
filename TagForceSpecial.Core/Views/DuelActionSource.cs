@@ -50,6 +50,10 @@ public sealed class DuelActionSource
         AuthorizedDecision? decision = state.PendingDecision is { } d && d.Player == player
             ? new(d.DecisionId, d.Kind.ToString(), PlayerProjection.Read(d.CardOptions.OrderBy(c => c.GameCardId).ThenBy(c => c.InstanceId)
                 .Select(c => PlayerProjection.Card(c, true, null, catalog))))
+            // Deck options are private: only the choosing player is shown them.
+            : state.PendingChain?.DefinitionSummon is { } summon && summon.Player == player
+                ? new(summon.DecisionId, "DefinitionSummon", PlayerProjection.Read(summon.Options
+                    .Select(o => PlayerProjection.Card(o.Card, true, null, catalog))))
             : state.OpenWindow is { } window && actor == player ? new(window.DecisionId, "OpenWindow", PlayerProjection.Read(Array.Empty<CardView>()))
             : state.PendingChain is { } chain && actor == player ? new(chain.DecisionId, "Chain", PlayerProjection.Read(Array.Empty<CardView>()))
             : state.Battle is { } battle && actor == player ? new(battle.Window.DecisionId,
@@ -77,6 +81,7 @@ public sealed class DuelActionSource
 
     private static PlayerId Other(PlayerId player) => player == PlayerId.One ? PlayerId.Two : PlayerId.One;
     private static PlayerId Actor(DuelState state) => state.PendingDecision?.Player
+        ?? state.PendingChain?.DefinitionSummon?.Player
         ?? state.OpenWindow?.Responder
         ?? (state.PendingChain is { } chain ? chain.NextLink > 0 ? state.ActivePlayer : chain.Responder
             : state.Battle is { } battle && !battle.Window.Closed ? battle.Window.Responder : state.ActivePlayer);
@@ -111,10 +116,24 @@ public sealed class DuelActionSource
             yield return B(new PassChainResponse(player, window.DecisionId), ActionKind.ChainPass, "Pass");
             yield break;
         }
+        if (state.PendingChain?.DefinitionSummon is { } summon)
+        {
+            foreach (var option in summon.Options)
+                foreach (int zone in summon.MonsterZoneOptions)
+                    foreach (var position in summon.PositionOptions)
+                        yield return B(new ChooseDefinitionSummon(player, summon.DecisionId, option.Card.InstanceId, zone, position),
+                            ActionKind.ChooseCard, $"Summon {catalog[option.Card.GameCardId].Name} ({option.Source}) [{zone + 1}] {position}",
+                            option.Card.InstanceId, zone, position: position);
+            yield break;
+        }
         if (state.PendingChain is { } chain)
         {
             for (int z = 0; z < 5; z++)
                 yield return B(new ActivateChainResponse(player, chain.DecisionId, z), ActionKind.ChainResponse, $"Respond zone {z + 1}", zone: z);
+            foreach (var card in own.Hand)
+                for (int z = 0; z < 5; z++)
+                    yield return B(new ActivateHandChainResponse(player, chain.DecisionId, card.InstanceId, z), ActionKind.ChainResponse,
+                        $"Respond with {catalog[card.GameCardId].Name} [{z + 1}]", card.InstanceId, z);
             yield return B(new PassChainResponse(player, chain.DecisionId), ActionKind.ChainPass, "Pass response");
             yield return B(new ResolveNextChainLink(player, chain.DecisionId), ActionKind.ResolveChain, "Resolve chain link");
             yield break;

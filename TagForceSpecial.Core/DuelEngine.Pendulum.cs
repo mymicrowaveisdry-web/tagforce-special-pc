@@ -52,7 +52,7 @@ public sealed partial class DuelEngine
         zones[command.PendulumZone] = new(card, true, placement);
         var receipt = new CommittedActivation(player.Id, "pendulum-scale", card, command.PendulumZone, null, null);
         var link = new ChainLink(1, receipt, placement, ChainOperation.ActivatePendulumScale, IsPendulumScale: true);
-        var chain = new PendingChain(placement, [link], Other(player.Id), freezeOnCompletion: false);
+        var chain = new PendingChain(placement, [link], Other(player.Id));
         return Accept(State.With(player: player.With(hand: player.Hand.Where(c => c != card), pendulumZones: zones))
             .WithCommittedActivation(receipt).WithChain(chain), new PendulumScaleActivated(player.Id, card, command.PendulumZone),
             new ActivationCommitted(receipt), new ChainLinkAdded(link), new ChainResponseRequested(chain.Responder, chain.DecisionId));

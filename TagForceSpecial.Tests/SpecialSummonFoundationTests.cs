@@ -32,8 +32,10 @@ public sealed class SpecialSummonFoundationTests
                 new("banished", [Target], DecisionCardSource.Banished)],
             experimentalSummonWindows: window ? [new(Target)] : null,
             experimentalSummonNegations: [new("negate", Negate, 500, negateKinds)],
-            experimentalSpellEffects: [new("deck", Spell, onlyTargetInEffect ? [Target] : [Target, Alternative], banishAtEndPhase)],
-            experimentalTriggerEffects: triggers, experimentalChainResponses: responses);
+            experimentalTriggerEffects: triggers, experimentalChainResponses: responses,
+            effectDefinitions: [new("deck", Spell, EffectKind.NormalSpell, [new SpecialSummonStep(SpecialSummonSources.Deck,
+                onlyTargetInEffect ? [Target] : [Target, Alternative], banishAtEndPhase)])],
+            shuffleSeed: 1);
     }
 
     private static int Hand(DuelEngine e, uint id, PlayerId? player = null) =>
@@ -274,15 +276,20 @@ public sealed class SpecialSummonFoundationTests
         Assert.Equal(7500, e.State.GetPlayer(PlayerId.Two).LifePoints);
     }
 
-    private static DuelActionResult ResolveDeckSpell(DuelEngine e, uint choice, int zone = 0)
+    /// <summary>Activates the deck Spell, closes its response window and pauses at the resolution choice.</summary>
+    private static PendingDefinitionSummon ReachDeckChoice(DuelEngine e)
     {
         Ok(e, new ActivateSpell(PlayerId.One, Hand(e, Spell), 0));
-        var decision = e.State.PendingDecision!;
-        int card = decision.CardOptions.First(c => c.GameCardId == choice).InstanceId;
-        Ok(e, new ChooseDecisionCard(PlayerId.One, decision.DecisionId, card));
-        decision = e.State.PendingDecision!;
-        Ok(e, new ChooseDecisionPosition(PlayerId.One, decision.DecisionId, BattlePosition.FaceUpAttack));
-        return Ok(e, new ChooseDecisionZone(PlayerId.One, e.State.PendingDecision!.DecisionId, zone));
+        for (int i = 0; i < 2; i++) Ok(e, new PassChainResponse(e.State.PendingChain!.Responder, e.State.PendingChain.DecisionId));
+        Ok(e, new ResolveNextChainLink(PlayerId.One, e.State.PendingChain!.DecisionId));
+        return e.State.PendingChain!.DefinitionSummon!;
+    }
+
+    private static DuelActionResult ResolveDeckSpell(DuelEngine e, uint choice, int zone = 0)
+    {
+        var decision = ReachDeckChoice(e);
+        int card = decision.Options.First(o => o.Card.GameCardId == choice).Card.InstanceId;
+        return Ok(e, new ChooseDefinitionSummon(PlayerId.One, decision.DecisionId, card, zone, BattlePosition.FaceUpAttack));
     }
 
     [Fact]
@@ -292,7 +299,7 @@ public sealed class SpecialSummonFoundationTests
         var result = ResolveDeckSpell(e, Target);
         var monster = Assert.Single(result.Events.OfType<MonsterSpecialSummoned>()).Monster;
         Assert.Null(e.State.PendingSummon);
-        Assert.True(e.State.ResearchSliceComplete); // Existing research continuation limit is preserved.
+        Assert.False(e.State.ResearchSliceComplete);
         Assert.Equal(SummonMethod.SpecialEffect, Record(e, monster.Card.InstanceId).Method);
         Assert.Null(Record(e, monster.Card.InstanceId).ProperProcedureId);
         Assert.Equal(DecisionCardSource.Deck, Record(e, monster.Card.InstanceId).Source);
@@ -302,8 +309,7 @@ public sealed class SpecialSummonFoundationTests
     public void RestrictedEffectChoicesAreFilteredAndNoLegalChoiceRejectsBeforeActivation()
     {
         var e = Engine(); EnterMain(e);
-        Ok(e, new ActivateSpell(PlayerId.One, Hand(e, Spell), 0));
-        Assert.All(e.State.PendingDecision!.CardOptions, c => Assert.Equal(Alternative, c.GameCardId));
+        Assert.All(ReachDeckChoice(e).Options, o => Assert.Equal(Alternative, o.Card.GameCardId));
         var blocked = Engine(onlyTargetInEffect: true); EnterMain(blocked);
         Reject(blocked, new ActivateSpell(PlayerId.One, Hand(blocked, Spell), 0), DuelError.DecisionUnavailable);
         Assert.Empty(blocked.State.SummonHistory);
@@ -318,7 +324,7 @@ public sealed class SpecialSummonFoundationTests
     }
 
     [Fact]
-    public void HistorySurvivesTheExistingDelayedBanishmentStop()
+    public void HistorySurvivesTheDelayedBanishment()
     {
         var e = Engine(requiredProper: false, banishAtEndPhase: true); EnterMain(e);
         var result = ResolveDeckSpell(e, Target);
@@ -327,7 +333,7 @@ public sealed class SpecialSummonFoundationTests
         Ok(e, new ChangePhase(PlayerId.One, DuelPhase.End));
         Assert.Contains(e.State.GetPlayer(PlayerId.One).Banished, c => c.InstanceId == instance);
         Assert.Equal(record, Record(e, instance));
-        Assert.True(e.State.ResearchSliceComplete);
+        Assert.False(e.State.ResearchSliceComplete);
     }
 
     [Fact]
@@ -408,7 +414,7 @@ public sealed class SpecialSummonFoundationTests
     public void BattleResponseRevalidatesTheSelectedHandInstanceWhenItsLinkResolves()
     {
         var e = BattleFlowScenario.Engine(defender: false, profiles: [BattleSummoning()],
-            chains: [new("target-other-trap", BattleFlowScenario.Counter, ChainOperation.DestroyBoundSpellTrap, ChainSpellSpeed.Two,
+            chains: [new("negate-summon-link", BattleFlowScenario.Counter, ChainOperation.NegateEffect, ChainSpellSpeed.Two,
                     battleWindows: BattleTiming.AttackDeclaration),
                 new("discard-selected", BattleFlowScenario.Stats, ChainOperation.NegateEffect, ChainSpellSpeed.Three,
                     discardCardIds: [BattleFlowScenario.B], battleWindows: BattleTiming.AttackDeclaration)]);
@@ -416,11 +422,8 @@ public sealed class SpecialSummonFoundationTests
         int selected = Hand(e, BattleFlowScenario.B, PlayerId.Two);
         BattleFlowScenario.Respond(e, 2, selected, 1);
         Ok(e, new ActivateChainResponse(PlayerId.One, e.State.PendingChain!.DecisionId, 1));
+        Ok(e, new ActivateChainResponse(PlayerId.Two, e.State.PendingChain!.DecisionId, 3)); // negates link 2, discarding the selection
         var choice = e.State.PendingDecision!;
-        int target = e.State.GetPlayer(PlayerId.Two).SpellTrapFields[1]!.Card.InstanceId;
-        Ok(e, new ChooseDecisionTarget(PlayerId.One, choice.DecisionId, PlayerId.Two, 1, target));
-        Ok(e, new ActivateChainResponse(PlayerId.Two, e.State.PendingChain!.DecisionId, 3));
-        choice = e.State.PendingDecision!;
         Ok(e, new ChooseDecisionCard(PlayerId.Two, choice.DecisionId, selected));
         Pass(e); Pass(e); Resolve(e); Resolve(e);
         var result = Resolve(e);

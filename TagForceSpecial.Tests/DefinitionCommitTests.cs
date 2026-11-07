@@ -5,10 +5,13 @@ using TagForceSpecial.Effects;
 
 namespace TagForceSpecial.Tests;
 
-public sealed class ActivationContractTests
+/// <summary>
+/// Synthetic commit boundaries of the shared definition pipeline: a discard cost and a Spell/Trap target are
+/// separate decisions, preflighted before the source moves, paid once and never refunded.
+/// </summary>
+public sealed class DefinitionCommitTests
 {
-    private static DuelEngine Engine(PlayerId actor = PlayerId.One, bool enabled = true, bool combined = false,
-        bool eligibleCost = true, IEnumerable<uint>? allowedCosts = null)
+    private static DuelEngine Engine(PlayerId actor = PlayerId.One, bool enabled = true, bool combined = false, bool onlyTraps = false)
     {
         uint[] ids = [1, 2, 4909, 5217];
         var catalog = new CardCatalog(new(new string('0', 64), "invented-activation-inputs"),
@@ -17,13 +20,13 @@ public sealed class ActivationContractTests
         var rules = ids.ToDictionary(id => id, id => new DuelCardRules(id == 1 ? CardCategory.Monster :
             id == 2 ? CardCategory.Trap : CardCategory.Spell, AllowsNormalSummon: id == 1,
             AllowsSpellTrapSet: id != 1));
-        uint candidate = eligibleCost ? 1u : 2u;
+        uint candidate = onlyTraps ? 2u : 1u;
         uint[] deck = [5217, candidate, candidate, 4909, 2, .. Enumerable.Repeat(candidate, 35)];
-        ActivationContract[] profiles = combined
-            ? [new("synthetic-cost-and-target", 4909, [1], requiresSpellTrapTarget: true)]
-            : [ActivationResearch.LightningVortex(allowedCosts ?? [1]), ActivationResearch.MysticalSpaceTyphoon()];
-        var engine = new DuelEngine(catalog, rules, deck, deck, actor,
-            experimentalActivationContracts: enabled ? profiles : []);
+        EffectDefinition[] definitions = combined
+            ? [new("synthetic-cost-and-target", 4909, EffectKind.QuickPlaySpell, [new DestroyTargetStep()],
+                cost: new DiscardCost(), target: new SpellTrapOnFieldTarget())]
+            : EventEffectScenario.ChainCards(5217, 4909);
+        var engine = new DuelEngine(catalog, rules, deck, deck, actor, effectDefinitions: enabled ? definitions : []);
         Ok(engine, new ResolveDrawStep(actor));
         Ok(engine, new ChangePhase(actor, DuelPhase.Main1));
         return engine;
@@ -55,7 +58,7 @@ public sealed class ActivationContractTests
     private static void Activate(DuelEngine e, uint id) => Ok(e, new ActivateSpell(e.State.ActivePlayer, Hand(e, id).InstanceId, 2));
 
     [Fact]
-    public void ContractsStayDisabledByDefault()
+    public void CardsWithoutADefinitionCannotActivate()
     {
         var engine = Engine(enabled: false);
         Reject(engine, new ActivateSpell(PlayerId.One, Hand(engine, 5217).InstanceId, 2), DuelError.UnsupportedSpellEffect);
@@ -64,7 +67,7 @@ public sealed class ActivationContractTests
     [Theory]
     [InlineData(PlayerId.One)]
     [InlineData(PlayerId.Two)]
-    public void DiscardCommitsBeforeResolutionAndIsNotRefundedByRejectedCommands(PlayerId actor)
+    public void DiscardCommitsBeforeTheLinkAndIsNotRefundedByRejectedCommands(PlayerId actor)
     {
         var engine = Engine(actor);
         var initial = engine.State;
@@ -73,13 +76,15 @@ public sealed class ActivationContractTests
         var before = engine.State;
         Assert.Empty(before.GetPlayer(actor).Graveyard);
         var decision = before.PendingDecision!;
-        Assert.Equal(2, decision.CardOptions.Count);
+        Assert.Equal(4, decision.CardOptions.Count); // any other hand card
+        Assert.DoesNotContain(spell, decision.CardOptions);
         var cost = decision.CardOptions[0];
         var other = decision.CardOptions[1];
         var result = Ok(engine, new ChooseDecisionCard(actor, decision.DecisionId, cost.InstanceId));
         Assert.Collection(result.Events, e => Assert.IsType<DecisionAnswered>(e),
             e => Assert.Equal(cost, Assert.IsType<ActivationCostPaid>(e).Card),
-            e => Assert.IsType<DecisionSequenceCompleted>(e), e => Assert.IsType<ActivationCommitted>(e));
+            e => Assert.IsType<DecisionSequenceCompleted>(e), e => Assert.IsType<ActivationCommitted>(e),
+            e => Assert.IsType<ChainLinkAdded>(e), e => Assert.IsType<ChainResponseRequested>(e));
         var committed = result.State.CommittedActivation!;
         Assert.Equal(cost, committed.DiscardedCost);
         Assert.Equal(spell, committed.Spell);
@@ -89,15 +94,16 @@ public sealed class ActivationContractTests
         Assert.Equal(spell, result.State.GetPlayer(actor).SpellTrapFields[2]!.Card);
         Assert.All(result.State.GetPlayer(actor).MonsterZones, m => Assert.Null(m));
         Assert.False(result.State.NormalSummonUsed);
-        Assert.True(result.State.ResearchSliceComplete);
+        Assert.False(result.State.ResearchSliceComplete);
         Assert.Null(result.State.Outcome);
         Assert.Null(result.State.PendingSpellActivation);
         Assert.Null(result.State.PendingDecision);
+        Assert.Equal(committed, Assert.Single(result.State.PendingChain!.Links).Activation);
         Assert.Contains(cost, before.GetPlayer(actor).Hand);
         Assert.Empty(before.GetPlayer(actor).Graveyard);
         Assert.Null(initial.CommittedActivation);
-        Reject(engine, new ChooseDecisionCard(actor, decision.DecisionId, cost.InstanceId), DuelError.ResearchSliceComplete);
-        Reject(engine, new EndTurn(actor), DuelError.ResearchSliceComplete);
+        Reject(engine, new ChooseDecisionCard(actor, decision.DecisionId, cost.InstanceId), DuelError.NoPendingDecision);
+        Reject(engine, new EndTurn(actor), DuelError.ChainPending);
         Assert.Equal(cost, Assert.Single(engine.State.GetPlayer(actor).Graveyard));
     }
 
@@ -113,7 +119,8 @@ public sealed class ActivationContractTests
         Reject(engine, new ChooseDecisionCard(PlayerId.One, p.DecisionId - 1, p.CardOptions[0].InstanceId), DuelError.StaleDecision);
         Reject(engine, new ChooseDecisionPosition(PlayerId.One, p.DecisionId, BattlePosition.FaceUpAttack), DuelError.WrongDecisionKind);
         Reject(engine, new ChooseDecisionCard(PlayerId.One, p.DecisionId, spell.InstanceId), DuelError.InvalidDecisionChoice);
-        Reject(engine, new ChooseDecisionCard(PlayerId.One, p.DecisionId, Hand(engine, 4909).InstanceId), DuelError.InvalidDecisionChoice);
+        Reject(engine, new ChooseDecisionCard(PlayerId.One, p.DecisionId,
+            engine.State.GetPlayer(PlayerId.Two).Hand[0].InstanceId), DuelError.InvalidDecisionChoice);
         Assert.Empty(engine.State.GetPlayer(PlayerId.One).Graveyard);
     }
 
@@ -167,7 +174,7 @@ public sealed class ActivationContractTests
         var paid = engine.State;
         Assert.Equal(cost, paid.PendingSpellActivation!.DiscardedCost);
         Assert.Null(paid.CommittedActivation);
-        Assert.False(paid.ResearchSliceComplete);
+        Assert.Null(paid.PendingChain);
         p = paid.PendingDecision!;
         Reject(engine, new ChooseDecisionCard(PlayerId.One, costDecisionId, cost.InstanceId), DuelError.StaleDecision);
         Reject(engine, new ChooseDecisionTarget(PlayerId.One, p.DecisionId, PlayerId.One, 4, trap.InstanceId), DuelError.InvalidDecisionChoice);
@@ -182,28 +189,40 @@ public sealed class ActivationContractTests
     [Fact]
     public void MissingCostOrTargetRejectsBeforeSourceCommit()
     {
-        var engine = Engine(eligibleCost: false);
+        // Only the source left in hand: nothing to discard.
+        var engine = Engine(onlyTraps: true);
+        var others = engine.State.GetPlayer(PlayerId.One).Hand.Where(c => c.GameCardId != 5217).ToArray();
+        int[] zones = [0, 1, 3, 4];
+        for (int i = 0; i < others.Length; i++) Ok(engine, new SetSpellTrap(PlayerId.One, others[i].InstanceId, zones[i]));
+        Assert.Equal(5217u, Assert.Single(engine.State.GetPlayer(PlayerId.One).Hand).GameCardId);
         Reject(engine, new ActivateSpell(PlayerId.One, Hand(engine, 5217).InstanceId, 2), DuelError.DecisionUnavailable);
-        var sourceOnly = Engine(allowedCosts: [5217]);
-        Reject(sourceOnly, new ActivateSpell(PlayerId.One, Hand(sourceOnly, 5217).InstanceId, 2), DuelError.DecisionUnavailable);
         var combined = Engine(combined: true);
         Reject(combined, new ActivateSpell(PlayerId.One, Hand(combined, 4909).InstanceId, 2), DuelError.DecisionUnavailable);
         Assert.Empty(combined.State.GetPlayer(PlayerId.One).Graveyard);
     }
 
     [Fact]
-    public void ContractDefinitionsAreImmutableAndCannotStartThroughGenericSequenceCommands()
+    public void DefinitionsValidateTheirPartsAndCannotStartThroughGenericSequenceCommands()
     {
-        uint[] ids = [1];
-        var contract = ActivationResearch.LightningVortex(ids);
-        ids[0] = 2;
-        Assert.Equal(1u, Assert.Single(contract.DiscardCardIds));
-        Assert.Throws<NotSupportedException>(() => ((IList<uint>)contract.DiscardCardIds).Clear());
-        Assert.Throws<ArgumentException>(() => new ActivationContract("invalid", 5217));
-        Assert.Throws<ArgumentException>(() => new ActivationContract("invalid", 5217, []));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new ActivationContract("invalid", 0, [1]));
+        Assert.Throws<ArgumentException>(() => new EffectDefinition("x", 1, EffectKind.QuickPlaySpell, [new DestroyTargetStep()]));
+        Assert.Throws<ArgumentException>(() => new EffectDefinition("x", 1, EffectKind.QuickPlaySpell, [new DealDamageStep(1)],
+            target: new SpellTrapOnFieldTarget()));
+        Assert.Throws<ArgumentException>(() => new EffectDefinition("x", 1, EffectKind.CounterTrap, [new NegateActivationStep(true)]));
+        Assert.Throws<ArgumentException>(() => new EffectDefinition("x", 1, EffectKind.NormalSpell, [new DealDamageStep(1)],
+            conditions: [new RespondsToSpellActivationCondition()]));
+        Assert.Throws<ArgumentException>(() => new EffectDefinition("x", 1, EffectKind.NormalSpell, [new DealDamageStep(1)],
+            conditions: [new NoSummonThisTurnCondition(), new NoSummonThisTurnCondition()]));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new FreeMonsterZonesCondition(6));
+        Assert.Throws<ArgumentException>(() => new SpecialSummonStep(SpecialSummonSources.Deck, []));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new SpecialSummonStep(SpecialSummonSources.Graveyard, [1]));
         var engine = Engine();
-        Reject(engine, new BeginDecisionSequence(PlayerId.One, "activation:lightning-vortex-discard-commit-v1"), DuelError.UnsupportedDecisionSequence);
+        Reject(engine, new BeginDecisionSequence(PlayerId.One, "activation:lightning-vortex-v1"), DuelError.UnsupportedDecisionSequence);
+        var catalog = new CardCatalog(new(null, "x"), new uint[] { 1, 5217 }.Select(id => new CardDefinition(id, $"{id}", "", new(0, 0, 1))));
+        var rules = new Dictionary<uint, DuelCardRules> { [1] = new(CardCategory.Monster), [5217] = new(CardCategory.Spell, AllowsSpellTrapSet: true) };
+        uint[] deck = [.. Enumerable.Repeat(1u, 40)];
+        Assert.Throws<ArgumentException>(() => new DuelEngine(catalog, rules, deck, deck,
+            decisionSequences: [new("activation:lightning-vortex-v1", [DecisionStep.AnyCard(DecisionCardSource.Hand)])],
+            effectDefinitions: EventEffectScenario.ChainCards(5217)));
     }
 
     [Fact]

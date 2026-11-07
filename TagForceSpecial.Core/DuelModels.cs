@@ -97,6 +97,7 @@ public sealed class DuelState
     public long Revision { get; }
     public PendingDecision? PendingDecision { get; }
     public DecisionSequenceResult? DecisionResult { get; }
+    /// <summary>Set only when a selection-only <see cref="DecisionSequence"/> with StopAfterCompletion finishes.</summary>
     public bool ResearchSliceComplete { get; }
     public PendingSpellActivation? PendingSpellActivation { get; }
     public IReadOnlyList<PendingEndPhaseBanishment> PendingEndPhaseBanishments { get; }
@@ -114,6 +115,8 @@ public sealed class DuelState
     public DuelRandomState? Random => Bookkeeping.Random;
     /// <summary>Non-turn-player activation window opened by a phase-change request, if any.</summary>
     public PendingOpenWindow? OpenWindow => Bookkeeping.OpenWindow;
+    /// <summary>Summon locks applied by activations; each holds only during its own turn.</summary>
+    public IReadOnlyList<SummonLock> SummonLocks => Bookkeeping.SummonLocks;
 
     internal DuelState(IEnumerable<DuelPlayerState> players, PlayerId activePlayer, int turnNumber = 1,
         DuelPhase phase = DuelPhase.Draw, bool normalSummonUsed = false, DuelOutcome? outcome = null,
@@ -251,7 +254,7 @@ public enum DuelError
     UnsupportedSpecialSummon, SpecialSummonSourceUnavailable, ProperSummonRequired, SpecialSummonConditionsNotMet,
     UnsupportedMaterialProcedure, InvalidSummonMaterials, SummonMaterialNotAllowed,
     UnsupportedPendulumCard, InvalidPendulumZone, PendulumZoneOccupied, PendulumScalesUnavailable, PendulumSummonLimitReached,
-    ActivationTimingNotAllowed, SetThisTurn, OpenWindowPending
+    ActivationTimingNotAllowed, SetThisTurn, OpenWindowPending, ActivationConditionNotMet, SummonLocked
 }
 
 public abstract record DuelEvent

@@ -9,11 +9,8 @@ public sealed partial class DuelEngine
         var step = sequence.Steps[index];
         CardInstance[] cards = step.Kind == DecisionKind.Card
             ? SpecialSourceCards(player, step.CardSource!.Value)
-                .Where(c => c.InstanceId != excludeInstanceId && step.AllowedCardIds.Contains(c.GameCardId)).ToArray()
+                .Where(c => c.InstanceId != excludeInstanceId && step.Allows(c.GameCardId)).ToArray()
             : [];
-        if (step.Kind == DecisionKind.Card && spellEffects.Values.FirstOrDefault(e => e.Decisions.Id == sequence.Id) is not null)
-            cards = cards.Where(c => Enumerable.Range(0, 5).Any(z => CheckSpecialSummon(State, player.Id, c, z,
-                BattlePosition.FaceUpAttack, DecisionCardSource.Deck) == DuelError.None)).ToArray();
         int[] zones = step.Kind == DecisionKind.MonsterZone
             ? Enumerable.Range(0, 5).Where(z => player.MonsterZones[z] is null).ToArray()
             : [];
@@ -76,14 +73,12 @@ public sealed partial class DuelEngine
         if (answer.Target is { } binding && !binding.IsStillPresent(binding.Current(State)))
             return Reject(DuelError.InvalidDecisionChoice);
         var answers = pending.Answers.Append(answer).ToArray();
+        if (State.PendingSpellActivation is { } activation && definitions.ContainsKey(activation.Spell.GameCardId))
+            return AnswerDefinitionDecision(pending, answer, answers);
         if (State.PendingChain is not null && State.PendingSpellActivation is { ResponseToLink: > 0 })
             return AnswerChainResponse(pending, answer, answers);
-        if (State.PendingSpellActivation is { } contractActivation &&
-            activationContracts.TryGetValue(contractActivation.Spell.GameCardId, out var contract))
-            return AnswerActivationContract(pending, answer, answers, contract);
-        var sequence = State.PendingSpellActivation is { } activation
-            ? spellEffects[activation.Spell.GameCardId].Decisions
-            : decisionSequences[pending.SequenceId];
+        if (State.PendingSpellActivation is not null) return Reject(DuelError.InvalidEffectState);
+        var sequence = decisionSequences[pending.SequenceId];
         var answered = new DecisionAnswered(command.Player, sequence.Id, pending.DecisionId, answer);
         if (pending.StepIndex + 1 < sequence.Steps.Count)
         {
@@ -92,7 +87,6 @@ public sealed partial class DuelEngine
             return Accept(State.WithDecision(next), answered, new DecisionRequested(next));
         }
         var result = new DecisionSequenceResult(pending, answers);
-        if (State.PendingSpellActivation is not null) return ResolveSpell(result);
         return Accept(State.WithDecision(null, result, sequence.StopAfterCompletion), answered,
             new DecisionSequenceCompleted(result));
     }

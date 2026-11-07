@@ -10,14 +10,23 @@ public sealed class DecisionStep
     public DecisionCardSource? CardSource { get; }
     public IReadOnlyList<uint> AllowedCardIds { get; }
     public IReadOnlyList<BattlePosition> AllowedPositions { get; }
+    /// <summary>A card step that accepts any card of its source (the allowlist is then empty).</summary>
+    public bool AllowsAnyCard { get; }
 
-    private DecisionStep(DecisionKind kind, DecisionCardSource? source, uint[] ids, BattlePosition[] positions)
+    private DecisionStep(DecisionKind kind, DecisionCardSource? source, uint[] ids, BattlePosition[] positions, bool anyCard = false)
     {
         Kind = kind;
         CardSource = source;
         AllowedCardIds = Array.AsReadOnly(ids);
         AllowedPositions = Array.AsReadOnly(positions);
+        AllowsAnyCard = anyCard;
     }
+
+    internal bool Allows(uint cardId) => AllowsAnyCard || AllowedCardIds.Contains(cardId);
+
+    /// <summary>Any one card from the source (e.g. an activation's "discard 1 card" cost).</summary>
+    public static DecisionStep AnyCard(DecisionCardSource source) => Enum.IsDefined(source)
+        ? new(DecisionKind.Card, source, [], [], anyCard: true) : throw new ArgumentOutOfRangeException(nameof(source));
 
     public static DecisionStep Card(DecisionCardSource source, IEnumerable<uint> allowedCardIds)
     {

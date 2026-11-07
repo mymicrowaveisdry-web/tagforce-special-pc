@@ -92,13 +92,7 @@ public sealed class ContinuousEffectTests
     {
         var engine = Engine(continuous: [new("own", A, EffectRelation.Controller, 200, 0)]);
         EnterMain(engine);
-        Ok(engine, new ActivateSpell(PlayerId.One, engine.State.GetPlayer(PlayerId.One).Hand.First(c => c.GameCardId == SummonSpell).InstanceId, 0));
-        var p = engine.State.PendingDecision!;
-        Ok(engine, new ChooseDecisionCard(p.Player, p.DecisionId, p.CardOptions[0].InstanceId));
-        p = engine.State.PendingDecision!;
-        Ok(engine, new ChooseDecisionPosition(p.Player, p.DecisionId, BattlePosition.FaceUpAttack));
-        p = engine.State.PendingDecision!;
-        Ok(engine, new ChooseDecisionZone(p.Player, p.DecisionId, 1));
+        SummonWithProbe(engine);
         Assert.Single(engine.State.EventEffects.AppliedModifiers);
         var end = Ok(engine, new ChangePhase(PlayerId.One, DuelPhase.End));
         Assert.Single(end.Events.OfType<StatModifierRemoved>());

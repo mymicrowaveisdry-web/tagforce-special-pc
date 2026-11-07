@@ -25,9 +25,9 @@ public sealed class PlayablePreviewLocalReferenceTests
         // Denominator: 7,254 IDs minus 95 effect-generated Tokens; unobtainable cards stay included.
         Assert.Equal(95, full.GetProperty("excludedTokens").GetArrayLength());
         Assert.Equal(7159, entries.Length);
-        // 665 Normal Monsters (10C-1, including the 8 preview monsters) plus the 6 preview Spells.
-        Assert.Equal(671, entries.Count(c => c.GetProperty("status").GetString() == "supported"));
-        Assert.Equal(5, entries.Count(c => c.GetProperty("status").GetString() == "partial"));
+        // 665 Normal Monsters (10C-1, including the 8 preview monsters), the 6 preview Spells and the 5 10C-2 cards.
+        Assert.Equal(676, entries.Count(c => c.GetProperty("status").GetString() == "supported"));
+        Assert.Equal(0, entries.Count(c => c.GetProperty("status").GetString() == "partial"));
         Assert.Equal(6483, entries.Count(c => c.GetProperty("status").GetString() == "unsupported"));
         Assert.All(entries, c => Assert.False(c.GetProperty("pspVerified").GetBoolean()));
         var scenario = PreviewDuelScenario.Run(catalog);

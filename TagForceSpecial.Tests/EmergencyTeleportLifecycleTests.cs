@@ -5,7 +5,10 @@ using TagForceSpecial.Effects;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Scoped PSP End Phase comparisons; guards/events/identity are synthetic managed contracts.</summary>
+/// <summary>
+/// Scoped PSP End Phase comparisons for the Emergency Teleport definition; guards/events/identity are synthetic
+/// managed contracts.
+/// </summary>
 public sealed class EmergencyTeleportLifecycleTests
 {
     private static DuelEngine Engine(PlayerId starter = PlayerId.One, bool allowBattle = false)
@@ -16,10 +19,10 @@ public sealed class EmergencyTeleportLifecycleTests
                 new(0, 0, 0, 0, 0, 0, 0), new((int)id, id, 2u << 11, 0))));
         var rules = ids.ToDictionary(id => id, id => new DuelCardRules(
             id is 7747 or 5217 ? CardCategory.Spell : CardCategory.Monster,
-            AllowsNormalSummon: id is not (7747 or 5217), AllowsBasicBattle: allowBattle && id is 7716 or 9979));
+            AllowsNormalSummon: id is not (7747 or 5217), AllowsBasicBattle: allowBattle && id is 7716 or 9979,
+            AllowsSpellTrapSet: id is 7747 or 5217));
         uint[] deck = [9979, 7716, 9979, 6151, 7747, 7716, 9723, 5217, 1, 7716, .. Enumerable.Repeat(1u, 30)];
-        return new(catalog, rules, deck, deck, starter,
-            experimentalSpellEffects: [EmergencyTeleport.EndPhaseLifecycleOnly()]);
+        return new(catalog, rules, deck, deck, starter, effectDefinitions: [EmergencyTeleportTests.Definition], shuffleSeed: 7);
     }
 
     private static DuelActionResult Ok(DuelEngine engine, DuelCommand command)
@@ -61,17 +64,15 @@ public sealed class EmergencyTeleportLifecycleTests
         EnterMain(engine);
     }
 
+    /// <summary>Activation through resolution, summoning the first Deck copy (the PSP-observed branch).</summary>
     private static DuelActionResult Resolve(DuelEngine engine, int zone = 1)
     {
         var actor = engine.State.ActivePlayer;
-        var spell = engine.State.GetPlayer(actor).Hand.Single(c => c.GameCardId == EmergencyTeleport.CardId);
+        var spell = engine.State.GetPlayer(actor).Hand.Single(c => c.GameCardId == ChainCardFamily.EmergencyTeleport);
         Ok(engine, new ActivateSpell(actor, spell.InstanceId, 2));
-        var p = engine.State.PendingDecision!;
-        Ok(engine, new ChooseDecisionCard(actor, p.DecisionId, p.CardOptions[0].InstanceId));
-        p = engine.State.PendingDecision!;
-        Ok(engine, new ChooseDecisionPosition(actor, p.DecisionId, BattlePosition.FaceUpAttack));
-        p = engine.State.PendingDecision!;
-        return Ok(engine, new ChooseDecisionZone(actor, p.DecisionId, zone));
+        var choice = EmergencyTeleportTests.ReachChoice(engine);
+        var deckCopy = choice.Options.First(o => o.Source == DecisionCardSource.Deck).Card;
+        return Ok(engine, new ChooseDefinitionSummon(actor, choice.DecisionId, deckCopy.InstanceId, zone, BattlePosition.FaceUpAttack));
     }
 
     private static void AssertProjection(JsonElement expected, DuelState actual)
@@ -151,7 +152,7 @@ public sealed class EmergencyTeleportLifecycleTests
         Assert.Contains(handCopy, after.Hand);
         Assert.Equal(target, Assert.Single(after.Banished));
         Assert.Empty(result.State.PendingEndPhaseBanishments);
-        Assert.True(result.State.ResearchSliceComplete);
+        Assert.False(result.State.ResearchSliceComplete);
         Assert.Null(result.State.Outcome);
         Assert.Equal(before.NormalSummonUsed, result.State.NormalSummonUsed);
         Assert.Same(before.GetPlayer(PlayerId.Two), result.State.GetPlayer(PlayerId.Two));
@@ -162,8 +163,6 @@ public sealed class EmergencyTeleportLifecycleTests
         Assert.Empty(player.Banished);
         Assert.Single(before.PendingEndPhaseBanishments);
         Assert.Throws<NotSupportedException>(() => ((IList<CardInstance>)after.Banished).Clear());
-        Reject(engine, new ChangePhase(PlayerId.One, DuelPhase.End), DuelError.ResearchSliceComplete);
-        Reject(engine, new EndTurn(PlayerId.One), DuelError.ResearchSliceComplete);
     }
 
     [Theory]
@@ -176,13 +175,13 @@ public sealed class EmergencyTeleportLifecycleTests
         var before = engine.State;
         var resolution = Resolve(engine, zone);
         Assert.Collection(resolution.Events, e => Assert.IsType<MonsterSpecialSummoned>(e),
-            e => Assert.IsType<SpellSentToGraveyard>(e), e => Assert.IsType<EffectResolved>(e),
-            e => Assert.IsType<EndPhaseBanishmentScheduled>(e));
+            e => Assert.IsType<EndPhaseBanishmentScheduled>(e), e => Assert.IsType<DeckShuffled>(e),
+            e => Assert.IsType<ChainLinkResolved>(e), e => Assert.IsType<SpellSentToGraveyard>(e), e => Assert.IsType<ChainCompleted>(e));
         var delayed = Assert.Single(engine.State.PendingEndPhaseBanishments);
         Assert.Equal(actor, delayed.Player);
         Assert.Equal(engine.State.GetPlayer(actor).MonsterZones[zone]!.Card, delayed.Monster);
         Assert.Equal(1, delayed.DueTurn);
-        Assert.False(engine.State.ResearchSliceComplete);
+        Assert.Equal(engine.State.GetPlayer(actor).MonsterZones[zone]!.PlacementId, delayed.PlacementId);
         Assert.False(engine.State.NormalSummonUsed);
         Assert.Empty(before.PendingEndPhaseBanishments);
         Assert.Throws<NotSupportedException>(() => ((IList<PendingEndPhaseBanishment>)engine.State.PendingEndPhaseBanishments).Clear());
@@ -194,23 +193,22 @@ public sealed class EmergencyTeleportLifecycleTests
     }
 
     [Fact]
-    public void UnsupportedContinuationAndWrongActorLeavePendingBanishmentUnchanged()
+    public void OrdinaryCommandsContinueWhileABanishmentIsPending()
     {
         var engine = Engine();
         EnterMain(engine);
         Resolve(engine);
         var player = engine.State.GetPlayer(PlayerId.One);
-        var pending = engine.State.PendingEndPhaseBanishments[0];
         Reject(engine, new ChangePhase(PlayerId.Two, DuelPhase.End), DuelError.NotActivePlayer);
         Reject(engine, new ChangePhase(PlayerId.One, DuelPhase.Battle), DuelError.FirstTurnBattleNotAllowed);
         Reject(engine, new DeclareAttack(PlayerId.One, 1), DuelError.WrongPhase);
-        DuelCommand[] unsupported = [new ChangeMonsterPosition(PlayerId.One, 1, BattlePosition.FaceUpDefense),
-            new NormalSummon(PlayerId.One, player.Hand[0].InstanceId, 0),
-            new ActivateSpell(PlayerId.One, pending.Spell.InstanceId, 2), new EndTurn(PlayerId.One),
-            new ResolveDrawStep(PlayerId.One)];
-        foreach (var command in unsupported)
-            Reject(engine, command, DuelError.UnsupportedLifecycleContinuation);
-        Ok(engine, new ChangePhase(PlayerId.One, DuelPhase.End));
+        Reject(engine, new ChangeMonsterPosition(PlayerId.One, 1, BattlePosition.FaceUpDefense), DuelError.PositionChangeNotAllowed);
+        Ok(engine, new NormalSummon(PlayerId.One, player.Hand.First(c => c.GameCardId == 9979).InstanceId, 0));
+        Assert.Single(engine.State.PendingEndPhaseBanishments);
+        var end = Ok(engine, new ChangePhase(PlayerId.One, DuelPhase.End));
+        Assert.Single(end.Events.OfType<MonsterBanished>());
+        Assert.NotNull(engine.State.GetPlayer(PlayerId.One).MonsterZones[0]);
+        Ok(engine, new EndTurn(PlayerId.One));
     }
 
     [Fact]
@@ -221,22 +219,18 @@ public sealed class EmergencyTeleportLifecycleTests
         var spell = engine.State.GetPlayer(PlayerId.One).Hand.Single(c => c.GameCardId == 7747);
         Ok(engine, new ActivateSpell(PlayerId.One, spell.InstanceId, 2));
         Assert.Empty(engine.State.PendingEndPhaseBanishments);
+        Reject(engine, new ChangePhase(PlayerId.One, DuelPhase.End), DuelError.ChainPending);
+        var choice = EmergencyTeleportTests.ReachChoice(engine);
+        var card = choice.Options[0].Card;
         Reject(engine, new ChangePhase(PlayerId.One, DuelPhase.End), DuelError.DecisionPending);
-        var p = engine.State.PendingDecision!;
-        Ok(engine, new ChooseDecisionCard(PlayerId.One, p.DecisionId, p.CardOptions[0].InstanceId));
-        p = engine.State.PendingDecision!;
-        Reject(engine, new ChooseDecisionPosition(PlayerId.One, p.DecisionId, BattlePosition.FaceUpDefense), DuelError.InvalidDecisionChoice);
-        Assert.Empty(engine.State.PendingEndPhaseBanishments);
-        Ok(engine, new ChooseDecisionPosition(PlayerId.One, p.DecisionId, BattlePosition.FaceUpAttack));
-        p = engine.State.PendingDecision!;
-        Reject(engine, new ChooseDecisionZone(PlayerId.One, p.DecisionId, 5), DuelError.InvalidDecisionChoice);
+        Reject(engine, new ChooseDefinitionSummon(PlayerId.One, choice.DecisionId, card.InstanceId, 1, BattlePosition.FaceDownDefense), DuelError.InvalidBattlePosition);
+        Reject(engine, new ChooseDefinitionSummon(PlayerId.One, choice.DecisionId, card.InstanceId, 5, BattlePosition.FaceUpAttack), DuelError.InvalidMonsterZone);
         Assert.Empty(engine.State.PendingEndPhaseBanishments);
         Assert.Empty(engine.State.GetPlayer(PlayerId.One).Banished);
-        Ok(engine, new ChooseDecisionZone(PlayerId.One, p.DecisionId, 1));
+        Ok(engine, new ChooseDefinitionSummon(PlayerId.One, choice.DecisionId, card.InstanceId, 1, BattlePosition.FaceUpAttack));
         Assert.Single(engine.State.PendingEndPhaseBanishments);
         Ok(engine, new ChangePhase(PlayerId.One, DuelPhase.End));
     }
-
     [Fact]
     public void UsedNormalSummonAllowanceAndOtherMonsterSurviveLifecycle()
     {
@@ -299,8 +293,7 @@ public sealed class EmergencyTeleportLifecycleTests
         var beforeEnd = engine.State;
         AssertProjection(Projection(pair.GetProperty("before").GetString()!), beforeEnd);
         var result = Ok(engine, new ChangePhase(PlayerId.One, DuelPhase.End));
-        // Original after boundary is next Draw, before drawing. Compare card zones
-        // only; this managed research slice stops in End Phase.
+        // Original after boundary is next Draw, before drawing. Compare card zones only.
         AssertPlayerProjection(Projection(pair.GetProperty("after").GetString()!), result.State);
         Assert.Collection(result.Events, e => Assert.IsType<PhaseChanged>(e), e =>
             Assert.Equal(target, Assert.IsType<EndPhaseBanishmentExpired>(e).Card));
@@ -310,10 +303,9 @@ public sealed class EmergencyTeleportLifecycleTests
         Assert.Same(beforeEnd.GetPlayer(PlayerId.Two), result.State.GetPlayer(PlayerId.Two));
         Assert.Equal(beforeEnd.GetPlayer(PlayerId.One).LifePoints, result.State.GetPlayer(PlayerId.One).LifePoints);
         Assert.Empty(result.State.PendingEndPhaseBanishments);
-        Assert.True(result.State.ResearchSliceComplete);
+        Assert.False(result.State.ResearchSliceComplete);
         Assert.Null(result.State.Outcome);
         Assert.NotNull(resolved.GetPlayer(PlayerId.One).MonsterZones[1]);
-        Reject(engine, new EndTurn(PlayerId.One), DuelError.ResearchSliceComplete);
     }
 
     [Fact]

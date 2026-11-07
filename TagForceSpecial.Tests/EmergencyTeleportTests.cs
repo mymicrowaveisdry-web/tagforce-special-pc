@@ -6,11 +6,14 @@ using TagForceSpecial.Effects;
 namespace TagForceSpecial.Tests;
 
 /// <summary>
-/// Two scoped PSP projections plus synthetic managed guards/events/identity tests.
-/// Earlier native effects, absolute LP, opponent contents and deck order are excluded.
+/// Two scoped PSP projections plus synthetic guards/events/identity tests for the Emergency Teleport definition.
+/// Earlier native effects, absolute LP, opponent contents and deck order are excluded; the post-summon shuffle is
+/// deliberate PC design (no PSP RNG claim).
 /// </summary>
 public sealed class EmergencyTeleportTests
 {
+    internal static EffectDefinition Definition => Assert.Single(EventEffectScenario.ChainCards(ChainCardFamily.EmergencyTeleport));
+
     private static DuelEngine Engine(bool enabled = true, bool candidate = true, bool extraSpell = false,
         PlayerId starter = PlayerId.One)
     {
@@ -24,8 +27,7 @@ public sealed class EmergencyTeleportTests
             : new DuelCardRules(CardCategory.Monster, AllowsNormalSummon: true));
         uint[] deck = [extraSpell ? 7747u : 9979u, 7716, 9979, 6151, 7747,
             candidate ? 7716u : 1u, 9723, 5217, 1, candidate ? 7716u : 1u, .. Enumerable.Repeat(1u, 30)];
-        return new(catalog, rules, deck, deck, starter,
-            experimentalSpellEffects: enabled ? [EmergencyTeleport.ActivationResolutionOnly()] : []);
+        return new(catalog, rules, deck, deck, starter, effectDefinitions: enabled ? [Definition] : [], shuffleSeed: 7);
     }
 
     private static DuelActionResult Ok(DuelEngine engine, DuelCommand command)
@@ -67,19 +69,26 @@ public sealed class EmergencyTeleportTests
     }
 
     private static CardInstance Spell(DuelEngine engine) => engine.State.GetPlayer(engine.State.ActivePlayer)
-        .Hand.First(c => c.GameCardId == EmergencyTeleport.CardId);
+        .Hand.First(c => c.GameCardId == ChainCardFamily.EmergencyTeleport);
 
     private static void Activate(DuelEngine engine, int zone = 2) =>
         Ok(engine, new ActivateSpell(engine.State.ActivePlayer, Spell(engine).InstanceId, zone));
 
+    /// <summary>Closes the response window and resolves to the summon choice.</summary>
+    internal static PendingDefinitionSummon ReachChoice(DuelEngine engine)
+    {
+        for (int i = 0; i < 2; i++) Ok(engine, new PassChainResponse(engine.State.PendingChain!.Responder, engine.State.PendingChain.DecisionId));
+        var paused = Ok(engine, new ResolveNextChainLink(engine.State.ActivePlayer, engine.State.PendingChain!.DecisionId));
+        return Assert.IsType<DefinitionSummonRequested>(paused.Events[^1]).Decision;
+    }
+
+    /// <summary>Activation through resolution, choosing the first Deck copy (the PSP-observed branch).</summary>
     private static DuelActionResult Resolve(DuelEngine engine, int zone = 1)
     {
-        var p = engine.State.PendingDecision!;
-        Ok(engine, new ChooseDecisionCard(p.Player, p.DecisionId, p.CardOptions[0].InstanceId));
-        p = engine.State.PendingDecision!;
-        Ok(engine, new ChooseDecisionPosition(p.Player, p.DecisionId, BattlePosition.FaceUpAttack));
-        p = engine.State.PendingDecision!;
-        return Ok(engine, new ChooseDecisionZone(p.Player, p.DecisionId, zone));
+        Activate(engine);
+        var choice = ReachChoice(engine);
+        var deckCopy = choice.Options.First(o => o.Source == DecisionCardSource.Deck).Card;
+        return Ok(engine, new ChooseDefinitionSummon(choice.Player, choice.DecisionId, deckCopy.InstanceId, zone, BattlePosition.FaceUpAttack));
     }
 
     [Theory]
@@ -114,40 +123,38 @@ public sealed class EmergencyTeleportTests
         var originalDeck = before.GetPlayer(PlayerId.One).Deck;
         var activated = Ok(engine, new ActivateSpell(PlayerId.One, spell.InstanceId, 2));
         Assert.Collection(activated.Events, e => Assert.Equal(spell, Assert.IsType<SpellActivated>(e).Card),
-            e => Assert.IsType<DecisionRequested>(e));
+            e => Assert.IsType<ActivationCommitted>(e), e => Assert.IsType<ChainLinkAdded>(e), e => Assert.IsType<ChainResponseRequested>(e));
         AssertProjection(Projection("placed"), engine.State);
         Assert.True(engine.State.GetPlayer(PlayerId.One).SpellTrapFields[2]!.IsFaceUp);
         Assert.False(before.NormalSummonUsed);
-        var p = engine.State.PendingDecision!;
-        var chosen = Assert.Single(p.CardOptions);
+        var p = ReachChoice(engine);
+        AssertProjection(Projection("placed"), engine.State);
+        // Hand and Deck copies are both eligible; the original capture took the Deck branch.
+        Assert.Equal([handKrebons], p.Options.Where(o => o.Source == DecisionCardSource.Hand).Select(o => o.Card));
+        var chosen = Assert.Single(p.Options, o => o.Source == DecisionCardSource.Deck).Card;
         Assert.Equal(7716u, chosen.GameCardId);
-        Assert.NotEqual(handKrebons.InstanceId, chosen.InstanceId);
-        Ok(engine, new ChooseDecisionCard(PlayerId.One, p.DecisionId, chosen.InstanceId));
-        AssertProjection(Projection("placed"), engine.State);
-        p = engine.State.PendingDecision!;
-        Ok(engine, new ChooseDecisionPosition(PlayerId.One, p.DecisionId, BattlePosition.FaceUpAttack));
-        AssertProjection(Projection("placed"), engine.State);
-        p = engine.State.PendingDecision!;
-        var result = Ok(engine, new ChooseDecisionZone(PlayerId.One, p.DecisionId, 1));
+        var result = Ok(engine, new ChooseDefinitionSummon(PlayerId.One, p.DecisionId, chosen.InstanceId, 1, BattlePosition.FaceUpAttack));
         AssertProjection(Projection("resolved"), engine.State);
         Assert.Collection(result.Events, e => Assert.Same(chosen, Assert.IsType<MonsterSpecialSummoned>(e).Monster.Card),
-            e => Assert.Same(spell, Assert.IsType<SpellSentToGraveyard>(e).Card),
-            e => Assert.Equal(EmergencyTeleport.EffectId, Assert.IsType<EffectResolved>(e).EffectId));
+            e => Assert.Equal(chosen, Assert.IsType<EndPhaseBanishmentScheduled>(e).Banishment.Monster),
+            e => Assert.IsType<DeckShuffled>(e), e => Assert.IsType<ChainLinkResolved>(e),
+            e => Assert.Same(spell, Assert.IsType<SpellSentToGraveyard>(e).Card), e => Assert.IsType<ChainCompleted>(e));
         var player = engine.State.GetPlayer(PlayerId.One);
         Assert.Same(chosen, player.MonsterZones[1]!.Card);
         Assert.Equal(BattlePosition.FaceUpAttack, player.MonsterZones[1]!.Position);
         Assert.Equal(engine.State.TurnNumber, player.MonsterZones[1]!.SummonedOnTurn);
         Assert.Contains(handKrebons, player.Hand);
         Assert.Same(spell, player.Graveyard[^1]);
-        Assert.Equal(originalDeck.Where(c => c.InstanceId != chosen.InstanceId), player.Deck); // Managed deterministic policy, not PSP shuffle equivalence.
+        // Same remaining cards; their order is the seeded shuffle's (deliberate PC design).
+        Assert.Equal(originalDeck.Where(c => c.InstanceId != chosen.InstanceId).OrderBy(c => c.InstanceId), player.Deck.OrderBy(c => c.InstanceId));
         Assert.Same(before.GetPlayer(PlayerId.Two), engine.State.GetPlayer(PlayerId.Two));
         Assert.Equal(before.GetPlayer(PlayerId.One).LifePoints, player.LifePoints);
         Assert.Equal(before.NormalSummonUsed, engine.State.NormalSummonUsed);
         Assert.Equal(Projection("before").GetProperty("players")[0].GetProperty("lifePoints").GetInt32(),
             Projection("resolved").GetProperty("players")[0].GetProperty("lifePoints").GetInt32());
         Assert.Null(engine.State.PendingDecision);
-        Assert.Null(engine.State.PendingSpellActivation);
-        Assert.True(engine.State.ResearchSliceComplete);
+        Assert.Null(engine.State.PendingChain);
+        Assert.False(engine.State.ResearchSliceComplete);
         Assert.Null(engine.State.Outcome);
         AssertConservation(engine.State);
     }
@@ -173,16 +180,16 @@ public sealed class EmergencyTeleportTests
     }
 
     [Fact]
-    public void NoEffectProfileMeansNoActivationEvenWithSettingAndSummoningRules()
+    public void NoDefinitionMeansNoActivationEvenWithSettingAndSummoningRules()
     {
         var engine = Engine(enabled: false);
         EnterMain(engine);
         Reject(engine, new ActivateSpell(PlayerId.One, Spell(engine).InstanceId, 2), DuelError.UnsupportedSpellEffect);
-        Assert.Null(engine.State.PendingSpellActivation);
+        Assert.Null(engine.State.PendingChain);
     }
 
     [Fact]
-    public void InvalidActivationAndMissingDeckCandidateRejectBeforeCommitting()
+    public void InvalidActivationAndMissingCandidateRejectBeforeCommitting()
     {
         var engine = Engine();
         Reject(engine, new ActivateSpell(PlayerId.One, Spell(engine).InstanceId, 2), DuelError.WrongPhase);
@@ -193,9 +200,11 @@ public sealed class EmergencyTeleportTests
         Reject(engine, new ActivateSpell(PlayerId.One, spell.InstanceId, 5), DuelError.InvalidSpellTrapZone);
         Reject(engine, new ActivateSpell(PlayerId.One, int.MaxValue, 2), DuelError.CardNotInHand);
         Reject(engine, new ActivateSpell(PlayerId.One, engine.State.GetPlayer(PlayerId.One).Hand[0].InstanceId, 2), DuelError.UnsupportedSpellEffect);
-        Reject(engine, new BeginDecisionSequence(PlayerId.One, "spell:" + EmergencyTeleport.EffectId), DuelError.UnsupportedDecisionSequence);
+        Reject(engine, new BeginDecisionSequence(PlayerId.One, "activation:" + Definition.EffectId), DuelError.UnsupportedDecisionSequence);
+        // Without Deck copies, the hand copy is the only candidate; once it is summoned nothing is eligible.
         engine = Engine(candidate: false);
         EnterMain(engine);
+        Ok(engine, new NormalSummon(PlayerId.One, engine.State.GetPlayer(PlayerId.One).Hand.Single(c => c.GameCardId == 7716).InstanceId, 0));
         Reject(engine, new ActivateSpell(PlayerId.One, Spell(engine).InstanceId, 2), DuelError.DecisionUnavailable);
     }
 
@@ -213,7 +222,8 @@ public sealed class EmergencyTeleportTests
         var placed = engine.State;
         Assert.False(placed.GetPlayer(PlayerId.One).SpellTrapFields[2]!.IsFaceUp);
         Assert.True(placed.GetPlayer(PlayerId.One).SpellTrapFields[0]!.IsFaceUp);
-        Resolve(engine);
+        var choice = ReachChoice(engine);
+        Ok(engine, new ChooseDefinitionSummon(PlayerId.One, choice.DecisionId, choice.Options[0].Card.InstanceId, 1, BattlePosition.FaceUpAttack));
         Assert.Same(set, engine.State.GetPlayer(PlayerId.One).SpellTrapZones[2]);
         Assert.False(engine.State.GetPlayer(PlayerId.One).SpellTrapFields[2]!.IsFaceUp);
         Assert.Null(engine.State.GetPlayer(PlayerId.One).SpellTrapFields[0]);
@@ -223,52 +233,49 @@ public sealed class EmergencyTeleportTests
     }
 
     [Fact]
-    public void PendingSpellRejectsHandCopiesUnsupportedPositionsAndUnrelatedCommands()
+    public void ResolutionChoiceRejectsForeignCardsPositionsZonesAndOtherCommandsAtomically()
     {
         var engine = Engine();
         EnterMain(engine);
         Activate(engine);
-        var card = engine.State.PendingDecision!;
-        var hand = engine.State.GetPlayer(PlayerId.One).Hand.First(c => c.GameCardId == 7716);
-        Reject(engine, new ChooseDecisionCard(PlayerId.One, card.DecisionId, hand.InstanceId), DuelError.InvalidDecisionChoice);
-        Reject(engine, new ChooseDecisionCard(PlayerId.Two, card.DecisionId, card.CardOptions[0].InstanceId), DuelError.NotActivePlayer);
-        Reject(engine, new ChooseDecisionZone(PlayerId.One, card.DecisionId, 1), DuelError.WrongDecisionKind);
-        Reject(engine, new ActivateSpell(PlayerId.One, hand.InstanceId, 3), DuelError.DecisionPending);
+        var choice = ReachChoice(engine);
+        var option = choice.Options[0].Card;
+        var foreign = engine.State.GetPlayer(PlayerId.Two).Hand.First(c => c.GameCardId == 7716);
+        Reject(engine, new ChooseDefinitionSummon(PlayerId.One, choice.DecisionId, foreign.InstanceId, 1, BattlePosition.FaceUpAttack), DuelError.InvalidDecisionChoice);
+        Reject(engine, new ChooseDefinitionSummon(PlayerId.Two, choice.DecisionId, option.InstanceId, 1, BattlePosition.FaceUpAttack), DuelError.NotActivePlayer);
+        Reject(engine, new ChooseDefinitionSummon(PlayerId.One, choice.DecisionId - 1, option.InstanceId, 1, BattlePosition.FaceUpAttack), DuelError.StaleDecision);
+        Reject(engine, new ChooseDefinitionSummon(PlayerId.One, choice.DecisionId, option.InstanceId, 5, BattlePosition.FaceUpAttack), DuelError.InvalidMonsterZone);
+        Reject(engine, new ChooseDefinitionSummon(PlayerId.One, choice.DecisionId, option.InstanceId, 1, BattlePosition.FaceDownDefense), DuelError.InvalidBattlePosition);
         Reject(engine, new ChangePhase(PlayerId.One, DuelPhase.End), DuelError.DecisionPending);
-        Ok(engine, new ChooseDecisionCard(PlayerId.One, card.DecisionId, card.CardOptions[0].InstanceId));
-        Reject(engine, new ChooseDecisionCard(PlayerId.One, card.DecisionId, card.CardOptions[0].InstanceId), DuelError.StaleDecision);
-        var position = engine.State.PendingDecision!;
-        Reject(engine, new ChooseDecisionPosition(PlayerId.One, position.DecisionId, BattlePosition.FaceUpDefense), DuelError.InvalidDecisionChoice);
-        Reject(engine, new ChooseDecisionPosition(PlayerId.One, position.DecisionId, BattlePosition.FaceDownDefense), DuelError.InvalidDecisionChoice);
-        Ok(engine, new ChooseDecisionPosition(PlayerId.One, position.DecisionId, BattlePosition.FaceUpAttack));
-        var zone = engine.State.PendingDecision!;
-        Reject(engine, new ChooseDecisionZone(PlayerId.One, zone.DecisionId, 5), DuelError.InvalidDecisionChoice);
-        Assert.NotNull(engine.State.PendingSpellActivation);
-        Assert.True(engine.State.GetPlayer(PlayerId.One).SpellTrapFields[2]!.IsFaceUp);
+        Reject(engine, new PassChainResponse(PlayerId.One, engine.State.PendingChain!.DecisionId), DuelError.DecisionPending);
+        Assert.Empty(engine.State.PendingEndPhaseBanishments);
+        var result = Ok(engine, new ChooseDefinitionSummon(PlayerId.One, choice.DecisionId, option.InstanceId, 1, BattlePosition.FaceUpDefense));
+        Assert.Equal(BattlePosition.FaceUpDefense, engine.State.GetPlayer(PlayerId.One).MonsterZones[1]!.Position);
+        Assert.Empty(result.Events.OfType<DeckShuffled>()); // a hand summon does not shuffle
+        Assert.Single(engine.State.PendingEndPhaseBanishments);
     }
 
     [Theory]
     [InlineData(PlayerId.One)]
     [InlineData(PlayerId.Two)]
-    public void SpecialSummonPreservesUsedAllowanceAndStopsUnsupportedContinuation(PlayerId actor)
+    public void SpecialSummonPreservesUsedAllowanceAndTheDuelContinues(PlayerId actor)
     {
         var engine = Engine(starter: actor);
         EnterMain(engine);
         var normal = engine.State.GetPlayer(actor).Hand.First(c => c.GameCardId == 7716);
         Ok(engine, new NormalSummon(actor, normal.InstanceId, 2));
         Activate(engine);
-        var card = engine.State.PendingDecision!;
-        Ok(engine, new ChooseDecisionCard(actor, card.DecisionId, card.CardOptions[0].InstanceId));
-        var p = engine.State.PendingDecision!;
-        Ok(engine, new ChooseDecisionPosition(actor, p.DecisionId, BattlePosition.FaceUpAttack));
-        p = engine.State.PendingDecision!;
-        Reject(engine, new ChooseDecisionZone(actor, p.DecisionId, 2), DuelError.InvalidDecisionChoice);
-        Ok(engine, new ChooseDecisionZone(actor, p.DecisionId, 1));
+        var choice = ReachChoice(engine);
+        Assert.DoesNotContain(2, choice.MonsterZoneOptions);
+        var card = choice.Options[0].Card;
+        Reject(engine, new ChooseDefinitionSummon(actor, choice.DecisionId, card.InstanceId, 2, BattlePosition.FaceUpAttack), DuelError.InvalidMonsterZone);
+        Ok(engine, new ChooseDefinitionSummon(actor, choice.DecisionId, card.InstanceId, 1, BattlePosition.FaceUpAttack));
         Assert.True(engine.State.NormalSummonUsed);
         Assert.Null(engine.State.Outcome);
-        Reject(engine, new ChangePhase(actor, DuelPhase.End), DuelError.ResearchSliceComplete);
-        Reject(engine, new DeclareAttack(actor, 1), DuelError.ResearchSliceComplete);
         AssertConservation(engine.State);
+        Ok(engine, new ChangePhase(actor, DuelPhase.End));
+        Assert.Equal(card, Assert.Single(engine.State.GetPlayer(actor).Banished));
+        Ok(engine, new EndTurn(actor));
     }
 
     [Fact]
@@ -293,43 +300,41 @@ public sealed class EmergencyTeleportTests
         EnterMain(a); EnterMain(b);
         Activate(a); Activate(b);
         Assert.Equal(JsonSerializer.Serialize(a.State), JsonSerializer.Serialize(b.State));
-        var first = Resolve(a);
-        var second = Resolve(b);
+        var first = Resolve(a, 1);
+        var second = Resolve(b, 1);
         Assert.Equal(JsonSerializer.Serialize(first), JsonSerializer.Serialize(second));
     }
 
     [Fact]
-    public void EffectProfilesRequireExplicitCompatibleMetadataAndCannotShadowDecisionSequences()
+    public void DefinitionsRequireASeedSettableSpellRulesAndRuleBackedCandidates()
     {
         var catalog = new CardCatalog(new(new string('0', 64), "synthetic-effect-metadata"),
-            new uint[] { 1, 7747 }.Select(id => new CardDefinition(id, $"Synthetic {id}", "",
+            new uint[] { 1, 7716, 7747 }.Select(id => new CardDefinition(id, $"Synthetic {id}", "",
                 new(0, 0, 2), new(0, 0, 0, 0, 0, 0, 0), new((int)id, id, 2u << 11, 0))));
-        uint[] deck = [7747, .. Enumerable.Repeat(1u, 39)];
-        var rules = new Dictionary<uint, DuelCardRules>
+        uint[] deck = [7747, 7716, .. Enumerable.Repeat(1u, 38)];
+        Dictionary<uint, DuelCardRules> Rules(bool settable, bool krebonsRules)
         {
-            [1] = new(CardCategory.Monster, true), [7747] = new(CardCategory.Spell)
-        };
-        var effect = new DeckSpecialSummonSpell("synthetic", 7747, [1]);
-        var engine = new DuelEngine(catalog, rules, deck, deck, experimentalSpellEffects: [effect]);
+            var rules = new Dictionary<uint, DuelCardRules>
+            {
+                [1] = new(CardCategory.Monster, true), [7747] = new(CardCategory.Spell, AllowsSpellTrapSet: settable)
+            };
+            if (krebonsRules) rules[7716] = new(CardCategory.Monster, true);
+            return rules;
+        }
+        Assert.Throws<ArgumentException>(() => new DuelEngine(catalog, Rules(true, true), deck, deck, effectDefinitions: [Definition]));
+        Assert.Throws<ArgumentException>(() => new DuelEngine(catalog, Rules(false, true), deck, deck, effectDefinitions: [Definition], shuffleSeed: 1));
+        // A listed card without explicit Monster rules is never offered.
+        var engine = new DuelEngine(catalog, Rules(true, false), deck, deck, effectDefinitions: [Definition], shuffleSeed: 1);
         EnterMain(engine);
-        Ok(engine, new ActivateSpell(PlayerId.One, 1, 0)); // Setting permission is not activation permission.
-        Assert.True(engine.State.GetPlayer(PlayerId.One).SpellTrapFields[0]!.IsFaceUp);
-        Assert.Throws<ArgumentException>(() => new DuelEngine(catalog, rules, deck, deck,
-            experimentalSpellEffects: [EmergencyTeleport.ActivationResolutionOnly()])); // No catalog/rules for Krebons.
-        Assert.Throws<ArgumentException>(() => new DuelEngine(catalog, rules, deck, deck,
-            experimentalSpellEffects: [new("bad", 1, [1])])); // Monster cannot be the Spell.
-        Assert.Throws<ArgumentException>(() => new DuelEngine(catalog, rules, deck, deck,
-            experimentalSpellEffects: [new("bad", 7747, [7747])])); // Spell cannot be the summon candidate.
-        Assert.Throws<ArgumentException>(() => new DuelEngine(catalog, rules, deck, deck,
-            experimentalSpellEffects: [effect, effect]));
-        Assert.Throws<ArgumentException>(() => new DuelEngine(catalog, rules, deck, deck,
-            decisionSequences: [new("spell:synthetic", [DecisionStep.EmptyMonsterZone()])],
-            experimentalSpellEffects: [effect]));
+        Reject(engine, new ActivateSpell(PlayerId.One, Spell(engine).InstanceId, 0), DuelError.DecisionUnavailable);
+        var ruled = new DuelEngine(catalog, Rules(true, true), deck, deck, effectDefinitions: [Definition], shuffleSeed: 1);
+        EnterMain(ruled);
+        Ok(ruled, new ActivateSpell(PlayerId.One, Spell(ruled).InstanceId, 0));
     }
 
     private static void AssertConservation(DuelState state)
     {
-        var cards = state.Players.SelectMany(p => p.Hand.Concat(p.Deck).Concat(p.Graveyard)
+        var cards = state.Players.SelectMany(p => p.Hand.Concat(p.Deck).Concat(p.Graveyard).Concat(p.Banished)
             .Concat(p.MonsterZones.OfType<FieldMonster>().Select(m => m.Card))
             .Concat(p.SpellTrapZones.OfType<CardInstance>())).ToArray();
         Assert.Equal(80, cards.Length);

@@ -91,8 +91,7 @@ public sealed partial class DuelEngine
         next = next.WithEventEffects(next.EventEffects.WithTriggers(null));
         if (committed.Count == 0) return Accept(next, events.ToArray());
         var links = committed.Select((t, i) => TriggerLink(i + 1, t)).ToArray();
-        var chain = new PendingChain(checked(State.Revision + 1), links, Other(committed[^1].Player),
-            freezeOnCompletion: State.ResearchSliceComplete);
+        var chain = new PendingChain(checked(State.Revision + 1), links, Other(committed[^1].Player));
         events.Add(new ChainResponseRequested(chain.Responder, chain.DecisionId));
         return Accept(next.WithChain(chain), events.ToArray());
     }

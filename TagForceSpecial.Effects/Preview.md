@@ -39,8 +39,8 @@ Redirect imported manifests and scenario logs into an ignored local folder; they
 contain local card text. `card-support` records original text, IDs/provenance,
 conditions, operations, costs, choices, limits, tests and evidence separately for
 the preview and full pool (the full pool also includes the 665-card Normal Monster
-family and excludes 95 Tokens). Unreviewed cards remain unsupported; named research
-profiles remain partial. Unclassified effects require later family inventory.
+family and the five chain cards, and excludes 95 Tokens). Unreviewed cards
+remain unsupported. Unclassified effects require later family inventory.
 
 The reviewed cardinfo hash is
 `6cd21aa6ca4fb82289f329400c9645da0532bf5a5092a604bef4c3e1d82d9060`.

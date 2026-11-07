@@ -47,14 +47,21 @@ public sealed class NormalSpellTests
     internal static void EnterMain(DuelEngine engine)
     {
         Ok(engine, new ResolveDrawStep(engine.State.ActivePlayer));
-        Ok(engine, new ChangePhase(engine.State.ActivePlayer, DuelPhase.Main1));
+        Phase(engine, DuelPhase.Main1);
+    }
+
+    /// <summary>A phase change that passes any open window offered to the non-turn player.</summary>
+    internal static void Phase(DuelEngine engine, DuelPhase target)
+    {
+        Ok(engine, new ChangePhase(engine.State.ActivePlayer, target));
+        if (engine.State.OpenWindow is { } window) Ok(engine, new PassChainResponse(window.Responder, window.DecisionId));
     }
 
     internal static void Next(DuelEngine engine)
     {
         var actor = engine.State.ActivePlayer;
-        if (engine.State.Phase == DuelPhase.Battle) Ok(engine, new ChangePhase(actor, DuelPhase.Main2));
-        Ok(engine, new ChangePhase(actor, DuelPhase.End));
+        if (engine.State.Phase == DuelPhase.Battle) Phase(engine, DuelPhase.Main2);
+        Phase(engine, DuelPhase.End);
         while (engine.State.GetPlayer(actor).Hand.Count > 6)
             Ok(engine, new DiscardForHandLimit(actor, engine.State.GetPlayer(actor).Hand[^1].InstanceId));
         Ok(engine, new EndTurn(actor));
@@ -73,13 +80,15 @@ public sealed class NormalSpellTests
         return events;
     }
 
-    private static DuelEngine Engine(uint card, ChainOperation? response = null)
+    /// <summary>The opponent's set probe 90001 is a negation probe or, with <paramref name="destroyResponse"/>, a targeted destruction Trap.</summary>
+    private static DuelEngine Engine(uint card, ChainOperation? response = null, bool destroyResponse = false)
     {
         var rules = PlayablePreview.Rules.ToDictionary();
         rules[90001] = new(CardCategory.Trap, AllowsSpellTrapSet: true);
         var deck = new uint[] { card, 4012, 4030, 4032, 4033 }.Concat(Enumerable.Repeat(card, 35));
         return new(Catalog(), rules, deck, new uint[] { 90001, 4012, 4030, 4032, 4033 }.Concat(Enumerable.Repeat(4012u, 35)),
-            effectDefinitions: PlayablePreview.Definitions,
+            effectDefinitions: destroyResponse ? [.. PlayablePreview.Definitions, new("synthetic-destroy", 90001, EffectKind.NormalTrap,
+                [new DestroyTargetStep()], target: new SpellTrapOnFieldTarget())] : PlayablePreview.Definitions,
             experimentalChainResponses: response is { } operation ? [new("synthetic-response", 90001, operation, ChainSpellSpeed.Three)] : []);
     }
 
@@ -156,7 +165,7 @@ public sealed class NormalSpellTests
         foreach (var row in Spells())
         {
             uint id = (uint)row[0]; int amount = (int)row[1]; bool recovery = (bool)row[2];
-            var e = Engine(id, ChainOperation.DestroyBoundSpellTrap); EnterMain(e); Next(e);
+            var e = Engine(id, destroyResponse: true); EnterMain(e); Next(e);
             Ok(e, new SetSpellTrap(PlayerId.Two, e.State.GetPlayer(PlayerId.Two).Hand[0].InstanceId, 0));
             Next(e);
             var spell = e.State.GetPlayer(PlayerId.One).Hand.First(c => c.GameCardId == id);

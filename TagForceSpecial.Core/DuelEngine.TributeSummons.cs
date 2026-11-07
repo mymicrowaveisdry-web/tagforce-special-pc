@@ -26,6 +26,7 @@ public sealed partial class DuelEngine
         if (level == 0 || procedure is null && level < 5 && catalog[card.GameCardId].Statistics.Level < 5)
             return Reject(DuelError.UnsupportedMonsterLevel);
         if (State.NormalSummonUsed) return Reject(DuelError.NormalSummonLimitReached);
+        if (!command.FaceDown && IsSummonLocked(State, player.Id)) return Reject(DuelError.SummonLocked);
         int count = procedure?.TributeCount ?? (level <= 4 ? 0 : level <= 6 ? 1 : 2);
         var selected = command.Tributes;
         if (selected.Count != count || selected.Any(t => t is null || t.Player != command.Player ||

@@ -15,8 +15,7 @@ public sealed partial class DuelEngine
         bool ValidMaterial(uint id, bool ritual) => rules.TryGetValue(id, out var r) && r.Category == CardCategory.Monster &&
             (ritual ? r.AllowsTributeForSummon && catalog[id].Statistics.Level > 0 && !IsXyzId(id) : r.AllowsSummonMaterial);
         if (all.Any(p => p is null || !rules.TryGetValue(p.SpellCardId, out var source) || source.Category != CardCategory.Spell ||
-                spellEffects.ContainsKey(p.SpellCardId) || activationContracts.ContainsKey(p.SpellCardId) ||
-                chainEffects.ContainsKey(p.SpellCardId) || chainResponses.ContainsKey(p.SpellCardId) ||
+                chainResponses.ContainsKey(p.SpellCardId) ||
                 battleResponses.ContainsKey(p.SpellCardId) || reserved.Contains(p.EffectId) ||
                 p.FusionRecipes.Any(r => !ValidTarget(r.TargetCardId, p) || r.MaterialCardIds.Any(id => !ValidMaterial(id, false))) ||
                 p.RitualRecipes.Any(r => !ValidTarget(r.TargetCardId, p) || catalog[r.TargetCardId].Statistics.Level != r.RequiredLevel ||
@@ -107,7 +106,7 @@ public sealed partial class DuelEngine
         slots[zone] = new(spell, true, placement);
         var receipt = new CommittedActivation(player.Id, profile.EffectId, spell, zone, null, null);
         var link = new ChainLink(1, receipt, placement, ChainOperation.EffectSummon);
-        var chain = new PendingChain(placement, [link], Other(player.Id), freezeOnCompletion: false);
+        var chain = new PendingChain(placement, [link], Other(player.Id));
         var next = State.With(player: player.With(hand: player.Hand.Where(c => c != spell), spellTraps: slots))
             .WithCommittedActivation(receipt).WithChain(chain);
         return Accept(next, new SpellActivated(player.Id, profile.EffectId, spell, zone), new ActivationCommitted(receipt),

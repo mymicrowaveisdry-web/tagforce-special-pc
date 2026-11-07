@@ -37,7 +37,7 @@ public sealed partial class DuelEngine
         var link = new ChainLink((chain?.Links.Count ?? 0) + 1, receipt, source.PlacementId, ChainOperation.BattleResponse,
             profile.SpellSpeed, BattleEffect: profile, BattleAttackId: attack?.Id, BattleTarget: binding,
             BattleSummonCard: summon, BattleMonsterZone: monsterZone);
-        var nextChain = new PendingChain(checked(State.Revision + 1), (chain?.Links ?? []).Append(link), Other(actor), freezeOnCompletion: false);
+        var nextChain = new PendingChain(checked(State.Revision + 1), (chain?.Links ?? []).Append(link), Other(actor));
         var window = battle.Window with { ConsecutivePasses = 0, Responder = Other(actor) };
         return Accept(State.With(player: player.With(spellTraps: fields)).WithBattle(battle with { Window = window }).WithChain(nextChain),
             new ChainResponseActivated(actor, profile.EffectId, source.Card, zone), new ActivationCommitted(receipt),

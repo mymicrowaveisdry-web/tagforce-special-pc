@@ -21,16 +21,44 @@ public static class CardSupportInventory
         var catalogIds = catalog.Cards.Select(c => c.GameCardId).ToHashSet();
         bool fullFamilyCatalog = normalMonsters.IsSubsetOf(catalogIds);
         if (fullFamilyCatalog) NormalMonsterFamily.ValidateCatalog(catalog);
-        var researchCards = new Dictionary<uint, string>
+        // The 10C-2 batch is claimed only for a catalog holding its cards, Tokens and every reviewed summon target.
+        var chainCards = ChainCardFamily.Cards.ToDictionary(c => c.CardId);
+        bool fullChainCatalog = chainCards.Keys.Concat(ChainCardFamily.SheepTokenIds)
+            .Concat(ChainCardFamily.LevelThreeOrLowerPsychicIds).All(catalogIds.Contains);
+        if (fullChainCatalog) ChainCardFamily.ValidateCatalog(catalog);
+        string[] chainTests = ["ChainCardFamilyTests", "ChainInteractionTests", "DuelChainTests", "EmergencyTeleportTests",
+            "EmergencyTeleportLifecycleTests", "ChainCardFamilyLocalReferenceTests"];
+        // Preview manifest entries keep the preview contract; the release manifest uses the wider family contracts.
+        object Entry(CardDefinition c) =>
+            fullFamilyCatalog && normalMonsters.Contains(c.GameCardId) ? FamilyEntry(c)
+            : fullChainCatalog && chainCards.TryGetValue(c.GameCardId, out var chain)
+                ? DefinitionEntry(c, chain, ChainCardFamily.FamilyId, ChainCardFamily.BatchId, chainTests,
+                    "decoded-metadata; synthetic-rule-test; retained-psp-projection")
+            : PreviewEntry(c);
+        object DefinitionEntry(CardDefinition c, DefinitionCardProfile p, string family, string batch, string[] tests, string evidenceClass) => new
         {
-            [7747] = "Emergency Teleport: bounded Deck Krebons lifecycle; hand targets, shuffle and general continuation remain incomplete.",
-            [5217] = "Lightning Vortex: bounded discard/face-up destruction research; full effect interactions not accepted.",
-            [4909] = "Mystical Space Typhoon: bounded targeting and set response; general Quick-Play windows not accepted.",
-            [4818] = "Scapegoat: retained targeted-response experiment; general activation and token lifecycle incomplete.",
-            [4862] = "Magic Jammer: explicit discard allowlist; full card contract and comparison not accepted."
+            c.GameCardId, c.Name, c.Source, c.SourceRow, c.Statistics,
+            originalEraText = c.Description,
+            rulingBasis = "Imported local source text; default original-era chain and timing rules. No later errata inferred.",
+            behaviorFamily = family,
+            status = "supported",
+            scope = batch,
+            operation = p.Operation,
+            conditions = p.Conditions,
+            costs = p.Costs,
+            targets = p.Targets,
+            choices = p.Choices,
+            limits = p.Limits,
+            exceptions = p.Exceptions,
+            negationAndCleanup = p.NegationAndCleanup,
+            tests,
+            pspVerified = false,
+            pspEvidenceIds = Array.Empty<string>(),
+            evidenceClass,
+            staticEvidenceIds = p.StaticEvidenceIds,
+            missingEvidence = "Independent original-game runtime observations for each interaction scope.",
+            gaps = p.Gaps
         };
-        // Preview manifest entries keep the preview contract; the release manifest uses the wider family contract.
-        object Entry(CardDefinition c) => fullFamilyCatalog && normalMonsters.Contains(c.GameCardId) ? FamilyEntry(c) : PreviewEntry(c);
         object FamilyEntry(CardDefinition c) => new
         {
             c.GameCardId, c.Name, c.Source, c.SourceRow, c.Statistics,
@@ -68,8 +96,8 @@ public static class CardSupportInventory
                 c.GameCardId, c.Name, c.Source, c.SourceRow, c.Statistics,
                 originalEraText = c.Description,
                 rulingBasis = "Imported local source text; default original-era basic duel rules. No later errata inferred.",
-                behaviorFamily = profile?.Family ?? (researchCards.ContainsKey(c.GameCardId) ? "bounded-research-profile" : "unclassified"),
-                status = profile is not null ? "supported" : researchCards.ContainsKey(c.GameCardId) ? "partial" : "unsupported",
+                behaviorFamily = profile?.Family ?? "unclassified",
+                status = profile is not null ? "supported" : "unsupported",
                 scope = PlayablePreview.ManifestId,
                 operation = profile?.Contract,
                 conditions = profile?.Spell is not null ? "Own Main Phase, open state, valid source and back-row slot." : profile is not null ? "Ordinary level 1–4 monster procedures." : null,
@@ -85,8 +113,7 @@ public static class CardSupportInventory
                 evidenceClass = profile is not null ? "decoded-metadata; synthetic-rule-test" : "decoded-metadata",
                 staticEvidenceIds = profile?.Spell is not null ? new[] { "stage10-toolkit-lp-table-2026-11-01", "stage10-toolkit-handler-2026-11-01" } : [],
                 missingEvidence = "Independent original-game runtime observations for this card and interaction scope.",
-                gaps = profile is null ? new[] { researchCards.GetValueOrDefault(c.GameCardId,
-                    "Complete executable card contract and behavior tests are not reviewed for this release.") } : []
+                gaps = profile is null ? new[] { "Complete executable card contract and behavior tests are not reviewed for this release." } : []
             };
         }
         return new
@@ -105,11 +132,13 @@ public static class CardSupportInventory
                 cards = catalog.Cards.Where(c => !tokens.Contains(c.GameCardId)).Select(Entry).ToArray()
             },
             families = PlayablePreview.Cards.GroupBy(c => c.Family).Select(g => new { family = g.Key, cardIds = g.Select(c => c.CardId).ToArray() }),
-            familyBatches = fullFamilyCatalog
-                ? new[] { new { id = NormalMonsterFamily.BatchId, family = NormalMonsterFamily.FamilyId, cardIds = NormalMonsterFamily.CardIds.ToArray() } }
-                : [],
+            familyBatches = new[]
+                {
+                    fullFamilyCatalog ? new { id = NormalMonsterFamily.BatchId, family = NormalMonsterFamily.FamilyId, cardIds = NormalMonsterFamily.CardIds.ToArray() } : null,
+                    fullChainCatalog ? new { id = ChainCardFamily.BatchId, family = ChainCardFamily.FamilyId, cardIds = chainCards.Keys.Order().ToArray() } : null
+                }.OfType<object>().ToArray(),
             unclassifiedCardCount = catalog.Cards.Count(c => !tokens.Contains(c.GameCardId) && !preview.ContainsKey(c.GameCardId) &&
-                !(fullFamilyCatalog && normalMonsters.Contains(c.GameCardId))),
+                !(fullFamilyCatalog && normalMonsters.Contains(c.GameCardId)) && !(fullChainCatalog && chainCards.ContainsKey(c.GameCardId))),
             exampleDeck = PlayablePreview.ExampleDeck
         };
     }

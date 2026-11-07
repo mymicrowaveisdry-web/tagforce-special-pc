@@ -16,7 +16,7 @@ public sealed class SummonProfileTests
         IEnumerable<SummonWindowProfile>? windows = null, IEnumerable<SummonNegationProfile>? negations = null,
         IEnumerable<ChainResponseProfile>? responses = null, IEnumerable<TriggerEffectProfile>? triggers = null,
         IEnumerable<ContinuousNegationProfile>? continuousNegations = null, bool eligible = true, bool secondHigh = false,
-        bool counterIsSpell = false)
+        bool counterIsSpell = false, IEnumerable<EffectDefinition>? definitions = null)
     {
         uint[] ids = [Low, High, Filler, Negate, Counter, Other];
         var catalog = new CardCatalog(new(null, "synthetic-summon-profiles"), ids.Select(id =>
@@ -31,7 +31,7 @@ public sealed class SummonProfileTests
         return new(catalog, rules, first, second, experimentalSummonLevelModifiers: levels,
             experimentalTributeProcedures: procedures, experimentalSummonWindows: windows,
             experimentalSummonNegations: negations, experimentalChainResponses: responses,
-            experimentalTriggerEffects: triggers, experimentalContinuousNegations: continuousNegations);
+            experimentalTriggerEffects: triggers, experimentalContinuousNegations: continuousNegations, effectDefinitions: definitions);
     }
 
     private static int Hand(DuelEngine e, uint id, PlayerId player = PlayerId.One) =>
@@ -280,8 +280,10 @@ public sealed class SummonProfileTests
     public void OnlyCounterSpeedNegationResponsesMayChainDuringThePendingSummon()
     {
         var e = Engine(windows: [new(High)], negations: [new("negate", Negate)],
-            responses: [new("too-slow", Counter, ChainOperation.NegateActivation, ChainSpellSpeed.Two),
-                new("move-target", Other, ChainOperation.DestroyBoundSpellTrap, ChainSpellSpeed.Three)]);
+            responses: [new("too-slow", Counter, ChainOperation.NegateActivation, ChainSpellSpeed.Two)],
+            // Card definitions do not answer summon windows yet, even at Spell Speed 3.
+            definitions: [new("definition-counter", Other, EffectKind.CounterTrap, [new NegateActivationStep(true)],
+                conditions: [new RespondsToSpellActivationCondition()])]);
         Prepare(e, donors: 2); Ok(e, Tribute(e, [0, 1])); NegateSummon(e);
         var chain = e.State.PendingChain!;
         Reject(e, new ActivateChainResponse(PlayerId.One, chain.DecisionId, 0), DuelError.ChainResponseSpeedNotAllowed);

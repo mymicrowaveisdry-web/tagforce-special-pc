@@ -5,7 +5,10 @@ using static TagForceSpecial.Tests.DuelChainTests;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Repeated retained native success projections; not general priority/negation equivalence.</summary>
+/// <summary>
+/// Repeated retained native success projections, reached through the shared card definitions; not general
+/// priority/negation equivalence.
+/// </summary>
 [Trait("Category", "LocalReference")]
 public sealed class ChainReferenceTests
 {
@@ -64,7 +67,8 @@ public sealed class ChainReferenceTests
         Compare("tokensResolved");
         Resolve(engine);
         Compare("resolved");
-        Assert.True(engine.State.ResearchSliceComplete);
+        Assert.False(engine.State.ResearchSliceComplete); // the duel continues; Scapegoat locked Player Two's other summons this turn
+        Assert.Equal(PlayerId.Two, Assert.Single(engine.State.SummonLocks).Player);
         Assert.Null(engine.State.Outcome);
         Assert.Equal(initial.NormalSummonUsed, engine.State.NormalSummonUsed);
         Assert.Equal(initial.GetPlayer(PlayerId.One).LifePoints, engine.State.GetPlayer(PlayerId.One).LifePoints);
