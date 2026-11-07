@@ -5,7 +5,7 @@ namespace TagForceSpecial.PC.Setup;
 /// <summary>Schema 2 adds the original Options values; schema 1 files load with new-game defaults for them.</summary>
 public sealed record PlayerProfile(int SchemaVersion, string Name, DuelistLevelChoice Level, DateTimeOffset SavedUtc, PlayerOptions? Options = null);
 
-/// <summary>Native PC profile only. Original PSP DATA0 files are encrypted and are neither read nor written here.</summary>
+/// <summary>PC player profile store; game save files are neither read nor written.</summary>
 public sealed class PlayerProfileStore(PrivateStorage storage)
 {
     public const int CurrentSchema = 2;

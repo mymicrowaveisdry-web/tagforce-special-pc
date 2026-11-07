@@ -1,9 +1,7 @@
 namespace TagForceSpecial.Core;
 
 /// <summary>
-/// Trusted, default-off research negation probes for previously set cards: open chains, registered trigger
-/// chains, battle windows and summon windows. Card effects use <see cref="EffectDefinition"/>; these probes stay
-/// until definitions cover battle and summon windows. Not a card-text interpreter or protection contract.
+/// Default-off negation responses for set cards in open chains, trigger chains, battle and summon windows.
 /// </summary>
 public sealed class ChainResponseProfile
 {

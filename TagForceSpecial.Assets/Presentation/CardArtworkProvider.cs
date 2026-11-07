@@ -4,8 +4,7 @@ namespace TagForceSpecial.Assets.Presentation;
 
 public sealed record CardArtwork(string AssetKey, int Width, int Height, byte[] Rgba, string AlphaUsage = "straight");
 
-/// <summary>Exact resource lookup. Full artwork never substitutes a thumbnail.
-/// CPJ full-art normalization has separate source and decoder provenance.</summary>
+/// <summary>Exact artwork lookup; full artwork never substitutes a thumbnail.</summary>
 public sealed class CardArtworkProvider(PresentationPackage package)
 {
     public static string FullArtKey(uint cardId) => "card.art.full." + cardId.ToString(CultureInfo.InvariantCulture);

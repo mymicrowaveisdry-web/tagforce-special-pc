@@ -32,7 +32,7 @@ internal static class EventEffectScenario
             effectDefinitions: [SpecialProbe, .. ChainCards(5217, 4909, 4818)], shuffleSeed: 1);
     }
 
-    /// <summary>Synthetic Normal Spell: Special Summon A from the Deck, banished in the End Phase.</summary>
+    /// <summary>Normal Spell that Special Summons A from the Deck, banished in the End Phase.</summary>
     internal static EffectDefinition SpecialProbe { get; } = new("special-probe", SummonSpell, EffectKind.NormalSpell,
         [new SpecialSummonStep(SpecialSummonSources.Deck, [A], banishAtEndPhase: true)]);
 

@@ -5,7 +5,7 @@ public enum SpecialSummonSources { None = 0, Hand = 1, Deck = 2, Graveyard = 4, 
 public enum SummonMethod { Normal, Set, Flip, SpecialEffect, SpecialProcedure, Token, Pendulum }
 public enum SummonStatus { Pending, Completed, Negated }
 
-/// <summary>Latest summon/placement attempt per instance, with retained proper-procedure eligibility.</summary>
+/// <summary>Latest summon attempt per instance, with its proper-procedure eligibility.</summary>
 public sealed record SummonRecord(long AttemptId, PlayerId Player, CardInstance Card, int MonsterZone,
     BattlePosition Position, SummonMethod Method, DecisionCardSource? Source, SummonStatus Status,
     int TurnNumber, long? CompletedOnRevision, long? PlacementId, string? ProcedureId, string? ProperProcedureId);

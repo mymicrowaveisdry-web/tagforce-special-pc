@@ -56,7 +56,7 @@ public sealed partial class DuelEngine
                         null, SummonStatus.Completed, e.Monster.PlacementId);
                     break;
             }
-        // A return to a private origin ends retained proper-summon eligibility, even before another summon.
+        // Returning to a private zone ends proper-summon eligibility.
         var privateCards = next.Players.SelectMany(p => p.Hand.Concat(p.Deck).Concat(p.ExtraDeck)).ToHashSet();
         for (int i = 0; i < history.Count; i++)
             if (history[i].ProperProcedureId is not null && privateCards.Contains(history[i].Card))

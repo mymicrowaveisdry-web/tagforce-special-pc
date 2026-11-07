@@ -1,10 +1,6 @@
 namespace TagForceSpecial.Assets;
 
-/// <summary>
-/// Numeric attack extraction after the original EBOOT.BIN getter at 0x0881F334
-/// has resolved a card's property record. Does not reconstruct card-ID lookup,
-/// invalid-ID handling, register behavior, or PSP machine-code bytes.
-/// </summary>
+/// <summary>Reads a card's attack from a resolved property record.</summary>
 public static class CardAttackGetter
 {
     public static int FromPropertyWord(uint word0)

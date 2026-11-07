@@ -3,7 +3,7 @@ namespace TagForceSpecial.Core;
 /// <summary>How a chain link resolves. Card effects resolve as <see cref="Definition"/> steps.</summary>
 public enum ChainOperation
 {
-    /// <summary>Research negation probes (<see cref="ChainResponseProfile"/>) only.</summary>
+    /// <summary>Negation responses (<see cref="ChainResponseProfile"/>).</summary>
     NegateActivation, NegateEffect,
     TriggerEffect, BattleResponse, SummonNegation, EffectSummon, ActivatePendulumScale,
     /// <summary>Resolves the ordered steps of the link's <see cref="EffectDefinition"/>.</summary>
@@ -11,7 +11,7 @@ public enum ChainOperation
 }
 public enum ChainSpellSpeed { One = 1, Two = 2, Three = 3 }
 public enum ChainNegation { None, Effect, Activation }
-public enum ChainSkipReason { ActivationNegated, EffectNegated, TargetUnavailable, SourceEffectsNegated, SummonUnavailable }
+public enum ChainSkipReason { ActivationNegated, EffectNegated, TargetUnavailable, SourceEffectsNegated, SummonUnavailable, NoMatchingCard }
 
 public sealed record ChainLink(int Number, CommittedActivation Activation, long SourcePlacementId,
     ChainOperation Operation, ChainSpellSpeed SpellSpeed = ChainSpellSpeed.One,
@@ -35,11 +35,15 @@ public sealed class PendingChain
     /// <summary>Zero means response window; otherwise the next link to resolve, in reverse order.</summary>
     public int NextLink { get; }
     public PendingEffectSummon? SummonDecision { get; }
+    private readonly PendingDefinitionChoice? definitionChoice;
     /// <summary>A definition step paused for its resolution-time Special Summon choice.</summary>
-    public PendingDefinitionSummon? DefinitionSummon { get; }
+    public PendingDefinitionSummon? DefinitionSummon => definitionChoice as PendingDefinitionSummon;
+    /// <summary>A definition step paused for its resolution-time Deck card choice.</summary>
+    public PendingDefinitionCardChoice? DefinitionCardChoice => definitionChoice as PendingDefinitionCardChoice;
+    internal PendingDefinitionChoice? DefinitionChoice => definitionChoice;
     internal PendingChain(long decisionId, IEnumerable<ChainLink> links, PlayerId responder,
         int consecutivePasses = 0, int nextLink = 0, PendingEffectSummon? summonDecision = null,
-        PendingDefinitionSummon? definitionSummon = null)
+        PendingDefinitionChoice? definitionChoice = null)
     {
         DecisionId = decisionId;
         Links = Array.AsReadOnly(links.ToArray());
@@ -47,7 +51,7 @@ public sealed class PendingChain
         ConsecutivePasses = consecutivePasses;
         NextLink = nextLink;
         SummonDecision = summonDecision;
-        DefinitionSummon = definitionSummon;
+        this.definitionChoice = definitionChoice;
     }
 }
 

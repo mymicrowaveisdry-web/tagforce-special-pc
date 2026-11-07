@@ -21,7 +21,7 @@ public static class CardSupportInventory
         var catalogIds = catalog.Cards.Select(c => c.GameCardId).ToHashSet();
         bool fullFamilyCatalog = normalMonsters.IsSubsetOf(catalogIds);
         if (fullFamilyCatalog) NormalMonsterFamily.ValidateCatalog(catalog);
-        // The 10C-2 batch is claimed only for a catalog holding its cards, Tokens and every reviewed summon target.
+        // A family counts as supported only when the catalog holds all its cards and listed IDs.
         var chainCards = ChainCardFamily.Cards.ToDictionary(c => c.CardId);
         bool fullChainCatalog = chainCards.Keys.Concat(ChainCardFamily.SheepTokenIds)
             .Concat(ChainCardFamily.LevelThreeOrLowerPsychicIds).All(catalogIds.Contains);
@@ -29,8 +29,13 @@ public static class CardSupportInventory
         var lifePointCards = LifePointFamily.Cards.ToDictionary(c => c.CardId);
         bool fullLifePointCatalog = lifePointCards.Keys.All(catalogIds.Contains);
         if (fullLifePointCatalog) LifePointFamily.ValidateCatalog(catalog);
+        var deckCards = DeckOperationFamily.Cards.ToDictionary(c => c.CardId);
+        bool fullDeckCatalog = deckCards.Keys.Concat(DeckOperationFamily.PolymerizationIds).Concat(DeckOperationFamily.CatIds)
+            .Concat(DeckOperationFamily.FieldSpellIds).Concat(DeckOperationFamily.HighLevelNormalMonsterIds).All(catalogIds.Contains);
+        if (fullDeckCatalog) DeckOperationFamily.ValidateCatalog(catalog);
         string[] chainTests = ["ChainCardFamilyTests", "ChainInteractionTests", "DuelChainTests", "EmergencyTeleportTests",
             "EmergencyTeleportLifecycleTests", "ChainCardFamilyLocalReferenceTests"];
+        string[] deckTests = ["DeckOperationFamilyTests", "DeckOperationFamilyLocalReferenceTests"];
         string[] lifePointTests = ["LifePointFamilyTests", "LifePointFamilyLocalReferenceTests", "NormalSpellTests"];
         // Preview manifest entries keep the preview contract; the release manifest uses the wider family contracts.
         object Entry(CardDefinition c) =>
@@ -41,6 +46,8 @@ public static class CardSupportInventory
             : fullLifePointCatalog && lifePointCards.TryGetValue(c.GameCardId, out var life)
                 ? DefinitionEntry(c, life, LifePointFamily.FamilyId, LifePointFamily.BatchId, lifePointTests,
                     life.StaticEvidenceIds.Count != 0 ? "decoded-metadata; static-psp-interpretation; synthetic-rule-test" : "decoded-metadata; synthetic-rule-test")
+            : fullDeckCatalog && deckCards.TryGetValue(c.GameCardId, out var deck)
+                ? DefinitionEntry(c, deck, DeckOperationFamily.FamilyId, DeckOperationFamily.BatchId, deckTests, "decoded-metadata; synthetic-rule-test")
             : PreviewEntry(c);
         object DefinitionEntry(CardDefinition c, DefinitionCardProfile p, string family, string batch, string[] tests, string evidenceClass) => new
         {
@@ -143,11 +150,13 @@ public static class CardSupportInventory
                 {
                     fullFamilyCatalog ? new { id = NormalMonsterFamily.BatchId, family = NormalMonsterFamily.FamilyId, cardIds = NormalMonsterFamily.CardIds.ToArray() } : null,
                     fullChainCatalog ? new { id = ChainCardFamily.BatchId, family = ChainCardFamily.FamilyId, cardIds = chainCards.Keys.Order().ToArray() } : null,
-                    fullLifePointCatalog ? new { id = LifePointFamily.BatchId, family = LifePointFamily.FamilyId, cardIds = lifePointCards.Keys.Order().ToArray() } : null
+                    fullLifePointCatalog ? new { id = LifePointFamily.BatchId, family = LifePointFamily.FamilyId, cardIds = lifePointCards.Keys.Order().ToArray() } : null,
+                    fullDeckCatalog ? new { id = DeckOperationFamily.BatchId, family = DeckOperationFamily.FamilyId, cardIds = deckCards.Keys.Order().ToArray() } : null
                 }.OfType<object>().ToArray(),
             unclassifiedCardCount = catalog.Cards.Count(c => !tokens.Contains(c.GameCardId) && !preview.ContainsKey(c.GameCardId) &&
                 !(fullFamilyCatalog && normalMonsters.Contains(c.GameCardId)) && !(fullChainCatalog && chainCards.ContainsKey(c.GameCardId)) &&
-                !(fullLifePointCatalog && lifePointCards.ContainsKey(c.GameCardId))),
+                !(fullLifePointCatalog && lifePointCards.ContainsKey(c.GameCardId)) &&
+                !(fullDeckCatalog && deckCards.ContainsKey(c.GameCardId))),
             exampleDeck = PlayablePreview.ExampleDeck
         };
     }

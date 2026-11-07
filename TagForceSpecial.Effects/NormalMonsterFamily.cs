@@ -5,9 +5,8 @@ using TagForceSpecial.Core;
 namespace TagForceSpecial.Effects;
 
 /// <summary>
-/// Stage 10C-1 family: every reviewed effect-free Normal Monster. Ordinary Normal Summon/Set (Level 1–4),
-/// Tribute Summon/Set (5–6: one, 7–8: two), being Tributed, flip, position change, basic battle and Graveyard
-/// movement. Synthetic rule tests and decoded metadata only; no PSP observation is claimed.
+/// Every effect-free Normal Monster: Normal or Tribute Summon/Set by Level, being Tributed, flip, position change and
+/// basic battle.
 /// </summary>
 public static class NormalMonsterFamily
 {

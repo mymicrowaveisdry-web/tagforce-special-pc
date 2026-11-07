@@ -4,12 +4,12 @@ using TagForceSpecial.Effects;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Synthetic command contracts using independently authored printed values, not PSP observations.</summary>
+/// <summary>Normal Spell command tests with authored printed values.</summary>
 public sealed class NormalSpellTests
 {
     internal static CardCatalog Catalog()
     {
-        // Independent authored fixture values; production definitions now come exclusively from Cards packages.
+        // Authored fixture values.
         (uint Id, string Name, int Attack, int Defense, uint Level)[] rows =
         [
             (4012, "Feral Imp", 1300, 1400, 4), (4030, "Skull Servant", 300, 200, 1),
@@ -269,7 +269,7 @@ public sealed class NormalSpellTests
     [Fact]
     public void MultiStepDefinitionsResolveInOrderAndStopAtTerminalDamage()
     {
-        // Synthetic two-step Normal Spell on the 4352 card slot: gain then burn; a second burn never runs after defeat.
+        // Two-step Normal Spell on the 4352 card slot: gain then burn; a second burn never runs after defeat.
         var twoStep = new EffectDefinition("synthetic-two-step", 4352, EffectKind.NormalSpell,
             [new GainLifePointsStep(300), new DealDamageStep(8000), new DealDamageStep(100)]);
         var e = new DuelEngine(Catalog(), PlayablePreview.Rules, new uint[] { 4352 }.Concat(Enumerable.Repeat(4012u, 39)),

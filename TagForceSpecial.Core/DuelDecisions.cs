@@ -52,10 +52,7 @@ public sealed class DecisionStep
     public static DecisionStep SpellTrapTarget() => new(DecisionKind.SpellTrapTarget, null, [], []);
 }
 
-/// <summary>
-/// Explicit engine configuration for a selection-only workflow, not caller-supplied command data.
-/// By default completion freezes the research slice without manufacturing a duel outcome.
-/// </summary>
+/// <summary>Engine configuration for a selection-only workflow. Completion freezes the duel by default.</summary>
 public sealed class DecisionSequence
 {
     public string Id { get; }

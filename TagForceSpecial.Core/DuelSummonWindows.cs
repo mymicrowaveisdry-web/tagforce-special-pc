@@ -1,6 +1,6 @@
 namespace TagForceSpecial.Core;
 
-/// <summary>The target is committed to an attempt but is not yet a field monster.</summary>
+/// <summary>A summon target committed to an attempt but not on the field.</summary>
 public sealed record PendingSummon(long AttemptId, long DecisionId, PlayerId Player,
     CardInstance Card, int MonsterZone, PlayerId Responder, int ConsecutivePasses = 0,
     bool Negated = false, bool IsSpecialSummon = false, DecisionCardSource Source = DecisionCardSource.Hand,

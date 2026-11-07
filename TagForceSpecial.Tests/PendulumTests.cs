@@ -5,7 +5,7 @@ using static TagForceSpecial.Tests.EventEffectScenario;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Synthetic original-era generic contracts; no native or real-card verification.</summary>
+/// <summary>Pendulum tests.</summary>
 public sealed class PendulumTests
 {
     private const uint Left = 200_001, Right = 200_002, Pend = 200_003, Ordinary = 200_004,

@@ -5,7 +5,7 @@ using static TagForceSpecial.Tests.EventEffectScenario;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Authored profiles and procedural timing tests, not PSP gameplay comparisons.</summary>
+/// <summary>Summon profile and procedure timing tests.</summary>
 public sealed class SummonProfileTests
 {
     private const uint Low = uint.MaxValue - 1, High = uint.MaxValue, Filler = 100_000;

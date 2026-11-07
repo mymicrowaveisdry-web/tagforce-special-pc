@@ -5,7 +5,7 @@ using static TagForceSpecial.Tests.EventEffectScenario;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Synthetic foundation scenarios reached through legal commands; no PSP summon-procedure claim.</summary>
+/// <summary>Special Summon foundation scenarios reached through legal commands.</summary>
 public sealed class SpecialSummonFoundationTests
 {
     private const uint Target = uint.MaxValue, Alternative = uint.MaxValue - 1, Low = 1, Spell = 10, Negate = 20, Counter = 21;

@@ -7,7 +7,7 @@ namespace TagForceSpecial.Effects;
 public sealed record PreviewCard(uint CardId, string Family,
     string Contract, EffectDefinition? Spell = null);
 
-/// <summary>Stage 10B's explicit original-card pool. Synthetic validation and PSP fidelity are separate.</summary>
+/// <summary>The 14-card preview pool.</summary>
 public static class PlayablePreview
 {
     public const string ManifestId = "tfsp-playable-preview-10b-v1";

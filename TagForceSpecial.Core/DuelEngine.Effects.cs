@@ -12,12 +12,8 @@ public sealed partial class DuelEngine
     private enum ActivationContext { Hand, OwnSetCard, OpenWindow, ChainResponse, HandChainResponse }
 
     /// <summary>
-    /// The single legality check for definition activations (no mutation). Timing first — hand: Normal or
-    /// Quick-Play Spell, own Main Phase; own set card: Normal Spell any time, Quick-Play/Normal Trap not the turn it
-    /// was set, Counter Trap never in open state; open window: the non-turn player's set Quick-Play/Normal Trap;
-    /// chain response: set, not Normal Spell, not the turn it was set, Spell Speed at least that of the preceding
-    /// link; hand chain response: the turn player's Quick-Play. Then conditions, the summon lock, and that every
-    /// cost, target and summon choice is answerable.
+    /// The single activation legality check for definitions: timing by context, then conditions, the summon lock and
+    /// answerable choices. Does not mutate state.
     /// </summary>
     private DuelError DefinitionActivationError(EffectDefinition definition, ActivationContext context, PlayerId player,
         CardInstance card, FieldSpellTrap? source, ChainLink? preceding = null)
@@ -71,6 +67,19 @@ public sealed partial class DuelEngine
             return DuelError.DecisionUnavailable;
         if (definition.Steps.OfType<SpecialSummonStep>().Any(s => !SpecialSummonOptions(State, playerId, s, card).Any()))
             return DuelError.DecisionUnavailable;
+        // Deck operations need enough cards now; a choice needs a matching card.
+        foreach (var step in definition.Steps)
+        {
+            bool unavailable = step switch
+            {
+                DrawCardsStep draw => DrawingPlayers(playerId, draw.Players).Any(p => State.GetPlayer(p).Deck.Count < draw.Count),
+                MillTopOfDeckStep mill => player.Deck.Count < mill.Count,
+                AddFromDeckToHandStep search => !DeckMatches(State, playerId, search.Filter).Any(),
+                SendFromDeckToGraveyardStep send => !DeckMatches(State, playerId, send.Filter).Any(),
+                _ => false
+            };
+            if (unavailable) return DuelError.DecisionUnavailable;
+        }
         return DuelError.None;
     }
 
@@ -104,10 +113,7 @@ public sealed partial class DuelEngine
         return CommitDefinition(State, chain.Responder, source.Card, zone, definition, source, chain, []);
     }
 
-    /// <summary>
-    /// The turn player's Quick-Play Spell from the hand as the next chain link (caller checked responder and
-    /// decision ID). Battle and summon windows are later work.
-    /// </summary>
+    /// <summary>Activates the turn player's Quick-Play Spell from the hand as the next chain link.</summary>
     private DuelActionResult BeginHandDefinitionResponse(PendingChain chain, ActivateHandChainResponse command)
     {
         if (State.Battle is not null) return Reject(DuelError.UnsupportedBattleResponse);
@@ -126,11 +132,7 @@ public sealed partial class DuelEngine
         return CommitDefinition(State, player.Id, card, command.SpellTrapZone, definition, null, chain, []);
     }
 
-    /// <summary>
-    /// Commit: place or flip the source (one placement identity through cleanup). A definition with a cost or
-    /// target then asks its decisions (<see cref="AnswerDefinitionDecision"/>); otherwise its link is added at once.
-    /// All legality was checked before this point.
-    /// </summary>
+    /// <summary>Places or flips the source, then asks for cost and target decisions or adds the link at once.</summary>
     private DuelActionResult CommitDefinition(DuelState state, PlayerId playerId, CardInstance card, int zone,
         EffectDefinition definition, FieldSpellTrap? source, PendingChain? chain, DuelEvent[] lead)
     {
@@ -263,17 +265,35 @@ public sealed partial class DuelEngine
     /// Runs the link's steps in order from <paramref name="start"/>; stops at the first step that ends the duel.
     /// A Special Summon step without a <paramref name="choice"/> pauses the link for that choice.
     /// </summary>
-    private (DuelState State, PendingDefinitionSummon? Pause) ResolveDefinitionSteps(DuelState state, ChainLink[] links,
-        ChainLink link, int start, ChooseDefinitionSummon? choice, List<DuelEvent> events)
+    private (DuelState State, PendingDefinitionChoice? Pause) ResolveDefinitionSteps(DuelState state, ChainLink[] links,
+        ChainLink link, int start, DuelCommand? choice, List<DuelEvent> events)
     {
         var definition = definitions[link.Activation.Spell.GameCardId];
         var controller = link.Activation.Player;
         for (int i = start; i < definition.Steps.Count; i++)
         {
             var step = definition.Steps[i];
-            if (step is SpecialSummonStep summon)
+            if (step is AddFromDeckToHandStep or SendFromDeckToGraveyardStep)
             {
-                if (choice is null)
+                if (choice is not ChooseDefinitionCard picked)
+                {
+                    var filter = step is AddFromDeckToHandStep search ? search.Filter : ((SendFromDeckToGraveyardStep)step).Filter;
+                    var matches = DeckMatches(state, controller, filter).ToArray();
+                    if (matches.Length == 0)
+                    {
+                        events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
+                        continue;
+                    }
+                    return (state, new PendingDefinitionCardChoice(checked(State.Revision + 1), controller, definition.EffectId,
+                        link.Number, i, matches));
+                }
+                state = MoveChosenDeckCard(state, controller, picked.CardInstanceId, toHand: step is AddFromDeckToHandStep,
+                    definition.EffectId, events);
+                choice = null;
+            }
+            else if (step is SpecialSummonStep summon)
+            {
+                if (choice is not ChooseDefinitionSummon summonChoice)
                 {
                     var options = SpecialSummonOptions(state, controller, summon, link.Activation.Spell).ToArray();
                     if (options.Length == 0)
@@ -285,7 +305,7 @@ public sealed partial class DuelEngine
                     return (state, new PendingDefinitionSummon(checked(State.Revision + 1), controller, definition.EffectId,
                         link.Number, i, options, zones));
                 }
-                state = ApplySpecialSummon(state, link, summon, choice, definition.EffectId, events);
+                state = ApplySpecialSummon(state, link, summon, summonChoice, definition.EffectId, events);
                 choice = null;
             }
             else
@@ -300,11 +320,94 @@ public sealed partial class DuelEngine
                     DestroyTargetStep => DestroyTarget(state, link, events),
                     DestroyOpponentFaceUpMonstersStep => DestroyOpponentFaceUpMonsters(state, Other(controller), events),
                     NegateActivationStep negate => NegateLink(state, links, link, ChainNegation.Activation, negate.DestroySource, events),
+                    DrawCardsStep draw => DrawingPlayers(controller, draw.Players)
+                        .Aggregate(state, (s, p) => s.Outcome is null ? DrawCards(s, p, draw.Count, events) : s),
+                    MillTopOfDeckStep mill => MillTop(state, controller, mill.Count, definition.EffectId, events),
                     _ => throw new InvalidOperationException("Unsupported effect step.")
                 };
             if (state.Outcome is not null) break;
         }
         return (state, null);
+    }
+
+    private static IEnumerable<PlayerId> DrawingPlayers(PlayerId controller, EffectPlayers players) => players switch
+    {
+        EffectPlayers.Self => [controller],
+        EffectPlayers.Opponent => [Other(controller)],
+        _ => [controller, Other(controller)]
+    };
+
+    /// <summary>Deck cards matching a reviewed filter, in Deck order; cards without explicit rules never match.</summary>
+    private IEnumerable<CardInstance> DeckMatches(DuelState state, PlayerId playerId, CardFilter filter) =>
+        state.GetPlayer(playerId).Deck.Where(c => rules.TryGetValue(c.GameCardId, out var rule) && filter switch
+        {
+            CardIdFilter ids => ids.CardIds.Contains(c.GameCardId),
+            AnyMonsterFilter => rule.Category == CardCategory.Monster,
+            _ => false
+        });
+
+    /// <summary>Draws one card at a time; a player who must draw from an empty Deck loses at once.</summary>
+    private static DuelState DrawCards(DuelState state, PlayerId playerId, int count, List<DuelEvent> events)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            var player = state.GetPlayer(playerId);
+            if (player.Deck.Count == 0)
+            {
+                var outcome = new DuelOutcome(Other(playerId), playerId, DuelEndReason.UnableToDraw);
+                events.Add(new DuelEnded(outcome));
+                return state.With(outcome: outcome);
+            }
+            var card = player.Deck[0];
+            state = state.With(player: player.With(deck: player.Deck.Skip(1), hand: player.Hand.Append(card)));
+            events.Add(new CardDrawn(playerId, card));
+        }
+        return state;
+    }
+
+    private static DuelState MillTop(DuelState state, PlayerId playerId, int count, string effectId, List<DuelEvent> events)
+    {
+        var player = state.GetPlayer(playerId);
+        var sent = player.Deck.Take(count).ToArray();
+        state = state.With(player: player.With(deck: player.Deck.Skip(sent.Length)));
+        foreach (var card in sent)
+        {
+            var owner = state.GetPlayer(card.Owner);
+            state = state.With(player: owner.With(graveyard: owner.Graveyard.Append(card)));
+            events.Add(new CardSentFromDeckToGraveyard(playerId, card, effectId));
+        }
+        return state;
+    }
+
+    /// <summary>Moves the chosen Deck card (validated by the caller) to the hand (revealed) or Graveyard, then shuffles.</summary>
+    private static DuelState MoveChosenDeckCard(DuelState state, PlayerId playerId, int instanceId, bool toHand, string effectId,
+        List<DuelEvent> events)
+    {
+        var player = state.GetPlayer(playerId);
+        var card = player.Deck.Single(c => c.InstanceId == instanceId);
+        player = player.With(deck: player.Deck.Where(c => c != card));
+        if (toHand)
+        {
+            state = state.With(player: player.With(hand: player.Hand.Append(card)));
+            events.Add(new CardSearched(playerId, card, effectId));
+        }
+        else
+        {
+            state = state.With(player: player.With(graveyard: player.Graveyard.Append(card)));
+            events.Add(new CardSentFromDeckToGraveyard(playerId, card, effectId));
+        }
+        return ShuffleDeck(state, playerId, effectId, events);
+    }
+
+    private DuelActionResult AnswerDefinitionCardChoice(PendingChain chain, ChooseDefinitionCard command)
+    {
+        var pending = chain.DefinitionCardChoice!;
+        if (command.DecisionId != pending.DecisionId) return Reject(DuelError.StaleDecision);
+        if (command.Player != pending.Player) return Reject(DuelError.NotActivePlayer);
+        if (!pending.Options.Any(c => c.InstanceId == command.CardInstanceId) ||
+            !State.GetPlayer(pending.Player).Deck.Any(c => c.InstanceId == command.CardInstanceId))
+            return Reject(DuelError.InvalidDecisionChoice);
+        return ResolveChainLink(chain, definitionChoice: command);
     }
 
     /// <summary>Eligible hand cards first, then Deck cards (in order), each with at least one legal zone.</summary>
@@ -358,7 +461,7 @@ public sealed partial class DuelEngine
         return from == DecisionCardSource.Deck ? ShuffleDeck(state, controller, effectId, events) : state;
     }
 
-    /// <summary>Native Typhoon's validator returns without destroying an absent or different placement. No retargeting.</summary>
+    /// <summary>An absent or replaced target is neither destroyed nor retargeted.</summary>
     private DuelState DestroyTarget(DuelState state, ChainLink link, List<DuelEvent> events)
     {
         var target = link.Activation.Target ?? throw new InvalidOperationException("Target step without a bound target.");
@@ -395,8 +498,7 @@ public sealed partial class DuelEngine
     }
 
     /// <summary>
-    /// All or nothing, lowest free zones first (deliberate PC policy until a PSP observation exists). A summon
-    /// lock from another source skips the step; the activation's own lock never applies to it.
+    /// Summons all Tokens to the lowest free zones, or none. Skipped while another card's summon lock applies.
     /// </summary>
     private DuelState SummonTokens(DuelState state, ChainLink link, SummonTokensStep step, List<DuelEvent> events)
     {

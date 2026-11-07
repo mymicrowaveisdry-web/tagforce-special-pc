@@ -3,7 +3,7 @@ using System.Text;
 
 namespace TagForceSpecial.Assets.GameSource;
 
-/// <summary>Bounded read-only ISO9660 lookup for the pinned PSP image; no Joliet, CSO or multi-extent support.</summary>
+/// <summary>Read-only ISO9660 lookup without Joliet, CSO or multi-extent support.</summary>
 internal sealed class Iso9660Source
 {
     internal sealed record Entry(long Offset, long Length, bool Directory);

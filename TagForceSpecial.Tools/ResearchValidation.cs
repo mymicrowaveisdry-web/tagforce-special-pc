@@ -17,7 +17,7 @@ public sealed record CoverageScope(string Id, string Label, string ScopeVersion,
     CoverageCriterion[] Criteria);
 public sealed record CoverageManifest(int SchemaVersion, CoverageScope[] Scopes);
 
-/// <summary>Deterministic metadata checks; local mode also rehashes private evidence. Never awards native bytes.</summary>
+/// <summary>Deterministic metadata checks; local mode also rehashes private evidence files.</summary>
 public static class ResearchValidation
 {
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)

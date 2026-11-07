@@ -10,7 +10,7 @@ public sealed partial class GameLoop
 {
     private const int SmokeCycles = 5, HoldDraws = 90;
     private const string AnyState = "*";
-    // Every observed Continue/New Game branch, in PC keys: Enter = confirm, Escape = back, F1 = Start.
+    // Every Continue/New Game branch, in PC keys: Enter = confirm, Escape = back, F1 = Start.
     private static readonly (Keys? Key, string Expected)[] PresentationSteps = BuildPresentationSteps();
     private readonly Dictionary<int, string> presentationHashes = [];
     private byte[]? presentationPixels;
@@ -51,9 +51,9 @@ public sealed partial class GameLoop
         // Main Menu: every row, press wrap at both ends, each destination and its focus-keeping return.
         for (int row = 1; row < TitleFlow.MainMenuRows; row++) Press(Keys.Down, $"MainMenu/0/{row}");
         Press(Keys.Down, "MainMenu/0/0"); Press(Keys.Up, "MainMenu/0/7");
-        // Save Data leaves through both exits of the native prompt, always back on its own row.
+        // Save Data leaves through both exits of the prompt, back on its own row.
         Press(Keys.Enter, "SystemSavePrompt/0/7"); Press(Keys.Escape, "MainMenu/0/7");
-        // Observed: "Save completed." ignores confirm and closes with back.
+        // "Save completed." ignores confirm and closes with back.
         Press(Keys.Enter, "SystemSavePrompt/0/7"); Press(Keys.Enter, "SystemSaveDone/0/7"); Press(Keys.Enter, "SystemSaveDone/0/7"); Press(Keys.Escape, "MainMenu/0/7");
         for (int row = TitleFlow.MainMenuRows - 2; row >= 0; row--)
         {
@@ -69,7 +69,7 @@ public sealed partial class GameLoop
         // End-game question both ways.
         Press(Keys.Escape, "QuitQuestion/1/1"); Press(Keys.Enter, "MainMenu/0/1");
         Press(Keys.Escape, "QuitQuestion/1/1"); Press(Keys.Left, "QuitQuestion/0/1"); Press(Keys.Enter, "title");
-        // New Game with Back answers, then Create Yes and the native save prompt.
+        // New Game with Back answers, then Create Yes and the save prompt.
         Press(Keys.F1, "start:0"); Press(Keys.Enter, "NameEntry/0/0");
         Press(Keys.F1, "RulesQuestion/1/0"); Press(Keys.Escape, "DuelistLevel/0/0"); Press(Keys.Enter, "CreateQuestion/1/0");
         Press(Keys.Left, "CreateQuestion/0/0"); Press(Keys.Enter, "SystemSavePrompt/0/0");
@@ -82,8 +82,10 @@ public sealed partial class GameLoop
         return steps.ToArray();
     }
 
-    /// <summary>Options from the observed defaults (Duelist Level "Been there" from the route above): clamping, wrap, the cancel
-    /// question both ways, accept with the save question both ways, the kept session value, and an unchanged accept.</summary>
+    /// <summary>
+    /// Options from the defaults: clamping, wrap, the cancel question both ways, accept with the save question both
+    /// ways, the kept value and an unchanged accept.
+    /// </summary>
     private static void OptionsRoute(Action<Keys, string, string?> press)
     {
         void Press(Keys key, string expected) => press(key, expected, null);
@@ -179,8 +181,8 @@ public sealed partial class GameLoop
         }
     }
 
-    // Normal-speed route in a real window with synthetic keys: exercises fades, the entry sequence and the live background.
-    // It answers No to data creation, so it writes no profile.
+    // Normal-speed route in a real window with synthetic keys, covering fades, the entry sequence and the live
+    // background. Answers No to data creation, so it writes no profile.
     private static readonly (double At, Keys Key)[] RealtimeKeys =
     [
         (1, Keys.F1), (2, Keys.Enter), (4, Keys.F1), (5, Keys.Escape), (6, Keys.Enter), (7, Keys.Enter),

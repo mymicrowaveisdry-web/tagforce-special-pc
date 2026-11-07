@@ -11,9 +11,8 @@ public sealed partial class DuelEngine
         next = next.With(player: target.IsPendulumZone ? player.With(pendulumZones: zones) : player.With(spellTraps: zones));
         return SendFieldCardToGraveyard(next, target.Card, cause, events, activationNegated);
     }
-    // The single field-departure path. Caller removes the field placement. Destination and event semantics are
-    // chosen together, never inferred from a final GY diff. A Token goes to no zone: its cause event (e.g.
-    // MonsterDestroyed, MonsterTributed) is still emitted, marked Removed, then TokenRemoved.
+    // The single field-departure path; the caller removes the placement. A Token goes to no zone: its cause event is
+    // marked Removed, then TokenRemoved follows.
     private DuelState SendFieldCardToGraveyard(DuelState next, CardInstance card, DuelEvent cause,
         List<DuelEvent> events, bool activationNegated = false)
     {

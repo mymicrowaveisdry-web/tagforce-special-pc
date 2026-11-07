@@ -22,7 +22,7 @@ public sealed record GameCacheValidation(ValidatedGameCache? Cache, IReadOnlyLis
     public bool IsValid => Cache is not null && Diagnostics.Count == 0;
 }
 
-/// <summary>Early cache foundations. Copies pinned raw inputs/catalog only; asset conversion and setup UI are later work.</summary>
+/// <summary>Cache foundation that copies pinned raw inputs and the catalog only.</summary>
 public static class GameCache
 {
     private static readonly JsonSerializerOptions Json = new()

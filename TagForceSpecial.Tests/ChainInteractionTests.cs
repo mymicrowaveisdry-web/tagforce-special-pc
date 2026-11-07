@@ -6,9 +6,8 @@ using TagForceSpecial.Effects;
 namespace TagForceSpecial.Tests;
 
 /// <summary>
-/// Synthetic legal-command scenarios for the Mystical Space Typhoon, Lightning Vortex and Magic Jammer
-/// definitions. These are not original negation/interruption gameplay replays.
-/// Card 2 and card 3 are invented negation probes, not real-card support declarations.
+/// Legal-command chain scenarios for Mystical Space Typhoon, Lightning Vortex and Magic Jammer. Cards 2 and 3 are
+/// invented negation probes.
 /// </summary>
 public sealed class ChainInteractionTests
 {
@@ -378,7 +377,7 @@ public sealed class ChainInteractionTests
     [Fact]
     public void ResponseCostRemainsPaidWhileItsSeparateTargetDecisionWaits()
     {
-        // Synthetic costed-target Quick-Play on Typhoon's card; no probes or Magic Jammer.
+        // Costed-target Quick-Play on Typhoon's card, without probes or Magic Jammer.
         EffectDefinition costed = new("synthetic-costed-typhoon", 4909, EffectKind.QuickPlaySpell, [new DestroyTargetStep()],
             cost: new DiscardCost(), target: new SpellTrapOnFieldTarget());
         var engine = Engine(profiles: [], definitions: [costed, .. EventEffectScenario.ChainCards(5217)]);

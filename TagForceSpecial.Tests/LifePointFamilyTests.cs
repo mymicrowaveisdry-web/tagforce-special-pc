@@ -6,8 +6,7 @@ using static TagForceSpecial.Tests.NormalSpellTests;
 namespace TagForceSpecial.Tests;
 
 /// <summary>
-/// Synthetic wiring of the Stage 10C-3 LP batch through the production definitions. Expected LP changes are
-/// hand-authored from the card texts, never derived from the definitions under test.
+/// Life-point family wiring through the production definitions, with hand-authored expected LP changes.
 /// </summary>
 public sealed class LifePointFamilyTests
 {

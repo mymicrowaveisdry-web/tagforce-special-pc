@@ -4,7 +4,7 @@ namespace TagForceSpecial.PC.App.Screens.Title;
 
 public readonly record struct TitlePresentationState(bool ChoicesVisible, int Choice);
 
-/// <summary>Observed title prompt/choice route. Save loading/new-game work belongs to the application adapter.</summary>
+/// <summary>Title prompt and choice route; saving and loading belong to the application adapter.</summary>
 public sealed class TitleScreen(string screenId, bool choicesVisible, Action<TitlePresentationState> show,
     Action hide, Action continueRequested, Action newGameRequested, bool savePresent = true, Func<bool>? savePresentNow = null) : IGameScreen
 {
@@ -14,8 +14,7 @@ public sealed class TitleScreen(string screenId, bool choicesVisible, Action<Tit
     public void OnEnter(ScreenContext context, ScreenArguments arguments)
     {
         this.context = context;
-        // Original empty-profile capture focuses New Game; Continue remains selectable and reports no data.
-        // Observed: focus resets on every entry, even after moving it before cancelling.
+        // Focus starts on New Game at every entry. Continue stays selectable and reports no data.
         choice = (savePresentNow?.Invoke() ?? savePresent) ? 1 : 0;
         show(new(choicesVisible, choice));
     }

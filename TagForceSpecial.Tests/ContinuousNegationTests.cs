@@ -5,7 +5,7 @@ using static TagForceSpecial.Tests.TriggerCommitmentTests;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Generic synthetic field/lingering negation; no complete real-card support claims.</summary>
+/// <summary>Field and lingering negation tests.</summary>
 public sealed class ContinuousNegationTests
 {
     [Fact]

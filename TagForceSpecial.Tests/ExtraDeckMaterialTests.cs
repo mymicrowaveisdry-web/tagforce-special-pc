@@ -5,7 +5,7 @@ using static TagForceSpecial.Tests.EventEffectScenario;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Generic authored material procedures; no card-family or PSP verification claim.</summary>
+/// <summary>Extra Deck material procedure tests.</summary>
 public sealed class ExtraDeckMaterialTests
 {
     private const uint Material = uint.MaxValue - 1, Other = 100_000, Target = uint.MaxValue, OtherTarget = 100_001;

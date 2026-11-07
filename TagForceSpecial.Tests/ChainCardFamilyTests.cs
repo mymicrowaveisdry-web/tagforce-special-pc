@@ -7,8 +7,7 @@ using static TagForceSpecial.Tests.NormalSpellTests;
 namespace TagForceSpecial.Tests;
 
 /// <summary>
-/// Synthetic per-card wiring of the Stage 10C-2 batch through the production definitions, including
-/// interactions with an ordinary monster and a preview Spell. No PSP observation is claimed here.
+/// Per-card wiring of the chain card family, including interactions with a monster and a preview Spell.
 /// </summary>
 public sealed class ChainCardFamilyTests
 {

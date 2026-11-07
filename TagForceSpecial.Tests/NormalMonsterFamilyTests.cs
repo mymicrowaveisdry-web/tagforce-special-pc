@@ -7,7 +7,7 @@ using static TagForceSpecial.Tests.NormalSpellTests;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Synthetic Stage 10C-1 family contracts with authored statistics; not PSP observations.</summary>
+/// <summary>Normal Monster family tests with authored statistics.</summary>
 public sealed class NormalMonsterFamilyTests
 {
     // Authored levels for selected family IDs; every other family member is an authored Level 4.
@@ -44,7 +44,9 @@ public sealed class NormalMonsterFamilyTests
 
     private static CardInstance InHand(DuelEngine e, uint id) => e.State.GetPlayer(PlayerId.One).Hand.First(c => c.GameCardId == id);
 
-    /// <summary>Summons one donor per own turn into zones 0..count-1, then returns on the next own Main Phase 1.</summary>
+    /// <summary>
+    /// Summons one donor per own turn into zones 0..count-1, then returns on the next own Main Phase 1.
+    /// </summary>
     private static DuelEngine WithDonors(uint high, int count, CardCatalog? catalog = null, bool withSpells = false, IEnumerable<uint>? tail = null)
     {
         uint[] deck = [.. Enumerable.Repeat(Donor, count), high, high, .. tail ?? [], .. Enumerable.Repeat(Filler, 40)];

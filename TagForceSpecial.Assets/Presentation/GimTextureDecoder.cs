@@ -5,9 +5,10 @@ namespace TagForceSpecial.Assets.Presentation;
 public sealed record GimTexture(int Width, int Height, int Format, bool Swizzled,
     byte[] Rgba, IReadOnlyList<string> Diagnostics);
 
-/// <summary>Bounded PSP little-endian GIM decoder. Returns straight RGBA; never forces alpha.
-/// Supports one picture/frame/image level. Multiple CLUTs require explicit palette selection.
-/// Does not infer sprite rectangles.</summary>
+/// <summary>
+/// Little-endian GIM decoder returning straight RGBA for one picture, frame and level. Multiple palettes need an
+/// explicit selection.
+/// </summary>
 public sealed class GimTextureDecoder
 {
     public const int MaximumFileBytes = 64 * 1024 * 1024;
@@ -222,8 +223,7 @@ public sealed class GimTextureDecoder
                 for (int c = 0; c < 2; c++)
                 {
                     int word = c == 0 ? a : b;
-                    // PPSSPP 1.20.4's DXT path uses left-shifted RGB565 components,
-                    // unlike direct-color PSP textures. Keep these policies separate.
+                    // The DXT path uses left-shifted RGB565 components, unlike direct-color textures.
                     colors[c * 4] = (byte)(((word >> 11) & 31) * 8);
                     colors[c * 4 + 1] = (byte)(((word >> 5) & 63) * 4);
                     colors[c * 4 + 2] = (byte)((word & 31) * 8); colors[c * 4 + 3] = 255;

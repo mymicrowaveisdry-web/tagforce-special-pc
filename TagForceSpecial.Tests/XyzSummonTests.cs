@@ -5,7 +5,7 @@ using static TagForceSpecial.Tests.EventEffectScenario;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Synthetic authored profiles, not original-game verification.</summary>
+/// <summary>Xyz Summon tests with authored profiles.</summary>
 public sealed class XyzSummonTests
 {
     private const uint Material = 100_001, WrongLevel = 100_002, Target = uint.MaxValue, Negator = 100_003, Counter = 100_004, GenericTarget = 100_005;

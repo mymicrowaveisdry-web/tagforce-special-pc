@@ -4,11 +4,7 @@ using TagForceSpecial.Cards;
 namespace TagForceSpecial.Core;
 
 /// <summary>
-/// Deterministic two-player rules subset: opening hands, draws, phases, basic normal summons,
-/// sets, position changes, effect-free battles, hand-limit discards and defeat.
-/// Card effects run only through registered effect definitions; effect shuffles use the seeded generator in the
-/// snapshot. No AI. Chains, event effects and staged battle require explicit opt-ins. Atomic battle remains the compatibility default.
-/// Explicitly configured selection-only workflows pause the command loop for immutable decisions.
+/// Deterministic two-player duel rules. Card effects, chains, event effects and staged battle are explicit opt-ins.
 /// </summary>
 public sealed partial class DuelEngine
 {
@@ -38,10 +34,8 @@ public sealed partial class DuelEngine
     public DuelState State { get; private set; }
 
     /// <summary>
-    /// Decks are supplied top-first, after any external shuffle. Only size and catalog membership
-    /// are checked here. Extra Decks are separately supplied and explicitly eligible; banlists,
-    /// copy limits and complete deck legality are later work.
-    /// Rule metadata is explicit; missing classifications fail closed when attempting to summon.
+    /// Decks are supplied top-first and checked only for size and catalog membership. Missing rule classifications fail
+    /// closed when summoning.
     /// </summary>
     public DuelEngine(CardCatalog catalog, IReadOnlyDictionary<uint, DuelCardRules> rules,
         IEnumerable<uint> playerOneDeck, IEnumerable<uint> playerTwoDeck, PlayerId startingPlayer = PlayerId.One,
@@ -178,11 +172,10 @@ public sealed partial class DuelEngine
         var definitionList = (effectDefinitions ?? []).ToArray();
         var usedEffectIds = reservedIds.Concat(eventIds).Concat(summonIds)
             .Concat(battleProfiles.Select(p => p.EffectId)).Concat(summonEffects.Values.Select(p => p.EffectId)).ToHashSet(StringComparer.Ordinal);
-        // Spell kinds need Spell rules and Trap kinds Trap rules; every source must be settable. Shuffles (explicit
-        // or after a Deck summon) need a seed. Summon candidates are filtered by rules at resolution, not here.
+        // Definitions need matching settable card rules, Token rules for Token steps and a seed for shuffles.
         if (definitionList.Any(d => d is null ||
                 d.Steps.OfType<SummonTokensStep>().Any(s => s.TokenCardIds.Any(id => !IsTokenId(id))) ||
-                shuffleSeed is null && d.Steps.Any(s => s is ShuffleDeckStep ||
+                shuffleSeed is null && d.Steps.Any(s => s is ShuffleDeckStep or AddFromDeckToHandStep or SendFromDeckToGraveyardStep ||
                     s is SpecialSummonStep summon && summon.Sources.HasFlag(SpecialSummonSources.Deck)) ||
                 !this.rules.TryGetValue(d.CardId, out var rule) || !rule.AllowsSpellTrapSet ||
                 rule.Category != (d.Kind is EffectKind.NormalSpell or EffectKind.QuickPlaySpell ? CardCategory.Spell : CardCategory.Trap) ||
@@ -258,7 +251,7 @@ public sealed partial class DuelEngine
         if (State.PendingSummon is not null) return ExecuteSummonWindow(command);
         if (command is PassSummonResponse or ActivateSummonNegation) return Reject(DuelError.NoPendingSummon);
         if (command is PassChainResponse or ActivateChainResponse or ActivateHandChainResponse or ResolveNextChainLink or
-            ChooseEffectSummon or ChooseDefinitionSummon) return Reject(DuelError.NoPendingChain);
+            ChooseEffectSummon or ChooseDefinitionSummon or ChooseDefinitionCard) return Reject(DuelError.NoPendingChain);
         // A definition answering its cost/target decisions before its first link exists (hand, set or open-window
         // activation); the decision may belong to the non-turn player.
         if (State.PendingDecision is not null && State.PendingSpellActivation is { } activating &&
@@ -433,7 +426,6 @@ public sealed partial class DuelEngine
             defender is not null && !rules[defender.Card.GameCardId].AllowsBasicBattle)
             return Reject(DuelError.UnsupportedBattleCard);
         // A battle-revealed monster's continuous effects apply before damage calculation.
-        // This is still an atomic battle; response/damage-step windows remain Stage 8 work.
         var calculationState = State;
         if (defender?.Position == BattlePosition.FaceDownDefense)
         {

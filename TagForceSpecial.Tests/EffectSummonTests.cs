@@ -5,7 +5,7 @@ using static TagForceSpecial.Tests.EventEffectScenario;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Synthetic, explicit recipes; no original-game card or effect verification is claimed.</summary>
+/// <summary>Fusion and Ritual effect-summon tests with explicit recipes.</summary>
 public sealed class EffectSummonTests
 {
     private const uint Low = 100_100, High = 100_101, Fusion = 100_102, Ritual = 100_103,

@@ -6,8 +6,7 @@ public sealed record CharacterVoiceGroup(int Index, int Offset, IReadOnlyList<us
 public sealed record CharacterVoiceIndex(string InternalId, int OffsetWords, int TrailingTerminalOffsets,
     IReadOnlyList<CharacterVoiceGroup> Groups);
 
-/// <summary>Observed indexed voice-reference table, not a complete character roster or an audio-cue mapping.
-/// Empty terminal slots are preserved; event labels and display names are not guessed.</summary>
+/// <summary>Reads the indexed voice-reference table, keeping empty terminal slots.</summary>
 public static class CharacterVoiceIndexReader
 {
     public static CharacterVoiceIndex Read(string internalId, ReadOnlySpan<byte> bytes)

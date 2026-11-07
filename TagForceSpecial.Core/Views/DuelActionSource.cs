@@ -2,7 +2,7 @@ using TagForceSpecial.Cards;
 
 namespace TagForceSpecial.Core.Views;
 
-/// <summary>Trusted adapter. Owns command handles; clients get authorized, immutable observations only.</summary>
+/// <summary>Trusted adapter that owns command handles and gives clients authorized, immutable observations.</summary>
 public sealed class DuelActionSource
 {
     public const string ContractVersion = "authorized-actions-v1";
@@ -54,6 +54,9 @@ public sealed class DuelActionSource
             : state.PendingChain?.DefinitionSummon is { } summon && summon.Player == player
                 ? new(summon.DecisionId, "DefinitionSummon", PlayerProjection.Read(summon.Options
                     .Select(o => PlayerProjection.Card(o.Card, true, null, catalog))))
+            : state.PendingChain?.DefinitionCardChoice is { } pick && pick.Player == player
+                ? new(pick.DecisionId, "DefinitionCard", PlayerProjection.Read(pick.Options
+                    .Select(c => PlayerProjection.Card(c, true, null, catalog))))
             : state.OpenWindow is { } window && actor == player ? new(window.DecisionId, "OpenWindow", PlayerProjection.Read(Array.Empty<CardView>()))
             : state.PendingChain is { } chain && actor == player ? new(chain.DecisionId, "Chain", PlayerProjection.Read(Array.Empty<CardView>()))
             : state.Battle is { } battle && actor == player ? new(battle.Window.DecisionId,
@@ -81,7 +84,7 @@ public sealed class DuelActionSource
 
     private static PlayerId Other(PlayerId player) => player == PlayerId.One ? PlayerId.Two : PlayerId.One;
     private static PlayerId Actor(DuelState state) => state.PendingDecision?.Player
-        ?? state.PendingChain?.DefinitionSummon?.Player
+        ?? state.PendingChain?.DefinitionChoice?.Player
         ?? state.OpenWindow?.Responder
         ?? (state.PendingChain is { } chain ? chain.NextLink > 0 ? state.ActivePlayer : chain.Responder
             : state.Battle is { } battle && !battle.Window.Closed ? battle.Window.Responder : state.ActivePlayer);
@@ -124,6 +127,13 @@ public sealed class DuelActionSource
                         yield return B(new ChooseDefinitionSummon(player, summon.DecisionId, option.Card.InstanceId, zone, position),
                             ActionKind.ChooseCard, $"Summon {catalog[option.Card.GameCardId].Name} ({option.Source}) [{zone + 1}] {position}",
                             option.Card.InstanceId, zone, position: position);
+            yield break;
+        }
+        if (state.PendingChain?.DefinitionCardChoice is { } pick)
+        {
+            foreach (var card in pick.Options)
+                yield return B(new ChooseDefinitionCard(player, pick.DecisionId, card.InstanceId), ActionKind.ChooseCard,
+                    $"Choose {catalog[card.GameCardId].Name}", card.InstanceId);
             yield break;
         }
         if (state.PendingChain is { } chain)

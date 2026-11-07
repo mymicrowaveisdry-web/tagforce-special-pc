@@ -5,7 +5,7 @@ using TagForceSpecial.Effects;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Original commitment projections through the shared definitions. No native chain-resolution comparison is claimed here.</summary>
+/// <summary>Compares activation commits through the shared definitions with recorded projections.</summary>
 [Trait("Category", "LocalReference")]
 public sealed class ActivationCommitReferenceTests
 {
@@ -129,6 +129,6 @@ public sealed class ActivationCommitReferenceTests
         Assert.Equal(before.GetPlayer(PlayerId.One).LifePoints, engine.State.GetPlayer(PlayerId.One).LifePoints);
         Assert.NotNull(engine.State.PendingChain);
         Assert.False(engine.State.ResearchSliceComplete);
-        // Native Scapegoat response/face-up change and its later tokens are compared in ChainReferenceTests.
+        // The Scapegoat response and its Tokens are compared in ChainReferenceTests.
     }
 }

@@ -4,7 +4,7 @@ using static TagForceSpecial.Tests.NormalSpellTests;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Synthetic Stage 10C-2b Token lifecycle contracts (deliberate PC zone policy; no PSP observation).</summary>
+/// <summary>Token lifecycle tests.</summary>
 public sealed class TokenLifecycleTests
 {
     private const uint Attacker = 1, High = 2, Filler = 3, Spell = 800, Token = 900, Sheep = 901;

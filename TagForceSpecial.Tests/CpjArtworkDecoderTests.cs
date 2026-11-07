@@ -43,7 +43,7 @@ public class CpjArtworkDecoderTests
             CpjArtworkReferenceProfiles.JpegSha256, "relative-reference-root"));
     }
 
-    // Authored structural JPEG fixture. Entropy decoding is independently validated by the pixel decoder.
+    // Structural JPEG fixture; entropy decoding is checked by the pixel decoder.
     private static byte[] Jpeg()
     {
         var data = new List<byte>(new byte[160]);

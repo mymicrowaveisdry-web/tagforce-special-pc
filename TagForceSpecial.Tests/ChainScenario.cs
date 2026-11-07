@@ -6,9 +6,8 @@ using TagForceSpecial.Effects;
 namespace TagForceSpecial.Tests;
 
 /// <summary>
-/// The retained PSP activation scenario (turn 7, Player One activates a Spell from hand) driven through the
-/// shared definitions of Lightning Vortex, Mystical Space Typhoon and Scapegoat. Player Two's set Scapegoat and
-/// Typhoon offer open windows on Player One's phase changes; the script passes them.
+/// Turn-7 scenario where Player One activates a Spell from hand, driven through the Lightning Vortex, Mystical Space
+/// Typhoon and Scapegoat definitions. Open windows offered to Player Two are passed.
 /// </summary>
 internal static class ChainScenario
 {

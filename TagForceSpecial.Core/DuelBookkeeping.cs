@@ -11,18 +11,14 @@ internal sealed record DuelBookkeeping(int NextInstanceId = 1, DuelRandomState? 
 }
 
 /// <summary>
-/// A phase-change request by the turn player paused so the non-turn player can activate a set Quick-Play
-/// Spell or Normal Trap (or pass). Opened only when such an activation is legal. Deliberate PC design until
-/// the native priority windows are observed.
+/// A turn player's phase-change request paused so the non-turn player can activate a set Quick-Play Spell or Normal
+/// Trap, or pass. Opened only when such an activation is legal.
 /// </summary>
 public sealed record PendingOpenWindow(long DecisionId, PlayerId Responder, DuelPhase RequestedPhase);
 public sealed record OpenWindowRequested(PlayerId Responder, long DecisionId, DuelPhase RequestedPhase) : DuelEvent;
 public sealed record OpenWindowPassed(PlayerId Responder) : DuelEvent;
 
-/// <summary>
-/// xoshiro128** state (Blackman and Vigna). Seeded through SplitMix64 from the application-supplied duel seed.
-/// Deliberate PC design: no equivalence with the PSP random number generator is claimed.
-/// </summary>
+/// <summary>xoshiro128** generator state, seeded through SplitMix64 from the duel seed.</summary>
 public readonly record struct DuelRandomState(uint S0, uint S1, uint S2, uint S3)
 {
     public static DuelRandomState FromSeed(ulong seed)

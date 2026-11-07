@@ -1,9 +1,7 @@
 namespace TagForceSpecial.Effects;
 
 /// <summary>
-/// Reviewed effect-generated Token IDs for cardinfo 6cd21aa6 (decoded getter kind 10; every text states the
-/// card that summons it; reviewed 2026-11-06). Tokens are not deck cards: they are excluded from release
-/// manifests as entries and exercised only through the effects that create them.
+/// Effect-generated Token IDs for cardinfo 6cd21aa6. Tokens are not deck cards and are excluded from release manifests.
 /// </summary>
 public static class TfspTokens
 {

@@ -4,7 +4,7 @@ using static TagForceSpecial.Tests.EventEffectScenario;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Synthetic command scenarios, not PSP trigger gameplay comparisons.</summary>
+/// <summary>Trigger effect command scenarios.</summary>
 public sealed class TriggerEffectTests
 {
     [Theory]

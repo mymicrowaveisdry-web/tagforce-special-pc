@@ -4,8 +4,7 @@ namespace TagForceSpecial.Assets.Presentation;
 
 public sealed record PgfGlyph(int Width, int Height, int Left, int Top, int AdvanceH26_6, byte[] Coverage4);
 
-/// <summary>Bounded reader for revision 2 PSP PGF fonts. No font data ships with the application:
-/// the file comes from the user's private storage. Format facts: PPSSPP v1.20.4 Core/Font/PGF.{h,cpp}.</summary>
+/// <summary>Reader for revision 2 PGF fonts loaded from the user's private storage.</summary>
 public sealed class PgfFont
 {
     public const int MaximumBytes = 8 * 1024 * 1024;

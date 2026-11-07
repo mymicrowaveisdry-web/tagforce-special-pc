@@ -4,7 +4,7 @@ using static TagForceSpecial.Tests.EventEffectScenario;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Synthetic aura/lingering-stat interactions. No real card or native timing claims.</summary>
+/// <summary>Aura and lingering-stat interaction tests.</summary>
 public sealed class ContinuousEffectTests
 {
     [Fact]

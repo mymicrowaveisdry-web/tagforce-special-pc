@@ -6,8 +6,7 @@ using static TagForceSpecial.Tests.NormalSpellTests;
 namespace TagForceSpecial.Tests;
 
 /// <summary>
-/// Synthetic Stage 10C-2c contracts: seeded shuffle, activation timing by kind, chain-response speed and the
-/// non-turn-player open window. Deliberate PC design where noted; no PSP observation is claimed.
+/// Seeded shuffle, activation timing by kind, chain-response speed and the non-turn-player open window.
 /// </summary>
 public sealed class DeckOperationsAndTimingTests
 {

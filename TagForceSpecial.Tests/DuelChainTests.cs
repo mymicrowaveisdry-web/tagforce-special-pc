@@ -7,8 +7,8 @@ using static TagForceSpecial.Tests.ChainScenario;
 namespace TagForceSpecial.Tests;
 
 /// <summary>
-/// The retained turn-7 scenario driven through the Lightning Vortex, Mystical Space Typhoon and Scapegoat
-/// definitions: cost and target commitment, the Scapegoat response, resolution order and cleanup.
+/// Turn-7 scenario through the Lightning Vortex, Mystical Space Typhoon and Scapegoat definitions: commitment, the
+/// Scapegoat response, resolution order and cleanup.
 /// </summary>
 public sealed class DuelChainTests
 {

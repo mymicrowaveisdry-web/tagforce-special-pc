@@ -2,7 +2,7 @@ using TagForceSpecial.Cards;
 
 namespace TagForceSpecial.Assets.Import;
 
-/// <summary>PSP property-format checks at the import boundary, independent of catalog/gameplay rules.</summary>
+/// <summary>Property-format checks at the import boundary.</summary>
 public static class PspCardCatalogValidator
 {
     public static void Validate(CardDefinition card)

@@ -5,10 +5,7 @@ using TagForceSpecial.Effects;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>
-/// Scoped PSP End Phase comparisons for the Emergency Teleport definition; guards/events/identity are synthetic
-/// managed contracts.
-/// </summary>
+/// <summary>Compares Emergency Teleport's End Phase with recorded projections.</summary>
 public sealed class EmergencyTeleportLifecycleTests
 {
     private static DuelEngine Engine(PlayerId starter = PlayerId.One, bool allowBattle = false)
@@ -64,7 +61,7 @@ public sealed class EmergencyTeleportLifecycleTests
         EnterMain(engine);
     }
 
-    /// <summary>Activation through resolution, summoning the first Deck copy (the PSP-observed branch).</summary>
+    /// <summary>Activates and resolves, summoning the first Deck copy.</summary>
     private static DuelActionResult Resolve(DuelEngine engine, int zone = 1)
     {
         var actor = engine.State.ActivePlayer;
@@ -276,7 +273,7 @@ public sealed class EmergencyTeleportLifecycleTests
         var snapshots = fixture.GetProperty("snapshots");
         JsonElement Projection(string name) => snapshots.GetProperty(name).GetProperty("projection");
         var engine = Engine(allowBattle: true);
-        // Controlled synthetic 2500-ATK defender; native defender identity/summon is excluded.
+        // A 2500-ATK defender destroys the summoned monster.
         ReachReferenceMain(engine, syntheticDefender: true);
         Resolve(engine);
         var resolved = engine.State;

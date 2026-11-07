@@ -8,7 +8,7 @@ public sealed record CardInfoRow(int InternalIndex, uint CardId, string Name,
 public sealed record CardInfoIndex(uint MinimumCardId, uint MaximumCardId, int MissingIds,
     IReadOnlyList<CardInfoRow> Rows, IReadOnlyList<string> Limitations);
 
-/// <summary>Observed TFSP table links and UTF-16 names; no stats or effect semantics inferred.</summary>
+/// <summary>Reads card table links and UTF-16 names; no stats or effects.</summary>
 public sealed class CardInfoReader
 {
     private static readonly UnicodeEncoding Utf16 = new(false, false, true);

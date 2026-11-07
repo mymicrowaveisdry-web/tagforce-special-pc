@@ -3,7 +3,7 @@ using TagForceSpecial.PC.App.Screens.Title;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Options behaviour observed on the same build (config/reference/options.json). PC Cross = confirm, PC Circle = back.</summary>
+/// <summary>Options screen behavior. PC Cross = confirm, PC Circle = back.</summary>
 public class OptionsTests
 {
     private static readonly int[] Defaults = OptionsCatalog.Defaults(DuelistLevelChoice.BeenThere);
@@ -46,7 +46,7 @@ public class OptionsTests
         Assert.Equal(OptionsOutcome.None, Tap(session, PspAction.Circle));
         Assert.True(session.CancelQuestion);
         Assert.Equal(0, session.CancelFocus);
-        // Observed: back does not dismiss the question.
+        // Back does not dismiss the question.
         Tap(session, PspAction.Circle);
         Assert.True(session.CancelQuestion);
         Tap(session, PspAction.Right);
@@ -157,7 +157,7 @@ public class OptionsTests
         Press(flow, PspAction.Cross);
         Press(flow, PspAction.Cross);
         Assert.Equal(TitleFlowStep.SystemSavePrompt, flow.Step);
-        // Observed: overwriting an existing save offers No first.
+        // Overwriting an existing save offers No first.
         Assert.Equal(1, flow.ButtonFocus);
         Press(flow, PspAction.Left);
         Press(flow, PspAction.Cross);

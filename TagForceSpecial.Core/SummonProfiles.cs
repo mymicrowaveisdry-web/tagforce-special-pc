@@ -23,7 +23,7 @@ public sealed class SummonLevelModifierProfile
     }
 }
 
-/// <summary>Named, exact-count alternative procedure; does not infer card-text exceptions.</summary>
+/// <summary>Named alternative procedure with an exact Tribute count.</summary>
 public sealed class TributeProcedureProfile
 {
     public string ProcedureId { get; }

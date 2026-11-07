@@ -83,8 +83,10 @@ public sealed partial class GameLoop
         _ => null // Emulator/firmware keyboard and save dialogs are native PC UI, not game assets; the Main Menu has its own Gum screen.
     };
 
-    /// <summary>Exact comparisons fix the game frame per focused row. Normally the background runs from its measured
-    /// starting phase, restarting on each entry to the menu as observed.</summary>
+    /// <summary>
+    /// Exact comparisons fix the game frame per focused row; otherwise the background restarts from its starting phase
+    /// on each entry.
+    /// </summary>
     private int MainMenuFrame(TitleFlow flow, TitleFlowVisuals visuals) => options.PixelExact
         ? options.MainMenuFrames.GetValueOrDefault(flow.MenuFocus)
         : (visuals.MainMenuMotion.Profile.EntryAnimationFrame + flow.MenuFrame) % visuals.MainMenuMotion.Profile.LoopFrames;
@@ -149,7 +151,8 @@ public sealed partial class GameLoop
         if (optionsScreen) { renderedFlowKey = null; RefreshOptions(titleFlow, flowVisuals); return; }
         if (titleFlow.Step == TitleFlowStep.OptionsSaveQuestion)
         {
-            // Observed over the bare animated background: no header, no bars. Entry frame 0 draws neither header nor title.
+            // Drawn over the bare animated background without header or bars; entry frame 0 draws neither header nor
+            // title.
             int bare = MainMenuFrame(titleFlow, flowVisuals);
             if (bare * 64 != renderedOptionsFrame) { flowVisuals.RenderOptionsBackground(bare, 0); renderedOptionsFrame = bare * 64; }
             gum.Show("OriginalOptions", true);
@@ -166,7 +169,7 @@ public sealed partial class GameLoop
         renderedFlowKey = key;
     }
 
-    /// <summary>Drawn above Gum: native system-style UI and any authored text fallback.</summary>
+    /// <summary>Drawn above Gum: system-style UI and any fallback text.</summary>
     private void DrawFlowOverlay()
     {
         if (flowVisuals is { OriginalFontAvailable: false } visuals && activeScreen is ScreenId.TitleFlow or ScreenId.TitleStartMenu)

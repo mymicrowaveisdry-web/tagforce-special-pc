@@ -6,8 +6,8 @@ using TagForceSpecial.Effects;
 namespace TagForceSpecial.Tests;
 
 /// <summary>
-/// Synthetic commit boundaries of the shared definition pipeline: a discard cost and a Spell/Trap target are
-/// separate decisions, preflighted before the source moves, paid once and never refunded.
+/// Definition commit boundaries: discard cost and Spell/Trap target are separate decisions, checked before the source
+/// moves and never refunded.
 /// </summary>
 public sealed class DefinitionCommitTests
 {

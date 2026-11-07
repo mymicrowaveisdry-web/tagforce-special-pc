@@ -6,9 +6,8 @@ using TagForceSpecial.Effects;
 namespace TagForceSpecial.Tests;
 
 /// <summary>
-/// Two scoped PSP projections plus synthetic guards/events/identity tests for the Emergency Teleport definition.
-/// Earlier native effects, absolute LP, opponent contents and deck order are excluded; the post-summon shuffle is
-/// deliberate PC design (no PSP RNG claim).
+/// Compares Emergency Teleport with recorded projections, plus guard, event and identity tests. Deck order differs
+/// because of the seeded shuffle.
 /// </summary>
 public sealed class EmergencyTeleportTests
 {
@@ -82,7 +81,7 @@ public sealed class EmergencyTeleportTests
         return Assert.IsType<DefinitionSummonRequested>(paused.Events[^1]).Decision;
     }
 
-    /// <summary>Activation through resolution, choosing the first Deck copy (the PSP-observed branch).</summary>
+    /// <summary>Activates and resolves, choosing the first Deck copy.</summary>
     private static DuelActionResult Resolve(DuelEngine engine, int zone = 1)
     {
         Activate(engine);
@@ -145,7 +144,7 @@ public sealed class EmergencyTeleportTests
         Assert.Equal(engine.State.TurnNumber, player.MonsterZones[1]!.SummonedOnTurn);
         Assert.Contains(handKrebons, player.Hand);
         Assert.Same(spell, player.Graveyard[^1]);
-        // Same remaining cards; their order is the seeded shuffle's (deliberate PC design).
+        // Same remaining cards, in the seeded shuffle's order.
         Assert.Equal(originalDeck.Where(c => c.InstanceId != chosen.InstanceId).OrderBy(c => c.InstanceId), player.Deck.OrderBy(c => c.InstanceId));
         Assert.Same(before.GetPlayer(PlayerId.Two), engine.State.GetPlayer(PlayerId.Two));
         Assert.Equal(before.GetPlayer(PlayerId.One).LifePoints, player.LifePoints);
@@ -176,7 +175,7 @@ public sealed class EmergencyTeleportTests
         Assert.Equal(0, original.GetProperty("endLatchRaw").GetInt32());
         Assert.Equal(0, original.GetProperty("outcomeRaw").GetInt32());
         Assert.Null(managed.Outcome);
-        // Absolute native LP and opponent contents/counts follow excluded earlier effects.
+        // Absolute LP and opponent contents come from earlier effects.
     }
 
     [Fact]

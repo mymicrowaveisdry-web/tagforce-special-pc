@@ -6,7 +6,7 @@ using TagForceSpecial.PC.App.Visual;
 
 namespace TagForceSpecial.PC.UI;
 
-/// <summary>Retained visuals only. The application mapper owns all input; GumService.Update is deliberately not called.</summary>
+/// <summary>Retained visuals only: the application owns all input, so GumService.Update is not called.</summary>
 public sealed class GumPresentation : IDisposable
 {
     private readonly Dictionary<string, GraphicalUiElement> roots = new(StringComparer.Ordinal);
@@ -153,7 +153,7 @@ public sealed class GumPresentation : IDisposable
                 continue;
             }
             MainMenuSprite(row, "Value").SourceRectangle = visuals.ValueSlot(i, values[i]);
-            // Observed: the arrow on a side with no further value is dimmed.
+            // Dims the arrow on a side with no further value.
             MainMenuSprite(row, "ArrowLeft").SourceRectangle = Source(profile.Arrows[values[i] == 0 ? "left-dim" : "left"]);
             MainMenuSprite(row, "ArrowRight").SourceRectangle = Source(profile.Arrows[values[i] == definition.Count - 1 ? "right-dim" : "right"]);
         }
@@ -191,7 +191,7 @@ public sealed class GumPresentation : IDisposable
         }
     }
 
-    /// <summary>Observed: the focused button shows only its focus pieces, the other only its plain piece.</summary>
+    /// <summary>The focused button shows only its focus pieces, the other only its plain piece.</summary>
     private void ShowChoiceDialog(string instance, int? focus)
     {
         var dialog = roots["OriginalOptions"].GetGraphicalUiElementByName(instance)!;
@@ -245,7 +245,7 @@ public sealed class GumPresentation : IDisposable
                 sprite.SourceRectangle = new Rectangle(0, 0, 480, 272);
             }
     }
-    /// <summary>One retained layer: the measured start-menu bars or a complete flow frame, rendered by TitleFlowVisuals.</summary>
+    /// <summary>One retained layer: the start-menu bars or a complete flow frame from TitleFlowVisuals.</summary>
     public void BindFlowLayer(Texture2D layer)
     {
         foreach (string screen in new[] { "OriginalTitleStartMenu", "OriginalTitleFlow" })

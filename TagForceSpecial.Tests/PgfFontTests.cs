@@ -2,7 +2,7 @@ using TagForceSpecial.Assets.Presentation;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Synthetic font bytes only; no PSP font is committed or required.</summary>
+/// <summary>Font tests on generated font bytes.</summary>
 public class PgfFontTests
 {
     private sealed class BitWriter

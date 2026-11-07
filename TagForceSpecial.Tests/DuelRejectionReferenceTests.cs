@@ -4,10 +4,7 @@ using TagForceSpecial.Core;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>
-/// Compares a C# rejection with the original game's observed UI constraint and
-/// selected unchanged state. It does not assert an equivalent PSP error code.
-/// </summary>
+/// <summary>Compares a rejection with a recorded UI constraint and unchanged state.</summary>
 [Trait("Category", "LocalReference")]
 public sealed class DuelRejectionReferenceTests
 {

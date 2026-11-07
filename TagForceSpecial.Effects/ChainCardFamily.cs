@@ -4,15 +4,14 @@ using TagForceSpecial.Core;
 
 namespace TagForceSpecial.Effects;
 
-/// <summary>One reviewed card of a definition-based batch: its definition and manifest contract.</summary>
+/// <summary>One card of a definition-based family: its definition and manifest contract.</summary>
 public sealed record DefinitionCardProfile(uint CardId, string Name, CardKind Kind, EffectDefinition Definition,
     string Operation, string Conditions, string Costs, string Targets, string Choices, string Limits,
     string NegationAndCleanup, string Exceptions, IReadOnlyList<string> StaticEvidenceIds, IReadOnlyList<string> Gaps);
 
 /// <summary>
-/// Stage 10C-2 batch: five Spell/Trap cards as consumers of the shared definition pipeline (chain, Tokens, Deck
-/// operations). Contracts are authored from the original-era catalog text; synthetic rule tests and decoded
-/// metadata only, except the retained PSP projections named in the tests. No card-specific engine path exists.
+/// Mystical Space Typhoon, Magic Jammer, Lightning Vortex, Scapegoat and Emergency Teleport as shared effect
+/// definitions.
 /// </summary>
 public static class ChainCardFamily
 {
@@ -21,14 +20,11 @@ public static class ChainCardFamily
     public const uint Scapegoat = 4818, MagicJammer = 4862, MysticalSpaceTyphoon = 4909, LightningVortex = 5217,
         EmergencyTeleport = 7747;
 
-    /// <summary>Sheep Tokens in the zone order of the retained Scapegoat capture (lowest free zone first).</summary>
+    /// <summary>Sheep Token IDs in zone order (lowest free zone first).</summary>
     public static IReadOnlyList<uint> SheepTokenIds { get; } = Array.AsReadOnly(new uint[] { 3905, 3903, 3902, 3904 });
 
     /// <summary>
-    /// Emergency Teleport's reviewed targets for cardinfo 6cd21aa6: every main-deck monster (decoded getter kinds 1,
-    /// 3, 16, 18, 24, 27) with decoded type code 21 and Level 1–3. Code 21 matched all 12 Psychic monsters checked
-    /// by name and a seeded sample of the other 58 (2026-11-07). The two type-21 Xyz monsters (10172, 10466) have a
-    /// Rank, not a Level, and are excluded. Reviewed 2026-11-07; the duel never decodes the type at runtime.
+    /// Emergency Teleport's targets: main-deck monsters with type code 21 at Level 1–3, excluding the two Xyz monsters.
     /// </summary>
     public static IReadOnlyList<uint> LevelThreeOrLowerPsychicIds { get; } = Array.AsReadOnly(new uint[]
     {
@@ -109,7 +105,7 @@ public static class ChainCardFamily
     public static IReadOnlyDictionary<uint, CardStaticMetadata> Reviewed { get; } = Cards.ToFrozenDictionary(c => c.CardId,
         c => new CardStaticMetadata(c.Kind, new(CardEffectState.Referenced, [c.Definition.EffectId])));
 
-    /// <summary>Fails closed for an unreviewed build or metadata that differs from the reviewed batch.</summary>
+    /// <summary>Throws when the catalog's metadata differs from this family.</summary>
     public static void ValidateCatalog(CardCatalog catalog)
     {
         ArgumentNullException.ThrowIfNull(catalog);

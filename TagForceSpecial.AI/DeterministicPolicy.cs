@@ -65,7 +65,7 @@ public sealed class DeterministicPolicy(uint seed)
         if (a.Zone is not { } zone || v.Self.Monsters[zone] is not { Attack: { } attack }) return -10;
         if (a.TargetZone is not { } target) return 180;
         var defender = v.Opponent.Monsters[target];
-        // Face-down statistics are deliberately absent: use a fixed unknown-card priority.
+        // Face-down cards use a fixed unknown-card priority.
         if (defender is null || defender.Hidden) return 110;
         int? strength = defender.Position == BattlePosition.FaceUpAttack ? defender.Attack : defender.Defense;
         if (strength is null) return 110;

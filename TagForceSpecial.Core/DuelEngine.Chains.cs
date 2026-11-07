@@ -9,7 +9,9 @@ public sealed partial class DuelEngine
             return command is ChooseEffectSummon summon ? AnswerEffectSummon(chain, summon) : Reject(DuelError.DecisionPending);
         if (chain.DefinitionSummon is not null)
             return command is ChooseDefinitionSummon choice ? AnswerDefinitionSummon(chain, choice) : Reject(DuelError.DecisionPending);
-        if (command is ChooseEffectSummon or ChooseDefinitionSummon) return Reject(DuelError.NoPendingDecision);
+        if (chain.DefinitionCardChoice is not null)
+            return command is ChooseDefinitionCard card ? AnswerDefinitionCardChoice(chain, card) : Reject(DuelError.DecisionPending);
+        if (command is ChooseEffectSummon or ChooseDefinitionSummon or ChooseDefinitionCard) return Reject(DuelError.NoPendingDecision);
         if (State.PendingDecision is not null)
             return command is DecisionCommand answer ? AnswerDecision(answer) : Reject(DuelError.DecisionPending);
         if (command is DecisionCommand) return Reject(DuelError.NoPendingDecision);
@@ -42,7 +44,7 @@ public sealed partial class DuelEngine
                 return Reject(DuelError.InvalidDecisionChoice);
             if (source is not null && definitions.TryGetValue(source.Card.GameCardId, out var definition))
             {
-                // Definition responses are open-chain responses only; battle and summon windows are later work.
+                // Definitions answer open chains only, not battle or summon windows.
                 if (State.Battle is not null) return Reject(DuelError.UnsupportedBattleResponse);
                 if (State.PendingSummon is not null) return Reject(DuelError.UnsupportedSummonResponse);
                 return BeginDefinitionResponse(chain, response.SpellTrapZone, source, definition);
@@ -70,7 +72,7 @@ public sealed partial class DuelEngine
     }
 
     private DuelActionResult ResolveChainLink(PendingChain chain, ChooseEffectSummon? summonChoice = null,
-        ChooseDefinitionSummon? definitionChoice = null)
+        DuelCommand? definitionChoice = null)
     {
         var link = chain.Links[chain.NextLink - 1];
         var activation = link.Activation;
@@ -86,13 +88,18 @@ public sealed partial class DuelEngine
         {
             case ChainOperation.Definition:
             {
-                (next, var pause) = ResolveDefinitionSteps(next, links, link, chain.DefinitionSummon?.StepIndex ?? 0,
+                (next, var pause) = ResolveDefinitionSteps(next, links, link, chain.DefinitionChoice?.StepIndex ?? 0,
                     definitionChoice, events);
                 // Defeat is terminal immediately, as in damage calculation. No later link or cleanup executes.
                 if (next.Outcome is not null) return Accept(next, events.ToArray());
                 if (pause is not null)
                     return Accept(next.WithChain(new(pause.DecisionId, links, chain.Responder, chain.ConsecutivePasses,
-                        chain.NextLink, definitionSummon: pause)), [.. events, new DefinitionSummonRequested(pause)]);
+                        chain.NextLink, definitionChoice: pause)), [.. events, pause switch
+                        {
+                            PendingDefinitionSummon summon => new DefinitionSummonRequested(summon),
+                            PendingDefinitionCardChoice card => new DefinitionCardChoiceRequested(card),
+                            _ => throw new InvalidOperationException("Unknown definition choice.")
+                        }]);
                 break;
             }
             case ChainOperation.ActivatePendulumScale: break; // Source already occupies its dedicated zone; never recreate it.

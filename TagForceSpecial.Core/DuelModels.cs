@@ -7,17 +7,8 @@ public enum BattlePosition { FaceUpAttack, FaceUpDefense, FaceDownDefense }
 public enum DuelEndReason { UnableToDraw, LifePointsDepleted, BothLifePointsDepleted }
 
 /// <summary>
-/// Explicit, trusted gameplay metadata; never inferred from unverified binary kind codes.
-/// AllowsBasicBattle opts into supported combat using registered effective statistics; callers must not
-/// enable it where omitted mandatory/continuous effects would change the result.
-/// AllowsSpellTrapSet opts into ordinary back-row placement, excluding Field Spells.
-/// AllowsTributeSummon opts into the ordinary high-level procedure; AllowsTributeForSummon
-/// permits a donor's ordinary departure, with authored Pendulum field-to-Extra-Deck routing.
-/// RequiresRegisteredTributeProcedure disables default procedures for this card.
-/// AllowsExtraDeck and AllowsSummonMaterial explicitly opt into the bounded material slice.
-/// AllowsPendulumSummon permits ordinary hand targets independently of Pendulum scale identity.
-/// IsToken marks an effect-generated Token: never in a Deck or hand, never Normal Summoned, never Xyz
-/// Material, and it ceases to exist when it leaves the field.
+/// Explicit gameplay rules for a card; each flag opts into one supported behavior. IsToken marks an effect-generated
+/// Token that ceases to exist when it leaves the field.
 /// </summary>
 public sealed record DuelCardRules(CardCategory Category, bool AllowsNormalSummon = false,
     bool AllowsBasicBattle = false, bool AllowsSpellTrapSet = false,

@@ -3,10 +3,7 @@ namespace TagForceSpecial.Core;
 /// <summary>Card activation kinds. Spell Speed and set-turn rules derive from the kind.</summary>
 public enum EffectKind { NormalSpell, QuickPlaySpell, NormalTrap, CounterTrap }
 
-/// <summary>
-/// One ordered resolution operation. The set is closed: only Core defines steps, each with its own
-/// contract and tests. Values are authored, never parsed from card text.
-/// </summary>
+/// <summary>One ordered resolution operation from a closed, Core-defined set.</summary>
 public abstract record EffectStep
 {
     private protected EffectStep() { }
@@ -16,9 +13,8 @@ public abstract record EffectStep
 public enum EffectPlayers { Self, Opponent, Both }
 
 /// <summary>
-/// A public count an LP amount is multiplied by, read at resolution. A definition with a counted step can be
-/// activated only while every counted step's count is at least 1 (deliberate PC reading of the original-era
-/// rulings; no PSP observation). The set is closed.
+/// A public count that multiplies an LP amount at resolution. A counted definition can be activated only while each
+/// count is at least 1.
 /// </summary>
 public enum EffectCount
 {
@@ -52,16 +48,11 @@ public sealed record DealDamageStep(int Amount, EffectCount PerCount = EffectCou
 /// </summary>
 public sealed record DamageBothPlayersStep(int ToOpponent, int ToSelf) : EffectStep;
 
-/// <summary>
-/// Shuffles the activating player's Deck with the duel's seeded generator. The event carries no order; views
-/// expose only the Deck count. Definitions using it require an engine seed.
-/// </summary>
+/// <summary>Shuffles the activating player's Deck with the seeded generator; requires an engine seed.</summary>
 public sealed record ShuffleDeckStep : EffectStep;
 
 /// <summary>
-/// Special Summons the listed Tokens (one per entry, in order) to the activating player's lowest free Monster
-/// Zones. All or nothing: with fewer free zones than Tokens at resolution, none are summoned (link skipped,
-/// <see cref="ChainSkipReason.SummonUnavailable"/>). Every ID needs explicit <c>IsToken</c> card rules.
+/// Special Summons the listed Tokens to the lowest free Monster Zones, all or none. Each ID needs IsToken card rules.
 /// </summary>
 public sealed record SummonTokensStep : EffectStep
 {
@@ -82,9 +73,8 @@ public sealed record SummonTokensStep : EffectStep
 }
 
 /// <summary>
-/// Destroys the Spell/Trap bound at activation (<see cref="SpellTrapOnFieldTarget"/>). A target that left or was
-/// replaced is not retargeted: the step is skipped (<see cref="ChainSkipReason.TargetUnavailable"/>), as the native
-/// Typhoon validator returns without destroying.
+/// Destroys the Spell/Trap bound at activation (<see cref="SpellTrapOnFieldTarget"/>). Skipped if the target left or
+/// was replaced.
 /// </summary>
 public sealed record DestroyTargetStep : EffectStep;
 
@@ -98,11 +88,8 @@ public sealed record DestroyOpponentFaceUpMonstersStep : EffectStep;
 public sealed record NegateActivationStep(bool DestroySource) : EffectStep;
 
 /// <summary>
-/// Special Summons one eligible card chosen at resolution from the listed sources (face-up Attack or Defense, any
-/// free zone). Eligibility is an authored card-ID list, never decoded at duel time. A Deck summon shuffles the
-/// Deck afterwards (the definition then requires an engine seed). With
-/// <see cref="BanishAtEndPhase"/>, the summoned placement is banished in that turn's End Phase. No eligible card
-/// at resolution skips the step (<see cref="ChainSkipReason.SummonUnavailable"/>).
+/// Special Summons one eligible hand or Deck card chosen at resolution, shuffling after a Deck summon. Optionally
+/// banishes it in that turn's End Phase.
 /// </summary>
 public sealed record SpecialSummonStep : EffectStep
 {
@@ -124,6 +111,55 @@ public sealed record SpecialSummonStep : EffectStep
     }
 }
 
+/// <summary>A closed card filter for Deck choices. Cards without explicit rules never match.</summary>
+public abstract record CardFilter
+{
+    private protected CardFilter() { }
+}
+
+/// <summary>Matches the listed card IDs only (a reviewed list, e.g. every artwork ID of a named card).</summary>
+public sealed record CardIdFilter : CardFilter
+{
+    public IReadOnlyList<uint> CardIds { get; }
+
+    public CardIdFilter(IEnumerable<uint> cardIds)
+    {
+        ArgumentNullException.ThrowIfNull(cardIds);
+        var ids = cardIds.Take(2049).ToArray();
+        if (ids.Length is 0 or > 2048 || ids.Any(id => id == 0) || ids.Distinct().Count() != ids.Length)
+            throw new ArgumentException("Supply 1–2048 distinct nonzero card IDs.", nameof(cardIds));
+        CardIds = Array.AsReadOnly(ids);
+    }
+
+    // Value semantics over the list contents, so equal filters compare equal.
+    public bool Equals(CardIdFilter? other) => other is not null && CardIds.SequenceEqual(other.CardIds);
+    public override int GetHashCode() => CardIds.Aggregate(17, (hash, id) => hash * 31 + id.GetHashCode());
+}
+
+/// <summary>Matches any card with explicit Monster card rules.</summary>
+public sealed record AnyMonsterFilter : CardFilter;
+
+/// <summary>
+/// The listed players draw <see cref="Count"/> cards each (activating player first). Activation needs that many
+/// cards in each drawing Deck; a player who cannot draw them all at resolution loses (existing draw rule).
+/// </summary>
+public sealed record DrawCardsStep(int Count, EffectPlayers Players = EffectPlayers.Self) : EffectStep;
+
+/// <summary>
+/// The activating player chooses one matching card in their Deck at resolution, reveals it and adds it to the hand,
+/// then shuffles the Deck. Activation needs a matching card; none at resolution skips the step without shuffling.
+/// </summary>
+public sealed record AddFromDeckToHandStep(CardFilter Filter) : EffectStep;
+
+/// <summary>As <see cref="AddFromDeckToHandStep"/>, but the chosen card is sent to its owner's Graveyard.</summary>
+public sealed record SendFromDeckToGraveyardStep(CardFilter Filter) : EffectStep;
+
+/// <summary>
+/// Sends the top <see cref="Count"/> cards of the activating player's Deck to the Graveyard, in Deck order.
+/// Activation needs that many cards; fewer at resolution sends what remains (no loss).
+/// </summary>
+public sealed record MillTopOfDeckStep(int Count) : EffectStep;
+
 /// <summary>An authored activation condition, checked in preflight. The set is closed.</summary>
 public abstract record EffectCondition
 {
@@ -139,8 +175,7 @@ public sealed record FreeMonsterZonesCondition : EffectCondition
 }
 
 /// <summary>
-/// "When a Spell Card is activated": the preceding chain link is a Spell card's activation (a Pendulum scale
-/// activation counts). Monster and trigger effects do not. Makes the definition a response only.
+/// Requires the preceding link to be a Spell activation (Pendulum scales count), so the definition is a response only.
 /// </summary>
 public sealed record RespondsToSpellActivationCondition : EffectCondition;
 
@@ -220,6 +255,10 @@ public sealed class EffectDefinition
                     DamageBothPlayersStep s => s.ToOpponent <= 0 || s.ToSelf <= 0,
                     // Validated by their constructors; the engine checks Token rules and the seed.
                     SummonTokensStep or ShuffleDeckStep or SpecialSummonStep => false,
+                    DrawCardsStep s => s.Count is < 1 or > 10 || !Enum.IsDefined(s.Players),
+                    MillTopOfDeckStep s => s.Count is < 1 or > 60,
+                    AddFromDeckToHandStep s => s.Filter is null,
+                    SendFromDeckToGraveyardStep s => s.Filter is null,
                     DestroyTargetStep or DestroyOpponentFaceUpMonstersStep or NegateActivationStep => false,
                     _ => true
                 })
@@ -253,7 +292,7 @@ public sealed record ActivateHandChainResponse(PlayerId Player, long DecisionId,
     : DuelCommand(Player);
 public sealed record EffectDamageDealt(PlayerId Player, int Damage, int LifePointsBefore,
     int LifePointsAfter, string EffectId) : DuelEvent;
-/// <summary>The player's Deck was shuffled. Deliberately carries no card order.</summary>
+/// <summary>The player's Deck was shuffled; carries no card order.</summary>
 public sealed record DeckShuffled(PlayerId Player, string EffectId) : DuelEvent;
 /// <summary>A Token left the field and ceased to exist; follows the departure's cause event.</summary>
 public sealed record TokenRemoved(PlayerId Owner, CardInstance Card) : DuelEvent;
@@ -262,15 +301,25 @@ public sealed record TokenRemoved(PlayerId Owner, CardInstance Card) : DuelEvent
 public sealed record SummonLock(PlayerId Player, int TurnNumber, CardInstance Source, string EffectId);
 public sealed record SummonLockApplied(SummonLock Lock) : DuelEvent;
 
-/// <summary>Resolution-time Special Summon choice; deck options are visible only to the choosing player.</summary>
-public sealed record DefinitionSummonOption(CardInstance Card, DecisionCardSource Source);
-public sealed class PendingDefinitionSummon
+/// <summary>A definition step paused at resolution for its controller's choice.</summary>
+public abstract class PendingDefinitionChoice
 {
     public long DecisionId { get; }
     public PlayerId Player { get; }
     public string EffectId { get; }
     public int LinkNumber { get; }
     public int StepIndex { get; }
+
+    private protected PendingDefinitionChoice(long decisionId, PlayerId player, string effectId, int linkNumber, int stepIndex)
+    {
+        DecisionId = decisionId; Player = player; EffectId = effectId; LinkNumber = linkNumber; StepIndex = stepIndex;
+    }
+}
+
+/// <summary>Resolution-time Special Summon choice; deck options are visible only to the choosing player.</summary>
+public sealed record DefinitionSummonOption(CardInstance Card, DecisionCardSource Source);
+public sealed class PendingDefinitionSummon : PendingDefinitionChoice
+{
     public IReadOnlyList<DefinitionSummonOption> Options { get; }
     public IReadOnlyList<int> MonsterZoneOptions { get; }
     public IReadOnlyList<BattlePosition> PositionOptions { get; } =
@@ -278,8 +327,8 @@ public sealed class PendingDefinitionSummon
 
     internal PendingDefinitionSummon(long decisionId, PlayerId player, string effectId, int linkNumber, int stepIndex,
         IEnumerable<DefinitionSummonOption> options, IEnumerable<int> zones)
+        : base(decisionId, player, effectId, linkNumber, stepIndex)
     {
-        DecisionId = decisionId; Player = player; EffectId = effectId; LinkNumber = linkNumber; StepIndex = stepIndex;
         Options = Array.AsReadOnly(options.ToArray());
         MonsterZoneOptions = Array.AsReadOnly(zones.ToArray());
     }
@@ -287,3 +336,19 @@ public sealed class PendingDefinitionSummon
 public sealed record ChooseDefinitionSummon(PlayerId Player, long DecisionId, int CardInstanceId, int MonsterZone,
     BattlePosition Position) : DuelCommand(Player);
 public sealed record DefinitionSummonRequested(PendingDefinitionSummon Decision) : DuelEvent;
+
+/// <summary>Resolution-time choice of one Deck card (search or send); options are visible only to the choosing player.</summary>
+public sealed class PendingDefinitionCardChoice : PendingDefinitionChoice
+{
+    public IReadOnlyList<CardInstance> Options { get; }
+
+    internal PendingDefinitionCardChoice(long decisionId, PlayerId player, string effectId, int linkNumber, int stepIndex,
+        IEnumerable<CardInstance> options) : base(decisionId, player, effectId, linkNumber, stepIndex) =>
+        Options = Array.AsReadOnly(options.ToArray());
+}
+public sealed record ChooseDefinitionCard(PlayerId Player, long DecisionId, int CardInstanceId) : DuelCommand(Player);
+public sealed record DefinitionCardChoiceRequested(PendingDefinitionCardChoice Decision) : DuelEvent;
+/// <summary>A Deck card was revealed and added to its owner's hand by an effect.</summary>
+public sealed record CardSearched(PlayerId Player, CardInstance Card, string EffectId) : DuelEvent;
+/// <summary>A Deck card went to its owner's Graveyard by an effect (a chosen card or the top of the Deck).</summary>
+public sealed record CardSentFromDeckToGraveyard(PlayerId Player, CardInstance Card, string EffectId) : DuelEvent;

@@ -3,21 +3,17 @@ using TagForceSpecial.Cards;
 
 namespace TagForceSpecial.Effects;
 
-/// <summary>
-/// Code-owned reviewed card metadata, overlaid when a catalog is opened. Converted packages keep the frozen
-/// <see cref="TfspCardMetadata.Reviewed"/> baseline that the importer bakes in, so review batches never change
-/// pinned cache bytes. This lives outside the Cards assembly on purpose: presentation packages pin the Assets
-/// assembly hash, which depends on Cards, so review batches must not change Cards.
-/// </summary>
+/// <summary>Card metadata overlaid when a catalog is opened, so converted packages and Cards stay unchanged.</summary>
 public static class ReviewedCardMetadata
 {
-    /// <summary>The frozen converter baseline, every reviewed effect-free Normal Monster and the 10C-2/10C-3 batches.</summary>
+    /// <summary>The converter baseline plus every Effects family.</summary>
     public static IReadOnlyDictionary<uint, CardStaticMetadata> Reviewed { get; } =
         TfspCardMetadata.Reviewed
             .Concat(TfspNormalMonsters.Ids.Where(id => !TfspCardMetadata.Reviewed.ContainsKey(id))
                 .Select(id => new KeyValuePair<uint, CardStaticMetadata>(id, new(CardKind.Monster, CardEffectBinding.None))))
             .Concat(ChainCardFamily.Reviewed)
             .Concat(LifePointFamily.Reviewed)
+            .Concat(DeckOperationFamily.Reviewed)
             .ToFrozenDictionary();
 
     /// <summary>Full reviewed overlay for the reviewed build; throws for any other source.</summary>

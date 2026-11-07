@@ -5,7 +5,7 @@ using TagForceSpecial.Tools;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>The Stage 10C-2 batch against the private original cardinfo: metadata, the D4 list and the manifest.</summary>
+/// <summary>Chain card family against the local cardinfo: metadata, the Psychic list and the manifest.</summary>
 public sealed class ChainCardFamilyLocalReferenceTests
 {
     private static CardCatalog Original()
@@ -22,7 +22,7 @@ public sealed class ChainCardFamilyLocalReferenceTests
     {
         var catalog = Original();
         ChainCardFamily.ValidateCatalog(catalog);
-        // D4: every main-deck card with decoded type code 21 at Level 1–3; the two type-21 Xyz (getter kind 23) are excluded.
+        // Every main-deck card with type code 21 at Level 1–3; the two type-21 Xyz (getter kind 23) are excluded.
         var derived = catalog.Cards.Where(c => c.Codes!.Type == 21 && c.Codes.GetterKind != 23 && c.Statistics.Level is >= 1 and <= 3)
             .Select(c => c.GameCardId);
         Assert.Equal(ChainCardFamily.LevelThreeOrLowerPsychicIds.Order(), derived.Order());

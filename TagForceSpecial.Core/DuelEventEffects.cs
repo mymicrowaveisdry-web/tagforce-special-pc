@@ -72,7 +72,7 @@ public sealed class PendingTriggerCommitment
     }
 }
 
-/// <summary>Immutable event-effect state retained across decisions, chains and snapshots.</summary>
+/// <summary>Event-effect state kept across decisions, chains and snapshots.</summary>
 public sealed record EventEffectState
 {
     public PendingTriggerBatch? PendingTriggers { get; private init; }

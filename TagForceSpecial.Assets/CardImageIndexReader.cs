@@ -7,7 +7,7 @@ public sealed record CardImageSlot(uint CardId, long Offset, long StoredSlotByte
 public sealed record CardImageIndex(string Signature, uint MinimumCardId, uint MaximumCardId,
     long HeaderBytes, uint SlotSectors, IReadOnlyList<CardImageSlot> Entries, int MissingSlots);
 
-/// <summary>Observed single-art CIP/CPJ/CPM directory. Slot length includes padding.</summary>
+/// <summary>Single-art CIP/CPJ/CPM directory; slot length includes padding.</summary>
 public sealed class CardImageIndexReader
 {
     public CardImageIndex ReadIndex(Stream source)

@@ -5,10 +5,7 @@ using TagForceSpecial.Core;
 namespace TagForceSpecial.Effects;
 
 /// <summary>
-/// Stage 10C-3 batch: Normal Spells and Normal Traps whose whole effect is an authored LP change: fixed amounts
-/// (four corroborated by the signed LP table at historical 0x09c98ec4, the rest authored from the original-era
-/// text), both-player effects and amounts counted from public zones at resolution. Synthetic rule tests and
-/// decoded metadata only; no PSP observation is claimed.
+/// Normal Spells and Normal Traps whose effect is an LP change: fixed, both-player or counted at resolution.
 /// </summary>
 public static class LifePointFamily
 {

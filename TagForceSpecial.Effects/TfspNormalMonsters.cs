@@ -1,10 +1,6 @@
 namespace TagForceSpecial.Effects;
 
-/// <summary>
-/// Stage 10C-1 reviewed Normal Monster IDs for cardinfo 6cd21aa6. Evidence: decoded getter kind 0, no
-/// toolkit handler-table binding, printed statistics present and flavour-only text (reviewed 2026-11-06).
-/// Kind codes alone never qualify a card; this list is the explicit authority.
-/// </summary>
+/// <summary>Normal Monster IDs for cardinfo 6cd21aa6. This list, not the kind code, decides membership.</summary>
 public static class TfspNormalMonsters
 {
     /// <summary>Sorted, distinct game-local IDs; artwork variants keep separate IDs.</summary>
