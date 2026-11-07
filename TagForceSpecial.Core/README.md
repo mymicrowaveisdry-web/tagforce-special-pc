@@ -17,7 +17,7 @@ Selections do not move cards. Completion stops research by default (the only rem
 
 ## Card effect definitions
 
-`effectDefinitions` registers `EffectDefinition`s: kind (Normal/Quick-Play Spell, Normal/Counter Trap), conditions, a discard cost, a Spell/Trap target, a summon lock and ordered steps (LP, damage, shuffle, Tokens, target/face-up destruction, activation negation, hand/Deck Special Summon with End Phase banishment). One legality check covers hand, set, open-window and chain-response activation (including the turn player's hand Quick-Play via `ActivateHandChainResponse`).
+`effectDefinitions` registers `EffectDefinition`s: kind (Normal/Quick-Play Spell, Normal/Counter Trap), conditions, a discard cost, a Spell/Trap target, a summon lock and ordered steps (LP gain or damage for either or both players, optionally counted from public zones; both players at 0 LP is a draw; shuffle, Tokens, target/face-up destruction, activation negation, hand/Deck Special Summon with End Phase banishment). One legality check covers hand, set, open-window and chain-response activation (including the turn player's hand Quick-Play via `ActivateHandChainResponse`).
 
 Costs and targets are answered as decisions before the link is added; targets bind controller, slot, instance and placement, and paid costs remain paid. A resolution-time summon choice is answered with `ChooseDefinitionSummon`.
 

@@ -102,7 +102,7 @@ public sealed class DuelController
     private DuelView Build()
     {
         var v = source.Observe(viewer);
-        string prompt = v.Outcome is { } outcome ? outcome.Winner == viewer ? "YOU WIN" : "YOU LOSE"
+        string prompt = v.Outcome is { } outcome ? outcome.IsDraw ? "DRAW" : outcome.Winner == viewer ? "YOU WIN" : "YOU LOSE"
             : v.Availability == ActionAvailability.Unsupported ? "Unsupported decision"
             : v.Decision is { } d ? $"Choose {d.Kind}"
             : v.Availability == ActionAvailability.Waiting ? "Opponent choosing" : "Choose an action";

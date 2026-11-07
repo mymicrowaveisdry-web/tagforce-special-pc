@@ -4,7 +4,7 @@ public enum PlayerId { One, Two }
 public enum DuelPhase { Draw, Standby, Main1, Battle, Main2, End }
 public enum CardCategory { Unknown, Monster, Spell, Trap }
 public enum BattlePosition { FaceUpAttack, FaceUpDefense, FaceDownDefense }
-public enum DuelEndReason { UnableToDraw, LifePointsDepleted }
+public enum DuelEndReason { UnableToDraw, LifePointsDepleted, BothLifePointsDepleted }
 
 /// <summary>
 /// Explicit, trusted gameplay metadata; never inferred from unverified binary kind codes.
@@ -30,7 +30,13 @@ public sealed record FieldMonster(CardInstance Card, BattlePosition Position, in
 {
     public IReadOnlyList<CardInstance> XyzMaterials { get; internal init; } = Array.AsReadOnly(Array.Empty<CardInstance>());
 }
-public sealed record DuelOutcome(PlayerId Winner, PlayerId Loser, DuelEndReason Reason);
+/// <summary>A finished duel. A draw (both players at 0 LP at once) has no winner or loser.</summary>
+public sealed record DuelOutcome(PlayerId? Winner, PlayerId? Loser, DuelEndReason Reason)
+{
+    /// <summary>Derived; excluded from serialization so traces and replays keep their existing shape.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsDraw => Winner is null;
+}
 
 /// <summary>Immutable full-information engine snapshot. A future UI must hide private zones.</summary>
 public sealed class DuelPlayerState

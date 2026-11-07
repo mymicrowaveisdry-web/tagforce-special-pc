@@ -12,11 +12,45 @@ public abstract record EffectStep
     private protected EffectStep() { }
 }
 
-/// <summary>The activating player gains LP (existing integer saturation policy).</summary>
-public sealed record GainLifePointsStep(int Amount) : EffectStep;
+/// <summary>Which players an LP step applies to, relative to the activating player.</summary>
+public enum EffectPlayers { Self, Opponent, Both }
 
-/// <summary>Effect damage to the activating player's opponent; zero LP is an immediate terminal defeat.</summary>
-public sealed record DealDamageStep(int Amount) : EffectStep;
+/// <summary>
+/// A public count an LP amount is multiplied by, read at resolution. A definition with a counted step can be
+/// activated only while every counted step's count is at least 1 (deliberate PC reading of the original-era
+/// rulings; no PSP observation). The set is closed.
+/// </summary>
+public enum EffectCount
+{
+    None,
+    /// <summary>Monsters the opponent controls (face-down included).</summary>
+    OpponentMonsters,
+    /// <summary>Monsters on the field, both sides.</summary>
+    AllMonsters,
+    OpponentHand,
+    /// <summary>Cards in the opponent's hand plus every card they control (monster, Spell/Trap and Pendulum zones).</summary>
+    OpponentHandAndField,
+    OpponentGraveyard,
+    OpponentBanished
+}
+
+/// <summary>
+/// The listed players gain <see cref="Amount"/> LP (times <see cref="PerCount"/> when set), controller first, with
+/// the existing integer saturation policy.
+/// </summary>
+public sealed record GainLifePointsStep(int Amount, EffectPlayers Players = EffectPlayers.Self,
+    EffectCount PerCount = EffectCount.None) : EffectStep;
+
+/// <summary>
+/// Effect damage to the activating player's opponent (times <see cref="PerCount"/> when set); zero LP is an
+/// immediate terminal defeat.
+/// </summary>
+public sealed record DealDamageStep(int Amount, EffectCount PerCount = EffectCount.None) : EffectStep;
+
+/// <summary>
+/// Simultaneous effect damage to both players. If both reach 0 LP, the duel is a draw; if one does, that player loses.
+/// </summary>
+public sealed record DamageBothPlayersStep(int ToOpponent, int ToSelf) : EffectStep;
 
 /// <summary>
 /// Shuffles the activating player's Deck with the duel's seeded generator. The event carries no order; views
@@ -159,6 +193,12 @@ public sealed class EffectDefinition
     };
 
     internal bool SummonsMonsters => Steps.Any(s => s is SummonTokensStep or SpecialSummonStep);
+    internal IEnumerable<EffectCount> Counts => Steps.Select(s => s switch
+    {
+        GainLifePointsStep g => g.PerCount,
+        DealDamageStep d => d.PerCount,
+        _ => EffectCount.None
+    }).Where(c => c != EffectCount.None);
     internal bool RespondsOnly => Conditions.Any(c => c is RespondsToSpellActivationCondition);
 
     public EffectDefinition(string effectId, uint cardId, EffectKind kind, IEnumerable<EffectStep> steps,
@@ -175,8 +215,9 @@ public sealed class EffectDefinition
         foreach (var step in snapshot)
             if (step switch
                 {
-                    GainLifePointsStep s => s.Amount <= 0,
-                    DealDamageStep s => s.Amount <= 0,
+                    GainLifePointsStep s => s.Amount <= 0 || !Enum.IsDefined(s.Players) || !Enum.IsDefined(s.PerCount),
+                    DealDamageStep s => s.Amount <= 0 || !Enum.IsDefined(s.PerCount),
+                    DamageBothPlayersStep s => s.ToOpponent <= 0 || s.ToSelf <= 0,
                     // Validated by their constructors; the engine checks Token rules and the seed.
                     SummonTokensStep or ShuffleDeckStep or SpecialSummonStep => false,
                     DestroyTargetStep or DestroyOpponentFaceUpMonstersStep or NegateActivationStep => false,

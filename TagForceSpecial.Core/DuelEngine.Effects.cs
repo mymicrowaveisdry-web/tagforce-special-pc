@@ -63,6 +63,8 @@ public sealed partial class DuelEngine
             };
             if (!met) return DuelError.ActivationConditionNotMet;
         }
+        // A counted amount needs something to count when activated (it is read again at resolution).
+        if (definition.Counts.Any(count => CountFor(State, playerId, count) == 0)) return DuelError.ActivationConditionNotMet;
         if (definition.SummonsMonsters && IsSummonLocked(State, playerId)) return DuelError.SummonLocked;
         if (definitionDecisions.TryGetValue(definition.CardId, out var sequence) &&
             Enumerable.Range(0, sequence.Steps.Count).Any(i => CreateDecision(sequence, i, [], card.InstanceId, playerId) is null))
@@ -289,8 +291,10 @@ public sealed partial class DuelEngine
             else
                 state = step switch
                 {
-                    GainLifePointsStep gain => GainLifePoints(state, controller, gain.Amount, definition.EffectId, events),
-                    DealDamageStep damage => DealEffectDamage(state, Other(controller), damage.Amount, definition.EffectId, events),
+                    GainLifePointsStep gain => GainForPlayers(state, controller, gain, definition.EffectId, events),
+                    DealDamageStep damage => Scaled(state, controller, damage.Amount, damage.PerCount) is int amount and > 0
+                        ? DealEffectDamage(state, Other(controller), amount, definition.EffectId, events) : state,
+                    DamageBothPlayersStep both => DamageBothPlayers(state, controller, both, definition.EffectId, events),
                     SummonTokensStep tokens => SummonTokens(state, link, tokens, events),
                     ShuffleDeckStep => ShuffleDeck(state, controller, definition.EffectId, events),
                     DestroyTargetStep => DestroyTarget(state, link, events),
@@ -412,6 +416,62 @@ public sealed partial class DuelEngine
             events.Add(new TokenSpecialSummoned(controller, free[i], token));
         }
         return state.With(player: state.GetPlayer(controller).With(monsters: zones));
+    }
+
+    /// <summary>The current value of a public count, from the activating player's point of view.</summary>
+    private static int CountFor(DuelState state, PlayerId controller, EffectCount count)
+    {
+        var own = state.GetPlayer(controller);
+        var opponent = state.GetPlayer(Other(controller));
+        int Monsters(DuelPlayerState p) => p.MonsterZones.Count(m => m is not null);
+        return count switch
+        {
+            EffectCount.None => 1,
+            EffectCount.OpponentMonsters => Monsters(opponent),
+            EffectCount.AllMonsters => Monsters(own) + Monsters(opponent),
+            EffectCount.OpponentHand => opponent.Hand.Count,
+            EffectCount.OpponentHandAndField => opponent.Hand.Count + Monsters(opponent) +
+                opponent.SpellTrapFields.Count(f => f is not null) + opponent.PendulumZones.Count(f => f is not null),
+            EffectCount.OpponentGraveyard => opponent.Graveyard.Count,
+            EffectCount.OpponentBanished => opponent.Banished.Count,
+            _ => throw new ArgumentOutOfRangeException(nameof(count))
+        };
+    }
+
+    /// <summary>Amount times the count, saturated to the integer range; zero when nothing is counted.</summary>
+    private static int Scaled(DuelState state, PlayerId controller, int amount, EffectCount count) =>
+        (int)Math.Min(int.MaxValue, (long)amount * CountFor(state, controller, count));
+
+    private DuelState GainForPlayers(DuelState state, PlayerId controller, GainLifePointsStep step, string effectId, List<DuelEvent> events)
+    {
+        int amount = Scaled(state, controller, step.Amount, step.PerCount);
+        if (amount == 0) return state;
+        if (step.Players is EffectPlayers.Self or EffectPlayers.Both) state = GainLifePoints(state, controller, amount, effectId, events);
+        if (step.Players is EffectPlayers.Opponent or EffectPlayers.Both) state = GainLifePoints(state, Other(controller), amount, effectId, events);
+        return state;
+    }
+
+    /// <summary>Both players take damage at once (opponent's event first); both at 0 LP is a draw.</summary>
+    private static DuelState DamageBothPlayers(DuelState state, PlayerId controller, DamageBothPlayersStep step, string effectId,
+        List<DuelEvent> events)
+    {
+        var opponent = state.GetPlayer(Other(controller));
+        var self = state.GetPlayer(controller);
+        int opponentAfter = Math.Max(0, opponent.LifePoints - step.ToOpponent);
+        int selfAfter = Math.Max(0, self.LifePoints - step.ToSelf);
+        events.Add(new EffectDamageDealt(opponent.Id, opponent.LifePoints - opponentAfter, opponent.LifePoints, opponentAfter, effectId));
+        events.Add(new EffectDamageDealt(self.Id, self.LifePoints - selfAfter, self.LifePoints, selfAfter, effectId));
+        var next = state.With(player: opponent.With(lifePoints: opponentAfter)).With(player: self.With(lifePoints: selfAfter));
+        DuelOutcome? outcome = (opponentAfter, selfAfter) switch
+        {
+            (0, 0) => new(null, null, DuelEndReason.BothLifePointsDepleted),
+            (0, _) => new(controller, opponent.Id, DuelEndReason.LifePointsDepleted),
+            (_, 0) => new(opponent.Id, controller, DuelEndReason.LifePointsDepleted),
+            _ => null
+        };
+        if (outcome is null) return next;
+        events.Add(new DuelEnded(outcome));
+        return next.With(outcome: outcome);
     }
 
     private DuelState GainLifePoints(DuelState state, PlayerId recipient, int amount, string effectId, List<DuelEvent> events)

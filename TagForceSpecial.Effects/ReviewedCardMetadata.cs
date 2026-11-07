@@ -11,12 +11,13 @@ namespace TagForceSpecial.Effects;
 /// </summary>
 public static class ReviewedCardMetadata
 {
-    /// <summary>The frozen converter baseline, every reviewed effect-free Normal Monster and the 10C-2 batch.</summary>
+    /// <summary>The frozen converter baseline, every reviewed effect-free Normal Monster and the 10C-2/10C-3 batches.</summary>
     public static IReadOnlyDictionary<uint, CardStaticMetadata> Reviewed { get; } =
         TfspCardMetadata.Reviewed
             .Concat(TfspNormalMonsters.Ids.Where(id => !TfspCardMetadata.Reviewed.ContainsKey(id))
                 .Select(id => new KeyValuePair<uint, CardStaticMetadata>(id, new(CardKind.Monster, CardEffectBinding.None))))
             .Concat(ChainCardFamily.Reviewed)
+            .Concat(LifePointFamily.Reviewed)
             .ToFrozenDictionary();
 
     /// <summary>Full reviewed overlay for the reviewed build; throws for any other source.</summary>

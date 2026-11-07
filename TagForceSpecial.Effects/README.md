@@ -3,6 +3,7 @@
 [`PlayablePreview`](PlayablePreview.cs) defines the tested 14-card [preview pool](Preview.md).
 [`NormalMonsterFamily`](NormalMonsterFamily.cs) supports all 665 reviewed Normal Monsters: Level 1–4 Normal Summon/Set, Level 5–8 Tribute Summon/Set, being Tributed, flip and basic battle; combine with other profiles through `RulesWith`. Tokens are excluded from release manifests.
 [`ChainCardFamily`](ChainCardFamily.cs) supports Mystical Space Typhoon, Magic Jammer, Lightning Vortex, Scapegoat and Emergency Teleport as `EffectDefinition`s on the shared Core pipeline, with their rules, Sheep Tokens and a reviewed 24-card Level 1–3 Psychic list.
+[`LifePointFamily`](LifePointFamily.cs) supports 13 LP Normal Spells/Traps: fixed amounts (four corroborated by the signed LP table), both-player effects (a simultaneous double knockout is a draw) and amounts counted at resolution.
 [`ReviewedCardMetadata`](ReviewedCardMetadata.cs) overlays reviewed metadata when a catalog is opened; converted packages keep the frozen Cards baseline, so review batches never change pinned cache bytes or artwork bindings.
 
 ```csharp
