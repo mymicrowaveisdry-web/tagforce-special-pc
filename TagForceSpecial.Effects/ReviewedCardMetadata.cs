@@ -14,6 +14,7 @@ public static class ReviewedCardMetadata
             .Concat(ChainCardFamily.Reviewed)
             .Concat(LifePointFamily.Reviewed)
             .Concat(DeckOperationFamily.Reviewed)
+            .Concat(RemovalFamily.Reviewed)
             .ToFrozenDictionary();
 
     /// <summary>Full reviewed overlay for the reviewed build; throws for any other source.</summary>

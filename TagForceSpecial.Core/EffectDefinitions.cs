@@ -214,6 +214,8 @@ public sealed class EffectDefinition
     public IReadOnlyList<EffectCondition> Conditions { get; }
     public EffectCost? Cost { get; }
     public EffectTarget? Target { get; }
+    /// <summary>Field targets chosen in order at activation, each spec for its own count.</summary>
+    public IReadOnlyList<FieldTarget> FieldTargets { get; }
     /// <summary>
     /// On activation, the activating player cannot Summon other monsters for the rest of the turn (Sets remain
     /// legal). Applied at commit, so it holds even if the activation is later negated.
@@ -234,11 +236,12 @@ public sealed class EffectDefinition
         DealDamageStep d => d.PerCount,
         _ => EffectCount.None
     }).Where(c => c != EffectCount.None);
+    internal bool UsesFieldTargets => Steps.Any(s => s is DestroyTargetsStep or ReturnTargetsToHandStep or ChangeTargetsToDefenseStep);
     internal bool RespondsOnly => Conditions.Any(c => c is RespondsToSpellActivationCondition);
 
     public EffectDefinition(string effectId, uint cardId, EffectKind kind, IEnumerable<EffectStep> steps,
         IEnumerable<EffectCondition>? conditions = null, EffectCost? cost = null, EffectTarget? target = null,
-        bool locksOtherSummonsThisTurn = false)
+        bool locksOtherSummonsThisTurn = false, IEnumerable<FieldTarget>? fieldTargets = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(effectId);
         ArgumentNullException.ThrowIfNull(steps);
@@ -260,13 +263,18 @@ public sealed class EffectDefinition
                     AddFromDeckToHandStep s => s.Filter is null,
                     SendFromDeckToGraveyardStep s => s.Filter is null,
                     DestroyTargetStep or DestroyOpponentFaceUpMonstersStep or NegateActivationStep => false,
+                    DestroyTargetsStep or ReturnTargetsToHandStep or ChangeTargetsToDefenseStep => false,
+                    DestroyAllStep s => !Enum.IsDefined(s.Kind) || !Enum.IsDefined(s.Side) || !Enum.IsDefined(s.Filter),
+                    ReturnAllToHandStep s => !Enum.IsDefined(s.Kind) || !Enum.IsDefined(s.Side),
+                    ChangeAllToDefenseStep s => !Enum.IsDefined(s.Side),
+                    DestroyExtremeMonsterStep s => !Enum.IsDefined(s.Side) || !Enum.IsDefined(s.Stat) || !Enum.IsDefined(s.Extreme) || !Enum.IsDefined(s.Filter),
                     _ => true
                 })
                 throw new ArgumentException("Steps must be supported Core operations with positive amounts.", nameof(steps));
         var required = (conditions ?? []).Take(9).ToArray();
         if (required.Length > 8 || required.Any(c => c is null) || required.Distinct().Count() != required.Length)
             throw new ArgumentException("Supply up to 8 distinct conditions.", nameof(conditions));
-        if (cost is not (null or DiscardCost)) throw new ArgumentOutOfRangeException(nameof(cost));
+        if (cost is not (null or DiscardCost or PayLifePointsCost)) throw new ArgumentOutOfRangeException(nameof(cost));
         if (target is not (null or SpellTrapOnFieldTarget)) throw new ArgumentOutOfRangeException(nameof(target));
         bool responds = required.Any(c => c is RespondsToSpellActivationCondition);
         if (responds && kind == EffectKind.NormalSpell)
@@ -275,6 +283,11 @@ public sealed class EffectDefinition
             throw new ArgumentException("Negating an activation requires a response condition.", nameof(steps));
         if ((target is not null) != snapshot.Any(s => s is DestroyTargetStep))
             throw new ArgumentException("A Spell/Trap target and a target-destruction step go together.", nameof(target));
+        var fields = (fieldTargets ?? []).Take(6).ToArray();
+        if (fields.Any(f => f is null) || fields.Sum(f => f.Count) > 5 || fields.Length != 0 && target is not null ||
+            (fields.Length != 0) != snapshot.Any(s => s is DestroyTargetsStep or ReturnTargetsToHandStep or ChangeTargetsToDefenseStep) ||
+            snapshot.Any(s => s is ChangeTargetsToDefenseStep) && fields.Any(f => f.Kind != FieldCardKind.Monster))
+            throw new ArgumentException("Field targets (up to 5) and the steps that use them go together.", nameof(fieldTargets));
         EffectId = effectId;
         CardId = cardId;
         Kind = kind;
@@ -282,6 +295,7 @@ public sealed class EffectDefinition
         Conditions = Array.AsReadOnly(required);
         Cost = cost;
         Target = target;
+        FieldTargets = Array.AsReadOnly(fields);
         LocksOtherSummonsThisTurn = locksOtherSummonsThisTurn;
     }
 }

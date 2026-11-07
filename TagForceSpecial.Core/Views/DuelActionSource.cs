@@ -110,6 +110,10 @@ public sealed class DuelActionSource
                     target.Card.InstanceId, target.IsPendulumZone), ActionKind.ChooseTarget,
                     $"Target P{(int)target.Player + 1} {(target.IsPendulumZone ? "scale" : "zone")} {target.Zone + 1}",
                     zone: target.IsPendulumZone ? 1 : 0, target: target.Zone, targetPlayer: target.Player);
+            foreach (var field in decision.FieldTargetOptions ?? [])
+                yield return B(new ChooseDecisionFieldTarget(player, decision.DecisionId, field.Player, field.Location, field.Zone,
+                    field.Card.InstanceId), ActionKind.ChooseTarget, $"Target P{(int)field.Player + 1} {field.Location} {field.Zone + 1}",
+                    zone: (int)field.Location, target: field.Zone, targetPlayer: field.Player);
             yield break;
         }
         if (state.OpenWindow is { } window)

@@ -5,6 +5,7 @@
 [`ChainCardFamily`](ChainCardFamily.cs) supports Mystical Space Typhoon, Magic Jammer, Lightning Vortex, Scapegoat and Emergency Teleport as `EffectDefinition`s on the shared Core pipeline, with their rules, Sheep Tokens and a reviewed 24-card Level 1–3 Psychic list.
 [`LifePointFamily`](LifePointFamily.cs) supports 13 LP Normal Spells/Traps: fixed amounts (four corroborated by the signed LP table), both-player effects (a simultaneous double knockout is a draw) and amounts counted at resolution.
 [`DeckOperationFamily`](DeckOperationFamily.cs) supports 10 draw, Deck search, Deck-to-Graveyard and mill cards; search filters are reviewed ID lists (e.g. every icon-2 Field Spell).
+[`RemovalFamily`](RemovalFamily.cs) supports 15 destroy, return and position-change cards by field target, "all matching" or highest/lowest stat.
 [`ReviewedCardMetadata`](ReviewedCardMetadata.cs) overlays reviewed metadata when a catalog is opened; converted packages keep the frozen Cards baseline, so review batches never change pinned cache bytes or artwork bindings.
 
 ```csharp

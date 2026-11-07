@@ -62,9 +62,18 @@ public sealed partial class DuelEngine
         // A counted amount needs something to count when activated (it is read again at resolution).
         if (definition.Counts.Any(count => CountFor(State, playerId, count) == 0)) return DuelError.ActivationConditionNotMet;
         if (definition.SummonsMonsters && IsSummonLocked(State, playerId)) return DuelError.SummonLocked;
-        if (definitionDecisions.TryGetValue(definition.CardId, out var sequence) &&
-            Enumerable.Range(0, sequence.Steps.Count).Any(i => CreateDecision(sequence, i, [], card.InstanceId, playerId) is null))
-            return DuelError.DecisionUnavailable;
+        if (definition.Cost is PayLifePointsCost pay && player.LifePoints <= pay.Amount) return DuelError.InsufficientLifePoints;
+        if (definitionDecisions.TryGetValue(definition.CardId, out var sequence))
+        {
+            // Simulate one pick per field target so several targets need distinct cards.
+            List<DecisionAnswer> simulated = [];
+            for (int i = 0; i < sequence.Steps.Count; i++)
+            {
+                var decision = CreateDecision(sequence, i, simulated, card.InstanceId, playerId);
+                if (decision is null) return DuelError.DecisionUnavailable;
+                if (decision.FieldTargetOptions is { } options) simulated.Add(new(DecisionKind.FieldTarget, FieldTarget: options[0]));
+            }
+        }
         if (definition.Steps.OfType<SpecialSummonStep>().Any(s => !SpecialSummonOptions(State, playerId, s, card).Any()))
             return DuelError.DecisionUnavailable;
         // Deck operations need enough cards now; a choice needs a matching card.
@@ -76,6 +85,10 @@ public sealed partial class DuelEngine
                 MillTopOfDeckStep mill => player.Deck.Count < mill.Count,
                 AddFromDeckToHandStep search => !DeckMatches(State, playerId, search.Filter).Any(),
                 SendFromDeckToGraveyardStep send => !DeckMatches(State, playerId, send.Filter).Any(),
+                DestroyAllStep all => !FieldMatches(State, playerId, all.Kind, all.Side, all.Filter, card.InstanceId).Any(),
+                ReturnAllToHandStep all => !FieldMatches(State, playerId, all.Kind, all.Side, FieldCardFilter.Any, card.InstanceId).Any(),
+                ChangeAllToDefenseStep all => !FieldMatches(State, playerId, FieldCardKind.Monster, all.Side, FieldCardFilter.AttackPosition, null).Any(),
+                DestroyExtremeMonsterStep extreme => ExtremeCandidates(State, playerId, extreme).Length == 0,
                 _ => false
             };
             if (unavailable) return DuelError.DecisionUnavailable;
@@ -142,15 +155,22 @@ public sealed partial class DuelEngine
         slots[zone] = source is null ? new(card, true, placement) : source with { IsFaceUp = true };
         var placed = state.With(player: player.With(hand: player.Hand.Where(c => c.InstanceId != card.InstanceId), spellTraps: slots));
         var activated = new SpellActivated(playerId, definition.EffectId, card, zone);
+        DuelEvent[] head = [.. lead, activated];
+        if (definition.Cost is PayLifePointsCost pay)
+        {
+            var payer = placed.GetPlayer(playerId);
+            placed = placed.With(player: payer.With(lifePoints: payer.LifePoints - pay.Amount));
+            head = [.. head, new LifePointsPaid(playerId, pay.Amount, payer.LifePoints, payer.LifePoints - pay.Amount, definition.EffectId)];
+        }
         if (definitionDecisions.TryGetValue(definition.CardId, out var sequence))
         {
             var decision = CreateDecision(sequence, 0, [], card.InstanceId, playerId)!;
             var pending = new PendingSpellActivation(playerId, definition.EffectId, card, zone,
                 ResponseToLink: chain?.Links[^1].Number ?? 0, SourcePlacementId: placement);
-            return Accept(placed.WithActivation(pending).WithDecision(decision), [.. lead, activated, new DecisionRequested(decision)]);
+            return Accept(placed.WithActivation(pending).WithDecision(decision), [.. head, new DecisionRequested(decision)]);
         }
         return AddDefinitionLink(placed, new(playerId, definition.EffectId, card, zone, null, null), definition, placement,
-            chain, [.. lead, activated]);
+            chain, [.. head]);
     }
 
     /// <summary>Cost then target answers; the final answer adds the link. The cost stays paid if a later step waits.</summary>
@@ -188,7 +208,8 @@ public sealed partial class DuelEngine
         var result = new DecisionSequenceResult(pending, answers);
         var target = answers.SingleOrDefault(a => a.Kind == DecisionKind.SpellTrapTarget)?.Target;
         var receipt = new CommittedActivation(player.Id, definition.EffectId, activation.Spell,
-            activation.SpellTrapZone, activation.DiscardedCost, target);
+            activation.SpellTrapZone, activation.DiscardedCost, target,
+            answers.Any(a => a.FieldTarget is not null) ? Array.AsReadOnly(answers.Select(a => a.FieldTarget).OfType<FieldCardTarget>().ToArray()) : null);
         events.Add(new DecisionSequenceCompleted(result));
         return AddDefinitionLink(next.WithDecision(null, result).WithActivation(null), receipt, definition,
             activation.SourcePlacementId, chain, events);
@@ -291,6 +312,39 @@ public sealed partial class DuelEngine
                     definition.EffectId, events);
                 choice = null;
             }
+            else if (step is DestroyTargetsStep or ReturnTargetsToHandStep or ChangeTargetsToDefenseStep)
+            {
+                var valid = QualifyingTargets(state, link, definition).ToArray();
+                if (valid.Length == 0)
+                {
+                    // With every target gone, the rest of the effect does not resolve.
+                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
+                    break;
+                }
+                foreach (var target in valid)
+                    state = step switch
+                    {
+                        DestroyTargetsStep => DestroyFieldCard(state, target, events),
+                        ReturnTargetsToHandStep => ReturnFieldCardToHand(state, target, definition.EffectId, events),
+                        _ => ChangeToDefense(state, target, events)
+                    };
+            }
+            else if (step is DestroyExtremeMonsterStep extreme)
+            {
+                var tied = ExtremeCandidates(state, controller, extreme);
+                if (tied.Length == 0)
+                {
+                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
+                    continue;
+                }
+                var chosen = tied.Length == 1 ? tied[0]
+                    : choice is ChooseDefinitionCard pick ? tied.FirstOrDefault(t => t.Card.InstanceId == pick.CardInstanceId) : null;
+                if (chosen is null)
+                    return (state, new PendingDefinitionCardChoice(checked(State.Revision + 1), controller, definition.EffectId,
+                        link.Number, i, tied.Select(t => t.Card)));
+                state = DestroyFieldCard(state, chosen, events);
+                choice = null;
+            }
             else if (step is SpecialSummonStep summon)
             {
                 if (choice is not ChooseDefinitionSummon summonChoice)
@@ -323,11 +377,127 @@ public sealed partial class DuelEngine
                     DrawCardsStep draw => DrawingPlayers(controller, draw.Players)
                         .Aggregate(state, (s, p) => s.Outcome is null ? DrawCards(s, p, draw.Count, events) : s),
                     MillTopOfDeckStep mill => MillTop(state, controller, mill.Count, definition.EffectId, events),
+                    DestroyAllStep all => FieldMatches(state, controller, all.Kind, all.Side, all.Filter, link.Activation.Spell.InstanceId)
+                        .ToArray().Aggregate(state, (s, t) => DestroyFieldCard(s, t, events)),
+                    ReturnAllToHandStep all => FieldMatches(state, controller, all.Kind, all.Side, FieldCardFilter.Any, link.Activation.Spell.InstanceId)
+                        .ToArray().Aggregate(state, (s, t) => ReturnFieldCardToHand(s, t, definition.EffectId, events)),
+                    ChangeAllToDefenseStep all => FieldMatches(state, controller, FieldCardKind.Monster, all.Side, FieldCardFilter.AttackPosition, null)
+                        .ToArray().Aggregate(state, (s, t) => ChangeToDefense(s, t, events)),
                     _ => throw new InvalidOperationException("Unsupported effect step.")
                 };
             if (state.Outcome is not null) break;
         }
         return (state, null);
+    }
+
+    /// <summary>Matching field cards, the activating player's side first: monsters, then Spell/Trap and Pendulum zones.</summary>
+    private static IEnumerable<FieldCardTarget> FieldMatches(DuelState state, PlayerId controller, FieldCardKind kind, TargetSide side,
+        FieldCardFilter filter, int? excludeInstanceId)
+    {
+        PlayerId[] players = side switch
+        {
+            TargetSide.Own => [controller],
+            TargetSide.Opponent => [Other(controller)],
+            _ => [controller, Other(controller)]
+        };
+        foreach (var id in players)
+        {
+            var player = state.GetPlayer(id);
+            if (kind != FieldCardKind.SpellTrap)
+                for (int zone = 0; zone < 5; zone++)
+                    if (player.MonsterZones[zone] is { } monster && monster.Card.InstanceId != excludeInstanceId && filter switch
+                        {
+                            FieldCardFilter.Any => true,
+                            FieldCardFilter.FaceUp => monster.Position != BattlePosition.FaceDownDefense,
+                            FieldCardFilter.AttackPosition or FieldCardFilter.FaceUpAttack => monster.Position == BattlePosition.FaceUpAttack,
+                            FieldCardFilter.DefensePosition => monster.Position != BattlePosition.FaceUpAttack,
+                            _ => false
+                        })
+                        yield return new(id, FieldLocation.MonsterZone, zone, monster.Card, monster.PlacementId);
+            if (kind == FieldCardKind.Monster || filter is not (FieldCardFilter.Any or FieldCardFilter.FaceUp)) continue;
+            for (int zone = 0; zone < 5; zone++)
+                if (player.SpellTrapFields[zone] is { } field && field.Card.InstanceId != excludeInstanceId &&
+                    (filter == FieldCardFilter.Any || field.IsFaceUp))
+                    yield return new(id, FieldLocation.SpellTrapZone, zone, field.Card, field.PlacementId);
+            for (int zone = 0; zone < 2; zone++)
+                if (player.PendulumZones[zone] is { } scale && scale.Card.InstanceId != excludeInstanceId)
+                    yield return new(id, FieldLocation.PendulumZone, zone, scale.Card, scale.PlacementId);
+        }
+    }
+
+    /// <summary>The link's bound field targets that are still in place and still match their specification.</summary>
+    private static IEnumerable<FieldCardTarget> QualifyingTargets(DuelState state, ChainLink link, EffectDefinition definition)
+    {
+        var specs = definition.FieldTargets.SelectMany(s => Enumerable.Repeat(s, s.Count));
+        foreach (var (spec, target) in specs.Zip(link.Activation.FieldTargets ?? []))
+            if (target.IsStillPresent(state) && FieldMatches(state, link.Activation.Player, spec.Kind, spec.Side, spec.Filter, null)
+                    .Any(m => m.Card == target.Card))
+                yield return target;
+    }
+
+    /// <summary>Face-up monsters sharing the lowest or highest current stat; monsters without that stat are ignored.</summary>
+    private FieldCardTarget[] ExtremeCandidates(DuelState state, PlayerId controller, DestroyExtremeMonsterStep step)
+    {
+        var rated = FieldMatches(state, controller, FieldCardKind.Monster, step.Side, step.Filter, null)
+            .Select(t => (Target: t, Stats: GetMonsterStatistics(state, t.Player, t.Zone)))
+            .Select(x => (x.Target, Value: step.Stat == MonsterStat.Attack ? x.Stats?.Attack : x.Stats?.Defense))
+            .Where(x => x.Value is not null).ToArray();
+        if (rated.Length == 0) return [];
+        int best = step.Extreme == StatExtreme.Lowest ? rated.Min(x => x.Value!.Value) : rated.Max(x => x.Value!.Value);
+        return rated.Where(x => x.Value == best).Select(x => x.Target).ToArray();
+    }
+
+    private static DuelState RemovePlacement(DuelState state, FieldCardTarget target)
+    {
+        var player = state.GetPlayer(target.Player);
+        switch (target.Location)
+        {
+            case FieldLocation.MonsterZone:
+                var monsters = player.MonsterZones.ToArray(); monsters[target.Zone] = null;
+                return state.With(player: player.With(monsters: monsters));
+            case FieldLocation.SpellTrapZone:
+                var slots = player.SpellTrapFields.ToArray(); slots[target.Zone] = null;
+                return state.With(player: player.With(spellTraps: slots));
+            default:
+                var scales = player.PendulumZones.ToArray(); scales[target.Zone] = null;
+                return state.With(player: player.With(pendulumZones: scales));
+        }
+    }
+
+    private DuelState DestroyFieldCard(DuelState state, FieldCardTarget target, List<DuelEvent> events) =>
+        target.Location == FieldLocation.MonsterZone
+            ? SendFieldCardToGraveyard(RemovePlacement(state, target), target.Card, new MonsterDestroyed(target.Player, target.Zone, target.Card), events)
+            : RemoveFieldSpell(state, new SpellTrapTarget(target.Player, target.Zone, target.Card, target.PlacementId,
+                target.Location == FieldLocation.PendulumZone),
+                new SpellTrapDestroyed(target.Player, target.Zone, target.Card, target.Location == FieldLocation.PendulumZone), events);
+
+    /// <summary>Returns a field card to its owner's hand; Extra Deck monsters go to the Extra Deck and Tokens cease to exist.</summary>
+    private DuelState ReturnFieldCardToHand(DuelState state, FieldCardTarget target, string effectId, List<DuelEvent> events)
+    {
+        state = RemovePlacement(state, target);
+        var card = target.Card;
+        if (IsTokenId(card.GameCardId))
+        {
+            events.Add(new CardReturnedToHand(card.Owner, card, effectId) { FieldDestination = FieldCardDestination.Removed });
+            events.Add(new TokenRemoved(card.Owner, card) { FieldDestination = FieldCardDestination.Removed });
+            return state;
+        }
+        bool extra = rules.TryGetValue(card.GameCardId, out var rule) && rule.AllowsExtraDeck;
+        var owner = state.GetPlayer(card.Owner);
+        state = state.With(player: extra ? owner.With(extraDeck: owner.ExtraDeck.Append(card)) : owner.With(hand: owner.Hand.Append(card)));
+        events.Add(new CardReturnedToHand(card.Owner, card, effectId)
+            { FieldDestination = extra ? FieldCardDestination.ExtraDeck : FieldCardDestination.Hand });
+        return state;
+    }
+
+    private static DuelState ChangeToDefense(DuelState state, FieldCardTarget target, List<DuelEvent> events)
+    {
+        var player = state.GetPlayer(target.Player);
+        if (player.MonsterZones[target.Zone] is not { Position: BattlePosition.FaceUpAttack } monster) return state;
+        var zones = player.MonsterZones.ToArray();
+        zones[target.Zone] = monster with { Position = BattlePosition.FaceUpDefense };
+        events.Add(new MonsterPositionChanged(player.Id, target.Zone, BattlePosition.FaceUpAttack, BattlePosition.FaceUpDefense));
+        return state.With(player: player.With(monsters: zones));
     }
 
     private static IEnumerable<PlayerId> DrawingPlayers(PlayerId controller, EffectPlayers players) => players switch
@@ -404,9 +574,7 @@ public sealed partial class DuelEngine
         var pending = chain.DefinitionCardChoice!;
         if (command.DecisionId != pending.DecisionId) return Reject(DuelError.StaleDecision);
         if (command.Player != pending.Player) return Reject(DuelError.NotActivePlayer);
-        if (!pending.Options.Any(c => c.InstanceId == command.CardInstanceId) ||
-            !State.GetPlayer(pending.Player).Deck.Any(c => c.InstanceId == command.CardInstanceId))
-            return Reject(DuelError.InvalidDecisionChoice);
+        if (!pending.Options.Any(c => c.InstanceId == command.CardInstanceId)) return Reject(DuelError.InvalidDecisionChoice);
         return ResolveChainLink(chain, definitionChoice: command);
     }
 

@@ -22,11 +22,16 @@ public sealed partial class DuelEngine
                 .Concat(p.PendulumZones.Select((field, zone) => (field, zone))
                     .Where(s => s.field is not null && s.field.Card.InstanceId != excluded)
                     .Select(s => new SpellTrapTarget(p.Id, s.zone, s.field!.Card, s.field.PlacementId, true)))).ToArray() : [];
+        FieldCardTarget[]? fieldTargets = step.FieldTargetSpec is { } spec
+            ? FieldMatches(State, player.Id, spec.Kind, spec.Side, spec.Filter, excluded)
+                .Where(t => !answers.Any(a => a.FieldTarget is { } chosen && chosen.Card == t.Card)).ToArray()
+            : null;
         if (step.Kind == DecisionKind.Card && cards.Length == 0 ||
             step.Kind == DecisionKind.MonsterZone && zones.Length == 0 ||
-            step.Kind == DecisionKind.SpellTrapTarget && targets.Length == 0)
+            step.Kind == DecisionKind.SpellTrapTarget && targets.Length == 0 ||
+            step.Kind == DecisionKind.FieldTarget && fieldTargets!.Length == 0)
             return null;
-        return new(checked(State.Revision + 1), sequence, player.Id, index, cards, zones, answers, targets);
+        return new(checked(State.Revision + 1), sequence, player.Id, index, cards, zones, answers, targets, fieldTargets);
     }
 
     private DuelActionResult BeginDecisions(string sequenceId)
@@ -54,6 +59,7 @@ public sealed partial class DuelEngine
             ChooseDecisionPosition => DecisionKind.Position,
             ChooseDecisionZone => DecisionKind.MonsterZone,
             ChooseDecisionTarget => DecisionKind.SpellTrapTarget,
+            ChooseDecisionFieldTarget => DecisionKind.FieldTarget,
             _ => (DecisionKind)(-1)
         };
         if (kind != pending.Kind) return Reject(DuelError.WrongDecisionKind);
@@ -67,11 +73,15 @@ public sealed partial class DuelEngine
                 t.Zone == c.SpellTrapZone && t.Card.InstanceId == c.CardInstanceId && t.IsPendulumZone == c.IsPendulumZone) =>
                 new(kind, Target: pending.TargetOptions.Single(t => t.Player == c.TargetPlayer &&
                     t.Zone == c.SpellTrapZone && t.Card.InstanceId == c.CardInstanceId && t.IsPendulumZone == c.IsPendulumZone)),
+            ChooseDecisionFieldTarget c when pending.FieldTargetOptions?.FirstOrDefault(t => t.Player == c.TargetPlayer &&
+                t.Location == c.Location && t.Zone == c.Zone && t.Card.InstanceId == c.CardInstanceId) is { } field =>
+                new(kind, FieldTarget: field),
             _ => null
         };
         if (answer is null) return Reject(DuelError.InvalidDecisionChoice);
         if (answer.Target is { } binding && !binding.IsStillPresent(binding.Current(State)))
             return Reject(DuelError.InvalidDecisionChoice);
+        if (answer.FieldTarget is { } bound && !bound.IsStillPresent(State)) return Reject(DuelError.InvalidDecisionChoice);
         var answers = pending.Answers.Append(answer).ToArray();
         if (State.PendingSpellActivation is { } activation && definitions.ContainsKey(activation.Spell.GameCardId))
             return AnswerDefinitionDecision(pending, answer, answers);
