@@ -18,6 +18,11 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Install verification dependencies
+        run: python3 -m pip install 'Pillow==12.1.0'
       - name: Test verification command with synthetic inputs
         run: python3 -m unittest discover -s Verification -p 'test_*.py' -v
       # Dependency locks and PSP reference fixtures remain local.
@@ -36,7 +41,7 @@ jobs:
         run: |
           $reports = @(Get-ChildItem TestResults -Filter *.trx -Recurse -ErrorAction SilentlyContinue)
           if ($reports.Count -eq 0) {
-            'No test results were produced; check the restore, build and test steps.' >> $env:GITHUB_STEP_SUMMARY
+            'No test results were produced; check the verification, restore, build and test steps.' >> $env:GITHUB_STEP_SUMMARY
             exit 1
           }
           '## C# test results' >> $env:GITHUB_STEP_SUMMARY
