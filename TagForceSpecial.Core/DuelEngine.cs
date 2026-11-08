@@ -146,8 +146,7 @@ public sealed partial class DuelEngine
         // Definitions need matching settable card rules, Token rules for Token steps and a seed for shuffles.
         if (definitionList.Any(d => d is null || d.Cost is DiscardCost { Filter: { } discardFilter } && discardFilter.CardIds.Any(id => !knownIds.Contains(id)) ||
                 d.Steps.OfType<SummonTokensStep>().Any(s => s.TokenCardIds.Any(id => !IsTokenId(id))) ||
-                shuffleSeed is null && d.Steps.Any(s => s is ShuffleDeckStep or AddFromDeckToHandStep or SendFromDeckToGraveyardStep or ShuffleTargetsIntoDeckStep ||
-                    s is SpecialSummonStep summon && summon.Sources.HasFlag(SpecialSummonSources.Deck)) ||
+                d.Kind == EffectKind.MonsterTrigger || shuffleSeed is null && NeedsShuffle(d) ||
                 !this.rules.TryGetValue(d.CardId, out var rule) || !rule.AllowsSpellTrapSet ||
                 rule.Category != (d.Kind is EffectKind.NormalSpell or EffectKind.QuickPlaySpell ? CardCategory.Spell : CardCategory.Trap) ||
 
@@ -156,6 +155,8 @@ public sealed partial class DuelEngine
             definitionList.Select(d => d.CardId).Distinct().Count() != definitionList.Length ||
             definitionList.Select(d => d.EffectId).Distinct(StringComparer.Ordinal).Count() != definitionList.Length)
             throw new ArgumentException("Effect definitions require distinct, unreserved IDs, matching settable card rules, Token rules for Token steps and a seed for shuffle steps.", nameof(effectDefinitions));
+        if (shuffleSeed is null && triggerEffects.Any(p => p.Definition is { } d && NeedsShuffle(d)))
+            throw new ArgumentException("Triggers that search or Summon from the Deck need a seed.", nameof(shuffleSeed));
         definitions = definitionList.ToFrozenDictionary(d => d.CardId);
         definitionDecisions = definitionList.Where(d => d.Cost is DiscardCost or TributeCost || d.Target is not null || d.FieldTargets.Any(t => !EffectDefinition.IsAutomatic(t)))
             .ToFrozenDictionary(d => d.CardId, d => new DecisionSequence(DefinitionSequenceId(d),
@@ -192,6 +193,10 @@ public sealed partial class DuelEngine
             bookkeeping: new(nextInstance, shuffleSeed is { } seed ? DuelRandomState.FromSeed(seed) : null));
     }
 
+    private static bool NeedsShuffle(EffectDefinition definition) => definition.Steps.Any(s =>
+        s is ShuffleDeckStep or AddFromDeckToHandStep or SendFromDeckToGraveyardStep or ShuffleTargetsIntoDeckStep ||
+        s is SpecialSummonStep summon && summon.Sources.HasFlag(SpecialSummonSources.Deck));
+
     private bool IsTokenId(uint id) => rules.TryGetValue(id, out var rule) && rule.IsToken;
     private static string DefinitionSequenceId(EffectDefinition definition) => $"activation:{definition.EffectId}";
 
@@ -225,7 +230,7 @@ public sealed partial class DuelEngine
         if (State.PendingSummon is not null) return ExecuteSummonWindow(command);
         if (command is PassSummonResponse or ActivateSummonNegation) return Reject(DuelError.NoPendingSummon);
         if (command is PassChainResponse or ActivateChainResponse or ActivateHandChainResponse or ResolveNextChainLink or
-            ChooseEffectSummon or ChooseDefinitionSummon or ChooseDefinitionCard) return Reject(DuelError.NoPendingChain);
+            ChooseEffectSummon or ChooseDefinitionSummon or FinishDefinitionSummon or ChooseDefinitionCard) return Reject(DuelError.NoPendingChain);
         // A definition answering its cost/target decisions before its first link exists (hand, set or open-window
         // activation); the decision may belong to the non-turn player.
         if (State.PendingDecision is not null && State.PendingSpellActivation is { } activating &&
@@ -450,7 +455,7 @@ public sealed partial class DuelEngine
             var card = zones[zone]!.Card;
             zones[zone] = null;
             next = next.With(player: player.With(monsters: zones));
-            next = SendFieldCardToGraveyard(next, card, new MonsterDestroyed(playerId, zone, card), events);
+            next = SendFieldCardToGraveyard(next, card, new MonsterDestroyed(playerId, zone, card) { ByBattle = true }, events);
         }
         if (destroyAttacker) Destroy(attackerPlayer.Id, attackerZone);
         if (destroyDefender) Destroy(defenderPlayer.Id, targetZone!.Value);

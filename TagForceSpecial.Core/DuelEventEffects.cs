@@ -9,7 +9,7 @@ public sealed record MonsterBinding(PlayerId Player, int Zone, CardInstance Card
 }
 public sealed record EffectTimingPoint(long TransitionId, int Step);
 public sealed record MonsterEventOccurrence(MonsterEventKind Kind, MonsterBinding Subject,
-    EffectTimingPoint? TimingPoint = null, bool IsActivationCost = false);
+    EffectTimingPoint? TimingPoint = null, bool IsActivationCost = false, bool ByBattle = false);
 public sealed record TriggerActivation(int Id, TriggerEffectProfile Profile, MonsterBinding Source,
     MonsterEventOccurrence Occurrence, CardInstance? DiscardedCost = null, int PaidLifePoints = 0,
     MonsterBinding? Target = null)

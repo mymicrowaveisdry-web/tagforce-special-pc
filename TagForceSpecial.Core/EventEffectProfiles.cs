@@ -1,6 +1,8 @@
 namespace TagForceSpecial.Core;
 
-public enum MonsterEventKind { NormalSummoned, SpecialSummoned, FlipSummoned, Destroyed, SentToGraveyard, FlippedFaceUp }
+public enum MonsterEventKind { NormalSummoned, SpecialSummoned, FlipSummoned, Destroyed, SentToGraveyard, FlippedFaceUp, TributedForSummon }
+/// <summary>Narrows a Destroyed or SentToGraveyard event by where it came from or what caused it.</summary>
+public enum TriggerEventCause { Any, FromField, ByBattle }
 public enum EffectRelation { Self, Controller, Opponent, Any }
 public enum TriggerRequirement { Mandatory, Optional }
 public enum TriggerSourceLocation { FaceUpMonster, DestroyedSelf, GraveyardSelf }
@@ -58,14 +60,16 @@ public sealed class MonsterTargetPolicy
     public IReadOnlyList<uint> AllowedCardIds { get; }
     public bool ExcludeSource { get; }
     public bool RequireFaceUpAtResolution { get; }
+    /// <summary>Face-down monsters can be chosen.</summary>
+    public bool AllowFaceDown { get; }
     public MonsterTargetPolicy(EffectRelation relation, IEnumerable<uint>? allowedCardIds = null,
-        bool excludeSource = false, bool requireFaceUpAtResolution = true)
+        bool excludeSource = false, bool requireFaceUpAtResolution = true, bool allowFaceDown = false)
     {
         if (!Enum.IsDefined(relation)) throw new ArgumentOutOfRangeException(nameof(relation));
         var ids = (allowedCardIds ?? []).ToArray();
         if (ids.Any(id => id == 0) || ids.Distinct().Count() != ids.Length) throw new ArgumentException("Invalid target catalog IDs.");
         Relation = relation; AllowedCardIds = Array.AsReadOnly(ids);
-        ExcludeSource = excludeSource; RequireFaceUpAtResolution = requireFaceUpAtResolution;
+        ExcludeSource = excludeSource; RequireFaceUpAtResolution = requireFaceUpAtResolution; AllowFaceDown = allowFaceDown;
     }
 }
 
@@ -87,6 +91,18 @@ public sealed class TriggerEffectProfile
     public IReadOnlyList<uint> DiscardCardIds { get; }
     public MonsterTargetPolicy? Target { get; }
     public IReadOnlyList<TriggerEffectStep> Steps { get; }
+    /// <summary>When set, the link resolves through the shared definition steps instead of <see cref="Steps"/>.</summary>
+    public EffectDefinition? Definition { get; }
+    public TriggerEventCause Cause { get; }
+
+    /// <summary>A trigger whose resolution is a <see cref="EffectKind.MonsterTrigger"/> definition.</summary>
+    public TriggerEffectProfile(EffectDefinition definition, MonsterEventKind eventKind, EffectRelation relation, TriggerRequirement requirement,
+        TriggerSourceLocation sourceLocation = TriggerSourceLocation.FaceUpMonster, TriggerTiming timing = TriggerTiming.If,
+        TriggerEventCause cause = TriggerEventCause.Any, TriggerTurnLimit turnLimit = TriggerTurnLimit.None, string? limitKey = null,
+        bool? damageStepAllowed = null, int lifePointCost = 0, IEnumerable<uint>? discardCardIds = null, MonsterTargetPolicy? target = null,
+        int detachMaterialCount = 0)
+        : this(definition ?? throw new ArgumentNullException(nameof(definition)), cause, definition.EffectId, definition.CardId, eventKind, relation, requirement,
+            Array.Empty<TriggerEffectStep>(), sourceLocation, timing, turnLimit, limitKey, lifePointCost, discardCardIds, target, damageStepAllowed, detachMaterialCount) { }
 
     public TriggerEffectProfile(string effectId, uint cardId, MonsterEventKind eventKind,
         EffectRelation relation, TriggerRequirement requirement, TriggerOperation operation,
@@ -105,27 +121,40 @@ public sealed class TriggerEffectProfile
         TriggerTiming timing = TriggerTiming.If, TriggerTurnLimit turnLimit = TriggerTurnLimit.None,
         string? limitKey = null, int lifePointCost = 0, IEnumerable<uint>? discardCardIds = null,
         MonsterTargetPolicy? target = null, bool? damageStepAllowed = null, int detachMaterialCount = 0)
+        : this(null, TriggerEventCause.Any, effectId, cardId, eventKind, relation, requirement, steps, sourceLocation, timing, turnLimit,
+            limitKey, lifePointCost, discardCardIds, target, damageStepAllowed, detachMaterialCount) { }
+
+    private TriggerEffectProfile(EffectDefinition? definition, TriggerEventCause cause, string effectId, uint cardId, MonsterEventKind eventKind,
+        EffectRelation relation, TriggerRequirement requirement, IEnumerable<TriggerEffectStep> steps,
+        TriggerSourceLocation sourceLocation, TriggerTiming timing, TriggerTurnLimit turnLimit, string? limitKey, int lifePointCost,
+        IEnumerable<uint>? discardCardIds, MonsterTargetPolicy? target, bool? damageStepAllowed, int detachMaterialCount)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(effectId);
         ArgumentNullException.ThrowIfNull(steps);
         if (cardId == 0) throw new ArgumentOutOfRangeException(nameof(cardId));
         if (!Enum.IsDefined(eventKind) || !Enum.IsDefined(relation) || !Enum.IsDefined(requirement) ||
-            !Enum.IsDefined(sourceLocation) || !Enum.IsDefined(timing) || !Enum.IsDefined(turnLimit))
+            !Enum.IsDefined(sourceLocation) || !Enum.IsDefined(timing) || !Enum.IsDefined(turnLimit) || !Enum.IsDefined(cause))
             throw new ArgumentException("Unknown trigger metadata.");
         if (sourceLocation == TriggerSourceLocation.DestroyedSelf && (eventKind != MonsterEventKind.Destroyed || relation != EffectRelation.Self) ||
-            sourceLocation == TriggerSourceLocation.GraveyardSelf && (eventKind != MonsterEventKind.SentToGraveyard || relation != EffectRelation.Self))
+            sourceLocation == TriggerSourceLocation.GraveyardSelf && (eventKind is not (MonsterEventKind.SentToGraveyard or MonsterEventKind.TributedForSummon) || relation != EffectRelation.Self) ||
+            eventKind == MonsterEventKind.TributedForSummon && sourceLocation != TriggerSourceLocation.GraveyardSelf)
             throw new ArgumentException("Graveyard sources require the matching self event.");
+        if (cause != TriggerEventCause.Any && eventKind is not (MonsterEventKind.Destroyed or MonsterEventKind.SentToGraveyard))
+            throw new ArgumentException("Only destruction and Graveyard events have a cause.");
+        if (definition is not null && definition.Kind != EffectKind.MonsterTrigger)
+            throw new ArgumentException("A trigger definition must be a monster trigger.", nameof(definition));
         if (lifePointCost < 0 || limitKey is not null && (turnLimit == TriggerTurnLimit.None || string.IsNullOrWhiteSpace(limitKey)))
             throw new ArgumentException("Invalid activation cost or turn-limit key.");
         if (detachMaterialCount is < 0 or > 5 || detachMaterialCount != 0 && sourceLocation != TriggerSourceLocation.FaceUpMonster)
             throw new ArgumentException("Detach costs require a field source and one to five materials.");
         var discards = discardCardIds is null ? [] : DecisionStep.Card(DecisionCardSource.Hand, discardCardIds).AllowedCardIds.ToArray();
         var copy = steps.ToArray();
-        if (copy.Length == 0 || copy.Any(s => s is null) || copy[0].RequiresPreviousStepSuccess) throw new ArgumentException("A trigger requires nonnull resolution steps.");
+        if ((copy.Length == 0) != (definition is not null) || copy.Any(s => s is null) || copy.Length != 0 && copy[0].RequiresPreviousStepSuccess)
+            throw new ArgumentException("A trigger requires nonnull resolution steps or a definition.");
         var actions = copy.SelectMany(s => s.Actions).ToArray();
         bool targeted = actions.Any(a => a.Operation is TriggerOperation.ModifyTargetMonsterUntilEndPhase or
             TriggerOperation.DestroyTargetMonster or TriggerOperation.NegateTargetMonsterUntilEndPhase);
-        if (targeted != (target is not null) || actions.Any(a => a.Operation == TriggerOperation.ModifyEventMonsterUntilEndPhase &&
+        if ((targeted || definition is { FieldTargets: [TriggerTargetedMonster] }) != (target is not null) || actions.Any(a => a.Operation == TriggerOperation.ModifyEventMonsterUntilEndPhase &&
             eventKind is MonsterEventKind.Destroyed or MonsterEventKind.SentToGraveyard))
             throw new ArgumentException("Target policy and resolution operations do not agree.");
         EffectId = effectId; CardId = cardId; EventKind = eventKind; Relation = relation;
@@ -133,6 +162,7 @@ public sealed class TriggerEffectProfile
         TurnLimit = turnLimit; LimitKey = limitKey ?? effectId; LifePointCost = lifePointCost;
         DetachMaterialCount = detachMaterialCount;
         DiscardCardIds = Array.AsReadOnly(discards); Target = target; Steps = Array.AsReadOnly(copy);
+        Definition = definition; Cause = cause;
     }
 }
 

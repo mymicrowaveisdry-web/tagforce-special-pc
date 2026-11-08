@@ -22,8 +22,6 @@ public sealed class DuelActionSource
         var state = engine.State;
         PlayerId actor = Actor(state);
         string unsupported = state.ResearchSliceComplete ? "Research boundary reached"
-            : state.EventEffects.PendingCommitment is not null || state.EventEffects.PendingTriggers is not null
-                ? "Trigger commitments/order are outside this action adapter"
             : state.PendingChain?.SummonDecision is not null ? "Effect summon choice is outside this action adapter" : "";
         var status = state.Outcome is not null ? ActionAvailability.Finished
             : unsupported.Length > 0 ? ActionAvailability.Unsupported
@@ -46,7 +44,12 @@ public sealed class DuelActionSource
                 unsupported = "No supported legal command; duel is not complete";
             }
         }
-        AuthorizedDecision? decision = state.PendingDecision is { } d && d.Player == player
+        AuthorizedDecision? decision = state.EventEffects.PendingCommitment is { } commitment && commitment.Player == player
+            // Target options can be face-down, so only the chooser's cost cards are listed.
+            ? new(commitment.DecisionId, "TriggerCommitment", PlayerProjection.Read(commitment.CardOptions.Select(c => PlayerProjection.Card(c, true, null, catalog))))
+            : state.EventEffects.PendingCommitment is null && state.EventEffects.PendingTriggers is { } triggers && triggers.Player == player
+            ? new(triggers.DecisionId, "TriggerOrder", PlayerProjection.Read(triggers.Options.Select(t => PlayerProjection.Card(t.Source.Card, true, null, catalog))))
+            : state.PendingDecision is { } d && d.Player == player
             ? new(d.DecisionId, d.Kind.ToString(), PlayerProjection.Read(d.CardOptions.OrderBy(c => c.GameCardId).ThenBy(c => c.InstanceId)
                 .Select(c => PlayerProjection.Card(c, true, null, catalog))))
             // Deck options are private: only the choosing player is shown them.
@@ -84,7 +87,9 @@ public sealed class DuelActionSource
     }
 
     private static PlayerId Other(PlayerId player) => player == PlayerId.One ? PlayerId.Two : PlayerId.One;
-    private static PlayerId Actor(DuelState state) => state.PendingDecision?.Player
+    private static PlayerId Actor(DuelState state) => state.EventEffects.PendingCommitment?.Player
+        ?? state.EventEffects.PendingTriggers?.Player
+        ?? state.PendingDecision?.Player
         ?? state.PendingChain?.DefinitionChoice?.Player
         ?? state.OpenWindow?.Responder
         ?? (state.PendingChain is null ? state.PendingSummon?.Responder : null)
@@ -95,9 +100,57 @@ public sealed class DuelActionSource
         int? target = null, BattlePosition? position = null, DuelPhase? phase = null, PlayerId? targetPlayer = null)
         => new(command, new(0, $"{kind}|{card}|{zone}|{target}|{position}|{phase}|{targetPlayer}", kind, label, card, zone, target, position, phase));
 
+    private IEnumerable<Bound> CommitmentActions(PendingTriggerCommitment commitment, PlayerId player)
+    {
+        if (commitment.Kind == TriggerCommitmentKind.DiscardCost)
+            foreach (var card in commitment.CardOptions)
+                yield return B(new ChooseTriggerCostCard(player, commitment.DecisionId, card.InstanceId), ActionKind.ChooseCard,
+                    $"Discard {catalog[card.GameCardId].Name}", card.InstanceId);
+        // Bound by zone only: a target can be face-down.
+        foreach (var target in commitment.TargetOptions)
+            yield return B(new ChooseTriggerMonsterTarget(player, commitment.DecisionId, target.Player, target.Zone, target.Card.InstanceId), ActionKind.ChooseTarget,
+                $"Target P{(int)target.Player + 1} zone {target.Zone + 1}", zone: 0, target: target.Zone, targetPlayer: target.Player);
+        if (commitment.Kind != TriggerCommitmentKind.DetachCost) yield break;
+        int ordinal = 0;
+        foreach (var cards in Combinations(commitment.CardOptions, commitment.Trigger.Profile.DetachMaterialCount, 0).Take(MaximumTriggerOrders))
+            yield return B(new ChooseTriggerXyzMaterials(player, commitment.DecisionId, cards.Select(c => c.InstanceId)), ActionKind.ChooseCard,
+                $"Detach {string.Join(", ", cards.Select(c => catalog[c.GameCardId].Name))}", target: ordinal++);
+    }
+
+    private static IEnumerable<CardInstance[]> Combinations(IReadOnlyList<CardInstance> cards, int count, int start)
+    {
+        if (count == 0) { yield return []; yield break; }
+        for (int i = start; i <= cards.Count - count; i++)
+            foreach (var rest in Combinations(cards, count - 1, i + 1)) yield return [cards[i], .. rest];
+    }
+
+    private const int MaximumTriggerOrders = 256;
+
+    /// <summary>Every legal activation order; optional triggers also allow any subset, including none.</summary>
+    private static IEnumerable<TriggerActivation[]> TriggerOrders(IReadOnlyList<TriggerActivation> options, bool mandatory, TriggerActivation[] prefix)
+    {
+        if (!mandatory || prefix.Length == options.Count) yield return prefix;
+        foreach (var next in options.Except(prefix))
+            foreach (var order in TriggerOrders(options, mandatory, [.. prefix, next])) yield return order;
+    }
+
     private IEnumerable<Bound> Candidates(DuelState state, PlayerId player)
     {
         var own = state.GetPlayer(player);
+        if (state.EventEffects.PendingCommitment is { } commitment)
+        {
+            foreach (var bound in CommitmentActions(commitment, player)) yield return bound;
+            yield break;
+        }
+        if (state.EventEffects.PendingTriggers is { } batch)
+        {
+            int ordinal = 0;
+            foreach (var order in TriggerOrders(batch.Options, batch.Mandatory, []).Take(MaximumTriggerOrders))
+                yield return B(new ChooseTriggerOrder(player, batch.DecisionId, order.Select(t => t.Id).ToArray()),
+                    order.Length == 0 ? ActionKind.DeclineTriggers : ActionKind.OrderTriggers,
+                    order.Length == 0 ? "Decline" : string.Join(" then ", order.Select(t => catalog[t.Source.Card.GameCardId].Name)), target: ordinal++);
+            yield break;
+        }
         if (state.PendingDecision is { } decision)
         {
             foreach (var card in decision.CardOptions.OrderBy(c => c.GameCardId).ThenBy(c => c.InstanceId))
@@ -147,6 +200,7 @@ public sealed class DuelActionSource
                         yield return B(new ChooseDefinitionSummon(player, summon.DecisionId, option.Card.InstanceId, zone, position),
                             ActionKind.ChooseCard, $"Summon {catalog[option.Card.GameCardId].Name} ({option.Source}) [{zone + 1}] {position}",
                             option.Card.InstanceId, zone, position: position);
+            if (summon.CanFinish) yield return B(new FinishDefinitionSummon(player, summon.DecisionId), ActionKind.FinishChoice, "Done");
             yield break;
         }
         if (state.PendingChain?.DefinitionCardChoice is { } pick)

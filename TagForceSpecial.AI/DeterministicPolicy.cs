@@ -42,6 +42,8 @@ public sealed class DeterministicPolicy(uint seed)
             ActionKind.ChooseCard => 600 + attack / 100,
             ActionKind.ChoosePosition => a.Position == BattlePosition.FaceUpAttack ? 650 : 600,
             ActionKind.ChooseZone or ActionKind.ChooseTarget => 600,
+            ActionKind.OrderTriggers => 900,
+            ActionKind.DeclineTriggers => 0,
             ActionKind.ChainResponse or ActionKind.BattleResponse => 800,
             ActionKind.ChainPass or ActionKind.BattlePass or ActionKind.ResolveChain => 700,
             ActionKind.ReplayAttack => 150,

@@ -8,10 +8,15 @@ public sealed partial class DuelEngine
         if (chain.SummonDecision is not null)
             return command is ChooseEffectSummon summon ? AnswerEffectSummon(chain, summon) : Reject(DuelError.DecisionPending);
         if (chain.DefinitionSummon is not null)
-            return command is ChooseDefinitionSummon choice ? AnswerDefinitionSummon(chain, choice) : Reject(DuelError.DecisionPending);
+            return command switch
+            {
+                ChooseDefinitionSummon choice => AnswerDefinitionSummon(chain, choice),
+                FinishDefinitionSummon finish => FinishDefinitionSummons(chain, finish),
+                _ => Reject(DuelError.DecisionPending)
+            };
         if (chain.DefinitionCardChoice is not null)
             return command is ChooseDefinitionCard card ? AnswerDefinitionCardChoice(chain, card) : Reject(DuelError.DecisionPending);
-        if (command is ChooseEffectSummon or ChooseDefinitionSummon or ChooseDefinitionCard) return Reject(DuelError.NoPendingDecision);
+        if (command is ChooseEffectSummon or ChooseDefinitionSummon or FinishDefinitionSummon or ChooseDefinitionCard) return Reject(DuelError.NoPendingDecision);
         if (State.PendingDecision is not null)
             return command is DecisionCommand answer ? AnswerDecision(answer) : Reject(DuelError.DecisionPending);
         if (command is DecisionCommand) return Reject(DuelError.NoPendingDecision);
@@ -71,7 +76,13 @@ public sealed partial class DuelEngine
             events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.SourceEffectsNegated));
         else switch (link.Operation)
         {
+            case ChainOperation.TriggerEffect when link.Trigger is { Profile.Definition: null } trigger:
+            {
+                next = ResolveTrigger(next, trigger, events);
+                break;
+            }
             case ChainOperation.Definition:
+            case ChainOperation.TriggerEffect when link.Trigger is not null:
             {
                 (next, var pause) = ResolveDefinitionSteps(next, links, link, chain.DefinitionChoice?.StepIndex ?? 0,
                     definitionChoice, events);
@@ -113,12 +124,7 @@ public sealed partial class DuelEngine
                     EffectSummonSource(profile), events, properProcedureId: profile.ProperProcedureId, timingGroup: 1);
                 break;
             }
-            case ChainOperation.TriggerEffect:
-            {
-                if (link.Trigger is not { } trigger) return Reject(DuelError.InvalidEffectState);
-                next = ResolveTrigger(next, trigger, events);
-                break;
-            }
+            case ChainOperation.TriggerEffect: return Reject(DuelError.InvalidEffectState);
             default: return Reject(DuelError.UnsupportedChainResolution);
         }
         events.Add(new ChainLinkResolved(link.Number, activation.EffectId));

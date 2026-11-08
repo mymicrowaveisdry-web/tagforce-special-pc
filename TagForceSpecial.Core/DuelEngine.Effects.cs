@@ -434,7 +434,7 @@ public sealed partial class DuelEngine
     private (DuelState State, PendingDefinitionChoice? Pause) ResolveDefinitionSteps(DuelState state, ChainLink[] links,
         ChainLink link, int start, DuelCommand? choice, List<DuelEvent> events)
     {
-        var definition = definitions[link.Activation.Spell.GameCardId];
+        var definition = link.Trigger?.Profile.Definition ?? definitions[link.Activation.Spell.GameCardId];
         var controller = link.Activation.Player;
         for (int i = start; i < definition.Steps.Count; i++)
         {
@@ -530,7 +530,7 @@ public sealed partial class DuelEngine
             }
             else if (step is SpecialSummonStep summon)
             {
-                if (choice is not ChooseDefinitionSummon summonChoice)
+                if (choice is not (ChooseDefinitionSummon or FinishDefinitionSummon))
                 {
                     var options = SpecialSummonOptions(state, controller, summon, link.Activation.Spell).ToArray();
                     if (options.Length == 0)
@@ -540,9 +540,9 @@ public sealed partial class DuelEngine
                     }
                     var zones = Enumerable.Range(0, 5).Where(z => state.GetPlayer(controller).MonsterZones[z] is null);
                     return (state, new PendingDefinitionSummon(checked(State.Revision + 1), controller, definition.EffectId,
-                        link.Number, i, options, zones));
+                        link.Number, i, options, zones, summon.Position, canFinish: summon.AnyNumber && summon.MinCount == 0));
                 }
-                state = ApplySpecialSummon(state, link, summon, summonChoice, definition.EffectId, events);
+                state = ApplySpecialSummons(state, link, summon, FinalSummonPicks(state, choice), definition.EffectId, events);
                 choice = null;
             }
             else
@@ -625,6 +625,8 @@ public sealed partial class DuelEngine
                 FieldTarget f => FieldMatches(state, link.Activation.Player, f.Kind, f.Side, f.Filter, null),
                 ZoneTarget z => ZoneMatches(state, link.Activation.Player, z),
                 AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget => FieldMatches(state, link.Activation.Player, FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.Any, null),
+                TriggerTargetedMonster => FieldMatches(state, link.Activation.Player, FieldCardKind.Monster, TargetSide.Either,
+                    link.Trigger!.Profile.Target!.RequireFaceUpAtResolution ? FieldCardFilter.FaceUp : FieldCardFilter.Any, null),
                 _ => []
             };
             if (target.IsStillPresent(state) && matches.Any(m => m.Card == target.Card)) yield return target;
@@ -656,6 +658,10 @@ public sealed partial class DuelEngine
         CardIdFilter ids => ids.CardIds.Contains(card.GameCardId),
         AnyMonsterFilter => rule.Category == CardCategory.Monster,
         AnyCardFilter => true,
+        MonsterTraitFilter trait => rule.Category == CardCategory.Monster && !trait.ExcludedCardIds.Contains(card.GameCardId) &&
+            (trait.AttributeCode is not { } code || catalog[card.GameCardId].Codes?.Attribute == code) &&
+            (trait.Stat == MonsterStat.Attack ? catalog[card.GameCardId].Statistics.Attack : catalog[card.GameCardId].Statistics.Defense) is int value &&
+            value >= trait.Min && value <= trait.Max,
         _ => false
     };
 
@@ -963,7 +969,7 @@ public sealed partial class DuelEngine
         foreach (var (flag, from) in new[] { (SpecialSummonSources.Hand, DecisionCardSource.Hand), (SpecialSummonSources.Deck, DecisionCardSource.Deck) })
         {
             if (!step.Sources.HasFlag(flag)) continue;
-            foreach (var card in SpecialSourceCards(player, from).Where(c => step.EligibleCardIds.Contains(c.GameCardId)))
+            foreach (var card in SpecialSourceCards(player, from).Where(c => step.Filter is { } filter ? MatchesFilter(c, filter) : step.EligibleCardIds.Contains(c.GameCardId)))
                 if (Enumerable.Range(0, 5).Any(z => CheckSpecialSummon(state, playerId, card, z, BattlePosition.FaceUpAttack, from,
                         lockExemptSource: source) == DuelError.None))
                     yield return new(card, from);
@@ -981,29 +987,53 @@ public sealed partial class DuelEngine
         if (option is null) return Reject(DuelError.InvalidDecisionChoice);
         var link = chain.Links[pending.LinkNumber - 1];
         if (CheckSpecialSummon(State, pending.Player, option.Card, command.MonsterZone, command.Position, option.Source,
-                lockExemptSource: link.Activation.Spell, sourcePlayer: option.From) is not DuelError.None and var error)
+                lockExemptSource: link.Activation.Spell, sourcePlayer: option.From, allowFaceDown: true) is not DuelError.None and var error)
             return Reject(error);
-        return ResolveChainLink(chain, definitionChoice: command);
+        var definition = link.Trigger?.Profile.Definition ?? definitions[link.Activation.Spell.GameCardId];
+        var remaining = pending.Options.Where(o => o != option).ToArray();
+        var zones = pending.MonsterZoneOptions.Where(z => z != command.MonsterZone).ToArray();
+        if (definition.Steps[pending.StepIndex] is not SpecialSummonStep { AnyNumber: true } || remaining.Length == 0 || zones.Length == 0)
+            return ResolveChainLink(chain, definitionChoice: command);
+        var next = new PendingDefinitionSummon(checked(State.Revision + 1), pending.Player, pending.EffectId, pending.LinkNumber, pending.StepIndex,
+            remaining, zones, pending.PositionOptions.Count == 1 ? pending.PositionOptions[0] : null,
+            pending.Picks.Append(new(option.Card, option.Source, command.MonsterZone, command.Position)), canFinish: true);
+        return Accept(State.WithChain(new(next.DecisionId, chain.Links, chain.Responder, chain.ConsecutivePasses, chain.NextLink, definitionChoice: next)),
+            new DefinitionSummonRequested(next));
     }
 
-    /// <summary>Places the chosen card, schedules its End Phase banishment, then shuffles after a Deck summon.</summary>
-    private DuelState ApplySpecialSummon(DuelState state, ChainLink link, SpecialSummonStep step, ChooseDefinitionSummon choice,
+    private DuelActionResult FinishDefinitionSummons(PendingChain chain, FinishDefinitionSummon command)
+    {
+        var pending = chain.DefinitionSummon!;
+        if (command.DecisionId != pending.DecisionId) return Reject(DuelError.StaleDecision);
+        if (command.Player != pending.Player) return Reject(DuelError.NotActivePlayer);
+        return pending.CanFinish ? ResolveChainLink(chain, definitionChoice: command) : Reject(DuelError.InvalidDecisionChoice);
+    }
+
+    /// <summary>The monsters chosen across a pending Summon, including the answer that ended it.</summary>
+    private static ChosenDefinitionSummon[] FinalSummonPicks(DuelState state, DuelCommand? answer)
+    {
+        var pending = state.PendingChain!.DefinitionSummon!;
+        if (answer is not ChooseDefinitionSummon last) return [.. pending.Picks];
+        var option = pending.Options.Single(o => o.Card.InstanceId == last.CardInstanceId);
+        return [.. pending.Picks, new(option.Card, option.Source, last.MonsterZone, last.Position)];
+    }
+
+    /// <summary>Places the chosen monsters together, schedules any End Phase banishment, then shuffles once after a Deck summon.</summary>
+    private DuelState ApplySpecialSummons(DuelState state, ChainLink link, SpecialSummonStep step, ChosenDefinitionSummon[] picks,
         string effectId, List<DuelEvent> events)
     {
         var controller = link.Activation.Player;
-        var from = state.GetPlayer(controller).Hand.Any(c => c.InstanceId == choice.CardInstanceId)
-            ? DecisionCardSource.Hand : DecisionCardSource.Deck;
-        var card = SpecialSourceCards(state.GetPlayer(controller), from).Single(c => c.InstanceId == choice.CardInstanceId);
-        state = PlaceSpecialSummon(state, controller, card, choice.MonsterZone, choice.Position, from, events);
-        if (step.BanishAtEndPhase)
+        foreach (var pick in picks)
         {
-            var placed = state.GetPlayer(controller).MonsterZones[choice.MonsterZone]!;
-            var delayed = new PendingEndPhaseBanishment(controller, effectId, link.Activation.Spell, card, choice.MonsterZone,
+            state = PlaceSpecialSummon(state, controller, pick.Card, pick.MonsterZone, pick.Position, pick.Source, events);
+            if (!step.BanishAtEndPhase) continue;
+            var placed = state.GetPlayer(controller).MonsterZones[pick.MonsterZone]!;
+            var delayed = new PendingEndPhaseBanishment(controller, effectId, link.Activation.Spell, pick.Card, pick.MonsterZone,
                 state.TurnNumber, placed.PlacementId);
             state = state.WithEndPhaseBanishments(state.PendingEndPhaseBanishments.Append(delayed));
             events.Add(new EndPhaseBanishmentScheduled(delayed));
         }
-        return from == DecisionCardSource.Deck ? ShuffleDeck(state, controller, effectId, events) : state;
+        return picks.Any(p => p.Source == DecisionCardSource.Deck) ? ShuffleDeck(state, controller, effectId, events) : state;
     }
 
     /// <summary>An absent or replaced target is neither destroyed nor retargeted.</summary>

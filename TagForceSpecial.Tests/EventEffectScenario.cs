@@ -167,6 +167,8 @@ internal static class EventEffectScenario
             }
             else if (engine.State.EventEffects.PendingTriggers is not null) events.AddRange(Order(engine).Events);
             else if (engine.State.PendingChain?.DefinitionSummon is not null) events.AddRange(ChooseSummon(engine).Events);
+            else if (engine.State.PendingChain?.DefinitionCardChoice is { } pick)
+                events.AddRange(Ok(engine, new ChooseDefinitionCard(pick.Player, pick.DecisionId, pick.Options[0].InstanceId)).Events);
             else if (engine.State.PendingChain is { NextLink: 0 }) Pass(engine);
             else if (engine.State.PendingChain is not null) events.AddRange(Resolve(engine).Events);
             else return events;

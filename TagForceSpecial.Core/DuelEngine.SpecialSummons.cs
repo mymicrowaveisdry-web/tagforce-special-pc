@@ -37,10 +37,11 @@ public sealed partial class DuelEngine
 
     private DuelError CheckSpecialSummon(DuelState state, PlayerId playerId, CardInstance card, int zone,
         BattlePosition position, DecisionCardSource source, string? procedureId = null, CardInstance? lockExemptSource = null,
-        PlayerId? sourcePlayer = null)
+        PlayerId? sourcePlayer = null, bool allowFaceDown = false)
     {
         if (zone is < 0 or >= 5) return DuelError.InvalidMonsterZone;
-        if (position is not (BattlePosition.FaceUpAttack or BattlePosition.FaceUpDefense)) return DuelError.InvalidBattlePosition;
+        if (position is not (BattlePosition.FaceUpAttack or BattlePosition.FaceUpDefense) && !(allowFaceDown && position == BattlePosition.FaceDownDefense))
+            return DuelError.InvalidBattlePosition;
         if (!rules.TryGetValue(card.GameCardId, out var rule) || rule.Category != CardCategory.Monster)
             return DuelError.UnsupportedSpecialSummon;
         if (IsSummonLocked(state, playerId, lockExemptSource)) return DuelError.SummonLocked;

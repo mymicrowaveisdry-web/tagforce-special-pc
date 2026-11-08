@@ -263,7 +263,12 @@ public abstract record DuelEvent
 public sealed record CardDrawn(PlayerId Player, CardInstance Card) : DuelEvent;
 public sealed record FirstDrawSkipped(PlayerId Player) : DuelEvent;
 public sealed record PhaseChanged(DuelPhase From, DuelPhase To) : DuelEvent;
-public sealed record MonsterNormalSummoned(PlayerId Player, FieldMonster Monster, int Zone, long? AttemptId = null) : DuelEvent;
+public sealed record MonsterNormalSummoned(PlayerId Player, FieldMonster Monster, int Zone, long? AttemptId = null) : DuelEvent
+{
+    /// <summary>The monsters Tributed for this Summon.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IReadOnlyList<MonsterBinding> Tributes { get; internal init; } = Array.AsReadOnly(Array.Empty<MonsterBinding>());
+}
 public sealed record MonsterSet(PlayerId Player, FieldMonster Monster, int Zone) : DuelEvent;
 public sealed record SpellTrapSet(PlayerId Player, CardInstance Card, int Zone) : DuelEvent;
 public sealed record MonsterPositionChanged(PlayerId Player, int Zone, BattlePosition From, BattlePosition To) : DuelEvent;
@@ -271,7 +276,11 @@ public sealed record MonsterFlipSummoned(PlayerId Player, FieldMonster Monster, 
 public sealed record AttackDeclared(PlayerId Player, int AttackerZone, int? TargetZone) : DuelEvent;
 public sealed record MonsterRevealed(PlayerId Player, int Zone, CardInstance Card) : DuelEvent;
 public sealed record BattleDamageDealt(PlayerId Player, int Damage, int LifePointsBefore, int LifePointsAfter) : DuelEvent;
-public sealed record MonsterDestroyed(PlayerId Player, int Zone, CardInstance Card) : DuelEvent;
+public sealed record MonsterDestroyed(PlayerId Player, int Zone, CardInstance Card) : DuelEvent
+{
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool ByBattle { get; internal init; }
+}
 /// <summary>Ordinary summon procedure, not destruction or an activation cost.</summary>
 public sealed record MonsterTributed(MonsterBinding Monster) : DuelEvent;
 public sealed record CardDiscarded(PlayerId Player, CardInstance Card) : DuelEvent;

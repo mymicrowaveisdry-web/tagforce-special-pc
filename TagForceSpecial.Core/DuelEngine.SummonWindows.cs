@@ -5,26 +5,27 @@ public sealed partial class DuelEngine
     private DuelActionResult CommitSummon(DuelState next, PlayerId player, CardInstance card, int zone,
         bool faceDown, List<DuelEvent> events)
     {
-        var pending = new PendingSummon(checked(State.Revision + 1), checked(State.Revision + 1), player, card, zone, Other(player));
+        var tributes = Array.AsReadOnly(events.OfType<MonsterTributed>().Select(t => t.Monster).ToArray());
+        var pending = new PendingSummon(checked(State.Revision + 1), checked(State.Revision + 1), player, card, zone, Other(player)) { Tributes = tributes };
         if (!faceDown && OpensSummonWindow(next.WithSummon(pending), card.GameCardId))
         {
             events.Add(new SummonAttempted(pending) { TimingGroup = 1 });
             events.Add(new SummonResponseRequested(pending));
             return Accept(next.WithSummon(pending), events.ToArray());
         }
-        next = PlaceSuccessfulSummon(next, player, card, zone, faceDown, events);
+        next = PlaceSuccessfulSummon(next, player, card, zone, faceDown, events, tributes);
         return Accept(next, events.ToArray());
     }
 
     private DuelState PlaceSuccessfulSummon(DuelState next, PlayerId playerId, CardInstance card, int zone,
-        bool faceDown, List<DuelEvent> events)
+        bool faceDown, List<DuelEvent> events, IReadOnlyList<MonsterBinding> tributes)
     {
         var player = next.GetPlayer(playerId);
         var monster = NewSummonedMonster(next, card, faceDown ? BattlePosition.FaceDownDefense : BattlePosition.FaceUpAttack);
         var monsters = player.MonsterZones.ToArray();
         monsters[zone] = monster;
         events.Add(faceDown ? new MonsterSet(playerId, monster, zone) { TimingGroup = 1 }
-            : new MonsterNormalSummoned(playerId, monster, zone, next.PendingSummon?.AttemptId) { TimingGroup = 1 });
+            : new MonsterNormalSummoned(playerId, monster, zone, next.PendingSummon?.AttemptId) { TimingGroup = 1, Tributes = tributes });
         return next.With(player: player.With(monsters: monsters));
     }
 
@@ -46,7 +47,7 @@ public sealed partial class DuelEngine
             ? PlaceSpecialSummon(next, pending.Player, pending.Card, pending.MonsterZone, pending.Position,
                 pending.Source, events, pending.ProcedureId, pending.AttemptId, pending.ProperProcedureId, sourceAlreadyRemoved: true,
                 timingGroup: pending.Source == DecisionCardSource.ExtraDeck ? 1 : null, xyzMaterials: pending.XyzMaterials)
-            : PlaceSuccessfulSummon(next, pending.Player, pending.Card, pending.MonsterZone, false, events);
+            : PlaceSuccessfulSummon(next, pending.Player, pending.Card, pending.MonsterZone, false, events, pending.Tributes);
         return next.WithSummon(null);
     }
 

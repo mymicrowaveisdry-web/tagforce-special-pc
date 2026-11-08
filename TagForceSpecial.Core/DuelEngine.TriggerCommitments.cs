@@ -16,7 +16,7 @@ public sealed partial class DuelEngine
     private static IEnumerable<MonsterBinding> TriggerTargets(DuelState state, TriggerActivation trigger)
     {
         var policy = trigger.Profile.Target!;
-        return FieldMonsters(state).Where(e => e.Monster.Position != BattlePosition.FaceDownDefense && !e.Monster.BattleDestroyed &&
+        return FieldMonsters(state).Where(e => (policy.AllowFaceDown || e.Monster.Position != BattlePosition.FaceDownDefense) && !e.Monster.BattleDestroyed &&
             Relates(policy.Relation, trigger.Source, e.Binding) &&
             (!policy.ExcludeSource || e.Binding != trigger.Source) &&
             (policy.AllowedCardIds.Count == 0 || policy.AllowedCardIds.Contains(e.Monster.Card.GameCardId)))
@@ -96,9 +96,13 @@ public sealed partial class DuelEngine
         return Accept(next.WithChain(chain), events.ToArray());
     }
 
-    private static ChainLink TriggerLink(int number, TriggerActivation trigger) => new(number,
-        new(trigger.Player, trigger.Profile.EffectId, trigger.Source.Card, trigger.Source.Zone, trigger.DiscardedCost, null),
-        trigger.Source.PlacementId, ChainOperation.TriggerEffect, Trigger: trigger);
+    private static ChainLink TriggerLink(int number, TriggerActivation trigger)
+    {
+        IReadOnlyList<FieldCardTarget>? bound = trigger is { Profile.Definition.FieldTargets: [TriggerTargetedMonster], Target: { } target }
+            ? [new(target.Player, FieldLocation.MonsterZone, target.Zone, target.Card, target.PlacementId)] : null;
+        return new(number, new(trigger.Player, trigger.Profile.EffectId, trigger.Source.Card, trigger.Source.Zone, trigger.DiscardedCost, null, bound),
+            trigger.Source.PlacementId, ChainOperation.TriggerEffect, Trigger: trigger);
+    }
 
     private DuelActionResult RequestTriggerCommitment(DuelState next, TriggerActivation[] remaining,
         IEnumerable<TriggerActivation> committed, IEnumerable<TriggerActivation> queue,

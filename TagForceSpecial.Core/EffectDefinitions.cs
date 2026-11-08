@@ -1,7 +1,7 @@
 namespace TagForceSpecial.Core;
 
 /// <summary>Card activation kinds. Spell Speed and set-turn rules derive from the kind.</summary>
-public enum EffectKind { NormalSpell, QuickPlaySpell, NormalTrap, CounterTrap }
+public enum EffectKind { NormalSpell, QuickPlaySpell, NormalTrap, CounterTrap, MonsterTrigger }
 
 /// <summary>One ordered resolution operation from a closed, Core-defined set.</summary>
 public abstract record EffectStep
@@ -99,6 +99,31 @@ public sealed record SpecialSummonStep : EffectStep
     public SpecialSummonSources Sources { get; }
     public IReadOnlyList<uint> EligibleCardIds { get; }
     public bool BanishAtEndPhase { get; }
+    /// <summary>When set, replaces the ID list as the eligibility test.</summary>
+    public CardFilter? Filter { get; }
+    /// <summary>When set, the only position the monster can be Summoned in.</summary>
+    public BattlePosition? Position { get; }
+    /// <summary>The player may Summon several eligible monsters at once.</summary>
+    public bool AnyNumber { get; }
+    /// <summary>With <see cref="AnyNumber"/>, how many must be chosen: 0 or 1.</summary>
+    public int MinCount { get; } = 1;
+
+    /// <summary>Eligibility by filter, optionally in one fixed position and for any number of monsters.</summary>
+    public SpecialSummonStep(SpecialSummonSources sources, CardFilter filter, BattlePosition? position = null, bool anyNumber = false, int minCount = 1)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        if (sources == SpecialSummonSources.None || (sources & ~(SpecialSummonSources.Hand | SpecialSummonSources.Deck)) != 0)
+            throw new ArgumentOutOfRangeException(nameof(sources), "Only hand and Deck sources are supported.");
+        if (position is not (null or BattlePosition.FaceUpAttack or BattlePosition.FaceUpDefense or BattlePosition.FaceDownDefense))
+            throw new ArgumentOutOfRangeException(nameof(position));
+        if (minCount is < 0 or > 1 || !anyNumber && minCount != 1) throw new ArgumentOutOfRangeException(nameof(minCount));
+        AnyNumber = anyNumber;
+        MinCount = minCount;
+        Sources = sources;
+        EligibleCardIds = Array.AsReadOnly(Array.Empty<uint>());
+        Filter = filter;
+        Position = position;
+    }
 
     public SpecialSummonStep(SpecialSummonSources sources, IEnumerable<uint> eligibleCardIds, bool banishAtEndPhase = false)
     {
@@ -230,7 +255,7 @@ public sealed class EffectDefinition
 
     public ChainSpellSpeed SpellSpeed => Kind switch
     {
-        EffectKind.NormalSpell => ChainSpellSpeed.One,
+        EffectKind.NormalSpell or EffectKind.MonsterTrigger => ChainSpellSpeed.One,
         EffectKind.CounterTrap => ChainSpellSpeed.Three,
         _ => ChainSpellSpeed.Two
     };
@@ -244,7 +269,7 @@ public sealed class EffectDefinition
     }).Where(c => c != EffectCount.None);
     internal static bool IsFieldTargetStep(EffectStep s) => s is DestroyTargetsStep or ReturnTargetsToHandStep or ChangeTargetsToDefenseStep or
         BanishFieldTargetsStep or NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep or DestroyAndBanishTargetsStep or ModifyCombatantStatsStep;
-    internal static bool IsAutomatic(EffectTarget t) => t is AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget;
+    internal static bool IsAutomatic(EffectTarget t) => t is AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget or TriggerTargetedMonster;
     internal static bool IsZoneTargetStep(EffectStep s) => s is AddTargetsToHandStep or BanishTargetsStep or ReturnTargetsToGraveyardStep or
         ShuffleTargetsIntoDeckStep or SpecialSummonTargetStep;
     internal static int MinCount(EffectTarget t) => t switch { FieldTarget f => f.Count, ZoneTarget z => z.MinCount, _ => 1 };
@@ -311,18 +336,21 @@ public sealed class EffectDefinition
             throw new ArgumentException("A Spell/Trap target and a target-destruction step go together.", nameof(target));
         var fields = (fieldTargets ?? []).Take(6).ToArray();
         bool fieldSteps = snapshot.Any(IsFieldTargetStep), zoneSteps = snapshot.Any(IsZoneTargetStep);
-        if (fields.Any(f => f is not (FieldTarget or ZoneTarget or AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget)) ||
+        if (fields.Any(f => f is not (FieldTarget or ZoneTarget or AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget or TriggerTargetedMonster)) ||
             fields.Any(f => f is SummonedMonsterTarget) && (fields.Length != 1 || !required.Any(c => c is MonsterSummonedCondition)) ||
             fields.Any(f => f is AttackingMonsterTarget or DefendingMonsterTarget) && (fields.Length != 1 ||
                 !required.Any(c => c is BattleTimingCondition || c is OpponentAttackDeclaredCondition && fields[0] is AttackingMonsterTarget)) ||
             snapshot.Any(s => s is ModifyCombatantStatsStep) && fields is not [AttackingMonsterTarget or DefendingMonsterTarget] ||
             snapshot.Any(s => s is NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep) && fields is not [AttackingMonsterTarget] || fields.Sum(MaxCount) > 5 || fields.Length != 0 && target is not null ||
             (fields.Length != 0) != (fieldSteps || zoneSteps) || fieldSteps && zoneSteps ||
-            fieldSteps && fields.Any(f => f is not (FieldTarget or AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget)) || zoneSteps && fields.Any(f => f is not ZoneTarget) ||
+            fieldSteps && fields.Any(f => f is not (FieldTarget or AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget or TriggerTargetedMonster)) || zoneSteps && fields.Any(f => f is not ZoneTarget) ||
             fields.SkipLast(1).Any(f => MinCount(f) != MaxCount(f)) ||
             snapshot.Any(s => s is ChangeTargetsToDefenseStep) && fields.Any(f => f is FieldTarget { Kind: not FieldCardKind.Monster }) ||
             snapshot.Any(s => s is SpecialSummonTargetStep) && (fields.Length != 1 || fields[0] is not ZoneTarget { MaxCount: 1, MustBeSummonable: true, Zone: CardZone.Graveyard }))
             throw new ArgumentException("Field targets (up to 5) and the steps that use them go together.", nameof(fieldTargets));
+        if (kind == EffectKind.MonsterTrigger && (required.Length != 0 || cost is not null || target is not null || fields is not ([] or [TriggerTargetedMonster]) || locksOtherSummonsThisTurn) ||
+            kind != EffectKind.MonsterTrigger && fields.Any(f => f is TriggerTargetedMonster))
+            throw new ArgumentException("A monster trigger takes its timing and costs from its trigger profile.", nameof(kind));
         EffectId = effectId;
         CardId = cardId;
         Kind = kind;
@@ -373,19 +401,28 @@ public sealed class PendingDefinitionSummon : PendingDefinitionChoice
 {
     public IReadOnlyList<DefinitionSummonOption> Options { get; }
     public IReadOnlyList<int> MonsterZoneOptions { get; }
-    public IReadOnlyList<BattlePosition> PositionOptions { get; } =
-        Array.AsReadOnly(new[] { BattlePosition.FaceUpAttack, BattlePosition.FaceUpDefense });
+    public IReadOnlyList<BattlePosition> PositionOptions { get; }
+    /// <summary>Monsters already chosen for an any-number Summon; all are placed together.</summary>
+    public IReadOnlyList<ChosenDefinitionSummon> Picks { get; }
+    public bool CanFinish { get; }
 
     internal PendingDefinitionSummon(long decisionId, PlayerId player, string effectId, int linkNumber, int stepIndex,
-        IEnumerable<DefinitionSummonOption> options, IEnumerable<int> zones)
+        IEnumerable<DefinitionSummonOption> options, IEnumerable<int> zones, BattlePosition? onlyPosition = null,
+        IEnumerable<ChosenDefinitionSummon>? picks = null, bool canFinish = false)
         : base(decisionId, player, effectId, linkNumber, stepIndex)
     {
+        Picks = Array.AsReadOnly(picks?.ToArray() ?? []);
+        CanFinish = canFinish;
         Options = Array.AsReadOnly(options.ToArray());
         MonsterZoneOptions = Array.AsReadOnly(zones.ToArray());
+        PositionOptions = Array.AsReadOnly(onlyPosition is { } only ? [only] : new[] { BattlePosition.FaceUpAttack, BattlePosition.FaceUpDefense });
     }
 }
 public sealed record ChooseDefinitionSummon(PlayerId Player, long DecisionId, int CardInstanceId, int MonsterZone,
     BattlePosition Position) : DuelCommand(Player);
+public sealed record ChosenDefinitionSummon(CardInstance Card, DecisionCardSource Source, int MonsterZone, BattlePosition Position);
+/// <summary>Ends an any-number Summon with the monsters chosen so far.</summary>
+public sealed record FinishDefinitionSummon(PlayerId Player, long DecisionId) : DuelCommand(Player);
 public sealed record DefinitionSummonRequested(PendingDefinitionSummon Decision) : DuelEvent;
 
 /// <summary>Resolution-time choice of one Deck card (search or send); options are visible only to the choosing player.</summary>

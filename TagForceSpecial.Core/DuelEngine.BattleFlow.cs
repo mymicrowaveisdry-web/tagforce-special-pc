@@ -170,7 +170,7 @@ public sealed partial class DuelEngine
                 {
                     var player = next.GetPlayer(binding.Player); var monsters = player.MonsterZones.ToArray(); monsters[binding.Zone] = null;
                     next = next.With(player: player.With(monsters: monsters));
-                    next = SendFieldCardToGraveyard(next, monster.Card, new MonsterDestroyed(player.Id, binding.Zone, monster.Card), events);
+                    next = SendFieldCardToGraveyard(next, monster.Card, new MonsterDestroyed(player.Id, binding.Zone, monster.Card) { ByBattle = true }, events);
                 }
                 return EnterBattleStage(BattleStep.Damage, DamageStep.End, BattleTiming.DamageEnd, next, events);
             }

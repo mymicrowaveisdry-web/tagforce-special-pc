@@ -48,8 +48,12 @@ public static class CardSupportInventory
         var negationCards = SummonNegationFamily.Cards.ToDictionary(c => c.CardId);
         bool fullNegationCatalog = negationCards.Keys.All(catalogIds.Contains);
         if (fullNegationCatalog) SummonNegationFamily.ValidateCatalog(catalog);
+        var triggerCards = MonsterTriggerFamily.Cards.ToDictionary(c => c.CardId);
+        bool fullTriggerCatalog = triggerCards.Keys.All(catalogIds.Contains);
+        if (fullTriggerCatalog) MonsterTriggerFamily.ValidateCatalog(catalog);
         string[] chainTests = ["ChainCardFamilyTests", "ChainInteractionTests", "DuelChainTests", "EmergencyTeleportTests",
             "EmergencyTeleportLifecycleTests", "ChainCardFamilyLocalReferenceTests"];
+        string[] triggerTests = ["MonsterTriggerFamilyTests", "MonsterTriggerFamilyLocalReferenceTests"];
         string[] negationTests = ["SummonNegationFamilyTests", "SummonNegationFamilyLocalReferenceTests"];
         string[] summonTests = ["SummonTrapFamilyTests", "SummonTrapFamilyLocalReferenceTests"];
         string[] battleTests = ["BattleTrapFamilyTests", "BattleTrapFamilyLocalReferenceTests"];
@@ -78,6 +82,8 @@ public static class CardSupportInventory
                 ? DefinitionEntry(c, summon, SummonTrapFamily.FamilyId, SummonTrapFamily.BatchId, summonTests, "decoded-metadata; synthetic-rule-test")
             : fullNegationCatalog && negationCards.TryGetValue(c.GameCardId, out var negator)
                 ? DefinitionEntry(c, negator, SummonNegationFamily.FamilyId, SummonNegationFamily.BatchId, negationTests, "decoded-metadata; synthetic-rule-test")
+            : fullTriggerCatalog && triggerCards.TryGetValue(c.GameCardId, out var monsterTrigger)
+                ? DefinitionEntry(c, monsterTrigger, MonsterTriggerFamily.FamilyId, MonsterTriggerFamily.BatchId, triggerTests, "decoded-metadata; synthetic-rule-test")
             : PreviewEntry(c);
         object DefinitionEntry(CardDefinition c, DefinitionCardProfile p, string family, string batch, string[] tests, string evidenceClass) => new
         {
@@ -186,7 +192,8 @@ public static class CardSupportInventory
                     fullGraveCatalog ? new { id = GraveyardFamily.BatchId, family = GraveyardFamily.FamilyId, cardIds = graveCards.Keys.Order().ToArray() } : null,
                     fullBattleCatalog ? new { id = BattleTrapFamily.BatchId, family = BattleTrapFamily.FamilyId, cardIds = battleCards.Keys.Order().ToArray() } : null,
                     fullSummonCatalog ? new { id = SummonTrapFamily.BatchId, family = SummonTrapFamily.FamilyId, cardIds = summonCards.Keys.Order().ToArray() } : null,
-                    fullNegationCatalog ? new { id = SummonNegationFamily.BatchId, family = SummonNegationFamily.FamilyId, cardIds = negationCards.Keys.Order().ToArray() } : null
+                    fullNegationCatalog ? new { id = SummonNegationFamily.BatchId, family = SummonNegationFamily.FamilyId, cardIds = negationCards.Keys.Order().ToArray() } : null,
+                    fullTriggerCatalog ? new { id = MonsterTriggerFamily.BatchId, family = MonsterTriggerFamily.FamilyId, cardIds = triggerCards.Keys.Order().ToArray() } : null
                 }.OfType<object>().ToArray(),
             unclassifiedCardCount = catalog.Cards.Count(c => !tokens.Contains(c.GameCardId) && !preview.ContainsKey(c.GameCardId) &&
                 !(fullFamilyCatalog && normalMonsters.Contains(c.GameCardId)) && !(fullChainCatalog && chainCards.ContainsKey(c.GameCardId)) &&
@@ -196,7 +203,8 @@ public static class CardSupportInventory
                 !(fullGraveCatalog && graveCards.ContainsKey(c.GameCardId)) &&
                 !(fullBattleCatalog && battleCards.ContainsKey(c.GameCardId)) &&
                 !(fullSummonCatalog && summonCards.ContainsKey(c.GameCardId)) &&
-                !(fullNegationCatalog && negationCards.ContainsKey(c.GameCardId))),
+                !(fullNegationCatalog && negationCards.ContainsKey(c.GameCardId)) &&
+                !(fullTriggerCatalog && triggerCards.ContainsKey(c.GameCardId))),
             exampleDeck = PlayablePreview.ExampleDeck
         };
     }

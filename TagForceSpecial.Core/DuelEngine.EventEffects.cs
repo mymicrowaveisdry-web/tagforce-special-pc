@@ -35,6 +35,7 @@ public sealed partial class DuelEngine
             trigger.Profile.EventKind != MonsterEventKind.FlippedFaceUp) return false;
         if (trigger.Profile.DetachMaterialCount > 0 && trigger.DetachedCost.Count == 0 &&
             state.GetPlayer(trigger.Player).MonsterZones[trigger.Source.Zone]!.XyzMaterials.Count < trigger.Profile.DetachMaterialCount) return false;
+        if (trigger.Profile is { Requirement: TriggerRequirement.Optional, Definition: { } definition } && !DefinitionTriggerAvailable(state, trigger, definition)) return false;
         if (trigger.DiscardedCost is not null || trigger.PaidLifePoints > 0 || trigger.DetachedCost.Count > 0) return true;
         var player = state.GetPlayer(trigger.Player);
         return player.LifePoints > trigger.Profile.LifePointCost &&
@@ -78,11 +79,31 @@ public sealed partial class DuelEngine
         // Neither the face-up Extra Deck nor a removed Token is "sent to the Graveyard"; destruction still counts.
         bool notToGraveyard = emitted.FieldDestination is FieldCardDestination.FaceUpExtraDeck or FieldCardDestination.Removed;
         if (kind == MonsterEventKind.SentToGraveyard && notToGraveyard) yield break;
-        yield return new(kind, subject, point, cost);
+        bool byBattle = emitted is MonsterDestroyed { ByBattle: true };
+        yield return new(kind, subject, point, cost, byBattle);
         if (kind == MonsterEventKind.Destroyed && !notToGraveyard)
-            yield return new(MonsterEventKind.SentToGraveyard, subject, point);
+            yield return new(MonsterEventKind.SentToGraveyard, subject, point, ByBattle: byBattle);
+        if (emitted is MonsterNormalSummoned summoned)
+            foreach (var tribute in summoned.Tributes) yield return new(MonsterEventKind.TributedForSummon, tribute, point);
         if (kind == MonsterEventKind.FlipSummoned) yield return new(MonsterEventKind.FlippedFaceUp, subject, point);
     }
+
+    private static bool CauseMatches(TriggerEffectProfile profile, MonsterEventOccurrence occurrence) => profile.Cause switch
+    {
+        TriggerEventCause.FromField => occurrence.Subject.Zone >= 0,
+        TriggerEventCause.ByBattle => occurrence.ByBattle,
+        _ => true
+    };
+
+    /// <summary>An optional definition trigger needs its Deck operations to have something to act on.</summary>
+    private bool DefinitionTriggerAvailable(DuelState state, TriggerActivation trigger, EffectDefinition definition) =>
+        definition.Steps.All(step => step switch
+        {
+            SpecialSummonStep summon => SpecialSummonOptions(state, trigger.Player, summon, trigger.Source.Card).Any(),
+            AddFromDeckToHandStep search => DeckMatches(state, trigger.Player, search.Filter).Any(),
+            SendFromDeckToGraveyardStep send => DeckMatches(state, trigger.Player, send.Filter).Any(),
+            _ => true
+        });
 
     private IEnumerable<TriggerActivation> CollectTriggers(DuelState before, DuelState after, IReadOnlyList<DuelEvent> events, int firstId)
     {
@@ -96,11 +117,13 @@ public sealed partial class DuelEngine
                 var sources = emitted is MonsterDestroyed or MonsterTributed or SummonMaterialSentToGraveyard or
                     FusionMaterialSentToGraveyard or RitualMaterialTributed or XyzMaterialSentToGraveyard { IsCost: false }
                     ? destructionSources : FieldMonsters(after);
-                foreach (var profile in triggerEffects.Where(p => p.EventKind == occurrence.Kind).OrderBy(p => p.EffectId, StringComparer.Ordinal))
+                foreach (var profile in triggerEffects.Where(p => p.EventKind == occurrence.Kind && CauseMatches(p, occurrence)).OrderBy(p => p.EffectId, StringComparer.Ordinal))
                 {
                     if (profile.SourceLocation != TriggerSourceLocation.FaceUpMonster)
                     {
-                        if (profile.CardId == occurrence.Subject.Card.GameCardId) yield return new(id++, profile, occurrence.Subject, occurrence);
+                        // A definition effect in the Graveyard belongs to the card's owner, who may not have controlled it.
+                        if (profile.CardId == occurrence.Subject.Card.GameCardId)
+                            yield return new(id++, profile, profile.Definition is null ? occurrence.Subject : occurrence.Subject with { Player = occurrence.Subject.Card.Owner }, occurrence);
                         continue;
                     }
                     foreach (var (binding, monster) in sources)

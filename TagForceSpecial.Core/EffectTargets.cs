@@ -214,3 +214,23 @@ public sealed record DefendingMonsterTarget : EffectTarget;
 
 /// <summary>Changes each bound combatant's ATK and DEF until the current attack ends.</summary>
 public sealed record ModifyCombatantStatsStep(int Attack, int Defense) : EffectStep;
+
+/// <summary>Monsters with a printed stat in [Min, Max] and, when set, a raw attribute code; a variable ("?") stat never matches.</summary>
+public sealed record MonsterTraitFilter : CardFilter
+{
+    public MonsterStat Stat { get; }
+    public int Min { get; }
+    public int Max { get; }
+    public uint? AttributeCode { get; }
+    public IReadOnlySet<uint> ExcludedCardIds { get; }
+
+    public MonsterTraitFilter(MonsterStat stat, int max, int min = 0, uint? attributeCode = null, IEnumerable<uint>? excludedCardIds = null)
+    {
+        if (!Enum.IsDefined(stat) || min < 0 || max < min) throw new ArgumentOutOfRangeException(nameof(max));
+        Stat = stat; Max = max; Min = min; AttributeCode = attributeCode;
+        ExcludedCardIds = new HashSet<uint>(excludedCardIds ?? []);
+    }
+}
+
+/// <summary>The monster chosen for a trigger at activation, bound automatically to its link.</summary>
+public sealed record TriggerTargetedMonster : EffectTarget;
