@@ -214,8 +214,8 @@ public sealed class EffectDefinition
     public IReadOnlyList<EffectCondition> Conditions { get; }
     public EffectCost? Cost { get; }
     public EffectTarget? Target { get; }
-    /// <summary>Field targets chosen in order at activation, each spec for its own count.</summary>
-    public IReadOnlyList<FieldTarget> FieldTargets { get; }
+    /// <summary>Field, Graveyard or banished targets chosen in order at activation.</summary>
+    public IReadOnlyList<EffectTarget> FieldTargets { get; }
     /// <summary>
     /// On activation, the activating player cannot Summon other monsters for the rest of the turn (Sets remain
     /// legal). Applied at commit, so it holds even if the activation is later negated.
@@ -236,12 +236,16 @@ public sealed class EffectDefinition
         DealDamageStep d => d.PerCount,
         _ => EffectCount.None
     }).Where(c => c != EffectCount.None);
-    internal bool UsesFieldTargets => Steps.Any(s => s is DestroyTargetsStep or ReturnTargetsToHandStep or ChangeTargetsToDefenseStep);
+    internal static bool IsFieldTargetStep(EffectStep s) => s is DestroyTargetsStep or ReturnTargetsToHandStep or ChangeTargetsToDefenseStep;
+    internal static bool IsZoneTargetStep(EffectStep s) => s is AddTargetsToHandStep or BanishTargetsStep or ReturnTargetsToGraveyardStep or
+        ShuffleTargetsIntoDeckStep or SpecialSummonTargetStep;
+    internal static int MinCount(EffectTarget t) => t is FieldTarget f ? f.Count : ((ZoneTarget)t).MinCount;
+    internal static int MaxCount(EffectTarget t) => t is FieldTarget f ? f.Count : ((ZoneTarget)t).MaxCount;
     internal bool RespondsOnly => Conditions.Any(c => c is RespondsToSpellActivationCondition);
 
     public EffectDefinition(string effectId, uint cardId, EffectKind kind, IEnumerable<EffectStep> steps,
         IEnumerable<EffectCondition>? conditions = null, EffectCost? cost = null, EffectTarget? target = null,
-        bool locksOtherSummonsThisTurn = false, IEnumerable<FieldTarget>? fieldTargets = null)
+        bool locksOtherSummonsThisTurn = false, IEnumerable<EffectTarget>? fieldTargets = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(effectId);
         ArgumentNullException.ThrowIfNull(steps);
@@ -264,6 +268,7 @@ public sealed class EffectDefinition
                     SendFromDeckToGraveyardStep s => s.Filter is null,
                     DestroyTargetStep or DestroyOpponentFaceUpMonstersStep or NegateActivationStep => false,
                     DestroyTargetsStep or ReturnTargetsToHandStep or ChangeTargetsToDefenseStep => false,
+                    AddTargetsToHandStep or BanishTargetsStep or ReturnTargetsToGraveyardStep or ShuffleTargetsIntoDeckStep or SpecialSummonTargetStep => false,
                     DestroyAllStep s => !Enum.IsDefined(s.Kind) || !Enum.IsDefined(s.Side) || !Enum.IsDefined(s.Filter),
                     ReturnAllToHandStep s => !Enum.IsDefined(s.Kind) || !Enum.IsDefined(s.Side),
                     ChangeAllToDefenseStep s => !Enum.IsDefined(s.Side),
@@ -284,9 +289,13 @@ public sealed class EffectDefinition
         if ((target is not null) != snapshot.Any(s => s is DestroyTargetStep))
             throw new ArgumentException("A Spell/Trap target and a target-destruction step go together.", nameof(target));
         var fields = (fieldTargets ?? []).Take(6).ToArray();
-        if (fields.Any(f => f is null) || fields.Sum(f => f.Count) > 5 || fields.Length != 0 && target is not null ||
-            (fields.Length != 0) != snapshot.Any(s => s is DestroyTargetsStep or ReturnTargetsToHandStep or ChangeTargetsToDefenseStep) ||
-            snapshot.Any(s => s is ChangeTargetsToDefenseStep) && fields.Any(f => f.Kind != FieldCardKind.Monster))
+        bool fieldSteps = snapshot.Any(IsFieldTargetStep), zoneSteps = snapshot.Any(IsZoneTargetStep);
+        if (fields.Any(f => f is not (FieldTarget or ZoneTarget)) || fields.Sum(MaxCount) > 5 || fields.Length != 0 && target is not null ||
+            (fields.Length != 0) != (fieldSteps || zoneSteps) || fieldSteps && zoneSteps ||
+            fieldSteps && fields.Any(f => f is not FieldTarget) || zoneSteps && fields.Any(f => f is not ZoneTarget) ||
+            fields.SkipLast(1).Any(f => MinCount(f) != MaxCount(f)) ||
+            snapshot.Any(s => s is ChangeTargetsToDefenseStep) && fields.Any(f => f is FieldTarget { Kind: not FieldCardKind.Monster }) ||
+            snapshot.Any(s => s is SpecialSummonTargetStep) && (fields.Length != 1 || fields[0] is not ZoneTarget { MaxCount: 1, MustBeSummonable: true, Zone: CardZone.Graveyard }))
             throw new ArgumentException("Field targets (up to 5) and the steps that use them go together.", nameof(fieldTargets));
         EffectId = effectId;
         CardId = cardId;
@@ -331,7 +340,9 @@ public abstract class PendingDefinitionChoice
 }
 
 /// <summary>Resolution-time Special Summon choice; deck options are visible only to the choosing player.</summary>
-public sealed record DefinitionSummonOption(CardInstance Card, DecisionCardSource Source);
+public sealed record DefinitionSummonOption(CardInstance Card, DecisionCardSource Source,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    PlayerId? From = null);
 public sealed class PendingDefinitionSummon : PendingDefinitionChoice
 {
     public IReadOnlyList<DefinitionSummonOption> Options { get; }

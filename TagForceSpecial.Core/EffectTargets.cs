@@ -9,8 +9,8 @@ public enum TargetSide { Either, Own, Opponent }
 /// <summary>Position requirement on a field card; Spell/Trap cards only use <see cref="FaceUp"/>.</summary>
 public enum FieldCardFilter { Any, FaceUp, AttackPosition, DefensePosition, FaceUpAttack }
 
-/// <summary>Where a field card sits.</summary>
-public enum FieldLocation { MonsterZone, SpellTrapZone, PendulumZone }
+/// <summary>Where a targeted card sits; Graveyard and banished cards have no zone or placement.</summary>
+public enum FieldLocation { MonsterZone, SpellTrapZone, PendulumZone, Graveyard, Banished }
 
 /// <summary>A field card bound by instance and uninterrupted placement.</summary>
 public sealed record FieldCardTarget(PlayerId Player, FieldLocation Location, int Zone, CardInstance Card, long PlacementId)
@@ -22,7 +22,9 @@ public sealed record FieldCardTarget(PlayerId Player, FieldLocation Location, in
         {
             FieldLocation.MonsterZone => (player.MonsterZones[Zone]?.Card, player.MonsterZones[Zone]?.PlacementId ?? 0),
             FieldLocation.SpellTrapZone => (player.SpellTrapFields[Zone]?.Card, player.SpellTrapFields[Zone]?.PlacementId ?? 0),
-            _ => (player.PendulumZones[Zone]?.Card, player.PendulumZones[Zone]?.PlacementId ?? 0)
+            FieldLocation.PendulumZone => (player.PendulumZones[Zone]?.Card, player.PendulumZones[Zone]?.PlacementId ?? 0),
+            FieldLocation.Graveyard => (player.Graveyard.Contains(Card) ? Card : null, 0),
+            _ => (player.Banished.Contains(Card) ? Card : null, 0)
         };
         return card == Card && placement == PlacementId;
     }
@@ -87,3 +89,57 @@ public sealed record CardReturnedToHand(PlayerId Owner, CardInstance Card, strin
 
 /// <summary>LP paid as an activation cost.</summary>
 public sealed record LifePointsPaid(PlayerId Player, int Amount, int LifePointsBefore, int LifePointsAfter, string EffectId) : DuelEvent;
+
+public enum CardZone { Graveyard, Banished }
+
+/// <summary>
+/// Between <see cref="MinCount"/> and <see cref="MaxCount"/> distinct cards in a Graveyard or banished zone, chosen at
+/// activation. Only the last target of a definition may vary in count.
+/// </summary>
+public sealed record ZoneTarget : EffectTarget
+{
+    public CardZone Zone { get; }
+    public TargetSide Side { get; }
+    public CardFilter Filter { get; }
+    public int MinCount { get; }
+    public int MaxCount { get; }
+    /// <summary>Only cards that could be Special Summoned to the activating player's field qualify.</summary>
+    public bool MustBeSummonable { get; }
+
+    public ZoneTarget(CardZone zone, TargetSide side, CardFilter filter, int minCount = 1, int maxCount = 1, bool mustBeSummonable = false)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        if (!Enum.IsDefined(zone) || !Enum.IsDefined(side)) throw new ArgumentOutOfRangeException(nameof(zone));
+        if (minCount < 1 || maxCount < minCount || maxCount > 5) throw new ArgumentOutOfRangeException(nameof(maxCount));
+        Zone = zone; Side = side; Filter = filter; MinCount = minCount; MaxCount = maxCount; MustBeSummonable = mustBeSummonable;
+    }
+}
+
+/// <summary>Matches any card with explicit card rules.</summary>
+public sealed record AnyCardFilter : CardFilter;
+
+/// <summary>Adds every qualifying Graveyard or banished target to its owner's hand.</summary>
+public sealed record AddTargetsToHandStep : EffectStep;
+
+/// <summary>Banishes every qualifying Graveyard target.</summary>
+public sealed record BanishTargetsStep : EffectStep;
+
+/// <summary>Returns every qualifying banished target to its owner's Graveyard.</summary>
+public sealed record ReturnTargetsToGraveyardStep : EffectStep;
+
+/// <summary>
+/// Shuffles every qualifying target into its owner's Deck. With <see cref="StopUnlessAll"/>, later steps resolve
+/// only if every target was shuffled in.
+/// </summary>
+public sealed record ShuffleTargetsIntoDeckStep(bool StopUnlessAll = false) : EffectStep;
+
+/// <summary>Special Summons the single Graveyard target to the activating player's field; zone and position chosen at resolution.</summary>
+public sealed record SpecialSummonTargetStep : EffectStep;
+
+/// <summary>Ends an optional run of target choices early.</summary>
+public sealed record FinishDecision(PlayerId Player, long DecisionId) : DecisionCommand(Player, DecisionId);
+
+public sealed record CardMovedToHand(PlayerId Owner, CardInstance Card, CardZone From, string EffectId) : DuelEvent;
+public sealed record CardBanishedFromGraveyard(PlayerId Owner, CardInstance Card, string EffectId) : DuelEvent;
+public sealed record CardReturnedToGraveyard(PlayerId Owner, CardInstance Card, string EffectId) : DuelEvent;
+public sealed record CardShuffledIntoDeck(PlayerId Owner, CardInstance Card, string EffectId) : DuelEvent;

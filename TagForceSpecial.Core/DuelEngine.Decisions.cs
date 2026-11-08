@@ -22,10 +22,12 @@ public sealed partial class DuelEngine
                 .Concat(p.PendulumZones.Select((field, zone) => (field, zone))
                     .Where(s => s.field is not null && s.field.Card.InstanceId != excluded)
                     .Select(s => new SpellTrapTarget(p.Id, s.zone, s.field!.Card, s.field.PlacementId, true)))).ToArray() : [];
-        FieldCardTarget[]? fieldTargets = step.FieldTargetSpec is { } spec
-            ? FieldMatches(State, player.Id, spec.Kind, spec.Side, spec.Filter, excluded)
-                .Where(t => !answers.Any(a => a.FieldTarget is { } chosen && chosen.Card == t.Card)).ToArray()
-            : null;
+        FieldCardTarget[]? fieldTargets = (step.FieldTargetSpec switch
+            {
+                FieldTarget spec => FieldMatches(State, player.Id, spec.Kind, spec.Side, spec.Filter, excluded),
+                ZoneTarget zone => ZoneMatches(State, player.Id, zone),
+                _ => null
+            })?.Where(t => !answers.Any(a => a.FieldTarget is { } chosen && chosen.Card == t.Card)).ToArray();
         if (step.Kind == DecisionKind.Card && cards.Length == 0 ||
             step.Kind == DecisionKind.MonsterZone && zones.Length == 0 ||
             step.Kind == DecisionKind.SpellTrapTarget && targets.Length == 0 ||
@@ -53,6 +55,9 @@ public sealed partial class DuelEngine
         if (pending is null) return Reject(DuelError.NoPendingDecision);
         if (command.Player != pending.Player) return Reject(DuelError.NotActivePlayer);
         if (command.DecisionId != pending.DecisionId) return Reject(DuelError.StaleDecision);
+        if (command is FinishDecision)
+            return pending.CanFinish && State.PendingSpellActivation is { } finishing && definitions.ContainsKey(finishing.Spell.GameCardId)
+                ? FinishDefinitionDecisions(pending) : Reject(DuelError.InvalidDecisionChoice);
         var kind = command switch
         {
             ChooseDecisionCard => DecisionKind.Card,

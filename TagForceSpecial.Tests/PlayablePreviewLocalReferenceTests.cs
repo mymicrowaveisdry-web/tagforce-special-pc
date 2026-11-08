@@ -26,10 +26,10 @@ public sealed class PlayablePreviewLocalReferenceTests
         Assert.Equal(95, full.GetProperty("excludedTokens").GetArrayLength());
         Assert.Equal(7159, entries.Length);
         // 665 Normal Monsters (including the 8 preview monsters), 6 preview Spells, 5 chain cards, 13 life-point cards
-        // 10 Deck-operation cards and 15 removal cards.
-        Assert.Equal(714, entries.Count(c => c.GetProperty("status").GetString() == "supported"));
+        // 10 Deck-operation cards, 15 removal cards and 8 Graveyard cards.
+        Assert.Equal(722, entries.Count(c => c.GetProperty("status").GetString() == "supported"));
         Assert.Equal(0, entries.Count(c => c.GetProperty("status").GetString() == "partial"));
-        Assert.Equal(6445, entries.Count(c => c.GetProperty("status").GetString() == "unsupported"));
+        Assert.Equal(6437, entries.Count(c => c.GetProperty("status").GetString() == "unsupported"));
         Assert.All(entries, c => Assert.False(c.GetProperty("pspVerified").GetBoolean()));
         var scenario = PreviewDuelScenario.Run(catalog);
         Assert.Equal(TagForceSpecial.Core.DuelEndReason.LifePointsDepleted, scenario.Outcome.Reason);

@@ -175,7 +175,7 @@ public sealed partial class DuelEngine
         // Definitions need matching settable card rules, Token rules for Token steps and a seed for shuffles.
         if (definitionList.Any(d => d is null ||
                 d.Steps.OfType<SummonTokensStep>().Any(s => s.TokenCardIds.Any(id => !IsTokenId(id))) ||
-                shuffleSeed is null && d.Steps.Any(s => s is ShuffleDeckStep or AddFromDeckToHandStep or SendFromDeckToGraveyardStep ||
+                shuffleSeed is null && d.Steps.Any(s => s is ShuffleDeckStep or AddFromDeckToHandStep or SendFromDeckToGraveyardStep or ShuffleTargetsIntoDeckStep ||
                     s is SpecialSummonStep summon && summon.Sources.HasFlag(SpecialSummonSources.Deck)) ||
                 !this.rules.TryGetValue(d.CardId, out var rule) || !rule.AllowsSpellTrapSet ||
                 rule.Category != (d.Kind is EffectKind.NormalSpell or EffectKind.QuickPlaySpell ? CardCategory.Spell : CardCategory.Trap) ||
@@ -190,7 +190,8 @@ public sealed partial class DuelEngine
             .ToFrozenDictionary(d => d.CardId, d => new DecisionSequence(DefinitionSequenceId(d),
                 [.. d.Cost is DiscardCost ? [DecisionStep.AnyCard(DecisionCardSource.Hand)] : Array.Empty<DecisionStep>(),
                  .. d.Target is SpellTrapOnFieldTarget ? [DecisionStep.SpellTrapTarget()] : Array.Empty<DecisionStep>(),
-                 .. d.FieldTargets.SelectMany(spec => Enumerable.Repeat(spec, spec.Count)).Select(DecisionStep.FieldTargetChoice)],
+                 .. d.FieldTargets.SelectMany(spec => Enumerable.Range(0, EffectDefinition.MaxCount(spec))
+                     .Select(i => DecisionStep.FieldTargetChoice(spec, optional: i >= EffectDefinition.MinCount(spec))))],
                 stopAfterCompletion: false));
         bool IsMonster(uint id) => this.rules.TryGetValue(id, out var rule) && rule.Category == CardCategory.Monster;
         int nextInstance = 1;

@@ -111,9 +111,16 @@ public sealed class DuelActionSource
                     $"Target P{(int)target.Player + 1} {(target.IsPendulumZone ? "scale" : "zone")} {target.Zone + 1}",
                     zone: target.IsPendulumZone ? 1 : 0, target: target.Zone, targetPlayer: target.Player);
             foreach (var field in decision.FieldTargetOptions ?? [])
+            {
+                // Graveyard and banished cards are public; field targets never reveal a face-down card.
+                bool zone = field.Location is FieldLocation.Graveyard or FieldLocation.Banished;
                 yield return B(new ChooseDecisionFieldTarget(player, decision.DecisionId, field.Player, field.Location, field.Zone,
-                    field.Card.InstanceId), ActionKind.ChooseTarget, $"Target P{(int)field.Player + 1} {field.Location} {field.Zone + 1}",
-                    zone: (int)field.Location, target: field.Zone, targetPlayer: field.Player);
+                    field.Card.InstanceId), ActionKind.ChooseTarget, zone
+                        ? $"Target P{(int)field.Player + 1} {field.Location} {catalog[field.Card.GameCardId].Name}"
+                        : $"Target P{(int)field.Player + 1} {field.Location} {field.Zone + 1}",
+                    zone ? field.Card.InstanceId : null, (int)field.Location, field.Zone, targetPlayer: field.Player);
+            }
+            if (decision.CanFinish) yield return B(new FinishDecision(player, decision.DecisionId), ActionKind.FinishChoice, "Done");
             yield break;
         }
         if (state.OpenWindow is { } window)

@@ -40,7 +40,8 @@ contain local card text. `card-support` records original text, IDs/provenance,
 conditions, operations, costs, choices, limits, tests and evidence separately for
 the preview and full pool (the full pool also includes the 665-card Normal Monster
 family, the five chain cards, the 13 LP cards, the 10
-Deck-operation cards and the 15 removal cards, and excludes 95 Tokens).
+Deck-operation cards, the 15 removal cards and the 8 Graveyard cards,
+and excludes 95 Tokens).
 Unreviewed cards remain unsupported. Unclassified effects require later family inventory.
 
 The reviewed cardinfo hash is

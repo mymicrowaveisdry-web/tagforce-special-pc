@@ -227,9 +227,9 @@ public sealed class RemovalFamilyTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new PayLifePointsCost(0));
         Assert.Throws<ArgumentException>(() => new EffectDefinition("x", 1, EffectKind.NormalSpell, [new DestroyTargetsStep()]));
         Assert.Throws<ArgumentException>(() => new EffectDefinition("x", 1, EffectKind.NormalSpell, [new ChangeTargetsToDefenseStep()],
-            fieldTargets: [new(FieldCardKind.SpellTrap)]));
+            fieldTargets: [new FieldTarget(FieldCardKind.SpellTrap)]));
         Assert.Throws<ArgumentException>(() => new EffectDefinition("x", 1, EffectKind.NormalSpell, [new DestroyTargetsStep()],
-            fieldTargets: [new(FieldCardKind.Monster, count: 3), new(FieldCardKind.Monster, count: 3)]));
+            fieldTargets: [new FieldTarget(FieldCardKind.Monster, count: 3), new FieldTarget(FieldCardKind.Monster, count: 3)]));
         Assert.Equal(15, RemovalFamily.Cards.Count);
     }
 }

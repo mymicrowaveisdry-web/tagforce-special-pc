@@ -50,12 +50,15 @@ public sealed class DecisionStep
         return new(DecisionKind.Position, null, [], positions);
     }
 
-    /// <summary>The field target matching <see cref="FieldTargetSpec"/>, distinct from earlier answers.</summary>
+    /// <summary>The field, Graveyard or banished target this step chooses, distinct from earlier answers.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public FieldTarget? FieldTargetSpec { get; private init; }
+    public EffectTarget? FieldTargetSpec { get; private init; }
+    /// <summary>An optional pick that <see cref="FinishDecision"/> may skip, ending the choices.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Optional { get; private init; }
 
-    public static DecisionStep FieldTargetChoice(FieldTarget spec) => spec is null ? throw new ArgumentNullException(nameof(spec))
-        : new(DecisionKind.FieldTarget, null, [], []) { FieldTargetSpec = spec };
+    public static DecisionStep FieldTargetChoice(EffectTarget spec, bool optional = false) => spec is null ? throw new ArgumentNullException(nameof(spec))
+        : new(DecisionKind.FieldTarget, null, [], []) { FieldTargetSpec = spec, Optional = optional };
 
     public static DecisionStep EmptyMonsterZone() => new(DecisionKind.MonsterZone, null, [], []);
     public static DecisionStep SpellTrapTarget() => new(DecisionKind.SpellTrapTarget, null, [], []);
@@ -102,6 +105,9 @@ public sealed class PendingDecision
     /// <summary>Field target options; null unless this is a field-target decision.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<FieldCardTarget>? FieldTargetOptions { get; }
+    /// <summary>The choices may end here with <see cref="FinishDecision"/>.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool CanFinish { get; }
 
     internal PendingDecision(long id, DecisionSequence sequence, PlayerId player, int index,
         IEnumerable<CardInstance> cards, IEnumerable<int> zones, IEnumerable<DecisionAnswer> answers,
@@ -120,6 +126,7 @@ public sealed class PendingDecision
         Answers = Array.AsReadOnly(answers.ToArray());
         TargetOptions = Array.AsReadOnly(targets?.ToArray() ?? []);
         FieldTargetOptions = fieldTargets is null ? null : Array.AsReadOnly(fieldTargets.ToArray());
+        CanFinish = step.Optional;
     }
 }
 

@@ -36,7 +36,8 @@ public sealed partial class DuelEngine
     };
 
     private DuelError CheckSpecialSummon(DuelState state, PlayerId playerId, CardInstance card, int zone,
-        BattlePosition position, DecisionCardSource source, string? procedureId = null, CardInstance? lockExemptSource = null)
+        BattlePosition position, DecisionCardSource source, string? procedureId = null, CardInstance? lockExemptSource = null,
+        PlayerId? sourcePlayer = null)
     {
         if (zone is < 0 or >= 5) return DuelError.InvalidMonsterZone;
         if (position is not (BattlePosition.FaceUpAttack or BattlePosition.FaceUpDefense)) return DuelError.InvalidBattlePosition;
@@ -45,7 +46,9 @@ public sealed partial class DuelEngine
         if (IsSummonLocked(state, playerId, lockExemptSource)) return DuelError.SummonLocked;
         var player = state.GetPlayer(playerId);
         if (player.MonsterZones[zone] is not null) return DuelError.MonsterZoneOccupied;
-        if (card.Owner != playerId || !SpecialSourceCards(player, source).Contains(card))
+        // A card may come from the other player's zone (e.g. their Graveyard); it keeps its owner.
+        var origin = state.GetPlayer(sourcePlayer ?? playerId);
+        if (card.Owner != origin.Id || !SpecialSourceCards(origin, source).Contains(card))
             return DuelError.SpecialSummonSourceUnavailable;
         if (specialSummonCards.TryGetValue(card.GameCardId, out var policy))
         {
