@@ -90,8 +90,6 @@ public sealed partial class DuelEngine
         var answers = pending.Answers.Append(answer).ToArray();
         if (State.PendingSpellActivation is { } activation && definitions.ContainsKey(activation.Spell.GameCardId))
             return AnswerDefinitionDecision(pending, answer, answers);
-        if (State.PendingChain is not null && State.PendingSpellActivation is { ResponseToLink: > 0 })
-            return AnswerChainResponse(pending, answer, answers);
         if (State.PendingSpellActivation is not null) return Reject(DuelError.InvalidEffectState);
         var sequence = decisionSequences[pending.SequenceId];
         var answered = new DecisionAnswered(command.Player, sequence.Id, pending.DecisionId, answer);

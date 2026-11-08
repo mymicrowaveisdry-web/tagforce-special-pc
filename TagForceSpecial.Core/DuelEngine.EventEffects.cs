@@ -133,7 +133,7 @@ public sealed partial class DuelEngine
 
     private DuelState PrepareEventEffects(DuelState before, DuelState next, List<DuelEvent> events)
     {
-        if (triggerEffects.Length == 0 && continuousEffects.Length == 0 && continuousNegations.Length == 0 && battleResponses.Count == 0) return next;
+        if (triggerEffects.Length == 0 && continuousEffects.Length == 0 && continuousNegations.Length == 0 && !HasTimedCombatModifiers) return next;
         var current = next.EventEffects;
         var timed = current.TimedModifiers.Where(m => m.Target.IsStillPresent(next) &&
             next.GetPlayer(m.Target.Player).MonsterZones[m.Target.Zone]!.Position != BattlePosition.FaceDownDefense &&

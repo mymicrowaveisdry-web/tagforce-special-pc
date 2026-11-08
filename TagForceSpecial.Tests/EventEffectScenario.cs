@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using TagForceSpecial.Cards;
 using TagForceSpecial.Core;
@@ -10,7 +11,7 @@ internal static class EventEffectScenario
     internal const uint A = 100_000, B = uint.MaxValue, Filler = 1, Trap = 2, SummonSpell = 3;
 
     internal static DuelEngine Engine(IEnumerable<TriggerEffectProfile>? triggers = null,
-        IEnumerable<ContinuousEffectProfile>? continuous = null, IEnumerable<ChainResponseProfile>? responses = null,
+        IEnumerable<ContinuousEffectProfile>? continuous = null, IEnumerable<EffectDefinition>? responses = null,
         PlayerId startingPlayer = PlayerId.One, int? attackA = 1000, int? defenseA = 1000,
         int? attackB = 2000, int? defenseB = 1000,
         IEnumerable<uint>? playerOneDeck = null, IEnumerable<uint>? playerTwoDeck = null,
@@ -27,9 +28,8 @@ internal static class EventEffectScenario
         uint[] first = [A, A, Trap, 5217, SummonSpell, A, 4909, .. Enumerable.Repeat(Filler, 33)];
         uint[] second = [B, B, Trap, 4818, Filler, .. Enumerable.Repeat(Filler, 35)];
         return new(catalog, rules, playerOneDeck ?? first, playerTwoDeck ?? second, startingPlayer,
-            experimentalChainResponses: responses,
             experimentalTriggerEffects: triggers, experimentalContinuousEffects: continuous, experimentalContinuousNegations: negations,
-            effectDefinitions: [SpecialProbe, .. ChainCards(5217, 4909, 4818)], shuffleSeed: 1);
+            effectDefinitions: [SpecialProbe, .. ChainCards(5217, 4909, 4818), .. responses ?? []], shuffleSeed: 1);
     }
 
     /// <summary>Normal Spell that Special Summons A from the Deck, banished in the End Phase.</summary>
@@ -133,6 +133,22 @@ internal static class EventEffectScenario
     internal static DuelActionResult Resolve(DuelEngine engine) =>
         Ok(engine, new ResolveNextChainLink(engine.State.ActivePlayer, engine.State.PendingChain!.DecisionId));
 
+    private static readonly ConditionalWeakTable<DuelEngine, Tuple<int, int>> plannedSummons = new();
+
+    /// <summary>Sets the card and zone the next resolution-time definition summon picks; otherwise the first of each.</summary>
+    internal static void PlanSummon(DuelEngine engine, int cardInstanceId, int monsterZone) =>
+        plannedSummons.AddOrUpdate(engine, Tuple.Create(cardInstanceId, monsterZone));
+
+    /// <summary>Answers a pending definition summon in face-up Defense Position, using any planned card and zone.</summary>
+    internal static DuelActionResult ChooseSummon(DuelEngine engine)
+    {
+        var summon = engine.State.PendingChain!.DefinitionSummon!;
+        var (card, zone) = plannedSummons.TryGetValue(engine, out var plan)
+            ? (plan.Item1, plan.Item2) : (summon.Options[0].Card.InstanceId, summon.MonsterZoneOptions[0]);
+        plannedSummons.Remove(engine);
+        return Ok(engine, new ChooseDefinitionSummon(summon.Player, summon.DecisionId, card, zone, BattlePosition.FaceUpDefense));
+    }
+
     internal static IReadOnlyList<DuelEvent> Drain(DuelEngine engine)
     {
         List<DuelEvent> events = [];
@@ -150,6 +166,7 @@ internal static class EventEffectScenario
                 events.AddRange(Ok(engine, command).Events);
             }
             else if (engine.State.EventEffects.PendingTriggers is not null) events.AddRange(Order(engine).Events);
+            else if (engine.State.PendingChain?.DefinitionSummon is not null) events.AddRange(ChooseSummon(engine).Events);
             else if (engine.State.PendingChain is { NextLink: 0 }) Pass(engine);
             else if (engine.State.PendingChain is not null) events.AddRange(Resolve(engine).Events);
             else return events;

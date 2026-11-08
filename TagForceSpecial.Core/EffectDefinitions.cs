@@ -83,9 +83,12 @@ public sealed record DestroyOpponentFaceUpMonstersStep : EffectStep;
 
 /// <summary>
 /// Negates the activation of the link this one responded to and, when <paramref name="DestroySource"/>, destroys
-/// that card if it is still in place. Requires a <see cref="RespondsToSpellActivationCondition"/>.
+/// that card if it is still in place. Requires a response condition.
 /// </summary>
 public sealed record NegateActivationStep(bool DestroySource) : EffectStep;
+
+/// <summary>Negates the effect of the link this one responded to; <paramref name="DestroySource"/> also destroys its card or monster.</summary>
+public sealed record NegateEffectStep(bool DestroySource) : EffectStep;
 
 /// <summary>
 /// Special Summons one eligible hand or Deck card chosen at resolution, shuffling after a Deck summon. Optionally
@@ -179,6 +182,9 @@ public sealed record FreeMonsterZonesCondition : EffectCondition
 /// </summary>
 public sealed record RespondsToSpellActivationCondition : EffectCondition;
 
+/// <summary>Requires a preceding link (any activation or trigger), of <see cref="Category"/> when set.</summary>
+public sealed record RespondsToActivationCondition(CardCategory? Category = null) : EffectCondition;
+
 /// <summary>The activating player has not Summoned a monster this turn; Sets do not count.</summary>
 public sealed record NoSummonThisTurnCondition : EffectCondition;
 
@@ -188,8 +194,8 @@ public abstract record EffectCost
     private protected EffectCost() { }
 }
 
-/// <summary>Discard 1 card from the hand (any card other than the activated source).</summary>
-public sealed record DiscardCost : EffectCost;
+/// <summary>Discard 1 card from the hand other than the source; <see cref="Filter"/> limits which cards qualify.</summary>
+public sealed record DiscardCost(CardIdFilter? Filter = null) : EffectCost;
 
 /// <summary>An activation-time target, bound by instance and placement.</summary>
 public abstract record EffectTarget
@@ -237,13 +243,13 @@ public sealed class EffectDefinition
         _ => EffectCount.None
     }).Where(c => c != EffectCount.None);
     internal static bool IsFieldTargetStep(EffectStep s) => s is DestroyTargetsStep or ReturnTargetsToHandStep or ChangeTargetsToDefenseStep or
-        BanishFieldTargetsStep or NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep or DestroyAndBanishTargetsStep;
-    internal static bool IsAutomatic(EffectTarget t) => t is AttackingMonsterTarget or SummonedMonsterTarget;
+        BanishFieldTargetsStep or NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep or DestroyAndBanishTargetsStep or ModifyCombatantStatsStep;
+    internal static bool IsAutomatic(EffectTarget t) => t is AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget;
     internal static bool IsZoneTargetStep(EffectStep s) => s is AddTargetsToHandStep or BanishTargetsStep or ReturnTargetsToGraveyardStep or
         ShuffleTargetsIntoDeckStep or SpecialSummonTargetStep;
     internal static int MinCount(EffectTarget t) => t switch { FieldTarget f => f.Count, ZoneTarget z => z.MinCount, _ => 1 };
     internal static int MaxCount(EffectTarget t) => t switch { FieldTarget f => f.Count, ZoneTarget z => z.MaxCount, SummonedMonsterTarget => 5, _ => 1 };
-    internal bool RespondsOnly => Conditions.Any(c => c is RespondsToSpellActivationCondition);
+    internal bool RespondsOnly => Conditions.Any(c => c is RespondsToSpellActivationCondition or RespondsToActivationCondition);
 
     public EffectDefinition(string effectId, uint cardId, EffectKind kind, IEnumerable<EffectStep> steps,
         IEnumerable<EffectCondition>? conditions = null, EffectCost? cost = null, EffectTarget? target = null,
@@ -268,10 +274,11 @@ public sealed class EffectDefinition
                     MillTopOfDeckStep s => s.Count is < 1 or > 60,
                     AddFromDeckToHandStep s => s.Filter is null,
                     SendFromDeckToGraveyardStep s => s.Filter is null,
-                    DestroyTargetStep or DestroyOpponentFaceUpMonstersStep or NegateActivationStep or NegateSummonStep => false,
+                    DestroyTargetStep or DestroyOpponentFaceUpMonstersStep or NegateActivationStep or NegateEffectStep or NegateSummonStep => false,
                     DestroyTargetsStep or ReturnTargetsToHandStep or ChangeTargetsToDefenseStep => false,
                     AddTargetsToHandStep or BanishTargetsStep or ReturnTargetsToGraveyardStep or ShuffleTargetsIntoDeckStep or SpecialSummonTargetStep => false,
                     BanishFieldTargetsStep or NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep or DestroyAndBanishTargetsStep => false,
+                    ModifyCombatantStatsStep s => s.Attack == 0 && s.Defense == 0,
                     BanishAllStep s => !Enum.IsDefined(s.Side) || !Enum.IsDefined(s.Filter),
                     DestroyAllStep s => !Enum.IsDefined(s.Kind) || !Enum.IsDefined(s.Side) || !Enum.IsDefined(s.Filter),
                     ReturnAllToHandStep s => !Enum.IsDefined(s.Kind) || !Enum.IsDefined(s.Side),
@@ -285,26 +292,33 @@ public sealed class EffectDefinition
             throw new ArgumentException("Supply up to 8 distinct conditions.", nameof(conditions));
         if (required.OfType<MonsterSummonedCondition>().Any(c => c.Kinds is <= 0 or > SummonKinds.Any || !Enum.IsDefined(c.Stat) || c.Min < 0 || c.Min > c.Max))
             throw new ArgumentException("A summon condition needs summon kinds and a valid stat range.", nameof(conditions));
+        if (required.OfType<BattleTimingCondition>().Any(c => c.Windows == BattleTiming.None || (c.Windows & ~BattleTiming.All) != 0 ||
+                c.Windows.HasFlag(BattleTiming.Calculation) && !c.DuringCalculation))
+            throw new ArgumentException("A battle timing condition needs supported timings; during calculation needs an explicit exception.", nameof(conditions));
         if (cost is not (null or DiscardCost or PayLifePointsCost or TributeCost or PayHalfLifePointsCost)) throw new ArgumentOutOfRangeException(nameof(cost));
         if (required.OfType<MonsterWouldBeSummonedCondition>().Any(c => c.Kinds is <= 0 || (c.Kinds & ~(SummonKinds.Normal | SummonKinds.Special)) != 0) ||
             snapshot.Any(s => s is NegateSummonStep) != required.Any(c => c is MonsterWouldBeSummonedCondition) || snapshot.Any(s => s is NegateSummonStep) && kind != EffectKind.CounterTrap)
             throw new ArgumentException("Summon negation needs a Counter Trap with a Normal/Special would-be-Summoned condition.", nameof(steps));
         if (target is not (null or SpellTrapOnFieldTarget)) throw new ArgumentOutOfRangeException(nameof(target));
-        bool responds = required.Any(c => c is RespondsToSpellActivationCondition);
+        bool responds = required.Any(c => c is RespondsToSpellActivationCondition or RespondsToActivationCondition);
+        if (required.OfType<RespondsToActivationCondition>().Any(c => c.Category is not (null or CardCategory.Monster or CardCategory.Spell or CardCategory.Trap)))
+            throw new ArgumentOutOfRangeException(nameof(conditions));
         if (responds && kind == EffectKind.NormalSpell)
             throw new ArgumentException("A Normal Spell cannot be a chain response.", nameof(conditions));
-        if (snapshot.OfType<NegateActivationStep>().Any() && !responds)
+        if (snapshot.Any(s => s is NegateActivationStep or NegateEffectStep) && !responds)
             throw new ArgumentException("Negating an activation requires a response condition.", nameof(steps));
         if ((target is not null) != snapshot.Any(s => s is DestroyTargetStep))
             throw new ArgumentException("A Spell/Trap target and a target-destruction step go together.", nameof(target));
         var fields = (fieldTargets ?? []).Take(6).ToArray();
         bool fieldSteps = snapshot.Any(IsFieldTargetStep), zoneSteps = snapshot.Any(IsZoneTargetStep);
-        if (fields.Any(f => f is not (FieldTarget or ZoneTarget or AttackingMonsterTarget or SummonedMonsterTarget)) ||
+        if (fields.Any(f => f is not (FieldTarget or ZoneTarget or AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget)) ||
             fields.Any(f => f is SummonedMonsterTarget) && (fields.Length != 1 || !required.Any(c => c is MonsterSummonedCondition)) ||
-            fields.Any(f => f is AttackingMonsterTarget) && (fields.Length != 1 || !required.Any(c => c is OpponentAttackDeclaredCondition)) ||
+            fields.Any(f => f is AttackingMonsterTarget or DefendingMonsterTarget) && (fields.Length != 1 ||
+                !required.Any(c => c is BattleTimingCondition || c is OpponentAttackDeclaredCondition && fields[0] is AttackingMonsterTarget)) ||
+            snapshot.Any(s => s is ModifyCombatantStatsStep) && fields is not [AttackingMonsterTarget or DefendingMonsterTarget] ||
             snapshot.Any(s => s is NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep) && fields is not [AttackingMonsterTarget] || fields.Sum(MaxCount) > 5 || fields.Length != 0 && target is not null ||
             (fields.Length != 0) != (fieldSteps || zoneSteps) || fieldSteps && zoneSteps ||
-            fieldSteps && fields.Any(f => f is not (FieldTarget or AttackingMonsterTarget or SummonedMonsterTarget)) || zoneSteps && fields.Any(f => f is not ZoneTarget) ||
+            fieldSteps && fields.Any(f => f is not (FieldTarget or AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget)) || zoneSteps && fields.Any(f => f is not ZoneTarget) ||
             fields.SkipLast(1).Any(f => MinCount(f) != MaxCount(f)) ||
             snapshot.Any(s => s is ChangeTargetsToDefenseStep) && fields.Any(f => f is FieldTarget { Kind: not FieldCardKind.Monster }) ||
             snapshot.Any(s => s is SpecialSummonTargetStep) && (fields.Length != 1 || fields[0] is not ZoneTarget { MaxCount: 1, MustBeSummonable: true, Zone: CardZone.Graveyard }))

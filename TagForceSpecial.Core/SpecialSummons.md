@@ -65,8 +65,8 @@ or general movement contract. No hydration API was added for testing these paths
 
 A procedure may opt into `SummonWindowProfile`; the held card is outside the field
 until success. `PendingSummon.IsSpecialSummon`, source, chosen position and procedure
-metadata survive passes, response chains and cost decisions. `SummonNegationProfile`
-defaults to Normal only; opt into `SummonNegationKinds.Special` or All explicitly.
+metadata survive passes, response chains and cost decisions. A negating definition
+lists the kinds it answers in `MonsterWouldBeSummonedCondition`.
 The existing opposing set Counter Trap chain rules apply. A counter-negated negator
 allows success; a successful negator sends the unsuccessful target to its owner,
 records Negated, grants no new proper status and emits no successful summon event.

@@ -66,7 +66,7 @@ public sealed partial class DuelEngine
         if (id != pending.DecisionId) return Reject(DuelError.StaleSummonDecision);
         if (command.Player != pending.Responder) return Reject(DuelError.NotSummonResponder);
         if (command is ActivateSummonNegation activate)
-            return BeginSummonNegation(pending, activate);
+            return BeginSummonNegation(activate);
         List<DuelEvent> events = [new SummonResponsePassed(command.Player)];
         var updated = pending with { DecisionId = checked(State.Revision + 1), Responder = Other(pending.Responder),
             ConsecutivePasses = pending.ConsecutivePasses + 1 };
@@ -76,32 +76,14 @@ public sealed partial class DuelEngine
         return Accept(next, events.ToArray());
     }
 
-    private DuelActionResult BeginSummonNegation(PendingSummon pending, ActivateSummonNegation command)
+    private DuelActionResult BeginSummonNegation(ActivateSummonNegation command)
     {
         if (command.SpellTrapZone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
         var player = State.GetPlayer(command.Player);
         var source = player.SpellTrapFields[command.SpellTrapZone];
-        if (source is not null && definitions.TryGetValue(source.Card.GameCardId, out var definition))
-            return BeginSummonDefinition(player.Id, command.SpellTrapZone, source, definition);
-        if (command.Player == pending.Player || source is null || source.IsFaceUp || source.SetOnTurn >= State.TurnNumber ||
-            !summonNegations.TryGetValue(source.Card.GameCardId, out var profile) ||
-            pending.PendulumGroup.Count > 1 && !profile.AllowsMultipleSummons ||
-            !profile.Kinds.HasFlag(pending.IsSpecialSummon ? SummonNegationKinds.Special : SummonNegationKinds.Normal))
+        if (source is null || !definitions.TryGetValue(source.Card.GameCardId, out var definition))
             return Reject(DuelError.UnsupportedSummonResponse);
-        if (player.LifePoints <= profile.LifePointCost) return Reject(DuelError.InsufficientLifePoints);
-        var slots = player.SpellTrapFields.ToArray();
-        slots[command.SpellTrapZone] = source with { IsFaceUp = true };
-        var receipt = new CommittedActivation(player.Id, profile.EffectId, source.Card, command.SpellTrapZone, null, null);
-        var link = new ChainLink(1, receipt, source.PlacementId, ChainOperation.SummonNegation, ChainSpellSpeed.Three,
-            SummonAttemptId: pending.AttemptId);
-        var chain = new PendingChain(checked(State.Revision + 1), [link], Other(player.Id));
-        var next = State.With(player: player.With(spellTraps: slots, lifePoints: player.LifePoints - profile.LifePointCost)).WithChain(chain);
-        List<DuelEvent> events = [new ChainResponseActivated(player.Id, profile.EffectId, source.Card, command.SpellTrapZone)];
-        if (profile.LifePointCost != 0) events.Add(new SummonNegationCostPaid(player.Id, profile.EffectId, profile.LifePointCost));
-        events.Add(new ActivationCommitted(receipt));
-        events.Add(new ChainLinkAdded(link));
-        events.Add(new ChainResponseRequested(chain.Responder, chain.DecisionId));
-        return Accept(next, events.ToArray());
+        return BeginSummonDefinition(player.Id, command.SpellTrapZone, source, definition);
     }
 
     private DuelState ResolveSummonNegation(DuelState next, ChainLink link, List<DuelEvent> events)

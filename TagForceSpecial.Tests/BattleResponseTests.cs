@@ -5,8 +5,8 @@ namespace TagForceSpecial.Tests;
 
 public sealed class BattleResponseTests
 {
-    private static BattleResponseProfile Summoning(uint card = Summon, BattleTiming windows = BattleTiming.AttackDeclaration) =>
-        new("hand-summon", card, BattleResponseOperation.SpecialSummonFromHand, windows, summonableCardIds: [card == Stats ? A : B]);
+    private static EffectDefinition Summoning(uint card = Summon, BattleTiming windows = BattleTiming.AttackDeclaration) =>
+        ResponseProbe.SummonFromHand("hand-summon", card, windows, card == Stats ? A : B);
 
     [Fact]
     public void ANewDefenderCausesAReplayInsteadOfConvertingTheDeclaredDirectAttackAutomatically()
@@ -58,11 +58,7 @@ public sealed class BattleResponseTests
         var original = engine.State.Battle!.Attack!.DeclaredDefenders.ToArray();
         int card = engine.State.GetPlayer(PlayerId.Two).Hand.First(c => c.GameCardId == B).InstanceId;
         Respond(engine, 2, card, 1);
-        while (engine.State.PendingChain is { } chain)
-        {
-            if (chain.NextLink == 0) Ok(engine, new PassChainResponse(chain.Responder, chain.DecisionId));
-            else Ok(engine, new ResolveNextChainLink(PlayerId.One, chain.DecisionId));
-        }
+        ResolveChain(engine);
         var batch = engine.State.EventEffects.PendingTriggers!;
         Ok(engine, new ChooseTriggerOrder(batch.Player, batch.DecisionId, batch.Options.Select(t => t.Id).ToArray()));
         var target = engine.State.EventEffects.PendingCommitment!;
@@ -93,7 +89,7 @@ public sealed class BattleResponseTests
     [Fact]
     public void AttackNegationCancelsDamageAndDoesNotRestoreTheAttackAllowance()
     {
-        var engine = Engine(profiles: [new("negate", Negate, BattleResponseOperation.NegateAttack, BattleTiming.AttackDeclaration)]);
+        var engine = Engine(profiles: [ResponseProbe.NegateAttack("negate", Negate)]);
         Ready(engine); Declare(engine); Respond(engine, 0);
         var events = DrainEffects(engine);
         Assert.Equal(BattleAttackCancellation.Negated, engine.State.Battle!.Attack!.Cancellation);
@@ -107,7 +103,7 @@ public sealed class BattleResponseTests
     [Fact]
     public void DestroyingAnAttackerDuringTheDeclarationWindowCancelsThatAttack()
     {
-        var engine = Engine(profiles: [new("destroy", Destroy, BattleResponseOperation.DestroyAttacker, BattleTiming.AttackDeclaration)]);
+        var engine = Engine(profiles: [ResponseProbe.DestroyAttacker("destroy", Destroy)]);
         Ready(engine); Declare(engine); Respond(engine, 1); DrainEffects(engine);
         Assert.Equal(BattleAttackCancellation.AttackerUnavailable, engine.State.Battle!.Attack!.Cancellation);
         Assert.Null(engine.State.GetPlayer(PlayerId.One).MonsterZones[0]);
@@ -120,9 +116,8 @@ public sealed class BattleResponseTests
     [Fact]
     public void NegatingAnAttackNegationUsesTheExistingChainAndLetsTheAttackContinue()
     {
-        var profile = new ChainResponseProfile("counter", Counter, ChainOperation.NegateActivation, ChainSpellSpeed.Three,
-            respondsToCategory: CardCategory.Trap, battleWindows: BattleTiming.AttackDeclaration);
-        var engine = Engine(chains: [profile], profiles: [new("negate", Negate, BattleResponseOperation.NegateAttack, BattleTiming.AttackDeclaration)]);
+        var profile = ResponseProbe.Negate("counter", Counter, ResponseNegation.Activation, ChainSpellSpeed.Three, respondsTo: CardCategory.Trap);
+        var engine = Engine(chains: [profile], profiles: [ResponseProbe.NegateAttack("negate", Negate)]);
         Ready(engine); Declare(engine); Respond(engine, 0);
         var chain = engine.State.PendingChain!;
         Ok(engine, new ActivateChainResponse(chain.Responder, chain.DecisionId, 1));
@@ -135,20 +130,9 @@ public sealed class BattleResponseTests
     }
 
     [Fact]
-    public void ExistingResponseProfilesCannotAcquireBattleEligibilityImplicitly()
-    {
-        var profile = new ChainResponseProfile("counter", Counter, ChainOperation.NegateActivation, ChainSpellSpeed.Three);
-        var engine = Engine(chains: [profile], profiles: [new("negate", Negate, BattleResponseOperation.NegateAttack, BattleTiming.AttackDeclaration)]);
-        Ready(engine); Declare(engine); Respond(engine, 0);
-        var chain = engine.State.PendingChain!;
-        Reject(engine, new ActivateChainResponse(chain.Responder, chain.DecisionId, 1), DuelError.UnsupportedBattleResponse);
-    }
-
-    [Fact]
     public void BeforeCalculationStatModifiersAffectDamageThenExpireAfterTheDamageStep()
     {
-        var boost = new BattleResponseProfile("boost", Stats, BattleResponseOperation.ModifyCombatantStatistics,
-            BattleTiming.BeforeCalculation, attackDelta: 1000);
+        var boost = ResponseProbe.ModifyCombatant("boost", Stats, BattleTiming.BeforeCalculation, 1000);
         var engine = Engine(profiles: [boost]); Ready(engine); Declare(engine); ToDamage(engine, DamageStep.BeforeCalculation);
         Respond(engine, 0); DrainEffects(engine);
         Assert.Equal(2800, engine.GetMonsterStatistics(PlayerId.One, 0)!.Attack);
@@ -164,10 +148,8 @@ public sealed class BattleResponseTests
     [Fact]
     public void DuringCalculationStatChangesRequireExplicitExceptionMetadata()
     {
-        Assert.Throws<ArgumentException>(() => new BattleResponseProfile("ordinary", Stats,
-            BattleResponseOperation.ModifyCombatantStatistics, BattleTiming.Calculation, attackDelta: 500));
-        var boost = new BattleResponseProfile("exception", Stats, BattleResponseOperation.ModifyCombatantStatistics,
-            BattleTiming.Calculation, attackDelta: 500, damageCalculationException: true);
+        Assert.Throws<ArgumentException>(() => ResponseProbe.ModifyCombatant("ordinary", Stats, BattleTiming.Calculation, 500));
+        var boost = ResponseProbe.ModifyCombatant("exception", Stats, BattleTiming.Calculation, 500, duringCalculation: true);
         var engine = Engine(profiles: [boost]); Ready(engine); Declare(engine); ToDamage(engine, DamageStep.Calculation);
         Respond(engine, 0); DrainEffects(engine); FinishAttack(engine);
         Assert.Equal(6900, engine.State.GetPlayer(PlayerId.Two).LifePoints);
@@ -176,8 +158,7 @@ public sealed class BattleResponseTests
     [Fact]
     public void RemovingAnAttackerDuringDamageDoesNotReplayOrRevealAFaceDownDefender()
     {
-        var engine = Engine(faceDown: true, profiles: [new("damage-removal", Destroy,
-            BattleResponseOperation.DestroyAttacker, BattleTiming.DamageStart)]);
+        var engine = Engine(faceDown: true, profiles: [ResponseProbe.DestroyAttacker("damage-removal", Destroy, BattleTiming.DamageStart)]);
         Ready(engine); Declare(engine); ToDamage(engine, DamageStep.Start);
         var w = engine.State.Battle!.Window; Ok(engine, new PassBattleResponse(w.Responder, w.DecisionId));
         Respond(engine, 1); DrainEffects(engine);
@@ -199,11 +180,7 @@ public sealed class BattleResponseTests
         var w = engine.State.Battle!.Window; Ok(engine, new PassBattleResponse(w.Responder, w.DecisionId));
         int card = engine.State.GetPlayer(PlayerId.Two).Hand.First(c => c.GameCardId == B).InstanceId;
         Respond(engine, 2, card, 1);
-        while (engine.State.PendingChain is { } chain)
-        {
-            if (chain.NextLink == 0) Ok(engine, new PassChainResponse(chain.Responder, chain.DecisionId));
-            else Ok(engine, new ResolveNextChainLink(PlayerId.One, chain.DecisionId));
-        }
+        ResolveChain(engine);
         var batch = engine.State.EventEffects.PendingTriggers!;
         Ok(engine, new ChooseTriggerOrder(batch.Player, batch.DecisionId, batch.Options.Select(t => t.Id).ToArray()));
         var prompt = engine.State.EventEffects.PendingCommitment!; var target = prompt.TargetOptions.Single(t => t.Zone == 0);
@@ -222,8 +199,7 @@ public sealed class BattleResponseTests
     {
         var flip = new TriggerEffectProfile("optional-flip", B, MonsterEventKind.FlippedFaceUp, EffectRelation.Self,
             TriggerRequirement.Optional, TriggerOperation.GainLifePoints, lifePointGain: 100, timing: TriggerTiming.When);
-        var engine = Engine(faceDown: true, triggers: [flip], profiles: [new("remove", Destroy,
-            BattleResponseOperation.DestroyAttacker, BattleTiming.BeforeCalculation)]);
+        var engine = Engine(faceDown: true, triggers: [flip], profiles: [ResponseProbe.DestroyAttacker("remove", Destroy, BattleTiming.BeforeCalculation)]);
         Ready(engine); Declare(engine); ToDamage(engine, DamageStep.BeforeCalculation);
         Assert.Null(engine.State.EventEffects.PendingTriggers);
         var w = engine.State.Battle!.Window; Ok(engine, new PassBattleResponse(w.Responder, w.DecisionId));
@@ -238,28 +214,43 @@ public sealed class BattleResponseTests
     [Fact]
     public void WrongWindowAndUnsupportedChoicesAreAtomic()
     {
-        var summon = Summoning();
-        var engine = Engine(profiles: [summon]);
+        var engine = Engine(profiles: [Summoning()]);
         var w = engine.State.Battle!.Window;
         Reject(engine, new ActivateBattleResponse(w.Responder, w.DecisionId, 2), DuelError.UnsupportedBattleResponse);
         Ready(engine); Declare(engine); w = engine.State.Battle!.Window;
+        Reject(engine, new ActivateBattleResponse(PlayerId.One, w.DecisionId, 2), DuelError.NotBattleResponder);
+        Reject(engine, new ActivateBattleResponse(PlayerId.Two, w.DecisionId - 1, 2), DuelError.StaleBattleDecision);
+        Reject(engine, new ActivateBattleResponse(PlayerId.Two, w.DecisionId, 5), DuelError.InvalidSpellTrapZone);
+        Respond(engine, 2);
+        while (engine.State.PendingChain is { DefinitionSummon: null } chain)
+            Ok(engine, chain.NextLink == 0 ? new PassChainResponse(chain.Responder, chain.DecisionId)
+                : new ResolveNextChainLink(PlayerId.One, chain.DecisionId));
+        var summon = engine.State.PendingChain!.DefinitionSummon!;
         int card = engine.State.GetPlayer(PlayerId.Two).Hand.First(c => c.GameCardId == B).InstanceId;
-        Reject(engine, new ActivateBattleResponse(PlayerId.One, w.DecisionId, 2, card, 1), DuelError.NotBattleResponder);
-        Reject(engine, new ActivateBattleResponse(PlayerId.Two, w.DecisionId - 1, 2, card, 1), DuelError.StaleBattleDecision);
-        Reject(engine, new ActivateBattleResponse(PlayerId.Two, w.DecisionId, 2), DuelError.InvalidMonsterZone);
-        Reject(engine, new ActivateBattleResponse(PlayerId.Two, w.DecisionId, 2, card, 0), DuelError.MonsterZoneOccupied);
-        Reject(engine, new ActivateBattleResponse(PlayerId.Two, w.DecisionId, 2, int.MaxValue, 1), DuelError.InvalidDecisionChoice);
+        Reject(engine, new ChooseDefinitionSummon(PlayerId.Two, summon.DecisionId, card, 0, BattlePosition.FaceUpDefense), DuelError.InvalidMonsterZone);
+        Reject(engine, new ChooseDefinitionSummon(PlayerId.Two, summon.DecisionId, int.MaxValue, 1, BattlePosition.FaceUpDefense), DuelError.InvalidDecisionChoice);
+        Reject(engine, new ChooseDefinitionSummon(PlayerId.One, summon.DecisionId, card, 1, BattlePosition.FaceUpDefense), DuelError.NotActivePlayer);
     }
 
     [Fact]
-    public void ProfilesCopyCatalogAllowlistsAndRejectUnsupportedDeclarations()
+    public void BattleDefinitionsValidateTheirTimingsAndTargets()
     {
-        uint[] ids = [B]; var profile = new BattleResponseProfile("copy", Summon,
-            BattleResponseOperation.SpecialSummonFromHand, BattleTiming.Start, summonableCardIds: ids);
-        ids[0] = A; Assert.Equal(B, Assert.Single(profile.SummonableCardIds));
-        Assert.Throws<ArgumentException>(() => new BattleResponseProfile("bad", Negate, BattleResponseOperation.NegateAttack, BattleTiming.DamageStart));
-        Assert.Throws<ArgumentException>(() => new BattleResponseProfile("bad", Summon, BattleResponseOperation.SpecialSummonFromHand, BattleTiming.Start));
-        Assert.Throws<ArgumentException>(() => Engine(staged: false, profiles: [profile]));
-        Assert.Throws<ArgumentException>(() => Engine(profiles: [new("unknown", 17, BattleResponseOperation.NegateAttack, BattleTiming.BattleStep)]));
+        Assert.Throws<ArgumentException>(() => new EffectDefinition("bad", Negate, EffectKind.NormalTrap, [new NegateAttackStep()],
+            fieldTargets: [new AttackingMonsterTarget()]));
+        Assert.Throws<ArgumentException>(() => new EffectDefinition("bad", Stats, EffectKind.NormalTrap, [new ModifyCombatantStatsStep(0, 0)],
+            [new BattleTimingCondition(BattleTiming.DamageStart)], fieldTargets: [new AttackingMonsterTarget()]));
+        Assert.Throws<ArgumentException>(() => new EffectDefinition("bad", Stats, EffectKind.NormalTrap, [new DealDamageStep(1)],
+            [new BattleTimingCondition(BattleTiming.None)]));
+        Assert.Throws<ArgumentException>(() => Engine(profiles: [ResponseProbe.NegateAttack("unknown", 17)]));
+    }
+
+    private static void ResolveChain(DuelEngine engine)
+    {
+        while (engine.State.PendingChain is { } chain)
+        {
+            if (chain.DefinitionSummon is not null) EventEffectScenario.ChooseSummon(engine);
+            else if (chain.NextLink == 0) Ok(engine, new PassChainResponse(chain.Responder, chain.DecisionId));
+            else Ok(engine, new ResolveNextChainLink(PlayerId.One, chain.DecisionId));
+        }
     }
 }

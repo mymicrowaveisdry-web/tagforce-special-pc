@@ -55,7 +55,7 @@ public static class ChainCardFamily
             "Discard at activation.", "Default.",
             "Negates the activation and destroys the Spell if it is still in place; the negated link resolves with no effect.",
             "none", ["static-0x0990DBA4-magic-jammer-mode-1", .. SharedStatic],
-            ["Summon-response windows are not supported yet."]),
+            []),
         new(LightningVortex, "Lightning Vortex", CardKind.Spell,
             new("lightning-vortex-v1", LightningVortex, EffectKind.NormalSpell, [new DestroyOpponentFaceUpMonstersStep()],
                 cost: new DiscardCost()),

@@ -38,23 +38,10 @@ public sealed partial class DuelEngine
         {
             if (response.SpellTrapZone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
             var source = State.GetPlayer(command.Player).SpellTrapFields[response.SpellTrapZone];
-            if (source is not null && battleResponses.TryGetValue(source.Card.GameCardId, out var battleProfile))
-                return BeginBattleResponse(command.Player, response.SpellTrapZone, response.SummonedCardInstanceId, response.MonsterZone, battleProfile);
-            if (response.SummonedCardInstanceId is not null || response.MonsterZone is not null)
-                return Reject(DuelError.InvalidDecisionChoice);
             if (source is not null && definitions.TryGetValue(source.Card.GameCardId, out var definition))
             {
                 // In a summon chain only Spell Speed 3 can follow the first Counter Trap.
                 return BeginDefinitionResponse(chain, response.SpellTrapZone, source, definition);
-            }
-            if (source is not null && chainResponses.TryGetValue(source.Card.GameCardId, out var profile))
-            {
-                if (State.PendingSummon is not null && (rules[source.Card.GameCardId].Category != CardCategory.Trap ||
-                    profile.Operation is not (ChainOperation.NegateActivation or ChainOperation.NegateEffect)))
-                    return Reject(DuelError.UnsupportedSummonResponse);
-                if (State.Battle is { } battle && !profile.BattleWindows.HasFlag(battle.Window.Timing))
-                    return Reject(DuelError.UnsupportedBattleResponse);
-                return BeginChainResponse(chain, response.SpellTrapZone, source, profile);
             }
             if (State.Battle is not null) return Reject(DuelError.UnsupportedBattleResponse);
             if (State.PendingSummon is not null) return Reject(DuelError.UnsupportedSummonResponse);
@@ -126,30 +113,10 @@ public sealed partial class DuelEngine
                     EffectSummonSource(profile), events, properProcedureId: profile.ProperProcedureId, timingGroup: 1);
                 break;
             }
-            case ChainOperation.SummonNegation:
-            {
-                next = ResolveSummonNegation(next, link, events);
-                break;
-            }
-            case ChainOperation.BattleResponse:
-            {
-                next = ResolveBattleResponse(next, link, events);
-                break;
-            }
             case ChainOperation.TriggerEffect:
             {
                 if (link.Trigger is not { } trigger) return Reject(DuelError.InvalidEffectState);
                 next = ResolveTrigger(next, trigger, events);
-                break;
-            }
-            case ChainOperation.NegateActivation:
-            case ChainOperation.NegateEffect:
-            {
-                if (link.TargetLinkNumber is not int number || number < 1 || number >= link.Number)
-                    return Reject(DuelError.InvalidEffectState);
-                var negation = link.Operation == ChainOperation.NegateActivation || links[number - 1].ActivationNegated
-                    ? ChainNegation.Activation : ChainNegation.Effect;
-                next = NegateLink(next, links, link, negation, link.DestroyNegatedSource, events);
                 break;
             }
             default: return Reject(DuelError.UnsupportedChainResolution);

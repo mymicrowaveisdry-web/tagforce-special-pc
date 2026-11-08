@@ -17,4 +17,3 @@ public sealed record SummonResponseRequested(PendingSummon Attempt) : DuelEvent;
 public sealed record SummonResponsePassed(PlayerId Player) : DuelEvent;
 /// <summary>The unsuccessful target is destroyed and sent to its owner's Graveyard, without field entry.</summary>
 public sealed record SummonNegated(PendingSummon Attempt) : DuelEvent;
-public sealed record SummonNegationCostPaid(PlayerId Player, string EffectId, int LifePoints) : DuelEvent;

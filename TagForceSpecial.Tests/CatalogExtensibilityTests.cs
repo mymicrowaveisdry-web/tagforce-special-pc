@@ -122,8 +122,8 @@ public sealed class CatalogExtensibilityTests
         uint[] first = [spell, cost, cost, 1, 1, .. Enumerable.Repeat(cost, 35)];
         uint[] second = [response, cost, cost, 1, 1, .. Enumerable.Repeat(cost, 35)];
         var engine = new DuelEngine(catalog, rules, first, second,
-            experimentalChainResponses: [new("custom-negate", response, ChainOperation.NegateEffect, ChainSpellSpeed.Two, [cost])],
-            effectDefinitions: [new("custom-spell", spell, EffectKind.NormalSpell, [new DestroyOpponentFaceUpMonstersStep()], cost: new DiscardCost())]);
+            effectDefinitions: [new("custom-spell", spell, EffectKind.NormalSpell, [new DestroyOpponentFaceUpMonstersStep()], cost: new DiscardCost()),
+                ResponseProbe.Negate("custom-negate", response, ResponseNegation.Effect, ChainSpellSpeed.Two, [cost])]);
         EnterMain(engine);
         Next(engine);
         Ok(engine, new SetSpellTrap(PlayerId.Two, engine.State.GetPlayer(PlayerId.Two).Hand[0].InstanceId, 0));

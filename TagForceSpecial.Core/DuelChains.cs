@@ -3,9 +3,7 @@ namespace TagForceSpecial.Core;
 /// <summary>How a chain link resolves. Card effects resolve as <see cref="Definition"/> steps.</summary>
 public enum ChainOperation
 {
-    /// <summary>Negation responses (<see cref="ChainResponseProfile"/>).</summary>
-    NegateActivation, NegateEffect,
-    TriggerEffect, BattleResponse, SummonNegation, EffectSummon, ActivatePendulumScale,
+    TriggerEffect, EffectSummon, ActivatePendulumScale,
     /// <summary>Resolves the ordered steps of the link's <see cref="EffectDefinition"/>.</summary>
     Definition
 }
@@ -16,9 +14,8 @@ public enum ChainSkipReason { ActivationNegated, EffectNegated, TargetUnavailabl
 public sealed record ChainLink(int Number, CommittedActivation Activation, long SourcePlacementId,
     ChainOperation Operation, ChainSpellSpeed SpellSpeed = ChainSpellSpeed.One,
     int? TargetLinkNumber = null, ChainNegation Negation = ChainNegation.None,
-    bool DestroyNegatedSource = false, TriggerActivation? Trigger = null,
-    BattleResponseProfile? BattleEffect = null, long? BattleAttackId = null, MonsterBinding? BattleTarget = null,
-    CardInstance? BattleSummonCard = null, int? BattleMonsterZone = null, long? SummonAttemptId = null,
+    TriggerActivation? Trigger = null,
+    long? SummonAttemptId = null,
     bool IsPendulumScale = false)
 {
     public bool ActivationNegated => Negation == ChainNegation.Activation;
@@ -57,8 +54,7 @@ public sealed class PendingChain
 
 public sealed record PassChainResponse(PlayerId Player, long DecisionId) : DuelCommand(Player);
 /// <summary>Activate a previously set card as the next chain link (or in an open window).</summary>
-public sealed record ActivateChainResponse(PlayerId Player, long DecisionId, int SpellTrapZone,
-    int? SummonedCardInstanceId = null, int? MonsterZone = null) : DuelCommand(Player);
+public sealed record ActivateChainResponse(PlayerId Player, long DecisionId, int SpellTrapZone) : DuelCommand(Player);
 /// <summary>Explicit PC stepping boundary; the active turn player advances resolution.</summary>
 public sealed record ResolveNextChainLink(PlayerId Player, long DecisionId) : DuelCommand(Player);
 public sealed record ChainLinkAdded(ChainLink Link) : DuelEvent;

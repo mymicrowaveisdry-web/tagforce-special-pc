@@ -40,8 +40,7 @@ batch-capable negation rejects it together, otherwise all placements complete.
 Submit `PendulumSummon` with the current revision and `PendulumSummonSelection`
 entries (instance, `Hand` or `FaceUpExtraDeck` source, destination, position).
 Answer `PendingSummon` through the usual pass/negation commands. Multi-monster
-negators require `SummonNegationProfile.allowsMultipleSummons`; old single-only
-profiles are rejected for a group. Successful placements use one timing group.
+negators need `MonsterWouldBeSummonedCondition.Group`; others cannot answer a group. Successful placements use one timing group.
 
 ## Departures
 

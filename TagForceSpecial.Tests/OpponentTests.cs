@@ -266,8 +266,7 @@ public sealed class OpponentTests
     [Fact]
     public void ReplayAdapterSelectsACurrentTargetAfterALegalDefenderChange()
     {
-        var profile = new BattleResponseProfile("synthetic-hand-summon", BattleFlowScenario.Summon,
-            BattleResponseOperation.SpecialSummonFromHand, BattleTiming.AttackDeclaration, summonableCardIds: [BattleFlowScenario.B]);
+        var profile = ResponseProbe.SummonFromHand("synthetic-hand-summon", BattleFlowScenario.Summon, BattleTiming.AttackDeclaration, BattleFlowScenario.B);
         var e = BattleFlowScenario.Engine(defender: false, profiles: [profile]);
         BattleFlowScenario.Ready(e); BattleFlowScenario.Declare(e, null);
         int card = e.State.GetPlayer(PlayerId.Two).Hand.First(c => c.GameCardId == BattleFlowScenario.B).InstanceId;

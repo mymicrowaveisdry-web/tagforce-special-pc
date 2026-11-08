@@ -13,8 +13,8 @@ public sealed class SummonProfileTests
 
     private static DuelEngine Engine(uint level = 8, IEnumerable<SummonLevelModifierProfile>? levels = null,
         IEnumerable<TributeProcedureProfile>? procedures = null, bool restricted = false,
-        IEnumerable<SummonWindowProfile>? windows = null, IEnumerable<SummonNegationProfile>? negations = null,
-        IEnumerable<ChainResponseProfile>? responses = null, IEnumerable<TriggerEffectProfile>? triggers = null,
+        IEnumerable<SummonWindowProfile>? windows = null, IEnumerable<EffectDefinition>? negations = null,
+        IEnumerable<EffectDefinition>? responses = null, IEnumerable<TriggerEffectProfile>? triggers = null,
         IEnumerable<ContinuousNegationProfile>? continuousNegations = null, bool eligible = true, bool secondHigh = false,
         bool counterIsSpell = false, IEnumerable<EffectDefinition>? definitions = null)
     {
@@ -30,8 +30,7 @@ public sealed class SummonProfileTests
         uint[] second = [Low, Low, Negate, Counter, Filler, .. Enumerable.Repeat(Filler, 35)];
         return new(catalog, rules, first, second, experimentalSummonLevelModifiers: levels,
             experimentalTributeProcedures: procedures, experimentalSummonWindows: windows,
-            experimentalSummonNegations: negations, experimentalChainResponses: responses,
-            experimentalTriggerEffects: triggers, experimentalContinuousNegations: continuousNegations, effectDefinitions: definitions);
+            experimentalTriggerEffects: triggers, experimentalContinuousNegations: continuousNegations, effectDefinitions: [.. definitions ?? [], .. responses ?? [], .. negations ?? []]);
     }
 
     private static int Hand(DuelEngine e, uint id, PlayerId player = PlayerId.One) =>
@@ -234,7 +233,7 @@ public sealed class SummonProfileTests
     [Fact]
     public void NegatingSummonDoesNotRefundTributesAllowanceOrCostOrCreateAFieldPlacement()
     {
-        var e = Engine(windows: [new(High)], negations: [new("negate", Negate, 1000)], triggers: [Grave("target-grave", High)]);
+        var e = Engine(windows: [new(High)], negations: [ResponseProbe.NegateSummon("negate", Negate, 1000)], triggers: [Grave("target-grave", High)]);
         Prepare(e, donors: 2); Ok(e, Tribute(e, [0, 1]));
         var target = e.State.PendingSummon!.Card;
         NegateSummon(e);
@@ -257,12 +256,12 @@ public sealed class SummonProfileTests
     }
 
     [Theory]
-    [InlineData(ChainOperation.NegateActivation)] [InlineData(ChainOperation.NegateEffect)]
-    public void CounterNegationOfTheNegatorAllowsSummonWhileKeepingPaidCosts(ChainOperation operation)
+    [InlineData(ResponseNegation.Activation)] [InlineData(ResponseNegation.Effect)]
+    public void CounterNegationOfTheNegatorAllowsSummonWhileKeepingPaidCosts(ResponseNegation operation)
     {
-        var e = Engine(windows: [new(High)], negations: [new("negate", Negate, 1000)],
-            responses: [new("counter", Counter, operation, ChainSpellSpeed.Three, respondsToCategory: CardCategory.Trap,
-                destroyNegatedSource: true)]);
+        var e = Engine(windows: [new(High)], negations: [ResponseProbe.NegateSummon("negate", Negate, 1000)],
+            responses: [ResponseProbe.Negate("counter", Counter, operation, ChainSpellSpeed.Three, respondsTo: CardCategory.Trap,
+                destroy: true)]);
         Prepare(e, donors: 2); Ok(e, Tribute(e, [0, 1])); NegateSummon(e);
         var chain = e.State.PendingChain!;
         Ok(e, new ActivateChainResponse(PlayerId.One, chain.DecisionId, 0));
@@ -279,8 +278,8 @@ public sealed class SummonProfileTests
     [Fact]
     public void OnlyCounterSpeedNegationResponsesMayChainDuringThePendingSummon()
     {
-        var e = Engine(windows: [new(High)], negations: [new("negate", Negate)],
-            responses: [new("too-slow", Counter, ChainOperation.NegateActivation, ChainSpellSpeed.Two)],
+        var e = Engine(windows: [new(High)], negations: [ResponseProbe.NegateSummon("negate", Negate)],
+            responses: [ResponseProbe.Negate("too-slow", Counter, ResponseNegation.Activation, ChainSpellSpeed.Two)],
             // A Spell Speed 3 definition may chain, but this one answers only Spell activations.
             definitions: [new("definition-counter", Other, EffectKind.CounterTrap, [new NegateActivationStep(true)],
                 conditions: [new RespondsToSpellActivationCondition()])]);
@@ -295,7 +294,7 @@ public sealed class SummonProfileTests
     [InlineData(8000)] [InlineData(int.MaxValue)]
     public void UnpayableNegationCostLeavesTheAttemptAndTrapUnchanged(int cost)
     {
-        var e = Engine(windows: [new(High)], negations: [new("negate", Negate, cost)]);
+        var e = Engine(windows: [new(High)], negations: [ResponseProbe.NegateSummon("negate", Negate, cost)]);
         Prepare(e, donors: 2); Ok(e, Tribute(e, [0, 1]));
         var p = e.State.PendingSummon!;
         Reject(e, new ActivateSummonNegation(p.Responder, p.DecisionId, 0), DuelError.InsufficientLifePoints);
@@ -305,7 +304,7 @@ public sealed class SummonProfileTests
     [Fact]
     public void MissingNegationSourceAndSelfNegationReject()
     {
-        var e = Engine(windows: [new(High)], negations: [new("negate", Negate)]);
+        var e = Engine(windows: [new(High)], negations: [ResponseProbe.NegateSummon("negate", Negate)]);
         Prepare(e, donors: 2, setNegator: false);
         // Opponent has not set the negator; the slot is empty.
         Ok(e, Tribute(e, [0, 1]));
@@ -319,7 +318,7 @@ public sealed class SummonProfileTests
     [Fact]
     public void TributeSetNeverOpensSummonNegationAndDefaultProfilesRemainOff()
     {
-        var e = Engine(windows: [new(High)], negations: [new("negate", Negate)]); Prepare(e, donors: 2);
+        var e = Engine(windows: [new(High)], negations: [ResponseProbe.NegateSummon("negate", Negate)]); Prepare(e, donors: 2);
         var result = Ok(e, Tribute(e, [0, 1], set: true));
         Assert.Single(result.Events.OfType<MonsterSet>());
         Assert.Null(e.State.PendingSummon); Assert.DoesNotContain(result.Events, x => x is SummonAttempted);
@@ -347,8 +346,8 @@ public sealed class SummonProfileTests
         Assert.Throws<ArgumentException>(() => Engine(procedures: [new("x", High, 1, [Negate])]));
         Assert.Throws<ArgumentException>(() => Engine(levels: [new("x", Negate, EffectRelation.Any, [High], 1)]));
         Assert.Throws<ArgumentException>(() => Engine(windows: [new(Negate)]));
-        Assert.Throws<ArgumentException>(() => Engine(negations: [new("x", High)]));
-        Assert.Throws<ArgumentException>(() => Engine(levels: [Delta(-1)], negations: [new("level", Negate)]));
+        Assert.Throws<ArgumentException>(() => Engine(negations: [ResponseProbe.NegateSummon("x", High)]));
+        Assert.Throws<ArgumentException>(() => Engine(levels: [Delta(-1)], negations: [ResponseProbe.NegateSummon("level", Negate)]));
         Assert.Throws<ArgumentException>(() => new TributeProcedureProfile("x", High, 6));
         Assert.Throws<ArgumentException>(() => new SummonLevelModifierProfile("x", Low, EffectRelation.Self, [High], 1));
         uint[] targets = [High];
@@ -387,8 +386,8 @@ public sealed class SummonProfileTests
     [Fact]
     public void SummonAndChainContextSurviveDiscardDecisionsAndStaleAnswersRejectAtomically()
     {
-        var e = Engine(windows: [new(High)], negations: [new("negate", Negate, 500)],
-            responses: [new("counter-cost", Counter, ChainOperation.NegateActivation, ChainSpellSpeed.Three,
+        var e = Engine(windows: [new(High)], negations: [ResponseProbe.NegateSummon("negate", Negate, 500)],
+            responses: [ResponseProbe.Negate("counter-cost", Counter, ResponseNegation.Activation, ChainSpellSpeed.Three,
                 discardCardIds: [Filler])], triggers: [Grave("discard-if", Filler)]);
         Prepare(e, donors: 2); Ok(e, Tribute(e, [0, 1])); NegateSummon(e);
         var pending = e.State.PendingSummon!;
@@ -425,7 +424,7 @@ public sealed class SummonProfileTests
     [Fact]
     public void IndependentEnginesReplayTheNegationPathDeterministically()
     {
-        DuelEngine Make() => Engine(windows: [new(High)], negations: [new("negate", Negate, 750)]);
+        DuelEngine Make() => Engine(windows: [new(High)], negations: [ResponseProbe.NegateSummon("negate", Negate, 750)]);
         var first = Make(); var second = Make();
         foreach (var e in new[] { first, second })
         {
@@ -436,11 +435,10 @@ public sealed class SummonProfileTests
     }
 
     [Fact]
-    public void SpellSourcesCannotEnterTheCounterTrapOnlySummonChain()
+    public void SpellSourcesCannotBeCounterTrapResponses()
     {
-        var e = Engine(windows: [new(High)], negations: [new("negate", Negate)], counterIsSpell: true,
-            responses: [new("spell-counter", Counter, ChainOperation.NegateActivation, ChainSpellSpeed.Three)]);
-        Prepare(e, donors: 2); Ok(e, Tribute(e, [0, 1])); NegateSummon(e);
-        Reject(e, new ActivateChainResponse(PlayerId.One, e.State.PendingChain!.DecisionId, 0), DuelError.UnsupportedSummonResponse);
+        // Only a Trap can carry a Spell Speed 3 response, so a Spell never enters the summon chain.
+        Assert.Throws<ArgumentException>(() => Engine(windows: [new(High)], negations: [ResponseProbe.NegateSummon("negate", Negate)], counterIsSpell: true,
+            responses: [ResponseProbe.Negate("spell-counter", Counter, ResponseNegation.Activation, ChainSpellSpeed.Three)]));
     }
 }

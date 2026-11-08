@@ -11,7 +11,7 @@ public sealed class XyzSummonTests
     private const uint Material = 100_001, WrongLevel = 100_002, Target = uint.MaxValue, Negator = 100_003, Counter = 100_004, GenericTarget = 100_005;
 
     private static DuelEngine Make(bool window = false, int detach = 0, bool grave = false,
-        ChainOperation? response = null, bool aura = false, bool staged = false, int count = 2, bool genericWhen = false)
+        ResponseNegation? response = null, bool aura = false, bool staged = false, int count = 2, bool genericWhen = false)
     {
         uint[] ids = [Material, WrongLevel, Target, Negator, Counter, GenericTarget];
         var catalog = new CardCatalog(new(null, "synthetic-xyz"), ids.Select(id =>
@@ -43,9 +43,9 @@ public sealed class XyzSummonTests
             experimentalMaterialProcedures: [new("xyz", [Target], [Material, WrongLevel, Target], count,
                 MaterialDestination.Attached, xyz: new(4)), new("generic", [GenericTarget], [Material, Target], 2)],
             experimentalSummonWindows: window ? [new(Target)] : null,
-            experimentalSummonNegations: [new("negate-summon", Negator, 0, SummonNegationKinds.Special)],
             experimentalTriggerEffects: triggers,
-            experimentalChainResponses: response is { } op ? [new("counter", Counter, op, ChainSpellSpeed.Three)] : null,
+            effectDefinitions: [.. window ? [ResponseProbe.NegateSummon("negate-summon", Negator, 0, SummonKinds.Special)] : Array.Empty<EffectDefinition>(),
+                .. response is { } op ? [ResponseProbe.Negate("counter", Counter, op, ChainSpellSpeed.Three)] : Array.Empty<EffectDefinition>()],
             experimentalContinuousEffects: aura ? [new("aura", Material, EffectRelation.Controller, 100, 0)] : null,
             experimentalBattleFlow: staged);
     }
@@ -126,7 +126,7 @@ public sealed class XyzSummonTests
     [InlineData(false)] [InlineData(true)]
     public void PassingSummonWindowPreservesAttachmentsAndCounterNegationDoesToo(bool counter)
     {
-        var e = Make(window: true, response: ChainOperation.NegateActivation); Prepare(e, responses: true);
+        var e = Make(window: true, response: ResponseNegation.Activation); Prepare(e, responses: true);
         Ok(e, Command(e)); var pending = e.State.PendingSummon!;
         Assert.Equal(2, pending.XyzMaterials.Count); Assert.Null(e.State.GetPlayer(PlayerId.One).MonsterZones[0]);
         Assert.Empty(e.State.GetPlayer(PlayerId.One).Graveyard);
@@ -181,8 +181,8 @@ public sealed class XyzSummonTests
     }
 
     [Theory]
-    [InlineData(ChainOperation.NegateActivation)] [InlineData(ChainOperation.NegateEffect)]
-    public void NegatingTriggerDoesNotRefundDetachedCost(ChainOperation operation)
+    [InlineData(ResponseNegation.Activation)] [InlineData(ResponseNegation.Effect)]
+    public void NegatingTriggerDoesNotRefundDetachedCost(ResponseNegation operation)
     {
         var e = Make(detach: 1, response: operation); Prepare(e, responses: true); Ok(e, Command(e)); Order(e);
         var pending = e.State.EventEffects.PendingCommitment!;

@@ -81,15 +81,15 @@ public sealed class NormalSpellTests
     }
 
     /// <summary>The opponent's set probe 90001 is a negation probe or, with <paramref name="destroyResponse"/>, a targeted destruction Trap.</summary>
-    private static DuelEngine Engine(uint card, ChainOperation? response = null, bool destroyResponse = false)
+    private static DuelEngine Engine(uint card, ResponseNegation? response = null, bool destroyResponse = false)
     {
         var rules = PlayablePreview.Rules.ToDictionary();
         rules[90001] = new(CardCategory.Trap, AllowsSpellTrapSet: true);
         var deck = new uint[] { card, 4012, 4030, 4032, 4033 }.Concat(Enumerable.Repeat(card, 35));
         return new(Catalog(), rules, deck, new uint[] { 90001, 4012, 4030, 4032, 4033 }.Concat(Enumerable.Repeat(4012u, 35)),
             effectDefinitions: destroyResponse ? [.. PlayablePreview.Definitions, new("synthetic-destroy", 90001, EffectKind.NormalTrap,
-                [new DestroyTargetStep()], target: new SpellTrapOnFieldTarget())] : PlayablePreview.Definitions,
-            experimentalChainResponses: response is { } operation ? [new("synthetic-response", 90001, operation, ChainSpellSpeed.Three)] : []);
+                [new DestroyTargetStep()], target: new SpellTrapOnFieldTarget())]
+                : [.. PlayablePreview.Definitions, .. response is { } operation ? [ResponseProbe.Negate("synthetic-response", 90001, operation, ChainSpellSpeed.Three)] : Array.Empty<EffectDefinition>()]);
     }
 
     public static IEnumerable<object[]> Spells() => new object[][]
@@ -141,7 +141,7 @@ public sealed class NormalSpellTests
     public void EachSpellHonorsBothNegationKinds(uint id, int amount, bool recovery)
     {
         _ = amount; _ = recovery;
-        foreach (var operation in new[] { ChainOperation.NegateActivation, ChainOperation.NegateEffect })
+        foreach (var operation in new[] { ResponseNegation.Activation, ResponseNegation.Effect })
         {
             var e = Engine(id, operation); EnterMain(e); Next(e);
             Ok(e, new SetSpellTrap(PlayerId.Two, e.State.GetPlayer(PlayerId.Two).Hand[0].InstanceId, 0));

@@ -15,8 +15,7 @@ public sealed partial class DuelEngine
         bool ValidMaterial(uint id, bool ritual) => rules.TryGetValue(id, out var r) && r.Category == CardCategory.Monster &&
             (ritual ? r.AllowsTributeForSummon && catalog[id].Statistics.Level > 0 && !IsXyzId(id) : r.AllowsSummonMaterial);
         if (all.Any(p => p is null || !rules.TryGetValue(p.SpellCardId, out var source) || source.Category != CardCategory.Spell ||
-                chainResponses.ContainsKey(p.SpellCardId) ||
-                battleResponses.ContainsKey(p.SpellCardId) || reserved.Contains(p.EffectId) ||
+                reserved.Contains(p.EffectId) ||
                 p.FusionRecipes.Any(r => !ValidTarget(r.TargetCardId, p) || r.MaterialCardIds.Any(id => !ValidMaterial(id, false))) ||
                 p.RitualRecipes.Any(r => !ValidTarget(r.TargetCardId, p) || catalog[r.TargetCardId].Statistics.Level != r.RequiredLevel ||
                     r.TributeCardIds.Any(id => !ValidMaterial(id, true)))) ||

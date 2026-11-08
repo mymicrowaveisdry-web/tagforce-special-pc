@@ -13,7 +13,7 @@ public sealed class ExtraDeckMaterialTests
 
     private static DuelEngine Engine(int materialCount = 2, MaterialDestination destination = MaterialDestination.Graveyard,
         bool window = false, bool faceUp = true, IEnumerable<TriggerEffectProfile>? triggers = null,
-        IEnumerable<ContinuousEffectProfile>? continuous = null, IEnumerable<ChainResponseProfile>? responses = null,
+        IEnumerable<ContinuousEffectProfile>? continuous = null, IEnumerable<EffectDefinition>? responses = null,
         IEnumerable<uint>? extraOne = null, IEnumerable<uint>? extraTwo = null,
         IEnumerable<ExtraDeckMaterialProcedureProfile>? procedures = null)
     {
@@ -32,8 +32,7 @@ public sealed class ExtraDeckMaterialTests
             experimentalSpecialSummonProcedures: [new("revive", [Target], DecisionCardSource.Graveyard)],
             experimentalMaterialProcedures: procedures ?? [new("material", [Target], [Material], materialCount, destination, faceUp)],
             experimentalSummonWindows: window ? [new(Target)] : null,
-            experimentalSummonNegations: [new("summon-negator", Negate, 500, SummonNegationKinds.Special)],
-            experimentalChainResponses: responses, experimentalTriggerEffects: triggers, experimentalContinuousEffects: continuous);
+            effectDefinitions: [ResponseProbe.NegateSummon("summon-negator", Negate, 500, SummonKinds.Special), .. responses ?? []], experimentalTriggerEffects: triggers, experimentalContinuousEffects: continuous);
     }
 
     private static int Hand(DuelEngine e, uint id) => e.State.GetPlayer(e.State.ActivePlayer).Hand.First(c => c.GameCardId == id).InstanceId;
@@ -243,7 +242,7 @@ public sealed class ExtraDeckMaterialTests
     [Fact]
     public void CounterNegationCompletesTheSameAttemptAndDefersMaterialTriggers()
     {
-        var response = new ChainResponseProfile("counter", Counter, ChainOperation.NegateActivation, ChainSpellSpeed.Three);
+        var response = ResponseProbe.Negate("counter", Counter, ResponseNegation.Activation, ChainSpellSpeed.Three);
         var e = Engine(window: true, responses: [response], triggers: [Grave("if", TriggerTiming.If)]); Prepare(e, setResponses: true);
         int target = Command(e).CardInstanceId; Ok(e, Command(e));
         var pending = e.State.PendingSummon!; Assert.Null(e.State.EventEffects.PendingTriggers);

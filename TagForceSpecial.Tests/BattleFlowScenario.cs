@@ -10,8 +10,8 @@ internal static class BattleFlowScenario
     internal const uint Negate = 100_001, Destroy = 100_002, Summon = 100_003, Stats = 100_004, Counter = 100_005;
 
     internal static DuelEngine Engine(int attack = 1800, int defense = 1000, int opposingAttack = 1200, int opposingDefense = 2000,
-        bool defender = true, bool faceDown = false, IEnumerable<BattleResponseProfile>? profiles = null,
-        IEnumerable<ChainResponseProfile>? chains = null, IEnumerable<TriggerEffectProfile>? triggers = null,
+        bool defender = true, bool faceDown = false, IEnumerable<EffectDefinition>? profiles = null,
+        IEnumerable<EffectDefinition>? chains = null, IEnumerable<TriggerEffectProfile>? triggers = null,
         IEnumerable<ContinuousEffectProfile>? continuous = null, bool staged = true, bool additionalAttacker = false, IEnumerable<ContinuousNegationProfile>? negations = null,
         IEnumerable<SpecialSummonCardProfile>? specialCards = null, IEnumerable<SummonWindowProfile>? summonWindows = null)
     {
@@ -23,9 +23,9 @@ internal static class BattleFlowScenario
             AllowsSpellTrapSet: id is not (A or B or Filler)));
         uint[] first = [A, A, Stats, Counter, Filler, A, .. Enumerable.Repeat(Filler, 34)];
         uint[] second = [B, B, Negate, Destroy, Summon, Stats, Counter, .. Enumerable.Repeat(Filler, 33)];
-        var engine = new DuelEngine(catalog, rules, first, second, experimentalChainResponses: chains,
+        var engine = new DuelEngine(catalog, rules, first, second, effectDefinitions: [.. profiles ?? [], .. chains ?? []],
             experimentalTriggerEffects: triggers, experimentalContinuousEffects: continuous, experimentalContinuousNegations: negations,
-            experimentalBattleFlow: staged, experimentalBattleResponses: profiles,
+            experimentalBattleFlow: staged,
             experimentalSpecialSummonCards: specialCards, experimentalSummonWindows: summonWindows);
         EnterMain(engine); Play(engine, A, 0); Set(engine, Stats, 0); Set(engine, Counter, 1); NextMain(engine);
         if (defender) Play(engine, B, 0, faceDown);
@@ -109,9 +109,11 @@ internal static class BattleFlowScenario
         }
         throw new InvalidOperationException("Attack did not finish.");
     }
+    /// <summary>Activates the set card in <paramref name="zone"/>; a hand summon it resolves into picks <paramref name="card"/> and <paramref name="monsterZone"/>.</summary>
     internal static DuelActionResult Respond(DuelEngine engine, int zone, int? card = null, int? monsterZone = null)
     {
         var w = engine.State.Battle!.Window;
-        return Ok(engine, new ActivateBattleResponse(w.Responder, w.DecisionId, zone, card, monsterZone));
+        if (card is int planned) EventEffectScenario.PlanSummon(engine, planned, monsterZone ?? 0);
+        return Ok(engine, new ActivateBattleResponse(w.Responder, w.DecisionId, zone));
     }
 }

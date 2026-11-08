@@ -189,9 +189,10 @@ public sealed record SummonResponseWindowRequested(PlayerId Responder, long Deci
 
 /// <summary>
 /// A monster would be Normal or Special Summoned and no chain has started; by the opponent when ByOpponent is set.
-/// With OrSpellTrapActivation, a preceding Spell/Trap activation also qualifies.
+/// With OrSpellTrapActivation, a preceding Spell/Trap activation also qualifies; a group Summon needs Group.
 /// </summary>
-public sealed record MonsterWouldBeSummonedCondition(SummonKinds Kinds, bool ByOpponent = false, bool OrSpellTrapActivation = false) : EffectCondition;
+public sealed record MonsterWouldBeSummonedCondition(SummonKinds Kinds, bool ByOpponent = false, bool OrSpellTrapActivation = false,
+    bool Group = false) : EffectCondition;
 
 /// <summary>Negates the pending Summon and destroys that monster; as a chain response, negates that activation and destroys the card.</summary>
 public sealed record NegateSummonStep : EffectStep;
@@ -201,3 +202,15 @@ public sealed record TributeCost : EffectCost;
 
 /// <summary>Pay half your LP, rounded down (never refunded).</summary>
 public sealed record PayHalfLifePointsCost : EffectCost;
+
+/// <summary>
+/// Met during the listed battle timings; listing a Damage Step timing permits activation then. During damage
+/// calculation needs <paramref name="DuringCalculation"/>.
+/// </summary>
+public sealed record BattleTimingCondition(BattleTiming Windows, bool DuringCalculation = false) : EffectCondition;
+
+/// <summary>The current attack's defender, bound automatically at activation.</summary>
+public sealed record DefendingMonsterTarget : EffectTarget;
+
+/// <summary>Changes each bound combatant's ATK and DEF until the current attack ends.</summary>
+public sealed record ModifyCombatantStatsStep(int Attack, int Defense) : EffectStep;

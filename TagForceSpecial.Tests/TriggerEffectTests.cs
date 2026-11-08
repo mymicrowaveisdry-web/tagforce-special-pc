@@ -116,13 +116,13 @@ public sealed class TriggerEffectTests
     }
 
     [Theory]
-    [InlineData(ChainOperation.NegateEffect, false)]
-    [InlineData(ChainOperation.NegateActivation, true)]
-    public void NegatingAMonsterTriggerDefersItsDestructionTriggerUntilTheChainCompletes(ChainOperation operation, bool destroy)
+    [InlineData(ResponseNegation.Effect, false)]
+    [InlineData(ResponseNegation.Activation, true)]
+    public void NegatingAMonsterTriggerDefersItsDestructionTriggerUntilTheChainCompletes(ResponseNegation operation, bool destroy)
     {
         var engine = Engine(triggers: [Gain("summon", A), Gain("destroyed", A, MonsterEventKind.Destroyed,
             gain: 400, location: TriggerSourceLocation.DestroyedSelf)], responses:
-            [new("monster-negation", Trap, operation, ChainSpellSpeed.Two, respondsToCategory: CardCategory.Monster, destroyNegatedSource: destroy)]);
+            [ResponseProbe.Negate("monster-negation", Trap, operation, ChainSpellSpeed.Two, respondsTo: CardCategory.Monster, destroy: destroy)]);
         EnterMain(engine); NextMain(engine); Set(engine, Trap); NextMain(engine);
         Summon(engine, A); Order(engine);
         var chain = engine.State.PendingChain!;
@@ -152,7 +152,7 @@ public sealed class TriggerEffectTests
     public void DestroyingASharedSourceByNegatingOneTriggerDoesNotNegateItsOtherTrigger()
     {
         var engine = Engine(triggers: [Gain("a-first", A, gain: 100), Gain("b-second", A, gain: 250)], responses:
-            [new("destroy-and-negate", Trap, ChainOperation.NegateEffect, ChainSpellSpeed.Two, destroyNegatedSource: true)]);
+            [ResponseProbe.Negate("destroy-and-negate", Trap, ResponseNegation.Effect, ChainSpellSpeed.Two, destroy: true)]);
         EnterMain(engine); NextMain(engine); Set(engine, Trap); NextMain(engine);
         Summon(engine, A); Order(engine);
         var chain = engine.State.PendingChain!;

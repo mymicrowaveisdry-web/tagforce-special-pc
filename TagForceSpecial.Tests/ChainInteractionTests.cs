@@ -35,17 +35,15 @@ public sealed class ChainInteractionTests
         Assert.Empty(result.Events);
     }
 
-    private static ChainResponseProfile EffectProbe(bool destroy = false) =>
-        new("synthetic-effect-negation", 2, ChainOperation.NegateEffect, ChainSpellSpeed.Two,
-            respondsToCategory: CardCategory.Spell, destroyNegatedSource: destroy);
+    private static EffectDefinition EffectProbe(bool destroy = false) =>
+        ResponseProbe.Negate("synthetic-effect-negation", 2, ResponseNegation.Effect, respondsTo: CardCategory.Spell, destroy: destroy);
 
-    private static ChainResponseProfile CounterProbe() =>
-        new("synthetic-counter-negation", 3, ChainOperation.NegateActivation, ChainSpellSpeed.Three,
-            respondsToCategory: CardCategory.Trap, destroyNegatedSource: true);
+    private static EffectDefinition CounterProbe() =>
+        ResponseProbe.Negate("synthetic-counter-negation", 3, ResponseNegation.Activation, ChainSpellSpeed.Three, respondsTo: CardCategory.Trap, destroy: true);
 
     private static DuelEngine Engine(PlayerId actor = PlayerId.One, uint initialSpell = 5217,
         bool enabled = true, bool missingResponseCost = false, bool destroyEffectSource = false,
-        IEnumerable<ChainResponseProfile>? profiles = null, bool setOwnTyphoonOnActivationTurn = false,
+        IEnumerable<EffectDefinition>? profiles = null, bool setOwnTyphoonOnActivationTurn = false,
         IEnumerable<DecisionSequence>? decisionSequences = null, IEnumerable<EffectDefinition>? definitions = null)
     {
         uint[] ids = [1, 2, 3, 4, 4909, 5217, 4862];
@@ -60,8 +58,8 @@ public sealed class ChainInteractionTests
         var engine = new DuelEngine(catalog, rules,
             actor == PlayerId.One ? initiatingDeck : respondingDeck,
             actor == PlayerId.Two ? initiatingDeck : respondingDeck, startingPlayer: actor, decisionSequences: decisionSequences,
-            experimentalChainResponses: enabled ? profiles ?? [EffectProbe(destroyEffectSource), CounterProbe()] : [],
-            effectDefinitions: definitions ?? EventEffectScenario.ChainCards(enabled ? new uint[] { 4909, 5217, 4862 } : new uint[] { 4909, 5217 }));
+            effectDefinitions: [.. definitions ?? EventEffectScenario.ChainCards(enabled ? new uint[] { 4909, 5217, 4862 } : new uint[] { 4909, 5217 }),
+                .. enabled ? profiles ?? [EffectProbe(destroyEffectSource), CounterProbe()] : []]);
         for (int turn = 1; turn <= 3; turn++)
         {
             var player = engine.State.ActivePlayer;
@@ -289,7 +287,7 @@ public sealed class ChainInteractionTests
         Pay(engine);
         var c = engine.State.PendingChain!;
         Reject(engine, new ActivateChainResponse(c.Responder, c.DecisionId, 0), DuelError.ChainResponseSpeedNotAllowed);
-        Reject(engine, new ActivateChainResponse(c.Responder, c.DecisionId, 2), DuelError.UnsupportedChainResponse);
+        Reject(engine, new ActivateChainResponse(c.Responder, c.DecisionId, 2), DuelError.ChainResponseSpeedNotAllowed);
         Assert.False(engine.State.GetPlayer(PlayerId.One).SpellTrapFields[0]!.IsFaceUp);
         Assert.False(engine.State.GetPlayer(PlayerId.One).SpellTrapFields[2]!.IsFaceUp);
         Assert.Single(engine.State.GetPlayer(PlayerId.One).Graveyard);
@@ -338,16 +336,18 @@ public sealed class ChainInteractionTests
     public void ProbesAndDefinitionsAreImmutableAndRejectUntrustedRegistration()
     {
         uint[] costs = [1];
-        var profile = new ChainResponseProfile("probe", 2, ChainOperation.NegateEffect, ChainSpellSpeed.Two, costs);
+        var cost = new DiscardCost(new CardIdFilter(costs));
         costs[0] = 4;
-        Assert.Equal(1u, Assert.Single(profile.DiscardCardIds));
-        Assert.Throws<NotSupportedException>(() => ((IList<uint>)profile.DiscardCardIds).Clear());
-        Assert.Throws<ArgumentOutOfRangeException>(() => new ChainResponseProfile("bad", 2, ChainOperation.NegateEffect, ChainSpellSpeed.One));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new ChainResponseProfile("bad", 2, ChainOperation.Definition, ChainSpellSpeed.Two));
-        Assert.Throws<ArgumentException>(() => Engine(profiles: [new("unknown-cost", 2, ChainOperation.NegateEffect, ChainSpellSpeed.Two, [999])]));
-        Assert.Throws<ArgumentException>(() => Engine(profiles: [new("bad-source", 1, ChainOperation.NegateEffect, ChainSpellSpeed.Two)]));
-        // A probe and a definition cannot share a card.
-        Assert.Throws<ArgumentException>(() => Engine(profiles: [new("shadow", 4862, ChainOperation.NegateActivation, ChainSpellSpeed.Three)]));
+        Assert.Equal(1u, Assert.Single(cost.Filter!.CardIds));
+        Assert.Throws<NotSupportedException>(() => ((IList<uint>)cost.Filter.CardIds).Clear());
+        // Negation needs a response condition, and a Normal Spell cannot respond.
+        Assert.Throws<ArgumentException>(() => new EffectDefinition("bad", 2, EffectKind.NormalTrap, [new NegateEffectStep(false)]));
+        Assert.Throws<ArgumentException>(() => new EffectDefinition("bad", 2, EffectKind.NormalSpell, [new NegateEffectStep(false)],
+            [new RespondsToActivationCondition()]));
+        Assert.Throws<ArgumentException>(() => Engine(profiles: [ResponseProbe.Negate("unknown-cost", 2, ResponseNegation.Effect, discardCardIds: [999])]));
+        Assert.Throws<ArgumentException>(() => Engine(profiles: [ResponseProbe.Negate("bad-source", 1, ResponseNegation.Effect)]));
+        // Two definitions cannot share a card.
+        Assert.Throws<ArgumentException>(() => Engine(profiles: [ResponseProbe.Negate("shadow", 4862, ResponseNegation.Activation, ChainSpellSpeed.Three)]));
         Assert.Throws<ArgumentException>(() => Engine(decisionSequences:
             [new("activation:magic-jammer-v1", [DecisionStep.Card(DecisionCardSource.Hand, [1])])]));
         var jammer = Assert.Single(EventEffectScenario.ChainCards(4862));

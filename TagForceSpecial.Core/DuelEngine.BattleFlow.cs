@@ -44,12 +44,9 @@ public sealed partial class DuelEngine
             if (activate.Player != battle.Window.Responder) return Reject(DuelError.NotBattleResponder);
             if (activate.SpellTrapZone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
             var source = State.GetPlayer(command.Player).SpellTrapFields[activate.SpellTrapZone];
-            if (source is not null && definitions.TryGetValue(source.Card.GameCardId, out var definition))
-                return activate.SummonedCardInstanceId is not null || activate.MonsterZone is not null
-                    ? Reject(DuelError.InvalidDecisionChoice) : BeginBattleDefinition(command.Player, activate.SpellTrapZone, source, definition);
-            if (source is null || !battleResponses.TryGetValue(source.Card.GameCardId, out var profile))
+            if (source is null || !definitions.TryGetValue(source.Card.GameCardId, out var definition))
                 return Reject(DuelError.UnsupportedBattleResponse);
-            return BeginBattleResponse(command.Player, activate.SpellTrapZone, activate.SummonedCardInstanceId, activate.MonsterZone, profile);
+            return BeginBattleDefinition(command.Player, activate.SpellTrapZone, source, definition);
         }
         if (command is ActivateHandBattleResponse hand)
         {

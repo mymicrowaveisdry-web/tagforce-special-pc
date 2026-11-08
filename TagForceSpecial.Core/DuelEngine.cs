@@ -11,17 +11,14 @@ public sealed partial class DuelEngine
     private readonly CardCatalog catalog;
     private readonly FrozenDictionary<uint, DuelCardRules> rules;
     private readonly FrozenDictionary<string, DecisionSequence> decisionSequences;
-    private readonly FrozenDictionary<uint, ChainResponseProfile> chainResponses;
     private readonly TriggerEffectProfile[] triggerEffects;
     private readonly ContinuousEffectProfile[] continuousEffects;
     private readonly ContinuousNegationProfile[] continuousNegations;
     private readonly uint[] negationOrder;
     private readonly bool experimentalBattleFlow;
-    private readonly FrozenDictionary<uint, BattleResponseProfile> battleResponses;
     private readonly SummonLevelModifierProfile[] summonLevelModifiers;
     private readonly FrozenDictionary<string, TributeProcedureProfile> tributeProcedures;
     private readonly FrozenSet<uint> summonWindows;
-    private readonly FrozenDictionary<uint, SummonNegationProfile> summonNegations;
     private readonly FrozenDictionary<uint, SpecialSummonCardProfile> specialSummonCards;
     private readonly FrozenDictionary<string, SpecialSummonProcedureProfile> specialSummonProcedures;
     private readonly FrozenDictionary<string, ExtraDeckMaterialProcedureProfile> materialProcedures;
@@ -40,15 +37,13 @@ public sealed partial class DuelEngine
     public DuelEngine(CardCatalog catalog, IReadOnlyDictionary<uint, DuelCardRules> rules,
         IEnumerable<uint> playerOneDeck, IEnumerable<uint> playerTwoDeck, PlayerId startingPlayer = PlayerId.One,
         IEnumerable<DecisionSequence>? decisionSequences = null,
-        IEnumerable<ChainResponseProfile>? experimentalChainResponses = null,
         IEnumerable<TriggerEffectProfile>? experimentalTriggerEffects = null,
         IEnumerable<ContinuousEffectProfile>? experimentalContinuousEffects = null,
         IEnumerable<ContinuousNegationProfile>? experimentalContinuousNegations = null,
-        bool experimentalBattleFlow = false, IEnumerable<BattleResponseProfile>? experimentalBattleResponses = null,
+        bool experimentalBattleFlow = false,
         IEnumerable<SummonLevelModifierProfile>? experimentalSummonLevelModifiers = null,
         IEnumerable<TributeProcedureProfile>? experimentalTributeProcedures = null,
         IEnumerable<SummonWindowProfile>? experimentalSummonWindows = null,
-        IEnumerable<SummonNegationProfile>? experimentalSummonNegations = null,
         IEnumerable<SpecialSummonCardProfile>? experimentalSpecialSummonCards = null,
         IEnumerable<SpecialSummonProcedureProfile>? experimentalSpecialSummonProcedures = null,
         IEnumerable<uint>? playerOneExtraDeck = null, IEnumerable<uint>? playerTwoExtraDeck = null,
@@ -81,14 +76,6 @@ public sealed partial class DuelEngine
         if (sequences.Any(s => s is null || s.Steps.Any(step => step.AllowedCardIds.Any(id => !knownIds.Contains(id)))))
             throw new ArgumentException("Decision sequences must reference catalog IDs.", nameof(decisionSequences));
         this.decisionSequences = sequences.ToFrozenDictionary(s => s.Id, StringComparer.Ordinal);
-        var responses = (experimentalChainResponses ?? []).ToArray();
-        if (responses.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) ||
-                rule.Category is not (CardCategory.Spell or CardCategory.Trap) || !rule.AllowsSpellTrapSet ||
-                p.DiscardCardIds.Any(id => !knownIds.Contains(id)) ||
-                p.Decisions is { } decisions && this.decisionSequences.ContainsKey(decisions.Id)) ||
-            responses.Select(p => p.EffectId).Distinct(StringComparer.Ordinal).Count() != responses.Length)
-            throw new ArgumentException("Response profiles need explicit set rules, distinct IDs and catalog costs.", nameof(experimentalChainResponses));
-        chainResponses = responses.ToFrozenDictionary(p => p.CardId);
         triggerEffects = (experimentalTriggerEffects ?? []).ToArray();
         continuousEffects = (experimentalContinuousEffects ?? []).ToArray();
         continuousNegations = (experimentalContinuousNegations ?? []).ToArray();
@@ -105,24 +92,12 @@ public sealed partial class DuelEngine
         negationOrder = ValidateNegationDependencies(continuousNegations);
         var eventIds = triggerEffects.Select(p => p.EffectId).Concat(continuousEffects.Select(p => p.EffectId))
             .Concat(continuousNegations.Select(p => p.EffectId)).ToArray();
-        var reservedIds = responses.Select(p => p.EffectId).ToHashSet(StringComparer.Ordinal);
-        if (eventIds.Distinct(StringComparer.Ordinal).Count() != eventIds.Length || eventIds.Any(reservedIds.Contains))
+        if (eventIds.Distinct(StringComparer.Ordinal).Count() != eventIds.Length)
             throw new ArgumentException("Event effect IDs must be distinct and unreserved.");
         this.experimentalBattleFlow = experimentalBattleFlow;
-        var battleProfiles = (experimentalBattleResponses ?? []).ToArray();
-        if (battleProfiles.Length != 0 && !experimentalBattleFlow || battleProfiles.Any(p => p is null ||
-            !this.rules.TryGetValue(p.CardId, out var sourceRule) || sourceRule.Category is not (CardCategory.Spell or CardCategory.Trap) ||
-            !sourceRule.AllowsSpellTrapSet || p.SpellSpeed == ChainSpellSpeed.Three && sourceRule.Category != CardCategory.Trap ||
-            chainResponses.ContainsKey(p.CardId) ||
-            p.SummonableCardIds.Any(id => !this.rules.TryGetValue(id, out var targetRule) || targetRule.Category != CardCategory.Monster)) ||
-            battleProfiles.Select(p => p.EffectId).Distinct(StringComparer.Ordinal).Count() != battleProfiles.Length ||
-            battleProfiles.Any(p => reservedIds.Contains(p.EffectId) || eventIds.Contains(p.EffectId)))
-            throw new ArgumentException("Battle profiles need the staged flow, distinct source/effect IDs and explicit rules.", nameof(experimentalBattleResponses));
-        battleResponses = battleProfiles.ToFrozenDictionary(p => p.CardId);
         summonLevelModifiers = (experimentalSummonLevelModifiers ?? []).ToArray();
         var procedures = (experimentalTributeProcedures ?? []).ToArray();
         var windows = (experimentalSummonWindows ?? []).ToArray();
-        var negators = (experimentalSummonNegations ?? []).ToArray();
         var specialCards = (experimentalSpecialSummonCards ?? []).ToArray();
         var specialProcedures = (experimentalSpecialSummonProcedures ?? []).ToArray();
         if (specialCards.Any(p => p is null || !IsMonster(p.CardId)) ||
@@ -146,22 +121,18 @@ public sealed partial class DuelEngine
                 p.AllowedTributeCardIds.Any(id => !this.rules.TryGetValue(id, out var donor) || !donor.AllowsTributeForSummon)) ||
             windows.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) ||
                 !rule.AllowsNormalSummon && !specialSummonCards.ContainsKey(p.CardId)) ||
-            negators.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) || rule.Category != CardCategory.Trap ||
-                !rule.AllowsSpellTrapSet || chainResponses.ContainsKey(p.CardId) || battleResponses.ContainsKey(p.CardId)) ||
             procedures.Select(p => p.ProcedureId).Distinct(StringComparer.Ordinal).Count() != procedures.Length ||
             windows.Select(p => p.CardId).Distinct().Count() != windows.Length ||
-            negators.Select(p => p.CardId).Distinct().Count() != negators.Length ||
             this.rules.Any(entry => entry.Value.RequiresRegisteredTributeProcedure && !procedures.Any(p => p.CardId == entry.Key)))
             throw new ArgumentException("Summon profiles require explicit source/target eligibility, distinct registrations and procedures for restricted targets.");
-        var summonIds = summonLevelModifiers.Select(p => p.EffectId).Concat(negators.Select(p => p.EffectId)).ToArray();
+        var summonIds = summonLevelModifiers.Select(p => p.EffectId).ToArray();
         if (summonIds.Distinct(StringComparer.Ordinal).Count() != summonIds.Length ||
-            summonIds.Any(id => reservedIds.Contains(id) || eventIds.Contains(id) || battleProfiles.Any(p => p.EffectId == id)))
+            summonIds.Any(eventIds.Contains))
             throw new ArgumentException("Summon effect IDs must be distinct and unreserved.");
         tributeProcedures = procedures.ToFrozenDictionary(p => p.ProcedureId, StringComparer.Ordinal);
         summonWindows = windows.Select(p => p.CardId).ToFrozenSet();
-        summonNegations = negators.ToFrozenDictionary(p => p.CardId);
         summonEffects = ValidateSummonEffects(experimentalSummonEffects ?? [],
-            reservedIds.Concat(eventIds).Concat(summonIds).Concat(battleProfiles.Select(p => p.EffectId)));
+            eventIds.Concat(summonIds));
         var pendulums = (experimentalPendulumCards ?? []).ToArray();
         if (pendulums.Any(p => p is null || p.CardId == 0 || !IsMonster(p.CardId) || IsTokenId(p.CardId) ||
                 materialProcedures.Values.Any(m => (m.Xyz is not null || m.Synchro is not null) && m.TargetCardIds.Contains(p.CardId)) ||
@@ -170,17 +141,17 @@ public sealed partial class DuelEngine
             throw new ArgumentException("Pendulum identities require distinct explicitly classified ordinary monsters; hybrid families are unsupported.");
         pendulumCards = pendulums.ToFrozenDictionary(p => p.CardId);
         var definitionList = (effectDefinitions ?? []).ToArray();
-        var usedEffectIds = reservedIds.Concat(eventIds).Concat(summonIds)
-            .Concat(battleProfiles.Select(p => p.EffectId)).Concat(summonEffects.Values.Select(p => p.EffectId)).ToHashSet(StringComparer.Ordinal);
+        var usedEffectIds = eventIds.Concat(summonIds)
+            .Concat(summonEffects.Values.Select(p => p.EffectId)).ToHashSet(StringComparer.Ordinal);
         // Definitions need matching settable card rules, Token rules for Token steps and a seed for shuffles.
-        if (definitionList.Any(d => d is null ||
+        if (definitionList.Any(d => d is null || d.Cost is DiscardCost { Filter: { } discardFilter } && discardFilter.CardIds.Any(id => !knownIds.Contains(id)) ||
                 d.Steps.OfType<SummonTokensStep>().Any(s => s.TokenCardIds.Any(id => !IsTokenId(id))) ||
                 shuffleSeed is null && d.Steps.Any(s => s is ShuffleDeckStep or AddFromDeckToHandStep or SendFromDeckToGraveyardStep or ShuffleTargetsIntoDeckStep ||
                     s is SpecialSummonStep summon && summon.Sources.HasFlag(SpecialSummonSources.Deck)) ||
                 !this.rules.TryGetValue(d.CardId, out var rule) || !rule.AllowsSpellTrapSet ||
                 rule.Category != (d.Kind is EffectKind.NormalSpell or EffectKind.QuickPlaySpell ? CardCategory.Spell : CardCategory.Trap) ||
-                chainResponses.ContainsKey(d.CardId) || battleResponses.ContainsKey(d.CardId) ||
-                summonEffects.ContainsKey(d.CardId) || summonNegations.ContainsKey(d.CardId) || usedEffectIds.Contains(d.EffectId) ||
+
+                summonEffects.ContainsKey(d.CardId) || usedEffectIds.Contains(d.EffectId) ||
                 this.decisionSequences.ContainsKey(DefinitionSequenceId(d))) ||
             definitionList.Select(d => d.CardId).Distinct().Count() != definitionList.Length ||
             definitionList.Select(d => d.EffectId).Distinct(StringComparer.Ordinal).Count() != definitionList.Length)
@@ -188,7 +159,7 @@ public sealed partial class DuelEngine
         definitions = definitionList.ToFrozenDictionary(d => d.CardId);
         definitionDecisions = definitionList.Where(d => d.Cost is DiscardCost or TributeCost || d.Target is not null || d.FieldTargets.Any(t => !EffectDefinition.IsAutomatic(t)))
             .ToFrozenDictionary(d => d.CardId, d => new DecisionSequence(DefinitionSequenceId(d),
-                [.. d.Cost is DiscardCost ? [DecisionStep.AnyCard(DecisionCardSource.Hand)] : Array.Empty<DecisionStep>(),
+                [.. d.Cost is DiscardCost discard ? [discard.Filter is { } only ? DecisionStep.Card(DecisionCardSource.Hand, only.CardIds) : DecisionStep.AnyCard(DecisionCardSource.Hand)] : Array.Empty<DecisionStep>(),
                  .. d.Cost is TributeCost ? [DecisionStep.FieldTargetChoice(new FieldTarget(FieldCardKind.Monster, TargetSide.Own), optional: false)] : Array.Empty<DecisionStep>(),
                  .. d.Target is SpellTrapOnFieldTarget ? [DecisionStep.SpellTrapTarget()] : Array.Empty<DecisionStep>(),
                  .. d.FieldTargets.Where(t => !EffectDefinition.IsAutomatic(t)).SelectMany(spec => Enumerable.Range(0, EffectDefinition.MaxCount(spec))

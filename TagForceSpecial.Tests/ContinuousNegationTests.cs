@@ -147,7 +147,7 @@ public sealed class ContinuousNegationTests
         var profile = new TriggerEffectProfile("negate", A, MonsterEventKind.NormalSummoned, EffectRelation.Self,
             TriggerRequirement.Mandatory, TriggerOperation.NegateTargetMonsterUntilEndPhase, target: new(EffectRelation.Opponent));
         var engine = Engine(triggers: [profile], continuous: [new("aura", B, EffectRelation.Self, 500, 0)],
-            responses: [new("response", Trap, ChainOperation.NegateEffect, ChainSpellSpeed.Two)]);
+            responses: [ResponseProbe.Negate("response", Trap, ResponseNegation.Effect, ChainSpellSpeed.Two)]);
         EnterMain(engine); NextMain(engine); Set(engine, Trap); Summon(engine, B); NextMain(engine); Summon(engine, A); Order(engine);
         var p = engine.State.EventEffects.PendingCommitment!; var target = p.TargetOptions[0];
         Ok(engine, new ChooseTriggerMonsterTarget(p.Player, p.DecisionId, target.Player, target.Zone, target.Card.InstanceId));
