@@ -62,6 +62,7 @@ public sealed partial class DuelEngine
                     h.TurnNumber == State.TurnNumber && h.Method != SummonMethod.Set),
                 OpponentAttackDeclaredCondition => State.Battle is { Window.Timing: BattleTiming.AttackDeclaration, Attack: { Cancellation: null } attack } &&
                     attack.Attacker.Player != playerId && attack.Attacker.IsStillPresent(State),
+                MonsterSummonedCondition summoned => SummonedMatches(State, playerId, summoned).Any(),
                 _ => false
             };
             if (!met) return DuelError.ActivationConditionNotMet;
@@ -187,11 +188,12 @@ public sealed partial class DuelEngine
                 ResponseToLink: chain?.Links[^1].Number ?? 0, SourcePlacementId: placement);
             return Accept(placed.WithActivation(pending).WithDecision(decision), [.. head, new DecisionRequested(decision)]);
         }
-        // The attacking monster is bound automatically; no decision is needed.
+        // The attacking or just-Summoned monsters are bound automatically; no decision is needed.
         IReadOnlyList<FieldCardTarget>? automatic = definition.FieldTargets switch
         {
             [AttackingMonsterTarget] when State.Battle?.Attack is { } attack =>
                 [new(attack.Attacker.Player, FieldLocation.MonsterZone, attack.Attacker.Zone, attack.Attacker.Card, attack.Attacker.PlacementId)],
+            [SummonedMonsterTarget] => [.. SummonedMatches(State, playerId, definition.Conditions.OfType<MonsterSummonedCondition>().First())],
             _ => null
         };
         return AddDefinitionLink(placed, new(playerId, definition.EffectId, card, zone, null, null, automatic), definition, placement,
@@ -320,7 +322,8 @@ public sealed partial class DuelEngine
         if (command.Player != window.Responder) return Reject(DuelError.NotChainResponder);
         var cleared = State.WithBookkeeping(State.Bookkeeping with { OpenWindow = null });
         if (command is PassChainResponse)
-            return Advance(window.RequestedPhase, cleared, new OpenWindowPassed(window.Responder));
+            return window.Summoned is not null ? Accept(cleared, new OpenWindowPassed(window.Responder))
+                : Advance(window.RequestedPhase, cleared, new OpenWindowPassed(window.Responder));
         var response = (ActivateChainResponse)command;
         if (response.SummonedCardInstanceId is not null || response.MonsterZone is not null) return Reject(DuelError.InvalidDecisionChoice);
         if (response.SpellTrapZone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
@@ -406,6 +409,7 @@ public sealed partial class DuelEngine
                         ReturnTargetsToHandStep => ReturnFieldCardToHand(state, target, definition.EffectId, events),
                         ChangeTargetsToDefenseStep => ChangeToDefense(state, target, events),
                         BanishFieldTargetsStep => BanishFieldCard(state, target, definition.EffectId, events),
+                        DestroyAndBanishTargetsStep => DestroyAndBanishFieldCard(state, target, definition.EffectId, events),
                         DamageByTargetAttackStep => GetMonsterStatistics(state, target.Player, target.Zone)?.Attack is int damage and > 0
                             ? DealEffectDamage(state, Other(controller), damage, definition.EffectId, events) : state,
                         GainByTargetAttackStep => GetMonsterStatistics(state, target.Player, target.Zone)?.Attack is int gain and > 0
@@ -523,7 +527,7 @@ public sealed partial class DuelEngine
             {
                 FieldTarget f => FieldMatches(state, link.Activation.Player, f.Kind, f.Side, f.Filter, null),
                 ZoneTarget z => ZoneMatches(state, link.Activation.Player, z),
-                AttackingMonsterTarget => FieldMatches(state, link.Activation.Player, FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.Any, null),
+                AttackingMonsterTarget or SummonedMonsterTarget => FieldMatches(state, link.Activation.Player, FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.Any, null),
                 _ => []
             };
             if (target.IsStillPresent(state) && matches.Any(m => m.Card == target.Card)) yield return target;
@@ -658,6 +662,72 @@ public sealed partial class DuelEngine
         events.Add(new CardReturnedToHand(card.Owner, card, effectId)
             { FieldDestination = extra ? FieldCardDestination.ExtraDeck : FieldCardDestination.Hand });
         return state;
+    }
+
+    /// <summary>Destroys a field monster and banishes it instead of sending it to the Graveyard; a Token ceases to exist.</summary>
+    private DuelState DestroyAndBanishFieldCard(DuelState state, FieldCardTarget target, string effectId, List<DuelEvent> events)
+    {
+        state = RemovePlacement(state, target);
+        var card = target.Card;
+        bool token = IsTokenId(card.GameCardId);
+        var destination = token ? FieldCardDestination.Removed : FieldCardDestination.Banished;
+        events.Add(new MonsterDestroyed(target.Player, target.Zone, card) { FieldDestination = destination });
+        events.Add(new MonsterBanished(target.Player, card, target.Zone, effectId) { FieldDestination = destination });
+        if (token)
+        {
+            events.Add(new TokenRemoved(card.Owner, card) { FieldDestination = FieldCardDestination.Removed });
+            return state;
+        }
+        var owner = state.GetPlayer(card.Owner);
+        return state.With(player: owner.With(banished: owner.Banished.Append(card)));
+    }
+
+    /// <summary>The just-Summoned monsters, still in place, that meet a summon condition for this player.</summary>
+    private IEnumerable<FieldCardTarget> SummonedMatches(DuelState state, PlayerId playerId, MonsterSummonedCondition condition)
+    {
+        if (state.OpenWindow?.Summoned is not { } summoned || condition.Single && summoned.Count != 1) yield break;
+        foreach (var (monster, kind) in summoned)
+        {
+            if ((condition.Kinds & kind) == 0 || condition.ByOpponent && monster.Player == playerId || !monster.IsStillPresent(state)) continue;
+            var stats = GetMonsterStatistics(state, monster.Player, monster.Zone);
+            if ((condition.Stat == MonsterStat.Attack ? stats?.Attack : stats?.Defense) is int value && value >= condition.Min && value <= condition.Max)
+                yield return new(monster.Player, FieldLocation.MonsterZone, monster.Zone, monster.Card, monster.PlacementId);
+        }
+    }
+
+    /// <summary>
+    /// After a successful Summon in an open state, opens a summon-response window when the summoner's opponent has a
+    /// set card whose summon condition this Summon meets.
+    /// </summary>
+    private void OfferSummonResponse(List<DuelEvent> emitted)
+    {
+        if (State.Outcome is not null || State.PendingChain is not null || State.PendingDecision is not null || State.PendingSummon is not null ||
+            State.OpenWindow is not null || State.Battle is not null || State.EventEffects.PendingTriggers is not null ||
+            State.EventEffects.PendingCommitment is not null) return;
+        SummonedMonster[] summoned = [.. emitted.Select(e => e switch
+        {
+            MonsterNormalSummoned n => new SummonedMonster(new(n.Player, n.Zone, n.Monster.Card, n.Monster.PlacementId), SummonKinds.Normal),
+            MonsterFlipSummoned f => new SummonedMonster(new(f.Player, f.Zone, f.Monster.Card, f.Monster.PlacementId), SummonKinds.Flip),
+            MonsterSpecialSummoned s => new SummonedMonster(new(s.Player, s.Zone, s.Monster.Card, s.Monster.PlacementId), SummonKinds.Special),
+            _ => null
+        }).OfType<SummonedMonster>()];
+        if (summoned.Length == 0 || !definitions.Values.Any(d => d.Conditions.Any(c => c is MonsterSummonedCondition))) return;
+        var summoner = summoned[^1].Monster.Player;
+        summoned = [.. summoned.Where(s => s.Monster.Player == summoner)];
+        var responder = Other(summoner);
+        var before = State;
+        State = State.WithBookkeeping(State.Bookkeeping with { OpenWindow = new(State.Revision, responder, State.Phase) { Summoned = summoned } });
+        var player = State.GetPlayer(responder);
+        bool answerable = player.SpellTrapFields.Any(source => source is not null &&
+            definitions.TryGetValue(source.Card.GameCardId, out var definition) &&
+            definition.Conditions.Any(c => c is MonsterSummonedCondition) &&
+            DefinitionActivationError(definition, ActivationContext.OpenWindow, responder, source.Card, source) == DuelError.None);
+        if (!answerable)
+        {
+            State = before;
+            return;
+        }
+        emitted.Add(new SummonResponseWindowRequested(responder, State.Revision, summoned));
     }
 
     /// <summary>Banishes a field monster to its owner's banished zone; a Token ceases to exist.</summary>

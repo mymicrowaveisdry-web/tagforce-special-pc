@@ -163,3 +163,26 @@ public sealed record BanishFieldTargetsStep : EffectStep;
 
 /// <summary>Banishes every matching field monster (never the resolving source), activating player's side first.</summary>
 public sealed record BanishAllStep(TargetSide Side = TargetSide.Either, FieldCardFilter Filter = FieldCardFilter.Any) : EffectStep;
+
+/// <summary>Summon methods a summon-response condition accepts; a Tribute Summon is a Normal Summon.</summary>
+[Flags]
+public enum SummonKinds { Normal = 1, Flip = 2, Special = 4, Any = Normal | Flip | Special }
+
+/// <summary>
+/// A monster was just Summoned with its current stat in [Min, Max]; by the opponent unless ByOpponent is false.
+/// Single requires that exactly one monster was Summoned.
+/// </summary>
+public sealed record MonsterSummonedCondition(SummonKinds Kinds, bool ByOpponent = true, bool Single = false,
+    MonsterStat Stat = MonsterStat.Attack, int Min = 0, int Max = int.MaxValue) : EffectCondition;
+
+/// <summary>The just-Summoned monsters that meet the summon condition, bound automatically at activation.</summary>
+public sealed record SummonedMonsterTarget : EffectTarget;
+
+/// <summary>Destroys each bound target and banishes it instead of sending it to the Graveyard.</summary>
+public sealed record DestroyAndBanishTargetsStep : EffectStep;
+
+/// <summary>A monster that was just Summoned, and how.</summary>
+public sealed record SummonedMonster(MonsterBinding Monster, SummonKinds Kind);
+
+/// <summary>After a successful Summon, the opponent may activate a set card before play continues.</summary>
+public sealed record SummonResponseWindowRequested(PlayerId Responder, long DecisionId, IReadOnlyList<SummonedMonster> Summoned) : DuelEvent;

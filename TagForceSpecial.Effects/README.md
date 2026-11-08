@@ -8,6 +8,7 @@
 [`RemovalFamily`](RemovalFamily.cs) supports 15 destroy, return and position-change cards by field target, "all matching" or highest/lowest stat.
 [`GraveyardFamily`](GraveyardFamily.cs) supports 8 Graveyard and banished-zone cards, including Monster Reborn from either Graveyard and "up to" targets.
 [`BattleTrapFamily`](BattleTrapFamily.cs) supports 9 attack-declaration Traps, including Mirror Force, Magic Cylinder and Dimensional Prison.
+[`SummonTrapFamily`](SummonTrapFamily.cs) supports 5 summon-response Traps: Trap Hole, Eatgaboon, House of Adhesive Tape, Bottomless Trap Hole and Torrential Tribute.
 [`ReviewedCardMetadata`](ReviewedCardMetadata.cs) overlays reviewed metadata when a catalog is opened; converted packages keep the frozen Cards baseline, so review batches never change pinned cache bytes or artwork bindings.
 
 ```csharp
@@ -15,7 +16,7 @@ var engine = new DuelEngine(catalog, rules, playerOneDeck, playerTwoDeck,
     effectDefinitions: ChainCardFamily.Definitions, shuffleSeed: seed);
 ```
 
-Emergency Teleport shuffles after a Deck summon, so its definition needs a seed. Card definitions answer staged battle windows (not the Damage Step) but not summon windows.
+Emergency Teleport shuffles after a Deck summon, so its definition needs a seed. Card definitions answer staged battle windows (not the Damage Step) and successful Summons, but not "would be Summoned" windows.
 
 Trigger/aura primitives, staged battle and [bounded Fusion/Ritual effects](../TagForceSpecial.Core/EffectSummons.md) use separate [Core opt-ins](../TagForceSpecial.Core/README.md).
 Existing card factories do not automatically gain battle or Damage Step eligibility.

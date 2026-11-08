@@ -11,10 +11,15 @@ internal sealed record DuelBookkeeping(int NextInstanceId = 1, DuelRandomState? 
 }
 
 /// <summary>
-/// A turn player's phase-change request paused so the non-turn player can activate a set Quick-Play Spell or Normal
-/// Trap, or pass. Opened only when such an activation is legal.
+/// A turn player's phase-change request, or a just-completed Summon, paused so the other player can activate a set
+/// Quick-Play Spell or Normal Trap, or pass. Opened only when such an activation is legal.
 /// </summary>
-public sealed record PendingOpenWindow(long DecisionId, PlayerId Responder, DuelPhase RequestedPhase);
+public sealed record PendingOpenWindow(long DecisionId, PlayerId Responder, DuelPhase RequestedPhase)
+{
+    /// <summary>Set for a summon-response window; passing it changes no phase.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<SummonedMonster>? Summoned { get; init; }
+}
 public sealed record OpenWindowRequested(PlayerId Responder, long DecisionId, DuelPhase RequestedPhase) : DuelEvent;
 public sealed record OpenWindowPassed(PlayerId Responder) : DuelEvent;
 

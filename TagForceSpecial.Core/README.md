@@ -21,7 +21,7 @@ Selections do not move cards. Completion stops research by default (the only rem
 
 Costs and targets are answered as decisions before the link is added; targets bind controller, slot, instance and placement, and paid costs remain paid. A resolution-time summon choice is answered with `ChooseDefinitionSummon`.
 
-Two consecutive passes close a window; `ResolveNextChainLink` resolves in reverse order. Missing bound targets skip destruction; cleanup handles surviving sources once. Definitions answer staged battle windows outside the Damage Step (an attack-declaration condition binds the attacker); they do not yet answer summon windows.
+Two consecutive passes close a window; `ResolveNextChainLink` resolves in reverse order. Missing bound targets skip destruction; cleanup handles surviving sources once. Definitions answer staged battle windows outside the Damage Step (an attack-declaration condition binds the attacker); after a successful Summon, a summon-response open window is offered when the opponent has a set card whose summon condition is met. "Would be Summoned" windows remain profile-only.
 
 `experimentalChainResponses` keeps default-off negation probes for trigger, battle and summon windows. See [Effects](../TagForceSpecial.Effects/README.md) for supported cards.
 
