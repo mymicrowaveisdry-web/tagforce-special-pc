@@ -39,8 +39,12 @@ public static class CardSupportInventory
         var graveCards = GraveyardFamily.Cards.ToDictionary(c => c.CardId);
         bool fullGraveCatalog = graveCards.Keys.Concat(DeckOperationFamily.HighLevelNormalMonsterIds).All(catalogIds.Contains);
         if (fullGraveCatalog) GraveyardFamily.ValidateCatalog(catalog);
+        var battleCards = BattleTrapFamily.Cards.ToDictionary(c => c.CardId);
+        bool fullBattleCatalog = battleCards.Keys.All(catalogIds.Contains);
+        if (fullBattleCatalog) BattleTrapFamily.ValidateCatalog(catalog);
         string[] chainTests = ["ChainCardFamilyTests", "ChainInteractionTests", "DuelChainTests", "EmergencyTeleportTests",
             "EmergencyTeleportLifecycleTests", "ChainCardFamilyLocalReferenceTests"];
+        string[] battleTests = ["BattleTrapFamilyTests", "BattleTrapFamilyLocalReferenceTests"];
         string[] graveTests = ["GraveyardFamilyTests", "GraveyardFamilyLocalReferenceTests"];
         string[] removalTests = ["RemovalFamilyTests", "RemovalFamilyLocalReferenceTests"];
         string[] deckTests = ["DeckOperationFamilyTests", "DeckOperationFamilyLocalReferenceTests"];
@@ -60,6 +64,8 @@ public static class CardSupportInventory
                 ? DefinitionEntry(c, removal, RemovalFamily.FamilyId, RemovalFamily.BatchId, removalTests, "decoded-metadata; synthetic-rule-test")
             : fullGraveCatalog && graveCards.TryGetValue(c.GameCardId, out var grave)
                 ? DefinitionEntry(c, grave, GraveyardFamily.FamilyId, GraveyardFamily.BatchId, graveTests, "decoded-metadata; synthetic-rule-test")
+            : fullBattleCatalog && battleCards.TryGetValue(c.GameCardId, out var battle)
+                ? DefinitionEntry(c, battle, BattleTrapFamily.FamilyId, BattleTrapFamily.BatchId, battleTests, "decoded-metadata; synthetic-rule-test")
             : PreviewEntry(c);
         object DefinitionEntry(CardDefinition c, DefinitionCardProfile p, string family, string batch, string[] tests, string evidenceClass) => new
         {
@@ -165,14 +171,16 @@ public static class CardSupportInventory
                     fullLifePointCatalog ? new { id = LifePointFamily.BatchId, family = LifePointFamily.FamilyId, cardIds = lifePointCards.Keys.Order().ToArray() } : null,
                     fullDeckCatalog ? new { id = DeckOperationFamily.BatchId, family = DeckOperationFamily.FamilyId, cardIds = deckCards.Keys.Order().ToArray() } : null,
                     fullRemovalCatalog ? new { id = RemovalFamily.BatchId, family = RemovalFamily.FamilyId, cardIds = removalCards.Keys.Order().ToArray() } : null,
-                    fullGraveCatalog ? new { id = GraveyardFamily.BatchId, family = GraveyardFamily.FamilyId, cardIds = graveCards.Keys.Order().ToArray() } : null
+                    fullGraveCatalog ? new { id = GraveyardFamily.BatchId, family = GraveyardFamily.FamilyId, cardIds = graveCards.Keys.Order().ToArray() } : null,
+                    fullBattleCatalog ? new { id = BattleTrapFamily.BatchId, family = BattleTrapFamily.FamilyId, cardIds = battleCards.Keys.Order().ToArray() } : null
                 }.OfType<object>().ToArray(),
             unclassifiedCardCount = catalog.Cards.Count(c => !tokens.Contains(c.GameCardId) && !preview.ContainsKey(c.GameCardId) &&
                 !(fullFamilyCatalog && normalMonsters.Contains(c.GameCardId)) && !(fullChainCatalog && chainCards.ContainsKey(c.GameCardId)) &&
                 !(fullLifePointCatalog && lifePointCards.ContainsKey(c.GameCardId)) &&
                 !(fullDeckCatalog && deckCards.ContainsKey(c.GameCardId)) &&
                 !(fullRemovalCatalog && removalCards.ContainsKey(c.GameCardId)) &&
-                !(fullGraveCatalog && graveCards.ContainsKey(c.GameCardId))),
+                !(fullGraveCatalog && graveCards.ContainsKey(c.GameCardId)) &&
+                !(fullBattleCatalog && battleCards.ContainsKey(c.GameCardId))),
             exampleDeck = PlayablePreview.ExampleDeck
         };
     }

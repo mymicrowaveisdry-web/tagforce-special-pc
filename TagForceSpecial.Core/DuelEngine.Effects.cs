@@ -9,7 +9,10 @@ namespace TagForceSpecial.Core;
 public sealed partial class DuelEngine
 {
     /// <summary>Where an activation is requested; each context has its own timing rules.</summary>
-    private enum ActivationContext { Hand, OwnSetCard, OpenWindow, ChainResponse, HandChainResponse }
+    private enum ActivationContext { Hand, OwnSetCard, OpenWindow, ChainResponse, HandChainResponse, BattleWindow }
+
+    private const BattleTiming DamageStepTimings = BattleTiming.DamageStart | BattleTiming.BeforeCalculation |
+        BattleTiming.Calculation | BattleTiming.AfterCalculation | BattleTiming.DamageEnd;
 
     /// <summary>
     /// The single activation legality check for definitions: timing by context, then conditions, the summon lock and
@@ -18,10 +21,12 @@ public sealed partial class DuelEngine
     private DuelError DefinitionActivationError(EffectDefinition definition, ActivationContext context, PlayerId player,
         CardInstance card, FieldSpellTrap? source, ChainLink? preceding = null)
     {
+        // No definition is yet allowed during the Damage Step.
+        if (State.Battle is { } battle && (battle.Window.Timing & DamageStepTimings) != 0) return DuelError.ActivationTimingNotAllowed;
         bool fromHand = context is ActivationContext.Hand or ActivationContext.HandChainResponse;
         bool setThisTurn = source is not null && source.SetOnTurn >= State.TurnNumber;
         if (!fromHand && (source is null || source.IsFaceUp))
-            return context is ActivationContext.ChainResponse or ActivationContext.OpenWindow
+            return context is ActivationContext.ChainResponse or ActivationContext.OpenWindow or ActivationContext.BattleWindow
                 ? DuelError.UnsupportedChainResponse : DuelError.UnsupportedSpellEffect;
         bool slowerThanPreceding = preceding is not null && (int)definition.SpellSpeed < (int)preceding.SpellSpeed;
         var timing = (context, definition.Kind) switch
@@ -29,9 +34,9 @@ public sealed partial class DuelEngine
             (ActivationContext.Hand, EffectKind.NormalSpell or EffectKind.QuickPlaySpell) => DuelError.None,
             (ActivationContext.Hand, _) => DuelError.ActivationTimingNotAllowed,
             (ActivationContext.OwnSetCard, EffectKind.NormalSpell) => DuelError.None,
-            (ActivationContext.OwnSetCard or ActivationContext.OpenWindow, EffectKind.QuickPlaySpell or EffectKind.NormalTrap)
+            (ActivationContext.OwnSetCard or ActivationContext.OpenWindow or ActivationContext.BattleWindow, EffectKind.QuickPlaySpell or EffectKind.NormalTrap)
                 => setThisTurn ? DuelError.SetThisTurn : DuelError.None,
-            (ActivationContext.OwnSetCard or ActivationContext.OpenWindow, _) => DuelError.ActivationTimingNotAllowed,
+            (ActivationContext.OwnSetCard or ActivationContext.OpenWindow or ActivationContext.BattleWindow, _) => DuelError.ActivationTimingNotAllowed,
             (ActivationContext.ChainResponse, EffectKind.NormalSpell) => DuelError.ActivationTimingNotAllowed,
             (ActivationContext.ChainResponse, _) => setThisTurn ? DuelError.SetThisTurn
                 : slowerThanPreceding ? DuelError.ChainResponseSpeedNotAllowed : DuelError.None,
@@ -55,6 +60,8 @@ public sealed partial class DuelEngine
                     (preceding.IsPendulumScale || rules[preceding.Activation.Spell.GameCardId].Category == CardCategory.Spell),
                 NoSummonThisTurnCondition => !State.SummonHistory.Any(h => h.Player == playerId &&
                     h.TurnNumber == State.TurnNumber && h.Method != SummonMethod.Set),
+                OpponentAttackDeclaredCondition => State.Battle is { Window.Timing: BattleTiming.AttackDeclaration, Attack: { Cancellation: null } attack } &&
+                    attack.Attacker.Player != playerId && attack.Attacker.IsStillPresent(State),
                 _ => false
             };
             if (!met) return DuelError.ActivationConditionNotMet;
@@ -92,6 +99,7 @@ public sealed partial class DuelEngine
                 ReturnAllToHandStep all => !FieldMatches(State, playerId, all.Kind, all.Side, FieldCardFilter.Any, card.InstanceId).Any(),
                 ChangeAllToDefenseStep all => !FieldMatches(State, playerId, FieldCardKind.Monster, all.Side, FieldCardFilter.AttackPosition, null).Any(),
                 DestroyExtremeMonsterStep extreme => ExtremeCandidates(State, playerId, extreme).Length == 0,
+                BanishAllStep all => !FieldMatches(State, playerId, FieldCardKind.Monster, all.Side, all.Filter, null).Any(),
                 _ => false
             };
             if (unavailable) return DuelError.DecisionUnavailable;
@@ -120,6 +128,14 @@ public sealed partial class DuelEngine
         return CommitDefinition(State, State.ActivePlayer, card, zone, definition, null, null, []);
     }
 
+    /// <summary>A set definition card that starts a chain in an open battle window (caller checked responder and decision ID).</summary>
+    private DuelActionResult BeginBattleDefinition(PlayerId actor, int zone, FieldSpellTrap source, EffectDefinition definition)
+    {
+        if (DefinitionActivationError(definition, ActivationContext.BattleWindow, actor, source.Card, source) is not DuelError.None and var error)
+            return Reject(error);
+        return CommitDefinition(State, actor, source.Card, zone, definition, source, null, []);
+    }
+
     /// <summary>A set definition card activated as the next chain link (caller checked responder and decision ID).</summary>
     private DuelActionResult BeginDefinitionResponse(PendingChain chain, int zone, FieldSpellTrap source, EffectDefinition definition)
     {
@@ -132,7 +148,6 @@ public sealed partial class DuelEngine
     /// <summary>Activates the turn player's Quick-Play Spell from the hand as the next chain link.</summary>
     private DuelActionResult BeginHandDefinitionResponse(PendingChain chain, ActivateHandChainResponse command)
     {
-        if (State.Battle is not null) return Reject(DuelError.UnsupportedBattleResponse);
         if (State.PendingSummon is not null) return Reject(DuelError.UnsupportedSummonResponse);
         if (command.SpellTrapZone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
         var player = State.GetPlayer(chain.Responder);
@@ -172,7 +187,14 @@ public sealed partial class DuelEngine
                 ResponseToLink: chain?.Links[^1].Number ?? 0, SourcePlacementId: placement);
             return Accept(placed.WithActivation(pending).WithDecision(decision), [.. head, new DecisionRequested(decision)]);
         }
-        return AddDefinitionLink(placed, new(playerId, definition.EffectId, card, zone, null, null), definition, placement,
+        // The attacking monster is bound automatically; no decision is needed.
+        IReadOnlyList<FieldCardTarget>? automatic = definition.FieldTargets switch
+        {
+            [AttackingMonsterTarget] when State.Battle?.Attack is { } attack =>
+                [new(attack.Attacker.Player, FieldLocation.MonsterZone, attack.Attacker.Zone, attack.Attacker.Card, attack.Attacker.PlacementId)],
+            _ => null
+        };
+        return AddDefinitionLink(placed, new(playerId, definition.EffectId, card, zone, null, null, automatic), definition, placement,
             chain, [.. head]);
     }
 
@@ -248,6 +270,9 @@ public sealed partial class DuelEngine
             TargetLinkNumber: definition.Steps.Any(s => s is NegateActivationStep) ? chain!.Links[^1].Number : null);
         var pending = new PendingChain(checked(State.Revision + 1), (chain?.Links ?? []).Append(link), Other(receipt.Player));
         var next = state.WithCommittedActivation(receipt).WithChain(pending);
+        // A link added during battle reopens the battle window for the other player, as battle responses do.
+        if (next.Battle is { } battle)
+            next = next.WithBattle(battle with { Window = battle.Window with { ConsecutivePasses = 0, Responder = Other(receipt.Player) } });
         events.Add(new ActivationCommitted(receipt));
         if (definition.LocksOtherSummonsThisTurn)
         {
@@ -357,6 +382,17 @@ public sealed partial class DuelEngine
                     choice = null;
                     continue;
                 }
+                if (step is NegateAttackStep)
+                {
+                    if (state.Battle is not { Attack: { Cancellation: null } attack } battle || attack.Attacker.Card != valid[0].Card)
+                    {
+                        events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
+                        break;
+                    }
+                    events.Add(new AttackCancelled(attack.Id, BattleAttackCancellation.Negated));
+                    state = state.WithBattle(battle with { Attack = attack with { Cancellation = BattleAttackCancellation.Negated } });
+                    continue;
+                }
                 if (step is ShuffleTargetsIntoDeckStep shuffle)
                 {
                     state = ShuffleIntoDecks(state, valid, definition.EffectId, events);
@@ -369,6 +405,11 @@ public sealed partial class DuelEngine
                         DestroyTargetsStep => DestroyFieldCard(state, target, events),
                         ReturnTargetsToHandStep => ReturnFieldCardToHand(state, target, definition.EffectId, events),
                         ChangeTargetsToDefenseStep => ChangeToDefense(state, target, events),
+                        BanishFieldTargetsStep => BanishFieldCard(state, target, definition.EffectId, events),
+                        DamageByTargetAttackStep => GetMonsterStatistics(state, target.Player, target.Zone)?.Attack is int damage and > 0
+                            ? DealEffectDamage(state, Other(controller), damage, definition.EffectId, events) : state,
+                        GainByTargetAttackStep => GetMonsterStatistics(state, target.Player, target.Zone)?.Attack is int gain and > 0
+                            ? GainLifePoints(state, controller, gain, definition.EffectId, events) : state,
                         AddTargetsToHandStep => MoveZoneCardToHand(state, target, definition.EffectId, events),
                         BanishTargetsStep => MoveZoneCard(state, target, toBanished: true, definition.EffectId, events),
                         _ => MoveZoneCard(state, target, toBanished: false, definition.EffectId, events)
@@ -426,6 +467,8 @@ public sealed partial class DuelEngine
                         .ToArray().Aggregate(state, (s, t) => DestroyFieldCard(s, t, events)),
                     ReturnAllToHandStep all => FieldMatches(state, controller, all.Kind, all.Side, FieldCardFilter.Any, link.Activation.Spell.InstanceId)
                         .ToArray().Aggregate(state, (s, t) => ReturnFieldCardToHand(s, t, definition.EffectId, events)),
+                    BanishAllStep all => FieldMatches(state, controller, FieldCardKind.Monster, all.Side, all.Filter, null)
+                        .ToArray().Aggregate(state, (s, t) => BanishFieldCard(s, t, definition.EffectId, events)),
                     ChangeAllToDefenseStep all => FieldMatches(state, controller, FieldCardKind.Monster, all.Side, FieldCardFilter.AttackPosition, null)
                         .ToArray().Aggregate(state, (s, t) => ChangeToDefense(s, t, events)),
                     _ => throw new InvalidOperationException("Unsupported effect step.")
@@ -480,6 +523,7 @@ public sealed partial class DuelEngine
             {
                 FieldTarget f => FieldMatches(state, link.Activation.Player, f.Kind, f.Side, f.Filter, null),
                 ZoneTarget z => ZoneMatches(state, link.Activation.Player, z),
+                AttackingMonsterTarget => FieldMatches(state, link.Activation.Player, FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.Any, null),
                 _ => []
             };
             if (target.IsStillPresent(state) && matches.Any(m => m.Card == target.Card)) yield return target;
@@ -614,6 +658,22 @@ public sealed partial class DuelEngine
         events.Add(new CardReturnedToHand(card.Owner, card, effectId)
             { FieldDestination = extra ? FieldCardDestination.ExtraDeck : FieldCardDestination.Hand });
         return state;
+    }
+
+    /// <summary>Banishes a field monster to its owner's banished zone; a Token ceases to exist.</summary>
+    private DuelState BanishFieldCard(DuelState state, FieldCardTarget target, string effectId, List<DuelEvent> events)
+    {
+        state = RemovePlacement(state, target);
+        var card = target.Card;
+        if (IsTokenId(card.GameCardId))
+        {
+            events.Add(new MonsterBanished(target.Player, card, target.Zone, effectId) { FieldDestination = FieldCardDestination.Removed });
+            events.Add(new TokenRemoved(card.Owner, card) { FieldDestination = FieldCardDestination.Removed });
+            return state;
+        }
+        var owner = state.GetPlayer(card.Owner);
+        events.Add(new MonsterBanished(target.Player, card, target.Zone, effectId) { FieldDestination = FieldCardDestination.Banished });
+        return state.With(player: owner.With(banished: owner.Banished.Append(card)));
     }
 
     private static DuelState ChangeToDefense(DuelState state, FieldCardTarget target, List<DuelEvent> events)

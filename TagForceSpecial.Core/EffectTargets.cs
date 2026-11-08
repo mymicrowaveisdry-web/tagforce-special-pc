@@ -143,3 +143,23 @@ public sealed record CardMovedToHand(PlayerId Owner, CardInstance Card, CardZone
 public sealed record CardBanishedFromGraveyard(PlayerId Owner, CardInstance Card, string EffectId) : DuelEvent;
 public sealed record CardReturnedToGraveyard(PlayerId Owner, CardInstance Card, string EffectId) : DuelEvent;
 public sealed record CardShuffledIntoDeck(PlayerId Owner, CardInstance Card, string EffectId) : DuelEvent;
+/// <summary>"When an opponent's monster declares an attack": the activating player's opponent has an attack in progress at declaration.</summary>
+public sealed record OpponentAttackDeclaredCondition : EffectCondition;
+
+/// <summary>The attacking monster, bound automatically at activation.</summary>
+public sealed record AttackingMonsterTarget : EffectTarget;
+
+/// <summary>Negates the current attack by the bound attacker; if it cannot, the rest of the effect does not resolve.</summary>
+public sealed record NegateAttackStep : EffectStep;
+
+/// <summary>Inflicts damage to the opponent equal to the bound target's current ATK.</summary>
+public sealed record DamageByTargetAttackStep : EffectStep;
+
+/// <summary>The activating player gains LP equal to the bound target's current ATK.</summary>
+public sealed record GainByTargetAttackStep : EffectStep;
+
+/// <summary>Banishes every bound field target that still qualifies; Tokens cease to exist.</summary>
+public sealed record BanishFieldTargetsStep : EffectStep;
+
+/// <summary>Banishes every matching field monster (never the resolving source), activating player's side first.</summary>
+public sealed record BanishAllStep(TargetSide Side = TargetSide.Either, FieldCardFilter Filter = FieldCardFilter.Any) : EffectStep;

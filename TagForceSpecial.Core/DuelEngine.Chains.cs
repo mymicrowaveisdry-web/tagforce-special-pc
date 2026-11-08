@@ -44,8 +44,7 @@ public sealed partial class DuelEngine
                 return Reject(DuelError.InvalidDecisionChoice);
             if (source is not null && definitions.TryGetValue(source.Card.GameCardId, out var definition))
             {
-                // Definitions answer open chains only, not battle or summon windows.
-                if (State.Battle is not null) return Reject(DuelError.UnsupportedBattleResponse);
+                // Definitions answer open and battle chains (outside the Damage Step), not summon windows.
                 if (State.PendingSummon is not null) return Reject(DuelError.UnsupportedSummonResponse);
                 return BeginDefinitionResponse(chain, response.SpellTrapZone, source, definition);
             }

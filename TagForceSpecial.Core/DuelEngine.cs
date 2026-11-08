@@ -186,11 +186,11 @@ public sealed partial class DuelEngine
             definitionList.Select(d => d.EffectId).Distinct(StringComparer.Ordinal).Count() != definitionList.Length)
             throw new ArgumentException("Effect definitions require distinct, unreserved IDs, matching settable card rules, Token rules for Token steps and a seed for shuffle steps.", nameof(effectDefinitions));
         definitions = definitionList.ToFrozenDictionary(d => d.CardId);
-        definitionDecisions = definitionList.Where(d => d.Cost is DiscardCost || d.Target is not null || d.FieldTargets.Count != 0)
+        definitionDecisions = definitionList.Where(d => d.Cost is DiscardCost || d.Target is not null || d.FieldTargets.Any(t => t is not AttackingMonsterTarget))
             .ToFrozenDictionary(d => d.CardId, d => new DecisionSequence(DefinitionSequenceId(d),
                 [.. d.Cost is DiscardCost ? [DecisionStep.AnyCard(DecisionCardSource.Hand)] : Array.Empty<DecisionStep>(),
                  .. d.Target is SpellTrapOnFieldTarget ? [DecisionStep.SpellTrapTarget()] : Array.Empty<DecisionStep>(),
-                 .. d.FieldTargets.SelectMany(spec => Enumerable.Range(0, EffectDefinition.MaxCount(spec))
+                 .. d.FieldTargets.Where(t => t is not AttackingMonsterTarget).SelectMany(spec => Enumerable.Range(0, EffectDefinition.MaxCount(spec))
                      .Select(i => DecisionStep.FieldTargetChoice(spec, optional: i >= EffectDefinition.MinCount(spec))))],
                 stopAfterCompletion: false));
         bool IsMonster(uint id) => this.rules.TryGetValue(id, out var rule) && rule.Category == CardCategory.Monster;
