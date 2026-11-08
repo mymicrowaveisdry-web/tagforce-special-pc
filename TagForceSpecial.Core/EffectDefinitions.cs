@@ -268,7 +268,7 @@ public sealed class EffectDefinition
                     MillTopOfDeckStep s => s.Count is < 1 or > 60,
                     AddFromDeckToHandStep s => s.Filter is null,
                     SendFromDeckToGraveyardStep s => s.Filter is null,
-                    DestroyTargetStep or DestroyOpponentFaceUpMonstersStep or NegateActivationStep => false,
+                    DestroyTargetStep or DestroyOpponentFaceUpMonstersStep or NegateActivationStep or NegateSummonStep => false,
                     DestroyTargetsStep or ReturnTargetsToHandStep or ChangeTargetsToDefenseStep => false,
                     AddTargetsToHandStep or BanishTargetsStep or ReturnTargetsToGraveyardStep or ShuffleTargetsIntoDeckStep or SpecialSummonTargetStep => false,
                     BanishFieldTargetsStep or NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep or DestroyAndBanishTargetsStep => false,
@@ -285,7 +285,10 @@ public sealed class EffectDefinition
             throw new ArgumentException("Supply up to 8 distinct conditions.", nameof(conditions));
         if (required.OfType<MonsterSummonedCondition>().Any(c => c.Kinds is <= 0 or > SummonKinds.Any || !Enum.IsDefined(c.Stat) || c.Min < 0 || c.Min > c.Max))
             throw new ArgumentException("A summon condition needs summon kinds and a valid stat range.", nameof(conditions));
-        if (cost is not (null or DiscardCost or PayLifePointsCost)) throw new ArgumentOutOfRangeException(nameof(cost));
+        if (cost is not (null or DiscardCost or PayLifePointsCost or TributeCost or PayHalfLifePointsCost)) throw new ArgumentOutOfRangeException(nameof(cost));
+        if (required.OfType<MonsterWouldBeSummonedCondition>().Any(c => c.Kinds is <= 0 || (c.Kinds & ~(SummonKinds.Normal | SummonKinds.Special)) != 0) ||
+            snapshot.Any(s => s is NegateSummonStep) != required.Any(c => c is MonsterWouldBeSummonedCondition) || snapshot.Any(s => s is NegateSummonStep) && kind != EffectKind.CounterTrap)
+            throw new ArgumentException("Summon negation needs a Counter Trap with a Normal/Special would-be-Summoned condition.", nameof(steps));
         if (target is not (null or SpellTrapOnFieldTarget)) throw new ArgumentOutOfRangeException(nameof(target));
         bool responds = required.Any(c => c is RespondsToSpellActivationCondition);
         if (responds && kind == EffectKind.NormalSpell)

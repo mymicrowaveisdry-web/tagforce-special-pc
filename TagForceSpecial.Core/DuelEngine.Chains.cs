@@ -44,8 +44,7 @@ public sealed partial class DuelEngine
                 return Reject(DuelError.InvalidDecisionChoice);
             if (source is not null && definitions.TryGetValue(source.Card.GameCardId, out var definition))
             {
-                // Definitions answer open and battle chains (outside the Damage Step), not summon windows.
-                if (State.PendingSummon is not null) return Reject(DuelError.UnsupportedSummonResponse);
+                // In a summon chain only Spell Speed 3 can follow the first Counter Trap.
                 return BeginDefinitionResponse(chain, response.SpellTrapZone, source, definition);
             }
             if (source is not null && chainResponses.TryGetValue(source.Card.GameCardId, out var profile))

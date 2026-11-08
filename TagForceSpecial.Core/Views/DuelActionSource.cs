@@ -24,7 +24,6 @@ public sealed class DuelActionSource
         string unsupported = state.ResearchSliceComplete ? "Research boundary reached"
             : state.EventEffects.PendingCommitment is not null || state.EventEffects.PendingTriggers is not null
                 ? "Trigger commitments/order are outside this action adapter"
-            : state.PendingSummon is not null ? "Summon-negation window is outside this action adapter"
             : state.PendingChain?.SummonDecision is not null ? "Effect summon choice is outside this action adapter" : "";
         var status = state.Outcome is not null ? ActionAvailability.Finished
             : unsupported.Length > 0 ? ActionAvailability.Unsupported
@@ -58,6 +57,8 @@ public sealed class DuelActionSource
                 ? new(pick.DecisionId, "DefinitionCard", PlayerProjection.Read(pick.Options
                     .Select(c => PlayerProjection.Card(c, true, null, catalog))))
             : state.OpenWindow is { } window && actor == player ? new(window.DecisionId, "OpenWindow", PlayerProjection.Read(Array.Empty<CardView>()))
+            : state.PendingChain is null && state.PendingSummon is { } attempt && actor == player
+                ? new(attempt.DecisionId, "SummonWindow", PlayerProjection.Read(Array.Empty<CardView>()))
             : state.PendingChain is { } chain && actor == player ? new(chain.DecisionId, "Chain", PlayerProjection.Read(Array.Empty<CardView>()))
             : state.Battle is { } battle && actor == player ? new(battle.Window.DecisionId,
                 battle.Attack?.ReplayRequired == true && battle.Window.Closed ? "AttackReplay" : "Battle", PlayerProjection.Read(Array.Empty<CardView>())) : null;
@@ -86,6 +87,7 @@ public sealed class DuelActionSource
     private static PlayerId Actor(DuelState state) => state.PendingDecision?.Player
         ?? state.PendingChain?.DefinitionChoice?.Player
         ?? state.OpenWindow?.Responder
+        ?? (state.PendingChain is null ? state.PendingSummon?.Responder : null)
         ?? (state.PendingChain is { } chain ? chain.NextLink > 0 ? state.ActivePlayer : chain.Responder
             : state.Battle is { } battle && !battle.Window.Closed ? battle.Window.Responder : state.ActivePlayer);
 
@@ -128,6 +130,13 @@ public sealed class DuelActionSource
             for (int z = 0; z < 5; z++)
                 yield return B(new ActivateChainResponse(player, window.DecisionId, z), ActionKind.ChainResponse, $"Activate set zone {z + 1}", zone: z);
             yield return B(new PassChainResponse(player, window.DecisionId), ActionKind.ChainPass, "Pass");
+            yield break;
+        }
+        if (state.PendingChain is null && state.PendingSummon is { } summonAttempt)
+        {
+            for (int z = 0; z < 5; z++)
+                yield return B(new ActivateSummonNegation(player, summonAttempt.DecisionId, z), ActionKind.ChainResponse, $"Negate with zone {z + 1}", zone: z);
+            yield return B(new PassSummonResponse(player, summonAttempt.DecisionId), ActionKind.ChainPass, "Pass");
             yield break;
         }
         if (state.PendingChain?.DefinitionSummon is { } summon)

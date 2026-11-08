@@ -100,12 +100,13 @@ public sealed partial class DuelEngine
         var error = CheckSpecialSummon(State, player.Id, card, command.MonsterZone, command.Position, procedure.Source, procedure.ProcedureId);
         if (error != DuelError.None) return Reject(error);
         string? proper = procedure.Source == DecisionCardSource.Hand ? procedure.ProcedureId : null;
-        if (summonWindows.Contains(card.GameCardId))
+        var pending = new PendingSummon(checked(State.Revision + 1), checked(State.Revision + 1), player.Id,
+            card, command.MonsterZone, Other(player.Id), IsSpecialSummon: true, Source: procedure.Source,
+            Position: command.Position, ProcedureId: procedure.ProcedureId, ProperProcedureId: proper);
+        var attempted = State.With(player: RemoveSpecialSource(player, card, procedure.Source)).WithSummon(pending);
+        if (OpensSummonWindow(attempted, card.GameCardId))
         {
-            var pending = new PendingSummon(checked(State.Revision + 1), checked(State.Revision + 1), player.Id,
-                card, command.MonsterZone, Other(player.Id), IsSpecialSummon: true, Source: procedure.Source,
-                Position: command.Position, ProcedureId: procedure.ProcedureId, ProperProcedureId: proper);
-            return Accept(State.With(player: RemoveSpecialSource(player, card, procedure.Source)).WithSummon(pending),
+            return Accept(attempted,
                 new SummonAttempted(pending), new SummonResponseRequested(pending));
         }
         List<DuelEvent> events = [];

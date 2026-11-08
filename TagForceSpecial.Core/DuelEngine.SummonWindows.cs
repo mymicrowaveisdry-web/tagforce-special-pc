@@ -5,10 +5,9 @@ public sealed partial class DuelEngine
     private DuelActionResult CommitSummon(DuelState next, PlayerId player, CardInstance card, int zone,
         bool faceDown, List<DuelEvent> events)
     {
-        if (!faceDown && summonWindows.Contains(card.GameCardId))
+        var pending = new PendingSummon(checked(State.Revision + 1), checked(State.Revision + 1), player, card, zone, Other(player));
+        if (!faceDown && OpensSummonWindow(next.WithSummon(pending), card.GameCardId))
         {
-            var pending = new PendingSummon(checked(State.Revision + 1), checked(State.Revision + 1),
-                player, card, zone, Other(player));
             events.Add(new SummonAttempted(pending) { TimingGroup = 1 });
             events.Add(new SummonResponseRequested(pending));
             return Accept(next.WithSummon(pending), events.ToArray());
@@ -54,6 +53,9 @@ public sealed partial class DuelEngine
     private DuelActionResult ExecuteSummonWindow(DuelCommand command)
     {
         var pending = State.PendingSummon!;
+        // A Counter Trap answering this Summon may still be choosing its cost.
+        if (State.PendingDecision is not null && State.PendingSpellActivation is { } activating && definitions.ContainsKey(activating.Spell.GameCardId))
+            return command is DecisionCommand decision ? AnswerDecision(decision) : Reject(DuelError.DecisionPending);
         long id = command switch
         {
             PassSummonResponse p => p.DecisionId,
@@ -79,6 +81,8 @@ public sealed partial class DuelEngine
         if (command.SpellTrapZone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
         var player = State.GetPlayer(command.Player);
         var source = player.SpellTrapFields[command.SpellTrapZone];
+        if (source is not null && definitions.TryGetValue(source.Card.GameCardId, out var definition))
+            return BeginSummonDefinition(player.Id, command.SpellTrapZone, source, definition);
         if (command.Player == pending.Player || source is null || source.IsFaceUp || source.SetOnTurn >= State.TurnNumber ||
             !summonNegations.TryGetValue(source.Card.GameCardId, out var profile) ||
             pending.PendulumGroup.Count > 1 && !profile.AllowsMultipleSummons ||

@@ -52,13 +52,14 @@ public sealed partial class DuelEngine
         var error = CheckSpecialSummon(next, player.Id, target, command.MonsterZone, command.Position,
             DecisionCardSource.ExtraDeck, profile.ProcedureId);
         if (error != DuelError.None) return Reject(error);
-        if (summonWindows.Contains(target.GameCardId))
+        var pending = new PendingSummon(checked(State.Revision + 1), checked(State.Revision + 1), player.Id,
+            target, command.MonsterZone, Other(player.Id), IsSpecialSummon: true, Source: DecisionCardSource.ExtraDeck,
+            Position: command.Position, ProcedureId: profile.ProcedureId, ProperProcedureId: profile.ProcedureId)
+            { XyzMaterials = attachments };
+        var attempted = next.With(player: RemoveSpecialSource(next.GetPlayer(player.Id), target, DecisionCardSource.ExtraDeck)).WithSummon(pending);
+        if (OpensSummonWindow(attempted, target.GameCardId))
         {
-            var pending = new PendingSummon(checked(State.Revision + 1), checked(State.Revision + 1), player.Id,
-                target, command.MonsterZone, Other(player.Id), IsSpecialSummon: true, Source: DecisionCardSource.ExtraDeck,
-                Position: command.Position, ProcedureId: profile.ProcedureId, ProperProcedureId: profile.ProcedureId)
-                { XyzMaterials = attachments };
-            next = next.With(player: RemoveSpecialSource(next.GetPlayer(player.Id), target, DecisionCardSource.ExtraDeck)).WithSummon(pending);
+            next = attempted;
             events.Add(new SummonAttempted(pending) { TimingGroup = 1 });
             events.Add(new SummonResponseRequested(pending));
             return Accept(next, events.ToArray());

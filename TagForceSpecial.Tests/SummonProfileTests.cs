@@ -281,13 +281,13 @@ public sealed class SummonProfileTests
     {
         var e = Engine(windows: [new(High)], negations: [new("negate", Negate)],
             responses: [new("too-slow", Counter, ChainOperation.NegateActivation, ChainSpellSpeed.Two)],
-            // Card definitions do not answer summon windows yet, even at Spell Speed 3.
+            // A Spell Speed 3 definition may chain, but this one answers only Spell activations.
             definitions: [new("definition-counter", Other, EffectKind.CounterTrap, [new NegateActivationStep(true)],
                 conditions: [new RespondsToSpellActivationCondition()])]);
         Prepare(e, donors: 2); Ok(e, Tribute(e, [0, 1])); NegateSummon(e);
         var chain = e.State.PendingChain!;
         Reject(e, new ActivateChainResponse(PlayerId.One, chain.DecisionId, 0), DuelError.ChainResponseSpeedNotAllowed);
-        Reject(e, new ActivateChainResponse(PlayerId.One, chain.DecisionId, 1), DuelError.UnsupportedSummonResponse);
+        Reject(e, new ActivateChainResponse(PlayerId.One, chain.DecisionId, 1), DuelError.ActivationConditionNotMet);
         Reject(e, new PassSummonResponse(PlayerId.One, e.State.PendingSummon!.DecisionId), DuelError.ChainPending);
     }
 
