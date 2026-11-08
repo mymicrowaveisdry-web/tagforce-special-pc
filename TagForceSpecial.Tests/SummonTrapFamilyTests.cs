@@ -133,4 +133,44 @@ public sealed class SummonTrapFamilyTests
         Assert.Equal(2, destroyed.Length);
         Assert.All(e.State.Players, p => Assert.All(p.MonsterZones, Assert.Null));
     }
+
+    [Fact]
+    public void ASecondSummonTrapCanJoinTheChainLater()
+    {
+        var e = Engine(Deck(TrapHole, Bottomless), Deck(B));
+        EnterMain(e); Ok(e, new SetSpellTrap(PlayerId.One, Hand(e, TrapHole), 0)); Ok(e, new SetSpellTrap(PlayerId.One, Hand(e, Bottomless), 1));
+        Next(e);
+        Summon(e, B, 0);
+        Ok(e, new ActivateChainResponse(PlayerId.One, e.State.OpenWindow!.DecisionId, 0));
+        Ok(e, new PassChainResponse(PlayerId.Two, e.State.PendingChain!.DecisionId));
+        Ok(e, new ActivateChainResponse(PlayerId.One, e.State.PendingChain!.DecisionId, 1));
+        var events = Resolve(e);
+        Assert.Contains(e.State.GetPlayer(PlayerId.Two).Banished, c => c.GameCardId == B);
+        Assert.Contains(events, ev => ev is ChainLinkSkipped { Number: 1, Reason: ChainSkipReason.TargetUnavailable });
+    }
+
+    [Fact]
+    public void TheTurnPlayerAnswersFirstThenHandsTheWindowOver()
+    {
+        var e = Engine(Deck(TrapHole), Deck(Torrential, B));
+        EnterMain(e); Ok(e, new SetSpellTrap(PlayerId.One, Hand(e, TrapHole), 0)); Next(e);
+        Ok(e, new SetSpellTrap(PlayerId.Two, Hand(e, Torrential), 0)); Next(e); Next(e);
+        Summon(e, B, 0);
+        var window = e.State.OpenWindow!;
+        Assert.Equal(PlayerId.Two, window.Responder);
+        var events = Ok(e, new PassChainResponse(PlayerId.Two, window.DecisionId)).Events;
+        Assert.Contains(events, ev => ev is SummonResponseWindowRequested { Responder: PlayerId.One });
+        Assert.Contains(Spring(e), ev => ev is MonsterDestroyed { Player: PlayerId.Two, Zone: 0 });
+    }
+
+    [Fact]
+    public void ThePassedSummonCannotBeAnsweredLater()
+    {
+        var e = Prepared(TrapHole, Deck(B));
+        Summon(e, B, 0);
+        Ok(e, new PassChainResponse(PlayerId.One, e.State.OpenWindow!.DecisionId));
+        Ok(e, new ChangePhase(PlayerId.Two, DuelPhase.End));
+        Assert.Null(e.State.OpenWindow);
+        Assert.Equal(DuelPhase.End, e.State.Phase);
+    }
 }

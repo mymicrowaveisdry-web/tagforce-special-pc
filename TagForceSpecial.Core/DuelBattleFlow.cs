@@ -45,6 +45,8 @@ public sealed record ChooseAttackReplay(PlayerId Player, long DecisionId, int? T
 /// <summary>Explicit choices for an opted-in set response; hand summoning requires a card and empty zone.</summary>
 public sealed record ActivateBattleResponse(PlayerId Player, long DecisionId, int SpellTrapZone,
     int? SummonedCardInstanceId = null, int? MonsterZone = null) : DuelCommand(Player);
+/// <summary>The turn player's Quick-Play Spell activated from the hand in an open battle window.</summary>
+public sealed record ActivateHandBattleResponse(PlayerId Player, long DecisionId, int CardInstanceId, int SpellTrapZone) : DuelCommand(Player);
 public sealed record BattleStepChanged(BattleStep? From, BattleStep To) : DuelEvent;
 public sealed record DamageStepChanged(DamageStep? From, DamageStep To) : DuelEvent;
 public sealed record BattleResponseRequested(BattleResponseWindow Window) : DuelEvent;

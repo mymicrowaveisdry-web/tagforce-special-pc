@@ -9,7 +9,7 @@ namespace TagForceSpecial.Core;
 public sealed partial class DuelEngine
 {
     /// <summary>Where an activation is requested; each context has its own timing rules.</summary>
-    private enum ActivationContext { Hand, OwnSetCard, OpenWindow, ChainResponse, HandChainResponse, BattleWindow }
+    private enum ActivationContext { Hand, OwnSetCard, OpenWindow, ChainResponse, HandChainResponse, BattleWindow, BattleHand }
 
     private const BattleTiming DamageStepTimings = BattleTiming.DamageStart | BattleTiming.BeforeCalculation |
         BattleTiming.Calculation | BattleTiming.AfterCalculation | BattleTiming.DamageEnd;
@@ -23,7 +23,7 @@ public sealed partial class DuelEngine
     {
         // No definition is yet allowed during the Damage Step.
         if (State.Battle is { } battle && (battle.Window.Timing & DamageStepTimings) != 0) return DuelError.ActivationTimingNotAllowed;
-        bool fromHand = context is ActivationContext.Hand or ActivationContext.HandChainResponse;
+        bool fromHand = context is ActivationContext.Hand or ActivationContext.HandChainResponse or ActivationContext.BattleHand;
         bool setThisTurn = source is not null && source.SetOnTurn >= State.TurnNumber;
         if (!fromHand && (source is null || source.IsFaceUp))
             return context is ActivationContext.ChainResponse or ActivationContext.OpenWindow or ActivationContext.BattleWindow
@@ -33,6 +33,7 @@ public sealed partial class DuelEngine
         {
             (ActivationContext.Hand, EffectKind.NormalSpell or EffectKind.QuickPlaySpell) => DuelError.None,
             (ActivationContext.Hand, _) => DuelError.ActivationTimingNotAllowed,
+            (ActivationContext.BattleHand, EffectKind.QuickPlaySpell) => DuelError.None,
             (ActivationContext.OwnSetCard, EffectKind.NormalSpell) => DuelError.None,
             (ActivationContext.OwnSetCard or ActivationContext.OpenWindow or ActivationContext.BattleWindow, EffectKind.QuickPlaySpell or EffectKind.NormalTrap)
                 => setThisTurn ? DuelError.SetThisTurn : DuelError.None,
@@ -135,6 +136,21 @@ public sealed partial class DuelEngine
         if (DefinitionActivationError(definition, ActivationContext.BattleWindow, actor, source.Card, source) is not DuelError.None and var error)
             return Reject(error);
         return CommitDefinition(State, actor, source.Card, zone, definition, source, null, []);
+    }
+
+    /// <summary>The turn player's hand Quick-Play Spell starting a chain in an open battle window (caller checked the window).</summary>
+    private DuelActionResult BeginBattleHandDefinition(ActivateHandBattleResponse command)
+    {
+        if (command.SpellTrapZone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
+        var player = State.GetPlayer(command.Player);
+        var card = player.Hand.SingleOrDefault(c => c.InstanceId == command.CardInstanceId);
+        if (card is null) return Reject(DuelError.CardNotInHand);
+        if (!definitions.TryGetValue(card.GameCardId, out var definition)) return Reject(DuelError.UnsupportedBattleResponse);
+        if (player.Id != State.ActivePlayer) return Reject(DuelError.ActivationTimingNotAllowed);
+        if (player.SpellTrapFields[command.SpellTrapZone] is not null) return Reject(DuelError.SpellTrapZoneOccupied);
+        if (DefinitionActivationError(definition, ActivationContext.BattleHand, player.Id, card, null) is not DuelError.None and var error)
+            return Reject(error);
+        return CommitDefinition(State, player.Id, card, command.SpellTrapZone, definition, null, null, []);
     }
 
     /// <summary>A set definition card activated as the next chain link (caller checked responder and decision ID).</summary>
@@ -321,9 +337,17 @@ public sealed partial class DuelEngine
         if (id != window.DecisionId) return Reject(DuelError.StaleChainDecision);
         if (command.Player != window.Responder) return Reject(DuelError.NotChainResponder);
         var cleared = State.WithBookkeeping(State.Bookkeeping with { OpenWindow = null });
+        if (command is PassChainResponse && window.Summoned is not null)
+        {
+            // The turn player passes the summon response to the other player when that player can answer.
+            var other = Other(window.Responder);
+            if (window.Responder != State.ActivePlayer || !AnswersSummon(other)) return Accept(cleared, new OpenWindowPassed(window.Responder));
+            var handed = new PendingOpenWindow(checked(State.Revision + 1), other, window.RequestedPhase) { Summoned = window.Summoned };
+            return Accept(State.WithBookkeeping(State.Bookkeeping with { OpenWindow = handed }), new OpenWindowPassed(window.Responder),
+                new SummonResponseWindowRequested(other, handed.DecisionId, window.Summoned));
+        }
         if (command is PassChainResponse)
-            return window.Summoned is not null ? Accept(cleared, new OpenWindowPassed(window.Responder))
-                : Advance(window.RequestedPhase, cleared, new OpenWindowPassed(window.Responder));
+            return Advance(window.RequestedPhase, cleared, new OpenWindowPassed(window.Responder));
         var response = (ActivateChainResponse)command;
         if (response.SummonedCardInstanceId is not null || response.MonsterZone is not null) return Reject(DuelError.InvalidDecisionChoice);
         if (response.SpellTrapZone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
@@ -685,7 +709,7 @@ public sealed partial class DuelEngine
     /// <summary>The just-Summoned monsters, still in place, that meet a summon condition for this player.</summary>
     private IEnumerable<FieldCardTarget> SummonedMatches(DuelState state, PlayerId playerId, MonsterSummonedCondition condition)
     {
-        if (state.OpenWindow?.Summoned is not { } summoned || condition.Single && summoned.Count != 1) yield break;
+        if (state.Bookkeeping.RecentSummon is not { } summoned || condition.Single && summoned.Count != 1) yield break;
         foreach (var (monster, kind) in summoned)
         {
             if ((condition.Kinds & kind) == 0 || condition.ByOpponent && monster.Player == playerId || !monster.IsStillPresent(state)) continue;
@@ -695,15 +719,16 @@ public sealed partial class DuelEngine
         }
     }
 
+    private bool? summonResponders;
+    private bool SummonResponders => summonResponders ??= definitions.Values.Any(d => d.Conditions.Any(c => c is MonsterSummonedCondition));
+
     /// <summary>
-    /// After a successful Summon in an open state, opens a summon-response window when the summoner's opponent has a
-    /// set card whose summon condition this Summon meets.
+    /// Records the latest Summon for summon conditions. In an open state it offers a summon-response window to the
+    /// turn player, else the other player, when they have a set card answering it; otherwise the record lapses.
     /// </summary>
-    private void OfferSummonResponse(List<DuelEvent> emitted)
+    private void TrackSummons(List<DuelEvent> emitted)
     {
-        if (State.Outcome is not null || State.PendingChain is not null || State.PendingDecision is not null || State.PendingSummon is not null ||
-            State.OpenWindow is not null || State.Battle is not null || State.EventEffects.PendingTriggers is not null ||
-            State.EventEffects.PendingCommitment is not null) return;
+        if (!SummonResponders) return;
         SummonedMonster[] summoned = [.. emitted.Select(e => e switch
         {
             MonsterNormalSummoned n => new SummonedMonster(new(n.Player, n.Zone, n.Monster.Card, n.Monster.PlacementId), SummonKinds.Normal),
@@ -711,24 +736,30 @@ public sealed partial class DuelEngine
             MonsterSpecialSummoned s => new SummonedMonster(new(s.Player, s.Zone, s.Monster.Card, s.Monster.PlacementId), SummonKinds.Special),
             _ => null
         }).OfType<SummonedMonster>()];
-        if (summoned.Length == 0 || !definitions.Values.Any(d => d.Conditions.Any(c => c is MonsterSummonedCondition))) return;
-        var summoner = summoned[^1].Monster.Player;
-        summoned = [.. summoned.Where(s => s.Monster.Player == summoner)];
-        var responder = Other(summoner);
-        var before = State;
-        State = State.WithBookkeeping(State.Bookkeeping with { OpenWindow = new(State.Revision, responder, State.Phase) { Summoned = summoned } });
-        var player = State.GetPlayer(responder);
-        bool answerable = player.SpellTrapFields.Any(source => source is not null &&
-            definitions.TryGetValue(source.Card.GameCardId, out var definition) &&
-            definition.Conditions.Any(c => c is MonsterSummonedCondition) &&
-            DefinitionActivationError(definition, ActivationContext.OpenWindow, responder, source.Card, source) == DuelError.None);
-        if (!answerable)
+        bool open = State.Outcome is null && State.PendingChain is null && State.OpenWindow is null && State.PendingDecision is null &&
+            State.PendingSummon is null && State.EventEffects.PendingTriggers is null && State.EventEffects.PendingCommitment is null;
+        if (summoned.Length != 0)
         {
-            State = before;
+            var summoner = summoned[^1].Monster.Player;
+            State = State.WithBookkeeping(State.Bookkeeping with { RecentSummon = [.. summoned.Where(s => s.Monster.Player == summoner)] });
+        }
+        if (!open || State.Bookkeeping.RecentSummon is not { } recent) return;
+        PlayerId? responder = summoned.Length == 0 ? null
+            : AnswersSummon(State.ActivePlayer) ? State.ActivePlayer : AnswersSummon(Other(State.ActivePlayer)) ? Other(State.ActivePlayer) : null;
+        if (responder is not { } first)
+        {
+            State = State.WithBookkeeping(State.Bookkeeping with { RecentSummon = null });
             return;
         }
-        emitted.Add(new SummonResponseWindowRequested(responder, State.Revision, summoned));
+        State = State.WithBookkeeping(State.Bookkeeping with { OpenWindow = new(State.Revision, first, State.Phase) { Summoned = recent } });
+        emitted.Add(new SummonResponseWindowRequested(first, State.Revision, recent));
     }
+
+    /// <summary>True when the player has a set card whose summon condition answers the latest Summon now.</summary>
+    private bool AnswersSummon(PlayerId playerId) => State.GetPlayer(playerId).SpellTrapFields.Any(source => source is not null &&
+        definitions.TryGetValue(source.Card.GameCardId, out var definition) &&
+        definition.Conditions.Any(c => c is MonsterSummonedCondition) &&
+        DefinitionActivationError(definition, ActivationContext.OpenWindow, playerId, source.Card, source) == DuelError.None);
 
     /// <summary>Banishes a field monster to its owner's banished zone; a Token ceases to exist.</summary>
     private DuelState BanishFieldCard(DuelState state, FieldCardTarget target, string effectId, List<DuelEvent> events)

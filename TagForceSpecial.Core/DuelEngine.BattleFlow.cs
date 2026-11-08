@@ -51,6 +51,13 @@ public sealed partial class DuelEngine
                 return Reject(DuelError.UnsupportedBattleResponse);
             return BeginBattleResponse(command.Player, activate.SpellTrapZone, activate.SummonedCardInstanceId, activate.MonsterZone, profile);
         }
+        if (command is ActivateHandBattleResponse hand)
+        {
+            if (hand.DecisionId != battle.Window.DecisionId) return Reject(DuelError.StaleBattleDecision);
+            if (battle.Window.Closed) return Reject(DuelError.BattleWindowClosed);
+            if (hand.Player != battle.Window.Responder) return Reject(DuelError.NotBattleResponder);
+            return BeginBattleHandDefinition(hand);
+        }
         if (command.Player != State.ActivePlayer) return Reject(DuelError.NotActivePlayer);
         if (command is AdvanceBattle advance && advance.DecisionId != battle.Window.DecisionId ||
             command is ChooseAttackReplay replay && replay.DecisionId != battle.Window.DecisionId)

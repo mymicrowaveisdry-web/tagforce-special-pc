@@ -13,7 +13,7 @@ public sealed class BattleTrapFamilyTests
         Sakuretsu = 5799, Ruin = 4692, Catastrophe = 5493, DarkMirror = 5858;
 
     private static CardCatalog Catalog() => new(new(null, "synthetic-battle-trap"),
-        BattleTrapFamily.Cards.Select(c => c.CardId).Concat([A, B, C])
+        BattleTrapFamily.Cards.Select(c => c.CardId).Concat([A, B, C, ChainCardFamily.Scapegoat]).Concat(ChainCardFamily.SheepTokenIds)
             .Select(id => new CardDefinition(id, $"Probe {id}", "", id switch
             {
                 A => new(1000, 1000, 4), B => new(1500, 2000, 4), C => new(1800, 500, 4), _ => new(0, 0, 1)
@@ -24,7 +24,9 @@ public sealed class BattleTrapFamilyTests
         var rules = BattleTrapFamily.Rules.ToDictionary();
         foreach (uint monster in new[] { A, B, C })
             rules[monster] = new(CardCategory.Monster, AllowsNormalSummon: true, AllowsBasicBattle: true);
-        return new(Catalog(), rules, first, second, effectDefinitions: BattleTrapFamily.Definitions, experimentalBattleFlow: true);
+        foreach (uint id in ChainCardFamily.SheepTokenIds.Append(ChainCardFamily.Scapegoat)) rules[id] = ChainCardFamily.Rules[id];
+        return new(Catalog(), rules, first, second, effectDefinitions: [.. BattleTrapFamily.Definitions,
+            .. ChainCardFamily.Definitions.Where(d => d.CardId == ChainCardFamily.Scapegoat)], experimentalBattleFlow: true);
     }
 
     private static uint[] Deck(params uint[] top) => [.. top, .. Enumerable.Repeat(A, 40 - top.Length)];
@@ -176,5 +178,34 @@ public sealed class BattleTrapFamilyTests
         if (e.State.Battle!.Window.Responder == PlayerId.Two)
             Ok(e, new PassBattleResponse(PlayerId.Two, e.State.Battle.Window.DecisionId));
         Reject(e, new ActivateBattleResponse(PlayerId.One, e.State.Battle!.Window.DecisionId, 0), DuelError.ActivationTimingNotAllowed);
+    }
+
+    [Fact]
+    public void TheTurnPlayerCanActivateAHandQuickPlaySpellInABattleWindow()
+    {
+        var e = Engine(Deck(ChainCardFamily.Scapegoat, MirrorForce), Deck());
+        EnterMain(e); Next(e); Next(e);
+        Phase(e, DuelPhase.Battle);
+        var w = e.State.Battle!.Window;
+        Assert.Equal(PlayerId.One, w.Responder);
+        Reject(e, new ActivateHandBattleResponse(PlayerId.One, w.DecisionId, Hand(e, MirrorForce), 0), DuelError.ActivationTimingNotAllowed);
+        Ok(e, new ActivateHandBattleResponse(PlayerId.One, w.DecisionId, Hand(e, ChainCardFamily.Scapegoat), 0));
+        Assert.Equal(PlayerId.Two, e.State.Battle!.Window.Responder);
+        Resolve(e);
+        Assert.Equal(4, e.State.GetPlayer(PlayerId.One).MonsterZones.Count(m => m is not null));
+        Assert.Equal(DuelPhase.Battle, e.State.Phase);
+    }
+
+    [Fact]
+    public void TheNonTurnPlayerCannotActivateFromTheHandInABattleWindow()
+    {
+        var e = Engine(Deck(ChainCardFamily.Scapegoat), Deck(B));
+        EnterMain(e); Next(e);
+        Summon(e, B, 0); Phase(e, DuelPhase.Battle); S.Ready(e);
+        Ok(e, new DeclareAttack(PlayerId.Two, 0));
+        var w = e.State.Battle!.Window;
+        Assert.Equal(PlayerId.One, w.Responder);
+        var scapegoat = e.State.GetPlayer(PlayerId.One).Hand.First(c => c.GameCardId == ChainCardFamily.Scapegoat).InstanceId;
+        Reject(e, new ActivateHandBattleResponse(PlayerId.One, w.DecisionId, scapegoat, 0), DuelError.ActivationTimingNotAllowed);
     }
 }

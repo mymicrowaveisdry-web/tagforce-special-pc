@@ -259,7 +259,7 @@ public sealed partial class DuelEngine
         if (State.PendingDecision is not null && State.PendingSpellActivation is { } activating &&
             definitions.ContainsKey(activating.Spell.GameCardId))
             return command is DecisionCommand decision ? AnswerDecision(decision) : Reject(DuelError.DecisionPending);
-        if (command is AdvanceBattle or PassBattleResponse or ChooseAttackReplay or ActivateBattleResponse)
+        if (command is AdvanceBattle or PassBattleResponse or ChooseAttackReplay or ActivateBattleResponse or ActivateHandBattleResponse)
         {
             if (!experimentalBattleFlow) return Reject(DuelError.BattleFlowNotEnabled);
             if (State.Battle is null) return Reject(DuelError.NoBattleInProgress);
@@ -514,7 +514,7 @@ public sealed partial class DuelEngine
         state = PrepareSummonHistory(State, state, emitted);
         state = PrepareEventEffects(State, state, emitted);
         State = state.With(revision: checked(State.Revision + 1));
-        OfferSummonResponse(emitted);
+        TrackSummons(emitted);
         return new(true, DuelError.None, State, emitted.AsReadOnly());
     }
 

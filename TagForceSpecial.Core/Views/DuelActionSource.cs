@@ -163,6 +163,10 @@ public sealed class DuelActionSource
         {
             for (int z = 0; z < 5; z++)
                 yield return B(new ActivateBattleResponse(player, battle.Window.DecisionId, z), ActionKind.BattleResponse, $"Battle response [{z + 1}]", zone: z);
+            foreach (var card in own.Hand)
+                for (int z = 0; z < 5; z++)
+                    yield return B(new ActivateHandBattleResponse(player, battle.Window.DecisionId, card.InstanceId, z), ActionKind.BattleResponse,
+                        $"Activate {catalog[card.GameCardId].Name} [{z + 1}]", card.InstanceId, z);
             yield return B(new PassBattleResponse(player, battle.Window.DecisionId), ActionKind.BattlePass, "Pass battle response");
             yield return B(new AdvanceBattle(player, battle.Window.DecisionId), ActionKind.AdvanceBattle, "Advance battle step");
             yield return B(new ChooseAttackReplay(player, battle.Window.DecisionId, Cancel: true), ActionKind.CancelReplay, "Cancel attack replay");
