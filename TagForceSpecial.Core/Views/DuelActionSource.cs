@@ -46,7 +46,7 @@ public sealed class DuelActionSource
         }
         AuthorizedDecision? decision = state.EventEffects.PendingCommitment is { } commitment && commitment.Player == player
             // Target options can be face-down, so only the chooser's cost cards are listed.
-            ? new(commitment.DecisionId, "TriggerCommitment", PlayerProjection.Read(commitment.CardOptions.Select(c => PlayerProjection.Card(c, true, null, catalog))))
+            ? new(commitment.DecisionId, "TriggerCommitment", PlayerProjection.Read(commitment.CardOptions.Concat(commitment.ZoneOptions.Select(o => o.Card)).Select(c => PlayerProjection.Card(c, true, null, catalog))))
             : state.EventEffects.PendingCommitment is null && state.EventEffects.PendingTriggers is { } triggers && triggers.Player == player
             ? new(triggers.DecisionId, "TriggerOrder", PlayerProjection.Read(triggers.Options.Select(t => PlayerProjection.Card(t.Source.Card, true, null, catalog))))
             : state.PendingDecision is { } d && d.Player == player
@@ -106,6 +106,9 @@ public sealed class DuelActionSource
             foreach (var card in commitment.CardOptions)
                 yield return B(new ChooseTriggerCostCard(player, commitment.DecisionId, card.InstanceId), ActionKind.ChooseCard,
                     $"Discard {catalog[card.GameCardId].Name}", card.InstanceId);
+        foreach (var option in commitment.ZoneOptions)
+            yield return B(new ChooseTriggerZoneTarget(player, commitment.DecisionId, option.Player, option.Card.InstanceId), ActionKind.ChooseCard,
+                $"Target {catalog[option.Card.GameCardId].Name}", option.Card.InstanceId);
         // Bound by zone only: a target can be face-down.
         foreach (var target in commitment.TargetOptions)
             yield return B(new ChooseTriggerMonsterTarget(player, commitment.DecisionId, target.Player, target.Zone, target.Card.InstanceId), ActionKind.ChooseTarget,
@@ -253,6 +256,9 @@ public sealed class DuelActionSource
             }
             yield return B(new DiscardForHandLimit(player, card.InstanceId), ActionKind.Discard, $"Discard {name}", card.InstanceId);
         }
+        for (int z = 0; z < 5; z++)
+            if (own.MonsterZones[z] is { } gemini)
+                yield return B(new GeminiSummon(player, z), ActionKind.Summon, $"Gemini Summon {catalog[gemini.Card.GameCardId].Name} [{z + 1}]", gemini.Card.InstanceId, z);
         for (int z = 0; z < 5; z++)
         {
             yield return B(new ActivateSetSpell(player, z), ActionKind.ActivateSetSpell, $"Activate set [{z + 1}]", own.SpellTrapFields[z]?.Card.InstanceId, z);

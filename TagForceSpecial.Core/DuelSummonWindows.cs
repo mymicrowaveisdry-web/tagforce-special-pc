@@ -10,6 +10,9 @@ public sealed record PendingSummon(long AttemptId, long DecisionId, PlayerId Pla
     public IReadOnlyList<PendingSummon> PendulumGroup { get; internal init; } = Array.AsReadOnly(Array.Empty<PendingSummon>());
     [System.Text.Json.Serialization.JsonIgnore]
     public IReadOnlyList<MonsterBinding> Tributes { get; internal init; } = Array.AsReadOnly(Array.Empty<MonsterBinding>());
+    /// <summary>A face-up Gemini monster Normal Summoned again; it stays in its zone during the attempt.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsGeminiSummon { get; internal init; }
 }
 
 public sealed record PassSummonResponse(PlayerId Player, long DecisionId) : DuelCommand(Player);

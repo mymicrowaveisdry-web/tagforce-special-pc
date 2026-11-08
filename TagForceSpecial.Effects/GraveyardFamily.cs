@@ -38,7 +38,7 @@ public static class GraveyardFamily
             exceptions: "Activation needs a monster in your Graveyard before the discard."),
         Card(6129, "Dark Factory of Mass Production", EffectKind.NormalSpell, "Normal Spell: target 2 Normal Monsters in your Graveyard; add them to your hand.",
             [new AddTargetsToHandStep()], "2 reviewed Normal Monsters in your Graveyard.", "Needs two targets.",
-            [new(CardZone.Graveyard, TargetSide.Own, new CardIdFilter(TfspNormalMonsters.Ids), 2, 2)]),
+            [new(CardZone.Graveyard, TargetSide.Own, new NormalMonsterFilter(TfspNormalMonsters.Ids), 2, 2)]),
         Card(6511, "Pot of Avarice", EffectKind.NormalSpell, "Normal Spell: target 5 monsters in your Graveyard; shuffle all 5 into the Deck, then draw 2 cards.",
             [new ShuffleTargetsIntoDeckStep(StopUnlessAll: true), new DrawCardsStep(2)], "5 monsters in your Graveyard.", "Needs five targets.",
             [new(CardZone.Graveyard, TargetSide.Own, new AnyMonsterFilter(), 5, 5)],

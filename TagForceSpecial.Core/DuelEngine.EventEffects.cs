@@ -36,6 +36,7 @@ public sealed partial class DuelEngine
         if (trigger.Profile.DetachMaterialCount > 0 && trigger.DetachedCost.Count == 0 &&
             state.GetPlayer(trigger.Player).MonsterZones[trigger.Source.Zone]!.XyzMaterials.Count < trigger.Profile.DetachMaterialCount) return false;
         if (trigger.Profile is { Requirement: TriggerRequirement.Optional, Definition: { } definition } && !DefinitionTriggerAvailable(state, trigger, definition)) return false;
+        if (trigger is { TargetCard: null, Profile.Definition.FieldTargets: [ZoneTarget zone] } && !ZoneMatches(state, trigger.Player, zone).Any()) return false;
         if (trigger.DiscardedCost is not null || trigger.PaidLifePoints > 0 || trigger.DetachedCost.Count > 0) return true;
         var player = state.GetPlayer(trigger.Player);
         return player.LifePoints > trigger.Profile.LifePointCost &&
@@ -83,9 +84,21 @@ public sealed partial class DuelEngine
         yield return new(kind, subject, point, cost, byBattle);
         if (kind == MonsterEventKind.Destroyed && !notToGraveyard)
             yield return new(MonsterEventKind.SentToGraveyard, subject, point, ByBattle: byBattle);
+        if (emitted is MonsterDestroyed { DestroyedBy: { } destroyer } && !notToGraveyard)
+            yield return new(MonsterEventKind.DestroyedOpponentByBattle, destroyer, point, ByBattle: true);
         if (emitted is MonsterNormalSummoned summoned)
             foreach (var tribute in summoned.Tributes) yield return new(MonsterEventKind.TributedForSummon, tribute, point);
         if (kind == MonsterEventKind.FlipSummoned) yield return new(MonsterEventKind.FlippedFaceUp, subject, point);
+    }
+
+    /// <summary>On entering the End Phase, one occurrence per face-up monster Summoned or flipped face-up this turn.</summary>
+    private IEnumerable<MonsterEventOccurrence> EndPhaseOccurrences(DuelState after, DuelEvent emitted)
+    {
+        if (emitted is not PhaseChanged { To: DuelPhase.End }) yield break;
+        var point = new EffectTimingPoint(checked(State.Revision + 1), 0);
+        foreach (var (binding, monster) in FieldMonsters(after))
+            if (monster.Position != BattlePosition.FaceDownDefense && (monster.SummonedOnTurn == after.TurnNumber || monster.FlippedOnTurn == after.TurnNumber))
+                yield return new(MonsterEventKind.EndPhaseAfterSummonOrFlip, binding, point);
     }
 
     private static bool CauseMatches(TriggerEffectProfile profile, MonsterEventOccurrence occurrence) => profile.Cause switch
@@ -112,7 +125,7 @@ public sealed partial class DuelEngine
             events.OfType<MonsterRevealed>().Any(e => e.Card == entry.Monster.Card)
                 ? (entry.Binding, entry.Monster with { Position = BattlePosition.FaceUpDefense }) : entry).ToArray();
         foreach (var emitted in events)
-            foreach (var occurrence in Occurrences(before, emitted))
+            foreach (var occurrence in Occurrences(before, emitted).Concat(EndPhaseOccurrences(after, emitted)))
             {
                 var sources = emitted is MonsterDestroyed or MonsterTributed or SummonMaterialSentToGraveyard or
                     FusionMaterialSentToGraveyard or RitualMaterialTributed or XyzMaterialSentToGraveyard { IsCost: false }
@@ -127,7 +140,7 @@ public sealed partial class DuelEngine
                         continue;
                     }
                     foreach (var (binding, monster) in sources)
-                        if (monster.Position != BattlePosition.FaceDownDefense && monster.Card.GameCardId == profile.CardId &&
+                        if (monster.Position != BattlePosition.FaceDownDefense && monster.Card.GameCardId == profile.CardId && (!profile.RequiresGeminiActive || monster.GeminiActive) &&
                             Relates(profile.Relation, binding, occurrence.Subject))
                             yield return new(id++, profile, binding, occurrence);
                 }

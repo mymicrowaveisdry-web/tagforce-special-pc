@@ -44,6 +44,7 @@ public sealed partial class DuelEngine
             return DuelError.InvalidBattlePosition;
         if (!rules.TryGetValue(card.GameCardId, out var rule) || rule.Category != CardCategory.Monster)
             return DuelError.UnsupportedSpecialSummon;
+        if (rule.CannotBeSpecialSummoned) return DuelError.UnsupportedSpecialSummon;
         if (IsSummonLocked(state, playerId, lockExemptSource)) return DuelError.SummonLocked;
         var player = state.GetPlayer(playerId);
         if (player.MonsterZones[zone] is not null) return DuelError.MonsterZoneOccupied;

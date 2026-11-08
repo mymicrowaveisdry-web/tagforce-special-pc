@@ -269,7 +269,7 @@ public sealed class EffectDefinition
     }).Where(c => c != EffectCount.None);
     internal static bool IsFieldTargetStep(EffectStep s) => s is DestroyTargetsStep or ReturnTargetsToHandStep or ChangeTargetsToDefenseStep or
         BanishFieldTargetsStep or NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep or DestroyAndBanishTargetsStep or ModifyCombatantStatsStep;
-    internal static bool IsAutomatic(EffectTarget t) => t is AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget or TriggerTargetedMonster;
+    internal static bool IsAutomatic(EffectTarget t) => t is AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget or TriggerTargetedMonster or TriggerSourceMonster;
     internal static bool IsZoneTargetStep(EffectStep s) => s is AddTargetsToHandStep or BanishTargetsStep or ReturnTargetsToGraveyardStep or
         ShuffleTargetsIntoDeckStep or SpecialSummonTargetStep;
     internal static int MinCount(EffectTarget t) => t switch { FieldTarget f => f.Count, ZoneTarget z => z.MinCount, _ => 1 };
@@ -336,20 +336,20 @@ public sealed class EffectDefinition
             throw new ArgumentException("A Spell/Trap target and a target-destruction step go together.", nameof(target));
         var fields = (fieldTargets ?? []).Take(6).ToArray();
         bool fieldSteps = snapshot.Any(IsFieldTargetStep), zoneSteps = snapshot.Any(IsZoneTargetStep);
-        if (fields.Any(f => f is not (FieldTarget or ZoneTarget or AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget or TriggerTargetedMonster)) ||
+        if (fields.Any(f => f is not (FieldTarget or ZoneTarget or AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget or TriggerTargetedMonster or TriggerSourceMonster)) ||
             fields.Any(f => f is SummonedMonsterTarget) && (fields.Length != 1 || !required.Any(c => c is MonsterSummonedCondition)) ||
             fields.Any(f => f is AttackingMonsterTarget or DefendingMonsterTarget) && (fields.Length != 1 ||
                 !required.Any(c => c is BattleTimingCondition || c is OpponentAttackDeclaredCondition && fields[0] is AttackingMonsterTarget)) ||
             snapshot.Any(s => s is ModifyCombatantStatsStep) && fields is not [AttackingMonsterTarget or DefendingMonsterTarget] ||
             snapshot.Any(s => s is NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep) && fields is not [AttackingMonsterTarget] || fields.Sum(MaxCount) > 5 || fields.Length != 0 && target is not null ||
             (fields.Length != 0) != (fieldSteps || zoneSteps) || fieldSteps && zoneSteps ||
-            fieldSteps && fields.Any(f => f is not (FieldTarget or AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget or TriggerTargetedMonster)) || zoneSteps && fields.Any(f => f is not ZoneTarget) ||
+            fieldSteps && fields.Any(f => f is not (FieldTarget or AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget or TriggerTargetedMonster or TriggerSourceMonster)) || zoneSteps && fields.Any(f => f is not ZoneTarget) ||
             fields.SkipLast(1).Any(f => MinCount(f) != MaxCount(f)) ||
             snapshot.Any(s => s is ChangeTargetsToDefenseStep) && fields.Any(f => f is FieldTarget { Kind: not FieldCardKind.Monster }) ||
             snapshot.Any(s => s is SpecialSummonTargetStep) && (fields.Length != 1 || fields[0] is not ZoneTarget { MaxCount: 1, MustBeSummonable: true, Zone: CardZone.Graveyard }))
             throw new ArgumentException("Field targets (up to 5) and the steps that use them go together.", nameof(fieldTargets));
-        if (kind == EffectKind.MonsterTrigger && (required.Length != 0 || cost is not null || target is not null || fields is not ([] or [TriggerTargetedMonster]) || locksOtherSummonsThisTurn) ||
-            kind != EffectKind.MonsterTrigger && fields.Any(f => f is TriggerTargetedMonster))
+        if (kind == EffectKind.MonsterTrigger && (required.Length != 0 || cost is not null || target is not null || fields is not ([] or [TriggerTargetedMonster] or [TriggerSourceMonster] or [ZoneTarget { MinCount: 1, MaxCount: 1 }]) || locksOtherSummonsThisTurn) ||
+            kind != EffectKind.MonsterTrigger && fields.Any(f => f is TriggerTargetedMonster or TriggerSourceMonster))
             throw new ArgumentException("A monster trigger takes its timing and costs from its trigger profile.", nameof(kind));
         EffectId = effectId;
         CardId = cardId;

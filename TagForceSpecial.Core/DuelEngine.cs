@@ -68,6 +68,7 @@ public sealed partial class DuelEngine
                 profile.AllowsTributeSummon && !profile.AllowsNormalSummon ||
                 profile.RequiresRegisteredTributeProcedure && !profile.AllowsTributeSummon ||
                 profile.AllowsSpellTrapSet && profile.Category is not (CardCategory.Spell or CardCategory.Trap) ||
+                (profile.CannotBeSpecialSummoned || profile.IsGemini) && profile.Category != CardCategory.Monster ||
                 profile.IsToken && (profile.Category != CardCategory.Monster || profile.AllowsNormalSummon ||
                     profile.AllowsTributeSummon || profile.AllowsExtraDeck || profile.AllowsPendulumSummon))
                 throw new ArgumentException("Invalid explicit card rules.", nameof(rules));
@@ -94,7 +95,8 @@ public sealed partial class DuelEngine
             .Concat(continuousNegations.Select(p => p.EffectId)).ToArray();
         if (eventIds.Distinct(StringComparer.Ordinal).Count() != eventIds.Length)
             throw new ArgumentException("Event effect IDs must be distinct and unreserved.");
-        this.experimentalBattleFlow = experimentalBattleFlow;
+        // Battle flips activate after damage calculation, which only the staged flow has.
+        this.experimentalBattleFlow = experimentalBattleFlow || triggerEffects.Any(p => p is { EventKind: MonsterEventKind.FlippedFaceUp, Definition: not null });
         summonLevelModifiers = (experimentalSummonLevelModifiers ?? []).ToArray();
         var procedures = (experimentalTributeProcedures ?? []).ToArray();
         var windows = (experimentalSummonWindows ?? []).ToArray();
@@ -157,6 +159,8 @@ public sealed partial class DuelEngine
             throw new ArgumentException("Effect definitions require distinct, unreserved IDs, matching settable card rules, Token rules for Token steps and a seed for shuffle steps.", nameof(effectDefinitions));
         if (shuffleSeed is null && triggerEffects.Any(p => p.Definition is { } d && NeedsShuffle(d)))
             throw new ArgumentException("Triggers that search or Summon from the Deck need a seed.", nameof(shuffleSeed));
+        // Attack-declaration and Damage Step responses only have a window in the staged flow.
+        this.experimentalBattleFlow = this.experimentalBattleFlow || definitionList.Any(d => d.Conditions.Any(c => c is OpponentAttackDeclaredCondition or BattleTimingCondition));
         definitions = definitionList.ToFrozenDictionary(d => d.CardId);
         definitionDecisions = definitionList.Where(d => d.Cost is DiscardCost or TributeCost || d.Target is not null || d.FieldTargets.Any(t => !EffectDefinition.IsAutomatic(t)))
             .ToFrozenDictionary(d => d.CardId, d => new DecisionSequence(DefinitionSequenceId(d),
@@ -221,7 +225,7 @@ public sealed partial class DuelEngine
         if (State.Outcome is not null) return Reject(DuelError.DuelFinished);
         if (command.Player is not (PlayerId.One or PlayerId.Two)) return Reject(DuelError.InvalidPlayer);
         if (State.EventEffects.PendingCommitment is not null) return AnswerTriggerCommitment(command);
-        if (command is ChooseTriggerCostCard or ChooseTriggerMonsterTarget or ChooseTriggerXyzMaterials) return Reject(DuelError.NoPendingTriggerCommitment);
+        if (command is ChooseTriggerCostCard or ChooseTriggerMonsterTarget or ChooseTriggerXyzMaterials or ChooseTriggerZoneTarget) return Reject(DuelError.NoPendingTriggerCommitment);
         if (State.EventEffects.PendingTriggers is not null)
             return command is ChooseTriggerOrder order ? OrderTriggers(order) : Reject(DuelError.TriggerOrderPending);
         if (command is ChooseTriggerOrder) return Reject(DuelError.NoPendingTriggers);
@@ -263,6 +267,7 @@ public sealed partial class DuelEngine
             SpecialSummonWithMaterials material => ExecuteMaterialProcedure(material),
             SetSpellTrap set => SetBackRow(set.CardInstanceId, set.SpellTrapZone),
             ChangeMonsterPosition change => ChangePosition(change.MonsterZone, change.Target),
+            GeminiSummon gemini => ExecuteGeminiSummon(gemini.MonsterZone),
             DeclareAttack attack => Attack(attack.AttackerZone, attack.TargetZone),
             DiscardForHandLimit discard => Discard(discard.CardInstanceId),
             EndTurn => FinishTurn(),
@@ -424,7 +429,7 @@ public sealed partial class DuelEngine
         attackZones[attackerZone] = attacker with { LastAttackTurn = State.TurnNumber };
         if (defender?.Position == BattlePosition.FaceDownDefense)
         {
-            defenseZones[targetZone!.Value] = defender with { Position = BattlePosition.FaceUpDefense };
+            defenseZones[targetZone!.Value] = defender with { Position = BattlePosition.FaceUpDefense, FlippedOnTurn = State.TurnNumber };
             events.Add(new MonsterRevealed(defenderPlayer.Id, targetZone.Value, defender.Card));
         }
         var calculation = CalculateBasicBattle(attack, defendingValue, defender?.Position, attackerPlayer.Id, defenderPlayer.Id);
@@ -448,17 +453,19 @@ public sealed partial class DuelEngine
                 return Accept(next.With(outcome: outcome), events.ToArray());
             }
         }
-        void Destroy(PlayerId playerId, int zone)
+        MonsterBinding attackerBinding = new(attackerPlayer.Id, attackerZone, attacker.Card, attacker.PlacementId);
+        MonsterBinding? defenderBinding = defender is null ? null : new(defenderPlayer.Id, targetZone!.Value, defender.Card, defender.PlacementId);
+        void Destroy(PlayerId playerId, int zone, MonsterBinding? destroyedBy)
         {
             var player = next.GetPlayer(playerId);
             var zones = player.MonsterZones.ToArray();
             var card = zones[zone]!.Card;
             zones[zone] = null;
             next = next.With(player: player.With(monsters: zones));
-            next = SendFieldCardToGraveyard(next, card, new MonsterDestroyed(playerId, zone, card) { ByBattle = true }, events);
+            next = SendFieldCardToGraveyard(next, card, new MonsterDestroyed(playerId, zone, card) { ByBattle = true, DestroyedBy = destroyedBy }, events);
         }
-        if (destroyAttacker) Destroy(attackerPlayer.Id, attackerZone);
-        if (destroyDefender) Destroy(defenderPlayer.Id, targetZone!.Value);
+        if (destroyAttacker) Destroy(attackerPlayer.Id, attackerZone, defenderBinding);
+        if (destroyDefender) Destroy(defenderPlayer.Id, targetZone!.Value, attackerBinding);
         return Accept(next, events.ToArray());
     }
 

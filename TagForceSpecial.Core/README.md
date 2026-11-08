@@ -44,7 +44,7 @@ Follow-up triggers wait for chain completion. Basic combat uses effective stats;
 
 Use `PassBattleResponse`, `AdvanceBattle` and `ChooseAttackReplay` with current decision IDs.
 
-A `TriggerEffectProfile` can resolve through a `MonsterTrigger` definition and filter its event by `TriggerEventCause`; the action adapter drives trigger order, decline, costs and targets. Definitions cover attack negation, attacker destruction, hand summons (chosen at resolution) and combat-stat changes that last until the attack ends.
+A `TriggerEffectProfile` can resolve through a `MonsterTrigger` definition and filter its event by `TriggerEventCause`; the action adapter drives trigger order, decline, costs and targets. `GeminiSummon` gives a face-up Gemini monster its effects and can be negated; `NormalMonsterFilter` also matches Gemini monsters in the Graveyard; `DuelCardRules.CannotBeSpecialSummoned` blocks every Special Summon. Definitions cover attack negation, attacker destruction, hand summons (chosen at resolution) and combat-stat changes that last until the attack ends.
 
 `BattleTimingCondition` limits their windows and is required in the Damage Step; during calculation needs an explicit exception.
 

@@ -11,6 +11,7 @@
 [`SummonTrapFamily`](SummonTrapFamily.cs) supports 5 summon-response Traps: Trap Hole, Eatgaboon, House of Adhesive Tape, Bottomless Trap Hole and Torrential Tribute.
 [`SummonNegationFamily`](SummonNegationFamily.cs) supports Horn of Heaven, Black Horn of Heaven and Solemn Judgment, negating Summon attempts (Solemn Judgment also Spell/Trap activations).
 [`MonsterTriggerFamily`](MonsterTriggerFamily.cs) supports 13 monsters that trigger on leaving the field, such as Sangan and Mystic Tomato; register `Triggers` as trigger effects and supply a seed. `TfspSummonRestrictions` lists monsters an effect cannot Special Summon from the Deck.
+[`MonsterSubtypeFamily`](MonsterSubtypeFamily.cs) supports 12 Flip, Spirit and Gemini monsters; register `Triggers` and `CardRules`. A duel with flip or battle-window definitions runs the staged battle flow. Union and Toon monsters are not supported.
 [`ReviewedCardMetadata`](ReviewedCardMetadata.cs) overlays reviewed metadata when a catalog is opened; converted packages keep the frozen Cards baseline, so review batches never change pinned cache bytes or artwork bindings.
 
 ```csharp

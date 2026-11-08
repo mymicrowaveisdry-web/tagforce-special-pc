@@ -150,7 +150,7 @@ public sealed partial class DuelEngine
                     var player = next.GetPlayer(target.Player); var monster = player.MonsterZones[target.Zone]!;
                     if (monster.Position == BattlePosition.FaceDownDefense)
                     {
-                        var monsters = player.MonsterZones.ToArray(); monsters[target.Zone] = monster with { Position = BattlePosition.FaceUpDefense };
+                        var monsters = player.MonsterZones.ToArray(); monsters[target.Zone] = monster with { Position = BattlePosition.FaceUpDefense, FlippedOnTurn = next.TurnNumber };
                         next = next.With(player: player.With(monsters: monsters));
                         attack = attack with { RevealedDefender = target };
                         events.Add(new MonsterRevealed(target.Player, target.Zone, target.Card));
@@ -170,7 +170,8 @@ public sealed partial class DuelEngine
                 {
                     var player = next.GetPlayer(binding.Player); var monsters = player.MonsterZones.ToArray(); monsters[binding.Zone] = null;
                     next = next.With(player: player.With(monsters: monsters));
-                    next = SendFieldCardToGraveyard(next, monster.Card, new MonsterDestroyed(player.Id, binding.Zone, monster.Card) { ByBattle = true }, events);
+                    next = SendFieldCardToGraveyard(next, monster.Card, new MonsterDestroyed(player.Id, binding.Zone, monster.Card)
+                        { ByBattle = true, DestroyedBy = binding.Card == attack.Attacker.Card ? attack.Defender : attack.Attacker }, events);
                 }
                 return EnterBattleStage(BattleStep.Damage, DamageStep.End, BattleTiming.DamageEnd, next, events);
             }

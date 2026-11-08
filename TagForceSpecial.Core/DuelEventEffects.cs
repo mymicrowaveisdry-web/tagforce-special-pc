@@ -12,7 +12,7 @@ public sealed record MonsterEventOccurrence(MonsterEventKind Kind, MonsterBindin
     EffectTimingPoint? TimingPoint = null, bool IsActivationCost = false, bool ByBattle = false);
 public sealed record TriggerActivation(int Id, TriggerEffectProfile Profile, MonsterBinding Source,
     MonsterEventOccurrence Occurrence, CardInstance? DiscardedCost = null, int PaidLifePoints = 0,
-    MonsterBinding? Target = null)
+    MonsterBinding? Target = null, FieldCardTarget? TargetCard = null)
 {
     public PlayerId Player => Source.Player;
     public IReadOnlyList<CardInstance> DetachedCost { get; internal init; } = Array.AsReadOnly(Array.Empty<CardInstance>());
@@ -54,7 +54,7 @@ public sealed record EffectiveMonsterStatistics(MonsterBinding Monster, int? Att
 public sealed record TriggerUse(PlayerId Player, int Turn, string Key, int? InstanceId, long? PlacementId);
 public sealed record MonsterEffectNegation(string EffectId, MonsterBinding Source, MonsterBinding Target,
     long ResolutionId, int ExpiresOnTurn, int ActionOrdinal = 0);
-public enum TriggerCommitmentKind { DiscardCost, MonsterTarget, DetachCost }
+public enum TriggerCommitmentKind { DiscardCost, MonsterTarget, DetachCost, ZoneTarget }
 public sealed class PendingTriggerCommitment
 {
     public long DecisionId { get; }
@@ -63,9 +63,12 @@ public sealed class PendingTriggerCommitment
     public TriggerCommitmentKind Kind { get; }
     public IReadOnlyList<CardInstance> CardOptions { get; }
     public IReadOnlyList<MonsterBinding> TargetOptions { get; }
+    /// <summary>Graveyard or banished cards that can be targeted.</summary>
+    public IReadOnlyList<FieldCardTarget> ZoneOptions { get; }
     internal PendingTriggerCommitment(long id, TriggerActivation trigger, TriggerCommitmentKind kind,
-        IEnumerable<CardInstance>? cards = null, IEnumerable<MonsterBinding>? targets = null)
+        IEnumerable<CardInstance>? cards = null, IEnumerable<MonsterBinding>? targets = null, IEnumerable<FieldCardTarget>? zones = null)
     {
+        ZoneOptions = Array.AsReadOnly(zones?.ToArray() ?? []);
         DecisionId = id; Trigger = trigger; Kind = kind;
         CardOptions = Array.AsReadOnly(cards?.ToArray() ?? []);
         TargetOptions = Array.AsReadOnly(targets?.ToArray() ?? []);
@@ -113,6 +116,8 @@ public sealed record MonsterEffectNegationEnded(MonsterEffectNegation Negation) 
 
 /// <summary>Order every mandatory option, or an ordered subset of optional options (empty declines all).</summary>
 public sealed record ChooseTriggerOrder(PlayerId Player, long DecisionId, IReadOnlyList<int> TriggerIds) : DuelCommand(Player);
+public sealed record ChooseTriggerZoneTarget(PlayerId Player, long DecisionId, PlayerId TargetPlayer, int CardInstanceId) : DuelCommand(Player);
+public sealed record TriggerZoneTargetChosen(TriggerActivation Trigger, FieldCardTarget Target) : DuelEvent;
 public sealed record TriggerOrderRequested(PendingTriggerBatch Batch) : DuelEvent;
 public sealed record TriggerOrderChosen(PlayerId Player, IReadOnlyList<int> TriggerIds) : DuelEvent;
 public sealed record TriggerActivated(TriggerActivation Trigger, int LinkNumber) : DuelEvent;

@@ -40,6 +40,7 @@ public sealed partial class DuelEngine
                     entry.Source, events, "pendulum", entry.AttemptId, sourceAlreadyRemoved: true, timingGroup: 1);
             return next.WithSummon(null);
         }
+        if (pending.IsGeminiSummon) return CompleteGeminiSummon(next, pending, events).WithSummon(null);
         // The supported negation chain cannot move monsters or occupy this reserved slot.
         if (next.GetPlayer(pending.Player).MonsterZones[pending.MonsterZone] is not null)
             throw new InvalidOperationException("A pending summon destination was occupied by an unsupported operation.");
@@ -104,6 +105,13 @@ public sealed partial class DuelEngine
                 events.Add(new SummonNegated(entry) { TimingGroup = 1 });
             }
             return next.WithSummon(pending with { Negated = true });
+        }
+        if (pending.IsGeminiSummon)
+        {
+            var controller = next.GetPlayer(pending.Player);
+            var zones = controller.MonsterZones.ToArray();
+            zones[pending.MonsterZone] = null;
+            next = next.With(player: controller.With(monsters: zones));
         }
         var owner = next.GetPlayer(pending.Card.Owner);
         events.Add(new SummonNegated(pending) { TimingGroup = 1 });

@@ -234,3 +234,16 @@ public sealed record MonsterTraitFilter : CardFilter
 
 /// <summary>The monster chosen for a trigger at activation, bound automatically to its link.</summary>
 public sealed record TriggerTargetedMonster : EffectTarget;
+
+/// <summary>The monster whose trigger this is, bound automatically to its link.</summary>
+public sealed record TriggerSourceMonster : EffectTarget;
+
+/// <summary>Cards of one category.</summary>
+public sealed record CardCategoryFilter(CardCategory Category) : CardFilter;
+
+/// <summary>Reviewed Normal Monsters; in the Graveyard, Gemini monsters also count.</summary>
+public sealed record NormalMonsterFilter : CardFilter
+{
+    public IReadOnlySet<uint> CardIds { get; }
+    public NormalMonsterFilter(IEnumerable<uint> cardIds) => CardIds = new HashSet<uint>(cardIds ?? throw new ArgumentNullException(nameof(cardIds)));
+}

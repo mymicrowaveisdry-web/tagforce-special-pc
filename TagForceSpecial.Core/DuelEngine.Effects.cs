@@ -625,6 +625,7 @@ public sealed partial class DuelEngine
                 FieldTarget f => FieldMatches(state, link.Activation.Player, f.Kind, f.Side, f.Filter, null),
                 ZoneTarget z => ZoneMatches(state, link.Activation.Player, z),
                 AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget => FieldMatches(state, link.Activation.Player, FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.Any, null),
+                TriggerSourceMonster => FieldMatches(state, link.Activation.Player, FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.Any, null),
                 TriggerTargetedMonster => FieldMatches(state, link.Activation.Player, FieldCardKind.Monster, TargetSide.Either,
                     link.Trigger!.Profile.Target!.RequireFaceUpAtResolution ? FieldCardFilter.FaceUp : FieldCardFilter.Any, null),
                 _ => []
@@ -646,18 +647,20 @@ public sealed partial class DuelEngine
         {
             var player = state.GetPlayer(id);
             foreach (var card in spec.Zone == CardZone.Graveyard ? player.Graveyard : player.Banished)
-                if (MatchesFilter(card, spec.Filter) && (!spec.MustBeSummonable || Enumerable.Range(0, 5).Any(z =>
+                if (MatchesFilter(card, spec.Filter, spec.Zone == CardZone.Graveyard) && (!spec.MustBeSummonable || Enumerable.Range(0, 5).Any(z =>
                         CheckSpecialSummon(state, controller, card, z, BattlePosition.FaceUpAttack, DecisionCardSource.Graveyard,
                             sourcePlayer: id) == DuelError.None)))
                     yield return new(id, spec.Zone == CardZone.Graveyard ? FieldLocation.Graveyard : FieldLocation.Banished, -1, card, 0);
         }
     }
 
-    private bool MatchesFilter(CardInstance card, CardFilter filter) => rules.TryGetValue(card.GameCardId, out var rule) && filter switch
+    private bool MatchesFilter(CardInstance card, CardFilter filter, bool inGraveyard = false) => rules.TryGetValue(card.GameCardId, out var rule) && filter switch
     {
         CardIdFilter ids => ids.CardIds.Contains(card.GameCardId),
         AnyMonsterFilter => rule.Category == CardCategory.Monster,
         AnyCardFilter => true,
+        CardCategoryFilter category => rule.Category == category.Category,
+        NormalMonsterFilter normal => normal.CardIds.Contains(card.GameCardId) || inGraveyard && rule.IsGemini,
         MonsterTraitFilter trait => rule.Category == CardCategory.Monster && !trait.ExcludedCardIds.Contains(card.GameCardId) &&
             (trait.AttributeCode is not { } code || catalog[card.GameCardId].Codes?.Attribute == code) &&
             (trait.Stat == MonsterStat.Attack ? catalog[card.GameCardId].Statistics.Attack : catalog[card.GameCardId].Statistics.Defense) is int value &&

@@ -14,12 +14,19 @@ public sealed record DuelCardRules(CardCategory Category, bool AllowsNormalSummo
     bool AllowsBasicBattle = false, bool AllowsSpellTrapSet = false,
     bool AllowsTributeSummon = false, bool AllowsTributeForSummon = false,
     bool RequiresRegisteredTributeProcedure = false, bool AllowsExtraDeck = false,
-    bool AllowsSummonMaterial = false, bool AllowsPendulumSummon = false, bool IsToken = false);
+    bool AllowsSummonMaterial = false, bool AllowsPendulumSummon = false, bool IsToken = false,
+    bool CannotBeSpecialSummoned = false, bool IsGemini = false);
 public sealed record CardInstance(int InstanceId, uint GameCardId, PlayerId Owner);
 public sealed record FieldMonster(CardInstance Card, BattlePosition Position, int SummonedOnTurn = 0,
     int PositionChangedOnTurn = 0, int LastAttackTurn = 0, long PlacementId = 0, bool BattleDestroyed = false)
 {
     public IReadOnlyList<CardInstance> XyzMaterials { get; internal init; } = Array.AsReadOnly(Array.Empty<CardInstance>());
+    /// <summary>The turn this monster was last flipped face-up by battle.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int FlippedOnTurn { get; internal init; }
+    /// <summary>A Gemini monster that has been Normal Summoned again and has its effects.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool GeminiActive { get; internal init; }
 }
 /// <summary>A finished duel. A draw (both players at 0 LP at once) has no winner or loser.</summary>
 public sealed record DuelOutcome(PlayerId? Winner, PlayerId? Loser, DuelEndReason Reason)
@@ -223,6 +230,8 @@ public sealed record SetSpellTrap(PlayerId Player, int CardInstanceId, int Spell
 public sealed record ChangeMonsterPosition(PlayerId Player, int MonsterZone, BattlePosition Target) : DuelCommand(Player);
 /// <summary>Null target declares a direct attack. Commits a declaration in staged mode; otherwise resolves compatibility combat atomically.</summary>
 public sealed record DeclareAttack(PlayerId Player, int AttackerZone, int? TargetZone = null) : DuelCommand(Player);
+/// <summary>Normal Summons a face-up Gemini monster again so it gains its effects.</summary>
+public sealed record GeminiSummon(PlayerId Player, int MonsterZone) : DuelCommand(Player);
 public sealed record DiscardForHandLimit(PlayerId Player, int CardInstanceId) : DuelCommand(Player);
 public sealed record EndTurn(PlayerId Player) : DuelCommand(Player);
 
@@ -251,7 +260,7 @@ public enum DuelError
     UnsupportedSpecialSummon, SpecialSummonSourceUnavailable, ProperSummonRequired, SpecialSummonConditionsNotMet,
     UnsupportedMaterialProcedure, InvalidSummonMaterials, SummonMaterialNotAllowed,
     UnsupportedPendulumCard, InvalidPendulumZone, PendulumZoneOccupied, PendulumScalesUnavailable, PendulumSummonLimitReached,
-    ActivationTimingNotAllowed, SetThisTurn, OpenWindowPending, ActivationConditionNotMet, SummonLocked
+    ActivationTimingNotAllowed, SetThisTurn, OpenWindowPending, ActivationConditionNotMet, SummonLocked, NotGeminiMonster, GeminiAlreadyActive
 }
 
 public abstract record DuelEvent
@@ -280,6 +289,9 @@ public sealed record MonsterDestroyed(PlayerId Player, int Zone, CardInstance Ca
 {
     [System.Text.Json.Serialization.JsonIgnore]
     public bool ByBattle { get; internal init; }
+    /// <summary>The monster that destroyed this one by battle.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public MonsterBinding? DestroyedBy { get; internal init; }
 }
 /// <summary>Ordinary summon procedure, not destruction or an activation cost.</summary>
 public sealed record MonsterTributed(MonsterBinding Monster) : DuelEvent;

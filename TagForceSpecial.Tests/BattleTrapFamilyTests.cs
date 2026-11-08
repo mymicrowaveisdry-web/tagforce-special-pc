@@ -171,6 +171,13 @@ public sealed class BattleTrapFamilyTests
     }
 
     [Fact]
+    public void BattleWindowDefinitionsSwitchTheDuelToTheStagedBattleFlow()
+    {
+        Assert.True(new DuelEngine(Catalog(), BattleTrapFamily.Rules, Deck(), Deck(), effectDefinitions: BattleTrapFamily.Definitions).UsesStagedBattle);
+        Assert.False(new DuelEngine(Catalog(), BattleTrapFamily.Rules, Deck(), Deck()).UsesStagedBattle);
+    }
+
+    [Fact]
     public void DefinitionsCannotActivateDuringTheDamageStep()
     {
         var e = Attack(Draining);

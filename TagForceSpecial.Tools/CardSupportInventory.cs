@@ -51,8 +51,12 @@ public static class CardSupportInventory
         var triggerCards = MonsterTriggerFamily.Cards.ToDictionary(c => c.CardId);
         bool fullTriggerCatalog = triggerCards.Keys.All(catalogIds.Contains);
         if (fullTriggerCatalog) MonsterTriggerFamily.ValidateCatalog(catalog);
+        var subtypeCards = MonsterSubtypeFamily.Cards.ToDictionary(c => c.CardId);
+        bool fullSubtypeCatalog = subtypeCards.Keys.Concat(MonsterSubtypeFamily.SpiritIds).All(catalogIds.Contains);
+        if (fullSubtypeCatalog) MonsterSubtypeFamily.ValidateCatalog(catalog);
         string[] chainTests = ["ChainCardFamilyTests", "ChainInteractionTests", "DuelChainTests", "EmergencyTeleportTests",
             "EmergencyTeleportLifecycleTests", "ChainCardFamilyLocalReferenceTests"];
+        string[] subtypeTests = ["MonsterSubtypeFamilyTests", "MonsterSubtypeFamilyLocalReferenceTests"];
         string[] triggerTests = ["MonsterTriggerFamilyTests", "MonsterTriggerFamilyLocalReferenceTests"];
         string[] negationTests = ["SummonNegationFamilyTests", "SummonNegationFamilyLocalReferenceTests"];
         string[] summonTests = ["SummonTrapFamilyTests", "SummonTrapFamilyLocalReferenceTests"];
@@ -84,6 +88,8 @@ public static class CardSupportInventory
                 ? DefinitionEntry(c, negator, SummonNegationFamily.FamilyId, SummonNegationFamily.BatchId, negationTests, "decoded-metadata; synthetic-rule-test")
             : fullTriggerCatalog && triggerCards.TryGetValue(c.GameCardId, out var monsterTrigger)
                 ? DefinitionEntry(c, monsterTrigger, MonsterTriggerFamily.FamilyId, MonsterTriggerFamily.BatchId, triggerTests, "decoded-metadata; synthetic-rule-test")
+            : fullSubtypeCatalog && subtypeCards.TryGetValue(c.GameCardId, out var subtype)
+                ? DefinitionEntry(c, subtype, MonsterSubtypeFamily.FamilyId, MonsterSubtypeFamily.BatchId, subtypeTests, "decoded-metadata; synthetic-rule-test")
             : PreviewEntry(c);
         object DefinitionEntry(CardDefinition c, DefinitionCardProfile p, string family, string batch, string[] tests, string evidenceClass) => new
         {
@@ -193,7 +199,8 @@ public static class CardSupportInventory
                     fullBattleCatalog ? new { id = BattleTrapFamily.BatchId, family = BattleTrapFamily.FamilyId, cardIds = battleCards.Keys.Order().ToArray() } : null,
                     fullSummonCatalog ? new { id = SummonTrapFamily.BatchId, family = SummonTrapFamily.FamilyId, cardIds = summonCards.Keys.Order().ToArray() } : null,
                     fullNegationCatalog ? new { id = SummonNegationFamily.BatchId, family = SummonNegationFamily.FamilyId, cardIds = negationCards.Keys.Order().ToArray() } : null,
-                    fullTriggerCatalog ? new { id = MonsterTriggerFamily.BatchId, family = MonsterTriggerFamily.FamilyId, cardIds = triggerCards.Keys.Order().ToArray() } : null
+                    fullTriggerCatalog ? new { id = MonsterTriggerFamily.BatchId, family = MonsterTriggerFamily.FamilyId, cardIds = triggerCards.Keys.Order().ToArray() } : null,
+                    fullSubtypeCatalog ? new { id = MonsterSubtypeFamily.BatchId, family = MonsterSubtypeFamily.FamilyId, cardIds = subtypeCards.Keys.Order().ToArray() } : null
                 }.OfType<object>().ToArray(),
             unclassifiedCardCount = catalog.Cards.Count(c => !tokens.Contains(c.GameCardId) && !preview.ContainsKey(c.GameCardId) &&
                 !(fullFamilyCatalog && normalMonsters.Contains(c.GameCardId)) && !(fullChainCatalog && chainCards.ContainsKey(c.GameCardId)) &&
@@ -204,7 +211,8 @@ public static class CardSupportInventory
                 !(fullBattleCatalog && battleCards.ContainsKey(c.GameCardId)) &&
                 !(fullSummonCatalog && summonCards.ContainsKey(c.GameCardId)) &&
                 !(fullNegationCatalog && negationCards.ContainsKey(c.GameCardId)) &&
-                !(fullTriggerCatalog && triggerCards.ContainsKey(c.GameCardId))),
+                !(fullTriggerCatalog && triggerCards.ContainsKey(c.GameCardId)) &&
+                !(fullSubtypeCatalog && subtypeCards.ContainsKey(c.GameCardId))),
             exampleDeck = PlayablePreview.ExampleDeck
         };
     }

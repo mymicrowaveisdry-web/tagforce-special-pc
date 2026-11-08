@@ -1,6 +1,10 @@
 namespace TagForceSpecial.Core;
 
-public enum MonsterEventKind { NormalSummoned, SpecialSummoned, FlipSummoned, Destroyed, SentToGraveyard, FlippedFaceUp, TributedForSummon }
+public enum MonsterEventKind { NormalSummoned, SpecialSummoned, FlipSummoned, Destroyed, SentToGraveyard, FlippedFaceUp, TributedForSummon,
+    /// <summary>The End Phase of a turn this face-up monster was Summoned or flipped face-up.</summary>
+    EndPhaseAfterSummonOrFlip,
+    /// <summary>This monster destroyed an opponent's monster by battle and sent it to the Graveyard.</summary>
+    DestroyedOpponentByBattle }
 /// <summary>Narrows a Destroyed or SentToGraveyard event by where it came from or what caused it.</summary>
 public enum TriggerEventCause { Any, FromField, ByBattle }
 public enum EffectRelation { Self, Controller, Opponent, Any }
@@ -94,15 +98,17 @@ public sealed class TriggerEffectProfile
     /// <summary>When set, the link resolves through the shared definition steps instead of <see cref="Steps"/>.</summary>
     public EffectDefinition? Definition { get; }
     public TriggerEventCause Cause { get; }
+    /// <summary>The source must be a Gemini monster that has gained its effects.</summary>
+    public bool RequiresGeminiActive { get; }
 
     /// <summary>A trigger whose resolution is a <see cref="EffectKind.MonsterTrigger"/> definition.</summary>
     public TriggerEffectProfile(EffectDefinition definition, MonsterEventKind eventKind, EffectRelation relation, TriggerRequirement requirement,
         TriggerSourceLocation sourceLocation = TriggerSourceLocation.FaceUpMonster, TriggerTiming timing = TriggerTiming.If,
         TriggerEventCause cause = TriggerEventCause.Any, TriggerTurnLimit turnLimit = TriggerTurnLimit.None, string? limitKey = null,
         bool? damageStepAllowed = null, int lifePointCost = 0, IEnumerable<uint>? discardCardIds = null, MonsterTargetPolicy? target = null,
-        int detachMaterialCount = 0)
+        int detachMaterialCount = 0, bool requiresGeminiActive = false)
         : this(definition ?? throw new ArgumentNullException(nameof(definition)), cause, definition.EffectId, definition.CardId, eventKind, relation, requirement,
-            Array.Empty<TriggerEffectStep>(), sourceLocation, timing, turnLimit, limitKey, lifePointCost, discardCardIds, target, damageStepAllowed, detachMaterialCount) { }
+            Array.Empty<TriggerEffectStep>(), sourceLocation, timing, turnLimit, limitKey, lifePointCost, discardCardIds, target, damageStepAllowed, detachMaterialCount, requiresGeminiActive) { }
 
     public TriggerEffectProfile(string effectId, uint cardId, MonsterEventKind eventKind,
         EffectRelation relation, TriggerRequirement requirement, TriggerOperation operation,
@@ -122,12 +128,12 @@ public sealed class TriggerEffectProfile
         string? limitKey = null, int lifePointCost = 0, IEnumerable<uint>? discardCardIds = null,
         MonsterTargetPolicy? target = null, bool? damageStepAllowed = null, int detachMaterialCount = 0)
         : this(null, TriggerEventCause.Any, effectId, cardId, eventKind, relation, requirement, steps, sourceLocation, timing, turnLimit,
-            limitKey, lifePointCost, discardCardIds, target, damageStepAllowed, detachMaterialCount) { }
+            limitKey, lifePointCost, discardCardIds, target, damageStepAllowed, detachMaterialCount, false) { }
 
     private TriggerEffectProfile(EffectDefinition? definition, TriggerEventCause cause, string effectId, uint cardId, MonsterEventKind eventKind,
         EffectRelation relation, TriggerRequirement requirement, IEnumerable<TriggerEffectStep> steps,
         TriggerSourceLocation sourceLocation, TriggerTiming timing, TriggerTurnLimit turnLimit, string? limitKey, int lifePointCost,
-        IEnumerable<uint>? discardCardIds, MonsterTargetPolicy? target, bool? damageStepAllowed, int detachMaterialCount)
+        IEnumerable<uint>? discardCardIds, MonsterTargetPolicy? target, bool? damageStepAllowed, int detachMaterialCount, bool requiresGeminiActive)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(effectId);
         ArgumentNullException.ThrowIfNull(steps);
@@ -139,6 +145,9 @@ public sealed class TriggerEffectProfile
             sourceLocation == TriggerSourceLocation.GraveyardSelf && (eventKind is not (MonsterEventKind.SentToGraveyard or MonsterEventKind.TributedForSummon) || relation != EffectRelation.Self) ||
             eventKind == MonsterEventKind.TributedForSummon && sourceLocation != TriggerSourceLocation.GraveyardSelf)
             throw new ArgumentException("Graveyard sources require the matching self event.");
+        if (eventKind is MonsterEventKind.EndPhaseAfterSummonOrFlip or MonsterEventKind.DestroyedOpponentByBattle && (sourceLocation != TriggerSourceLocation.FaceUpMonster || relation != EffectRelation.Self) ||
+            requiresGeminiActive && sourceLocation != TriggerSourceLocation.FaceUpMonster)
+            throw new ArgumentException("This trigger needs its face-up source.");
         if (cause != TriggerEventCause.Any && eventKind is not (MonsterEventKind.Destroyed or MonsterEventKind.SentToGraveyard))
             throw new ArgumentException("Only destruction and Graveyard events have a cause.");
         if (definition is not null && definition.Kind != EffectKind.MonsterTrigger)
@@ -162,7 +171,7 @@ public sealed class TriggerEffectProfile
         TurnLimit = turnLimit; LimitKey = limitKey ?? effectId; LifePointCost = lifePointCost;
         DetachMaterialCount = detachMaterialCount;
         DiscardCardIds = Array.AsReadOnly(discards); Target = target; Steps = Array.AsReadOnly(copy);
-        Definition = definition; Cause = cause;
+        Definition = definition; Cause = cause; RequiresGeminiActive = requiresGeminiActive;
     }
 }
 
