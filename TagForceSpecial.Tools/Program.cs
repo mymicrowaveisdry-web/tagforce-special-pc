@@ -22,6 +22,7 @@ if (args.Length > 0 && args[0] == "progress") return ProjectProgress.Run(args[1.
 if (args.Length > 0 && args[0] == "research-check") return ResearchValidation.Run(args[1..], Console.Out, Console.Error);
 if (args.Length > 0 && args[0] == "card-support") return CardSupportInventory.Run(args[1..], Console.Out, Console.Error);
 if (args.Length > 0 && args[0] == "preview-duel") return PreviewDuelScenario.RunCommand(args[1..], Console.Out, Console.Error);
+if (args.Length > 0 && args[0] == "pool-duel") return PoolDuels.RunCommand(args[1..], Console.Out, Console.Error);
 if (args.Length > 0 && args[0] == "opponent-acceptance") return OpponentAcceptance.Run(args[1..], Console.Out, Console.Error);
 if (args.Length > 0 && args[0] is "catalog-import" or "catalog-check") return CardCatalogCommands.Run(args[0], args[1..], Console.Out, Console.Error);
 if (args.Length > 0 && args[0] is "source-check" or "cache-create" or "cache-check" or "deck-check" or "foundation-examples")

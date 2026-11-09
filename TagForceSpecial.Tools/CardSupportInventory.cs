@@ -22,88 +22,20 @@ public static class CardSupportInventory
         bool fullFamilyCatalog = normalMonsters.IsSubsetOf(catalogIds);
         if (fullFamilyCatalog) NormalMonsterFamily.ValidateCatalog(catalog);
         // A family counts as supported only when the catalog holds all its cards and listed IDs.
-        var chainCards = ChainCardFamily.Cards.ToDictionary(c => c.CardId);
-        bool fullChainCatalog = chainCards.Keys.Concat(ChainCardFamily.SheepTokenIds)
-            .Concat(ChainCardFamily.LevelThreeOrLowerPsychicIds).All(catalogIds.Contains);
-        if (fullChainCatalog) ChainCardFamily.ValidateCatalog(catalog);
-        var lifePointCards = LifePointFamily.Cards.ToDictionary(c => c.CardId);
-        bool fullLifePointCatalog = lifePointCards.Keys.All(catalogIds.Contains);
-        if (fullLifePointCatalog) LifePointFamily.ValidateCatalog(catalog);
-        var deckCards = DeckOperationFamily.Cards.ToDictionary(c => c.CardId);
-        bool fullDeckCatalog = deckCards.Keys.Concat(DeckOperationFamily.PolymerizationIds).Concat(DeckOperationFamily.CatIds)
-            .Concat(DeckOperationFamily.FieldSpellIds).Concat(DeckOperationFamily.HighLevelNormalMonsterIds).All(catalogIds.Contains);
-        if (fullDeckCatalog) DeckOperationFamily.ValidateCatalog(catalog);
-        var removalCards = RemovalFamily.Cards.ToDictionary(c => c.CardId);
-        bool fullRemovalCatalog = removalCards.Keys.All(catalogIds.Contains);
-        if (fullRemovalCatalog) RemovalFamily.ValidateCatalog(catalog);
-        var graveCards = GraveyardFamily.Cards.ToDictionary(c => c.CardId);
-        bool fullGraveCatalog = graveCards.Keys.Concat(DeckOperationFamily.HighLevelNormalMonsterIds).All(catalogIds.Contains);
-        if (fullGraveCatalog) GraveyardFamily.ValidateCatalog(catalog);
-        var battleCards = BattleTrapFamily.Cards.ToDictionary(c => c.CardId);
-        bool fullBattleCatalog = battleCards.Keys.All(catalogIds.Contains);
-        if (fullBattleCatalog) BattleTrapFamily.ValidateCatalog(catalog);
-        var summonCards = SummonTrapFamily.Cards.ToDictionary(c => c.CardId);
-        bool fullSummonCatalog = summonCards.Keys.All(catalogIds.Contains);
-        if (fullSummonCatalog) SummonTrapFamily.ValidateCatalog(catalog);
-        var negationCards = SummonNegationFamily.Cards.ToDictionary(c => c.CardId);
-        bool fullNegationCatalog = negationCards.Keys.All(catalogIds.Contains);
-        if (fullNegationCatalog) SummonNegationFamily.ValidateCatalog(catalog);
-        var triggerCards = MonsterTriggerFamily.Cards.ToDictionary(c => c.CardId);
-        bool fullTriggerCatalog = triggerCards.Keys.All(catalogIds.Contains);
-        if (fullTriggerCatalog) MonsterTriggerFamily.ValidateCatalog(catalog);
-        var subtypeCards = MonsterSubtypeFamily.Cards.ToDictionary(c => c.CardId);
-        bool fullSubtypeCatalog = subtypeCards.Keys.Concat(MonsterSubtypeFamily.SpiritIds).All(catalogIds.Contains);
-        if (fullSubtypeCatalog) MonsterSubtypeFamily.ValidateCatalog(catalog);
-        var lastingCards = LastingCardFamily.Cards.ToDictionary(c => c.CardId);
-        bool fullLastingCatalog = lastingCards.Keys.All(catalogIds.Contains);
-        if (fullLastingCatalog) LastingCardFamily.ValidateCatalog(catalog);
-        string[] lastingTests = ["LastingCardFamilyTests", "LastingSpellTrapTests", "LastingCardFamilyLocalReferenceTests"];
-        var procedureCards = SummonProcedureFamily.Cards.ToDictionary(c => c.CardId);
-        bool fullProcedureCatalog = procedureCards.Keys.All(catalogIds.Contains);
-        if (fullProcedureCatalog) SummonProcedureFamily.ValidateCatalog(catalog);
-        string[] procedureTests = ["SummonProcedureFamilyTests", "SummonProcedureFamilyLocalReferenceTests"];
-        string[] chainTests = ["ChainCardFamilyTests", "ChainInteractionTests", "DuelChainTests", "EmergencyTeleportTests",
-            "EmergencyTeleportLifecycleTests", "ChainCardFamilyLocalReferenceTests"];
-        string[] subtypeTests = ["MonsterSubtypeFamilyTests", "MonsterSubtypeFamilyLocalReferenceTests"];
-        string[] triggerTests = ["MonsterTriggerFamilyTests", "MonsterTriggerFamilyLocalReferenceTests"];
-        string[] negationTests = ["SummonNegationFamilyTests", "SummonNegationFamilyLocalReferenceTests"];
-        string[] summonTests = ["SummonTrapFamilyTests", "SummonTrapFamilyLocalReferenceTests"];
-        string[] battleTests = ["BattleTrapFamilyTests", "BattleTrapFamilyLocalReferenceTests"];
-        string[] graveTests = ["GraveyardFamilyTests", "GraveyardFamilyLocalReferenceTests"];
-        string[] removalTests = ["RemovalFamilyTests", "RemovalFamilyLocalReferenceTests"];
-        string[] deckTests = ["DeckOperationFamilyTests", "DeckOperationFamilyLocalReferenceTests"];
-        string[] lifePointTests = ["LifePointFamilyTests", "LifePointFamilyLocalReferenceTests", "NormalSpellTests"];
+        var definitionCards = new Dictionary<uint, (CardFamily Family, DefinitionCardProfile Card)>();
+        var completeFamilies = CardFamilies.All.Where(f => f.Cards.Select(c => c.CardId).Concat(f.RequiredCardIds).All(catalogIds.Contains)).ToArray();
+        foreach (var family in completeFamilies)
+        {
+            family.ValidateCatalog(catalog);
+            foreach (var card in family.Cards) definitionCards.TryAdd(card.CardId, (family, card));
+        }
         // Preview manifest entries keep the preview contract; the release manifest uses the wider family contracts.
         object Entry(CardDefinition c) =>
             fullFamilyCatalog && normalMonsters.Contains(c.GameCardId) ? FamilyEntry(c)
-            : fullChainCatalog && chainCards.TryGetValue(c.GameCardId, out var chain)
-                ? DefinitionEntry(c, chain, ChainCardFamily.FamilyId, ChainCardFamily.BatchId, chainTests,
-                    "decoded-metadata; synthetic-rule-test; retained-psp-projection")
-            : fullLifePointCatalog && lifePointCards.TryGetValue(c.GameCardId, out var life)
-                ? DefinitionEntry(c, life, LifePointFamily.FamilyId, LifePointFamily.BatchId, lifePointTests,
-                    life.StaticEvidenceIds.Count != 0 ? "decoded-metadata; static-psp-interpretation; synthetic-rule-test" : "decoded-metadata; synthetic-rule-test")
-            : fullDeckCatalog && deckCards.TryGetValue(c.GameCardId, out var deck)
-                ? DefinitionEntry(c, deck, DeckOperationFamily.FamilyId, DeckOperationFamily.BatchId, deckTests, "decoded-metadata; synthetic-rule-test")
-            : fullRemovalCatalog && removalCards.TryGetValue(c.GameCardId, out var removal)
-                ? DefinitionEntry(c, removal, RemovalFamily.FamilyId, RemovalFamily.BatchId, removalTests, "decoded-metadata; synthetic-rule-test")
-            : fullGraveCatalog && graveCards.TryGetValue(c.GameCardId, out var grave)
-                ? DefinitionEntry(c, grave, GraveyardFamily.FamilyId, GraveyardFamily.BatchId, graveTests, "decoded-metadata; synthetic-rule-test")
-            : fullBattleCatalog && battleCards.TryGetValue(c.GameCardId, out var battle)
-                ? DefinitionEntry(c, battle, BattleTrapFamily.FamilyId, BattleTrapFamily.BatchId, battleTests, "decoded-metadata; synthetic-rule-test")
-            : fullSummonCatalog && summonCards.TryGetValue(c.GameCardId, out var summon)
-                ? DefinitionEntry(c, summon, SummonTrapFamily.FamilyId, SummonTrapFamily.BatchId, summonTests, "decoded-metadata; synthetic-rule-test")
-            : fullNegationCatalog && negationCards.TryGetValue(c.GameCardId, out var negator)
-                ? DefinitionEntry(c, negator, SummonNegationFamily.FamilyId, SummonNegationFamily.BatchId, negationTests, "decoded-metadata; synthetic-rule-test")
-            : fullTriggerCatalog && triggerCards.TryGetValue(c.GameCardId, out var monsterTrigger)
-                ? DefinitionEntry(c, monsterTrigger, MonsterTriggerFamily.FamilyId, MonsterTriggerFamily.BatchId, triggerTests, "decoded-metadata; synthetic-rule-test")
-            : fullSubtypeCatalog && subtypeCards.TryGetValue(c.GameCardId, out var subtype)
-                ? DefinitionEntry(c, subtype, MonsterSubtypeFamily.FamilyId, MonsterSubtypeFamily.BatchId, subtypeTests, "decoded-metadata; synthetic-rule-test")
-            : fullLastingCatalog && lastingCards.TryGetValue(c.GameCardId, out var lasting)
-                ? DefinitionEntry(c, lasting, LastingCardFamily.FamilyId, LastingCardFamily.BatchId, lastingTests, "decoded-metadata; synthetic-rule-test")
-            : fullProcedureCatalog && procedureCards.TryGetValue(c.GameCardId, out var procedureCard)
-                ? DefinitionEntry(c, procedureCard, SummonProcedureFamily.FamilyId, SummonProcedureFamily.BatchId, procedureTests, "decoded-metadata; synthetic-rule-test")
+            : definitionCards.TryGetValue(c.GameCardId, out var definition)
+                ? DefinitionEntry(c, definition.Card, definition.Family.FamilyId, definition.Family.BatchId, definition.Family.Tests, definition.Family.EvidenceClass(definition.Card))
             : PreviewEntry(c);
-        object DefinitionEntry(CardDefinition c, DefinitionCardProfile p, string family, string batch, string[] tests, string evidenceClass) => new
+        object DefinitionEntry(CardDefinition c, DefinitionCardProfile p, string family, string batch, IReadOnlyList<string> tests, string evidenceClass) => new
         {
             c.GameCardId, c.Name, c.Source, c.SourceRow, c.Statistics,
             originalEraText = c.Description,
@@ -200,35 +132,10 @@ public static class CardSupportInventory
                 cards = catalog.Cards.Where(c => !tokens.Contains(c.GameCardId)).Select(Entry).ToArray()
             },
             families = PlayablePreview.Cards.GroupBy(c => c.Family).Select(g => new { family = g.Key, cardIds = g.Select(c => c.CardId).ToArray() }),
-            familyBatches = new[]
-                {
-                    fullFamilyCatalog ? new { id = NormalMonsterFamily.BatchId, family = NormalMonsterFamily.FamilyId, cardIds = NormalMonsterFamily.CardIds.ToArray() } : null,
-                    fullChainCatalog ? new { id = ChainCardFamily.BatchId, family = ChainCardFamily.FamilyId, cardIds = chainCards.Keys.Order().ToArray() } : null,
-                    fullLifePointCatalog ? new { id = LifePointFamily.BatchId, family = LifePointFamily.FamilyId, cardIds = lifePointCards.Keys.Order().ToArray() } : null,
-                    fullDeckCatalog ? new { id = DeckOperationFamily.BatchId, family = DeckOperationFamily.FamilyId, cardIds = deckCards.Keys.Order().ToArray() } : null,
-                    fullRemovalCatalog ? new { id = RemovalFamily.BatchId, family = RemovalFamily.FamilyId, cardIds = removalCards.Keys.Order().ToArray() } : null,
-                    fullGraveCatalog ? new { id = GraveyardFamily.BatchId, family = GraveyardFamily.FamilyId, cardIds = graveCards.Keys.Order().ToArray() } : null,
-                    fullBattleCatalog ? new { id = BattleTrapFamily.BatchId, family = BattleTrapFamily.FamilyId, cardIds = battleCards.Keys.Order().ToArray() } : null,
-                    fullSummonCatalog ? new { id = SummonTrapFamily.BatchId, family = SummonTrapFamily.FamilyId, cardIds = summonCards.Keys.Order().ToArray() } : null,
-                    fullNegationCatalog ? new { id = SummonNegationFamily.BatchId, family = SummonNegationFamily.FamilyId, cardIds = negationCards.Keys.Order().ToArray() } : null,
-                    fullTriggerCatalog ? new { id = MonsterTriggerFamily.BatchId, family = MonsterTriggerFamily.FamilyId, cardIds = triggerCards.Keys.Order().ToArray() } : null,
-                    fullSubtypeCatalog ? new { id = MonsterSubtypeFamily.BatchId, family = MonsterSubtypeFamily.FamilyId, cardIds = subtypeCards.Keys.Order().ToArray() } : null,
-                    fullLastingCatalog ? new { id = LastingCardFamily.BatchId, family = LastingCardFamily.FamilyId, cardIds = lastingCards.Keys.Order().ToArray() } : null,
-                    fullProcedureCatalog ? new { id = SummonProcedureFamily.BatchId, family = SummonProcedureFamily.FamilyId, cardIds = procedureCards.Keys.Order().ToArray() } : null
-                }.OfType<object>().ToArray(),
+            familyBatches = (fullFamilyCatalog ? new[] { new { id = NormalMonsterFamily.BatchId, family = NormalMonsterFamily.FamilyId, cardIds = NormalMonsterFamily.CardIds.ToArray() } } : [])
+                .Concat(completeFamilies.Select(f => new { id = f.BatchId, family = f.FamilyId, cardIds = f.Cards.Select(c => c.CardId).Order().ToArray() })).ToArray(),
             unclassifiedCardCount = catalog.Cards.Count(c => !tokens.Contains(c.GameCardId) && !preview.ContainsKey(c.GameCardId) &&
-                !(fullFamilyCatalog && normalMonsters.Contains(c.GameCardId)) && !(fullChainCatalog && chainCards.ContainsKey(c.GameCardId)) &&
-                !(fullLifePointCatalog && lifePointCards.ContainsKey(c.GameCardId)) &&
-                !(fullDeckCatalog && deckCards.ContainsKey(c.GameCardId)) &&
-                !(fullRemovalCatalog && removalCards.ContainsKey(c.GameCardId)) &&
-                !(fullGraveCatalog && graveCards.ContainsKey(c.GameCardId)) &&
-                !(fullBattleCatalog && battleCards.ContainsKey(c.GameCardId)) &&
-                !(fullSummonCatalog && summonCards.ContainsKey(c.GameCardId)) &&
-                !(fullNegationCatalog && negationCards.ContainsKey(c.GameCardId)) &&
-                !(fullTriggerCatalog && triggerCards.ContainsKey(c.GameCardId)) &&
-                !(fullSubtypeCatalog && subtypeCards.ContainsKey(c.GameCardId)) &&
-                !(fullLastingCatalog && lastingCards.ContainsKey(c.GameCardId)) &&
-                !(fullProcedureCatalog && procedureCards.ContainsKey(c.GameCardId))),
+                !(fullFamilyCatalog && normalMonsters.Contains(c.GameCardId)) && !definitionCards.ContainsKey(c.GameCardId)),
             exampleDeck = PlayablePreview.ExampleDeck
         };
     }

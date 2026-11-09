@@ -126,7 +126,7 @@ public sealed partial class DuelEngine
                 MillTopOfDeckStep mill => player.Deck.Count < mill.Count,
                 AddFromDeckToHandStep search => !DeckMatches(State, playerId, search.Filter).Any(),
                 SendFromDeckToGraveyardStep send => !DeckMatches(State, playerId, send.Filter).Any(),
-                DestroyAllStep all => !FieldMatches(State, playerId, all.Kind, all.Side, all.Filter, card.InstanceId).Any(),
+                DestroyAllStep all => !FieldMatches(State, playerId, all.Kind, all.Side, all.Filter, card.InstanceId).Any(t => all.Cards is null || MatchesFilter(t.Card, all.Cards)),
                 ReturnAllToHandStep all => !FieldMatches(State, playerId, all.Kind, all.Side, FieldCardFilter.Any, card.InstanceId).Any(),
                 ChangeAllToDefenseStep all => !FieldMatches(State, playerId, FieldCardKind.Monster, all.Side, FieldCardFilter.AttackPosition, null).Any(),
                 DestroyExtremeMonsterStep extreme => ExtremeCandidates(State, playerId, extreme).Length == 0,
@@ -621,7 +621,7 @@ public sealed partial class DuelEngine
                         .Aggregate(state, (s, p) => s.Outcome is null ? DrawCards(s, p, draw.Count, events) : s),
                     MillTopOfDeckStep mill => MillTop(state, controller, mill.Count, definition.EffectId, events),
                     DestroyAllStep all => FieldMatches(state, controller, all.Kind, all.Side, all.Filter, link.Activation.Spell.InstanceId)
-                        .ToArray().Aggregate(state, (s, t) => DestroyFieldCard(s, t, events)),
+                        .Where(t => all.Cards is null || MatchesFilter(t.Card, all.Cards)).ToArray().Aggregate(state, (s, t) => DestroyFieldCard(s, t, events)),
                     ReturnAllToHandStep all => FieldMatches(state, controller, all.Kind, all.Side, FieldCardFilter.Any, link.Activation.Spell.InstanceId)
                         .ToArray().Aggregate(state, (s, t) => ReturnFieldCardToHand(s, t, definition.EffectId, events)),
                     BanishAllStep all => FieldMatches(state, controller, FieldCardKind.Monster, all.Side, all.Filter, null)

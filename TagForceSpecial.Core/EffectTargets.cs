@@ -67,8 +67,8 @@ public sealed record ReturnTargetsToHandStep : EffectStep;
 /// <summary>Changes every bound monster target that still qualifies to face-up Defense Position.</summary>
 public sealed record ChangeTargetsToDefenseStep : EffectStep;
 
-/// <summary>Destroys every matching field card (never the resolving source), activating player's side first.</summary>
-public sealed record DestroyAllStep(FieldCardKind Kind, TargetSide Side = TargetSide.Either, FieldCardFilter Filter = FieldCardFilter.Any) : EffectStep;
+/// <summary>Destroys every matching field card (never the resolving source), activating player's side first. <paramref name="Cards"/> narrows the match.</summary>
+public sealed record DestroyAllStep(FieldCardKind Kind, TargetSide Side = TargetSide.Either, FieldCardFilter Filter = FieldCardFilter.Any, CardFilter? Cards = null) : EffectStep;
 
 /// <summary>Returns every matching field card (never the resolving source) to its owner's hand.</summary>
 public sealed record ReturnAllToHandStep(FieldCardKind Kind, TargetSide Side = TargetSide.Either) : EffectStep;

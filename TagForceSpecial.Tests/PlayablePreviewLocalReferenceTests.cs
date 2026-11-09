@@ -25,11 +25,12 @@ public sealed class PlayablePreviewLocalReferenceTests
         // Denominator: 7,254 IDs minus 95 effect-generated Tokens; unobtainable cards stay included.
         Assert.Equal(95, full.GetProperty("excludedTokens").GetArrayLength());
         Assert.Equal(7159, entries.Length);
-        // 665 Normal Monsters (including the 8 preview monsters), 6 preview Spells, 5 chain cards, 13 life-point cards
-        // 10 Deck-operation cards, 15 removal cards and 8 Graveyard cards.
-        Assert.Equal(814, entries.Count(c => c.GetProperty("status").GetString() == "supported"));
+        // Every Normal Monster, preview card and registered family card is supported; nothing else is.
+        int supported = NormalMonsterFamily.CardIds.Concat(PlayablePreview.Cards.Select(c => c.CardId))
+            .Concat(CardFamilies.All.SelectMany(f => f.Cards).Select(c => c.CardId)).Distinct().Count();
+        Assert.Equal(supported, entries.Count(c => c.GetProperty("status").GetString() == "supported"));
         Assert.Equal(0, entries.Count(c => c.GetProperty("status").GetString() == "partial"));
-        Assert.Equal(6345, entries.Count(c => c.GetProperty("status").GetString() == "unsupported"));
+        Assert.Equal(7159 - supported, entries.Count(c => c.GetProperty("status").GetString() == "unsupported"));
         Assert.All(entries, c => Assert.False(c.GetProperty("pspVerified").GetBoolean()));
         var scenario = PreviewDuelScenario.Run(catalog);
         Assert.Equal(TagForceSpecial.Core.DuelEndReason.LifePointsDepleted, scenario.Outcome.Reason);

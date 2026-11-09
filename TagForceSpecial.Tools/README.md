@@ -12,6 +12,7 @@ before creating a format-independent catalog; authored cards use the Cards API d
 `catalog-import <file> <min> <max> <new-directory>` stores a versioned local package;
 `catalog-check <directory>` validates it. `card-support` emits per-source support
 manifests; `preview-duel` accepts either a package directory or the file/ID-range arguments.
+`pool-duel <package-directory> [duels] [seed] [report.json]` plays seeded duels over every supported card, checking engine invariants and replay.
 `source-check`, `cache-create`, `cache-check`, `foundation-examples` and `deck-check`
 exercise the source/cache and deck foundations with deterministic diagnostics.
 

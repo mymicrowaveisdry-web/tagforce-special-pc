@@ -11,18 +11,7 @@ public static class ReviewedCardMetadata
         TfspCardMetadata.Reviewed
             .Concat(TfspNormalMonsters.Ids.Where(id => !TfspCardMetadata.Reviewed.ContainsKey(id))
                 .Select(id => new KeyValuePair<uint, CardStaticMetadata>(id, new(CardKind.Monster, CardEffectBinding.None))))
-            .Concat(ChainCardFamily.Reviewed)
-            .Concat(LifePointFamily.Reviewed)
-            .Concat(DeckOperationFamily.Reviewed)
-            .Concat(RemovalFamily.Reviewed)
-            .Concat(GraveyardFamily.Reviewed)
-            .Concat(BattleTrapFamily.Reviewed)
-            .Concat(SummonTrapFamily.Reviewed)
-            .Concat(SummonNegationFamily.Reviewed)
-            .Concat(MonsterTriggerFamily.Reviewed)
-            .Concat(MonsterSubtypeFamily.Reviewed)
-            .Concat(LastingCardFamily.Reviewed)
-            .Concat(SummonProcedureFamily.Reviewed)
+            .Concat(CardFamilies.All.SelectMany(f => f.Reviewed))
             .ToFrozenDictionary();
 
     /// <summary>Full reviewed overlay for the reviewed build; throws for any other source.</summary>
