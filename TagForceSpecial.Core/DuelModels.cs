@@ -30,6 +30,9 @@ public sealed record FieldMonster(CardInstance Card, BattlePosition Position, in
     /// <summary>Counters on this monster; a card effect places and removes them.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public int Counters { get; internal init; }
+    /// <summary>Counters removed instead of this monster being destroyed.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int ProtectionCounters { get; internal init; }
 }
 /// <summary>A finished duel. A draw (both players at 0 LP at once) has no winner or loser.</summary>
 public sealed record DuelOutcome(PlayerId? Winner, PlayerId? Loser, DuelEndReason Reason)

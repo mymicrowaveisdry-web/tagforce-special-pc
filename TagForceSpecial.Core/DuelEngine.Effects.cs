@@ -9,7 +9,7 @@ namespace TagForceSpecial.Core;
 public sealed partial class DuelEngine
 {
     /// <summary>Where an activation is requested; each context has its own timing rules.</summary>
-    private enum ActivationContext { Hand, OwnSetCard, OpenWindow, ChainResponse, HandChainResponse, BattleWindow, BattleHand, SummonWindow, MonsterField, MonsterChainResponse }
+    private enum ActivationContext { Hand, OwnSetCard, OpenWindow, ChainResponse, HandChainResponse, BattleWindow, BattleHand, SummonWindow, MonsterField, MonsterChainResponse, MonsterWindow }
 
     private const BattleTiming DamageStepTimings = BattleTiming.DamageStart | BattleTiming.BeforeCalculation |
         BattleTiming.Calculation | BattleTiming.AfterCalculation | BattleTiming.DamageEnd;
@@ -27,7 +27,7 @@ public sealed partial class DuelEngine
             return DuelError.ActivationTimingNotAllowed;
         bool fromHand = context is ActivationContext.Hand or ActivationContext.HandChainResponse or ActivationContext.BattleHand;
         bool setThisTurn = source is not null && source.SetOnTurn >= State.TurnNumber;
-        bool fromMonster = context is ActivationContext.MonsterField or ActivationContext.MonsterChainResponse;
+        bool fromMonster = context is ActivationContext.MonsterField or ActivationContext.MonsterChainResponse or ActivationContext.MonsterWindow;
         if (!fromHand && !fromMonster && (source is null || source.IsFaceUp))
             return context switch
             {
@@ -41,6 +41,7 @@ public sealed partial class DuelEngine
         {
             (ActivationContext.MonsterField, EffectKind.MonsterIgnition or EffectKind.MonsterQuick) => DuelError.None,
             (ActivationContext.MonsterChainResponse, EffectKind.MonsterQuick) => slowerThanPreceding ? DuelError.ChainResponseSpeedNotAllowed : DuelError.None,
+            (ActivationContext.MonsterWindow, EffectKind.MonsterQuick) => DuelError.None,
             (ActivationContext.Hand, EffectKind.NormalSpell or EffectKind.QuickPlaySpell or EffectKind.ContinuousSpell or EffectKind.FieldSpell or EffectKind.EquipSpell) => DuelError.None,
             (ActivationContext.Hand, _) => DuelError.ActivationTimingNotAllowed,
             (ActivationContext.BattleHand, EffectKind.QuickPlaySpell) => DuelError.None,
@@ -425,7 +426,7 @@ public sealed partial class DuelEngine
         if (PhaseChangeError(target) is not DuelError.None and var error) return Reject(error);
         if (State.Phase == DuelPhase.Standby && AnyUpkeepDue(State.ActivePlayer)) return Reject(DuelError.UpkeepPending);
         var responder = Other(State.ActivePlayer);
-        if (!OpenWindowActivations(responder).Any()) return Advance(target);
+        if (!OpenWindowActivations(responder).Any() && !QuickMonsterReady(responder)) return Advance(target);
         var window = new PendingOpenWindow(checked(State.Revision + 1), responder, target);
         return Accept(State.WithBookkeeping(State.Bookkeeping with { OpenWindow = window }),
             new OpenWindowRequested(responder, window.DecisionId, target));
@@ -435,7 +436,7 @@ public sealed partial class DuelEngine
     private DuelActionResult ExecuteOpenWindow(DuelCommand command)
     {
         var window = State.OpenWindow!;
-        long id = command switch { PassChainResponse c => c.DecisionId, ActivateChainResponse c => c.DecisionId, _ => -1 };
+        long id = command switch { PassChainResponse c => c.DecisionId, ActivateChainResponse c => c.DecisionId, ActivateMonsterChainResponse c => c.DecisionId, _ => -1 };
         if (id == -1) return Reject(DuelError.OpenWindowPending);
         if (id != window.DecisionId) return Reject(DuelError.StaleChainDecision);
         if (command.Player != window.Responder) return Reject(DuelError.NotChainResponder);
@@ -451,6 +452,7 @@ public sealed partial class DuelEngine
         }
         if (command is PassChainResponse)
             return Advance(window.RequestedPhase, cleared, new OpenWindowPassed(window.Responder));
+        if (command is ActivateMonsterChainResponse quick) return BeginMonsterEffect(quick.Player, quick.MonsterZone, null, cleared, window: true);
         var response = (ActivateChainResponse)command;
         if (response.SpellTrapZone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
         var source = State.GetPlayer(window.Responder).SpellTrapFields[response.SpellTrapZone];
@@ -604,6 +606,7 @@ public sealed partial class DuelEngine
                     DamageBothPlayersStep both => DamageBothPlayers(state, controller, both, definition.EffectId, events),
                     SummonTokensStep tokens => SummonTokens(state, link, tokens, events),
                     ShuffleDeckStep => ShuffleDeck(state, controller, definition.EffectId, events),
+                    ReturnSourceToDeckTopStep => ReturnSourceToDeckTop(state, link, definition.EffectId, events),
                     DestroyTargetStep => DestroyTarget(state, link, events),
                     DestroyOpponentFaceUpMonstersStep => DestroyOpponentFaceUpMonsters(state, Other(controller), events),
                     NegateActivationStep negate => NegateLink(state, links, link, ChainNegation.Activation, negate.DestroySource, events),
@@ -796,8 +799,10 @@ public sealed partial class DuelEngine
         }
     }
 
-    private DuelState DestroyFieldCard(DuelState state, FieldCardTarget target, List<DuelEvent> events) =>
-        target.Location == FieldLocation.MonsterZone
+    /// <summary>Destroys a field card by a card effect, unless a replacement applies; rule-driven destruction cannot be replaced.</summary>
+    private DuelState DestroyFieldCard(DuelState state, FieldCardTarget target, List<DuelEvent> events, bool replaceable = true) =>
+        replaceable && ReplacedDestruction(state, target, events) is { } kept ? kept
+        : target.Location == FieldLocation.MonsterZone
             ? SendFieldCardToGraveyard(RemovePlacement(state, target), target.Card, new MonsterDestroyed(target.Player, target.Zone, target.Card), events)
             : RemoveFieldSpell(state, new SpellTrapTarget(target.Player, target.Zone, target.Card, target.PlacementId,
                 target.Location == FieldLocation.PendulumZone),
@@ -847,6 +852,7 @@ public sealed partial class DuelEngine
     /// <summary>Destroys a field monster and banishes it instead of sending it to the Graveyard; a Token ceases to exist.</summary>
     private DuelState DestroyAndBanishFieldCard(DuelState state, FieldCardTarget target, string effectId, List<DuelEvent> events)
     {
+        if (ReplacedDestruction(state, target, events) is { } kept) return kept;
         state = RemovePlacement(state, target);
         var card = target.Card;
         bool token = IsTokenId(card.GameCardId);
@@ -1100,6 +1106,8 @@ public sealed partial class DuelEngine
             events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
             return state;
         }
+        var bound = new FieldCardTarget(target.Player, target.IsPendulumZone ? FieldLocation.PendulumZone : FieldLocation.SpellTrapZone, target.Zone, target.Card, target.PlacementId);
+        if (ReplacedDestruction(state, bound, events) is { } kept) return kept;
         return RemoveFieldSpell(state, target, new SpellTrapDestroyed(target.Player, target.Zone, target.Card, target.IsPendulumZone), events);
     }
 

@@ -9,13 +9,20 @@ public sealed record MonsterBinding(PlayerId Player, int Zone, CardInstance Card
 }
 public sealed record EffectTimingPoint(long TransitionId, int Step);
 public sealed record MonsterEventOccurrence(MonsterEventKind Kind, MonsterBinding Subject,
-    EffectTimingPoint? TimingPoint = null, bool IsActivationCost = false, bool ByBattle = false);
+    EffectTimingPoint? TimingPoint = null, bool IsActivationCost = false, bool ByBattle = false)
+{
+    /// <summary>The subject left a Spell/Trap Zone, so it is not a monster for other cards' monster triggers.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool FromSpellTrapZone { get; internal init; }
+}
 public sealed record TriggerActivation(int Id, TriggerEffectProfile Profile, MonsterBinding Source,
     MonsterEventOccurrence Occurrence, CardInstance? DiscardedCost = null, int PaidLifePoints = 0,
     MonsterBinding? Target = null, FieldCardTarget? TargetCard = null)
 {
     public PlayerId Player => Source.Player;
     public IReadOnlyList<CardInstance> DetachedCost { get; internal init; } = Array.AsReadOnly(Array.Empty<CardInstance>());
+    /// <summary>The monster Tributed to pay this trigger's cost.</summary>
+    public MonsterBinding? TributedCost { get; internal init; }
 }
 
 /// <summary>All trigger groups are ordered before either player may add a fast response.</summary>
@@ -54,7 +61,7 @@ public sealed record EffectiveMonsterStatistics(MonsterBinding Monster, int? Att
 public sealed record TriggerUse(PlayerId Player, int Turn, string Key, int? InstanceId, long? PlacementId);
 public sealed record MonsterEffectNegation(string EffectId, MonsterBinding Source, MonsterBinding Target,
     long ResolutionId, int ExpiresOnTurn, int ActionOrdinal = 0);
-public enum TriggerCommitmentKind { DiscardCost, MonsterTarget, DetachCost, ZoneTarget }
+public enum TriggerCommitmentKind { DiscardCost, MonsterTarget, DetachCost, ZoneTarget, TributeCost }
 public sealed class PendingTriggerCommitment
 {
     public long DecisionId { get; }

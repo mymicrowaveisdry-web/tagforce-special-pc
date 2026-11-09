@@ -81,7 +81,9 @@ public sealed partial class DuelEngine
         triggerEffects = (experimentalTriggerEffects ?? []).ToArray();
         continuousEffects = (experimentalContinuousEffects ?? []).ToArray();
         continuousNegations = (experimentalContinuousNegations ?? []).ToArray();
-        if (triggerEffects.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) || rule.Category != CardCategory.Monster ||
+        // Spells and Traps may only have effects that activate once they are in the Graveyard.
+        if (triggerEffects.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) ||
+                rule.Category != CardCategory.Monster && !(p.SourceLocation == TriggerSourceLocation.GraveyardSelf && rule.Category is CardCategory.Spell or CardCategory.Trap) ||
                 p.DiscardCardIds.Any(id => !knownIds.Contains(id)) ||
                 p.Target is { } target && target.AllowedCardIds.Any(id => !knownIds.Contains(id) ||
                     !this.rules.TryGetValue(id, out var targetRule) || targetRule.Category != CardCategory.Monster)))
@@ -161,7 +163,7 @@ public sealed partial class DuelEngine
         if (shuffleSeed is null && triggerEffects.Any(p => p.Definition is { } d && NeedsShuffle(d)))
             throw new ArgumentException("Triggers that search or Summon from the Deck need a seed.", nameof(shuffleSeed));
         // Attack-declaration and Damage Step responses only have a window in the staged flow.
-        this.experimentalBattleFlow = this.experimentalBattleFlow || definitionList.Any(d => d.Conditions.Any(c => c is OpponentAttackDeclaredCondition or BattleTimingCondition));
+        this.experimentalBattleFlow = this.experimentalBattleFlow || definitionList.Any(d => d.Kind == EffectKind.MonsterQuick || d.Conditions.Any(c => c is OpponentAttackDeclaredCondition or BattleTimingCondition));
         definitions = definitionList.ToFrozenDictionary(d => d.CardId);
         definitionDecisions = definitionList.Where(d => d.Cost is DiscardCost or TributeCost or BanishFromGraveyardCost || d.Target is not null || d.FieldTargets.Any(t => !EffectDefinition.IsAutomatic(t)))
             .ToFrozenDictionary(d => d.CardId, d => new DecisionSequence(DefinitionSequenceId(d),
@@ -242,7 +244,7 @@ public sealed partial class DuelEngine
         if (State.PendingDecision is not null && State.PendingSpellActivation is { } activating &&
             definitions.ContainsKey(activating.Spell.GameCardId))
             return command is DecisionCommand decision ? AnswerDecision(decision) : Reject(DuelError.DecisionPending);
-        if (command is AdvanceBattle or PassBattleResponse or ChooseAttackReplay or ActivateBattleResponse or ActivateHandBattleResponse)
+        if (command is AdvanceBattle or PassBattleResponse or ChooseAttackReplay or ActivateBattleResponse or ActivateHandBattleResponse or ActivateMonsterBattleResponse)
         {
             if (!experimentalBattleFlow) return Reject(DuelError.BattleFlowNotEnabled);
             if (State.Battle is null) return Reject(DuelError.NoBattleInProgress);
@@ -474,7 +476,7 @@ public sealed partial class DuelEngine
             var player = next.GetPlayer(playerId);
             var zones = player.MonsterZones.ToArray();
             var card = zones[zone]!.Card;
-            if (ReplaceDestruction(next, new(playerId, zone, card, zones[zone]!.PlacementId), events) is { } replaced)
+            if (ReplaceDestruction(next, new(playerId, zone, card, zones[zone]!.PlacementId), DestructionCause.Battle, events) is { } replaced)
             {
                 next = replaced;
                 return;
@@ -502,6 +504,7 @@ public sealed partial class DuelEngine
     private DuelActionResult FinishTurn()
     {
         if (State.Phase != DuelPhase.End) return Reject(DuelError.WrongPhase);
+        if (AnyUpkeepDue(State.ActivePlayer)) return Reject(DuelError.UpkeepPending);
         if (State.GetPlayer(State.ActivePlayer).Hand.Count > 6) return Reject(DuelError.HandLimitExceeded);
         var player = Other(State.ActivePlayer);
         var next = State.With(activePlayer: player, turnNumber: State.TurnNumber + 1,

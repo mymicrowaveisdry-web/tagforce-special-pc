@@ -149,6 +149,8 @@ public sealed partial class DuelEngine
             case ChainOperation.TriggerEffect: return Reject(DuelError.InvalidEffectState);
             default: return Reject(DuelError.UnsupportedChainResolution);
         }
+        if (link.Operation is ChainOperation.Definition or ChainOperation.EffectSummon && !link.ActivationNegated && rules[activation.Spell.GameCardId].Category == CardCategory.Spell)
+            next = AddSpellCounters(next, activation.Spell, events);
         events.Add(new ChainLinkResolved(link.Number, activation.EffectId));
         if (chain.NextLink > 1)
             return Accept(next.WithChain(new(checked(State.Revision + 1), links, chain.Responder,
@@ -177,8 +179,8 @@ public sealed partial class DuelEngine
                 !(definitions[receipt.Spell.GameCardId].Kind == EffectKind.EquipSpell && field.EquippedTo is null)) continue;
             next = next.With(player: player.WithSpellTrapAt(receipt.SpellTrapZone, null).With(graveyard: player.Graveyard.Append(receipt.Spell)));
             events.Add(rules[receipt.Spell.GameCardId].Category == CardCategory.Trap
-                ? new ChainTrapSentToGraveyard(player.Id, receipt.Spell, receipt.SpellTrapZone)
-                : new SpellSentToGraveyard(player.Id, receipt.Spell, receipt.SpellTrapZone));
+                ? new ChainTrapSentToGraveyard(player.Id, receipt.Spell, receipt.SpellTrapZone) { ActivationNegated = entry.ActivationNegated }
+                : new SpellSentToGraveyard(player.Id, receipt.Spell, receipt.SpellTrapZone) { ActivationNegated = entry.ActivationNegated });
         }
         events.Add(new ChainCompleted());
         next = next.WithChain(null).WithDecision(null, State.DecisionResult);
@@ -226,7 +228,7 @@ public sealed partial class DuelEngine
             if (field is not null && field.Card == receipt.Spell && field.PlacementId == target.SourcePlacementId)
             {
                 var binding = new SpellTrapTarget(player.Id, receipt.SpellTrapZone, receipt.Spell, field.PlacementId, target.IsPendulumScale);
-                next = RemoveFieldSpell(next, binding, new SpellTrapDestroyed(player.Id, receipt.SpellTrapZone, receipt.Spell, target.IsPendulumScale),
+                next = RemoveFieldSpell(next, binding, new SpellTrapDestroyed(player.Id, receipt.SpellTrapZone, receipt.Spell, target.IsPendulumScale) { ActivationNegated = negation == ChainNegation.Activation },
                     events, activationNegated: target.IsPendulumScale && negation == ChainNegation.Activation);
             }
         }

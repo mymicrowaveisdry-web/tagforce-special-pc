@@ -185,6 +185,8 @@ public sealed class DuelActionSource
         {
             for (int z = 0; z < 5; z++)
                 yield return B(new ActivateChainResponse(player, window.DecisionId, z), ActionKind.ChainResponse, $"Activate set zone {z + 1}", zone: z);
+            for (int z = 0; z < 5; z++)
+                yield return B(new ActivateMonsterChainResponse(player, window.DecisionId, z), ActionKind.MonsterEffect, $"Activate monster [{z + 1}]", own.MonsterZones[z]?.Card.InstanceId, z);
             yield return B(new PassChainResponse(player, window.DecisionId), ActionKind.ChainPass, "Pass");
             yield break;
         }
@@ -230,7 +232,10 @@ public sealed class DuelActionSource
         if (state.Battle is { } battle)
         {
             for (int z = 0; z < 5; z++)
+            {
                 yield return B(new ActivateBattleResponse(player, battle.Window.DecisionId, z), ActionKind.BattleResponse, $"Battle response [{z + 1}]", zone: z);
+                yield return B(new ActivateMonsterBattleResponse(player, battle.Window.DecisionId, z), ActionKind.MonsterEffect, $"Battle monster effect [{z + 1}]", own.MonsterZones[z]?.Card.InstanceId, z);
+            }
             foreach (var card in own.Hand)
                 for (int z = 0; z < 5; z++)
                     yield return B(new ActivateHandBattleResponse(player, battle.Window.DecisionId, card.InstanceId, z), ActionKind.BattleResponse,

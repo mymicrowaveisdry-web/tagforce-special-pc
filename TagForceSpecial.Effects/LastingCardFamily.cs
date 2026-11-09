@@ -13,7 +13,7 @@ public static class LastingCardFamily
     private const uint SpellKind = 13, TrapKind = 14, EffectMonsterKind = 1, UnionKind = 8, ToonKind = 28;
     private const uint IconEquip = 3, IconField = 2, IconContinuous = 4;
     private const uint Beastwarrior = 12, Warrior = 15, Fiend = 3, Spellcaster = 18, Fairy = 17;
-    private const uint XHeadCannon = 5504, YDragonHead = 5552, ZMetalTank = 5555;
+    private const uint Machine = 7, XHeadCannon = 5504, YDragonHead = 5552, ZMetalTank = 5555, HeavyMech = 6181;
     private const string Cleanup = "Activation negated: sent to the Graveyard. Effect negated: stays and does not apply.";
     private const string MonsterCleanup = "Negation skips the link; the monster stays unless the negating effect destroys it.";
 
@@ -49,14 +49,29 @@ public static class LastingCardFamily
             "Destroyed when the equipped monster leaves the field or is flipped face-down."), [definition], [], SpellKind, IconEquip, SpellRules);
     }
 
-    private static Entry Union(uint id, string name, int bonus, CardFilter targets)
+    /// <summary>A plain Equip that also activates from the Graveyard when sent there from the field.</summary>
+    private static Entry EquipWithGraveyardEffect(uint id, string name, int attack, int defense, string operation, EffectStep[] steps, TriggerRequirement requirement,
+        string costs = "none", int lifePoints = 0, bool tribute = false)
+    {
+        var equip = new EffectDefinition($"lasting-{id}-equip-v1", id, EffectKind.EquipSpell, [new EquipTargetStep()], fieldTargets: [FaceUpMonster],
+            lastingModifiers: [new LastingStatModifier(TargetSide.Either, attack, defense, equippedOnly: true)]);
+        var trigger = new EffectDefinition($"lasting-{id}-graveyard-v1", id, EffectKind.MonsterTrigger, steps);
+        return new(Profile(id, name, CardKind.Spell, equip, operation, "Own Main Phase, with a face-up monster to equip.", costs, "1 face-up monster on the field.",
+                "Its Graveyard effect does not activate if its activation was negated."),
+            [equip, trigger], [new(trigger, MonsterEventKind.SentToGraveyard, EffectRelation.Self, requirement, TriggerSourceLocation.GraveyardSelf, TriggerTiming.When,
+                TriggerEventCause.FromField, lifePointCost: lifePoints) { TributeCost = tribute }], SpellKind, IconEquip, SpellRules);
+    }
+
+    private static Entry Union(uint id, string name, int bonus, CardFilter targets, DestructionCause replaces = DestructionCause.Battle)
     {
         var definition = new EffectDefinition($"lasting-{id}-union-v1", id, EffectKind.MonsterIgnition, [new UnionEquipStep()],
             fieldTargets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Own, FieldCardFilter.FaceUp, cardFilter: targets, noUnionEquipped: true)],
-            lastingModifiers: [new LastingStatModifier(TargetSide.Either, bonus, bonus, equippedOnly: true)], oncePerTurn: true);
+            lastingModifiers: [new LastingStatModifier(TargetSide.Either, bonus, bonus, equippedOnly: true)], oncePerTurn: true, unionReplaces: replaces);
         return new(Profile(id, name, CardKind.Monster, definition, $"Equip to a listed monster you control, or unequip and Special Summon in Attack Position. Equipped monster gains {bonus} ATK and DEF.",
             "Own Main Phase; once per turn across both options.", "none", "1 listed monster you control without a Union equip.",
-            "If the equipped monster would be destroyed by battle, this card is destroyed instead. The unequip uses the lowest free Monster Zone."), [definition], [], UnionKind, 0, MonsterRules);
+            replaces == DestructionCause.Any
+                ? "If the equipped monster would be destroyed, this card is destroyed instead. The unequip uses the lowest free Monster Zone."
+                : "If the equipped monster would be destroyed by battle, this card is destroyed instead. The unequip uses the lowest free Monster Zone."), [definition], [], UnionKind, 0, MonsterRules);
     }
 
     private static Entry Toon(uint id, string name, uint tributes) =>
@@ -81,6 +96,8 @@ public static class LastingCardFamily
     private static EffectDefinition ImperialOrder { get; } = new("lasting-4960-negate-v1", 4960, EffectKind.ContinuousTrap, [], negation: LastingNegation.Spells, upkeepLifePoints: 700);
     private static EffectDefinition MaskOfBrutality { get; } = new("lasting-5108-equip-v1", 5108, EffectKind.EquipSpell, [new EquipTargetStep()], fieldTargets: [FaceUpMonster],
         lastingModifiers: [new LastingStatModifier(TargetSide.Either, 1000, -1000, equippedOnly: true)], upkeepLifePoints: 1000);
+    private static EffectDefinition MagicReflector { get; } = new("lasting-5395-counter-v1", 5395, EffectKind.NormalSpell, [new PlaceCounterStep(1, int.MaxValue, protective: true)],
+        fieldTargets: [new FieldTarget(FieldCardKind.SpellTrap, TargetSide.Own, FieldCardFilter.FaceUp, cardFilter: new CardCategoryFilter(CardCategory.Spell))]);
     private static EffectDefinition CannonSoldier { get; } = new("lasting-4518-burn-v1", 4518, EffectKind.MonsterIgnition, [new DealDamageStep(500)], cost: new TributeCost());
     private static EffectDefinition ExiledForce { get; } = new("lasting-5323-destroy-v1", 5323, EffectKind.MonsterIgnition, [new DestroyTargetsStep()], cost: new TributeSelfCost(),
         fieldTargets: [new FieldTarget(FieldCardKind.Monster)]);
@@ -108,8 +125,15 @@ public static class LastingCardFamily
         Toon(4773, "Blue-Eyes Toon Dragon", 2),
         Union(YDragonHead, "Y-Dragon Head", 400, new CardIdFilter([XHeadCannon])),
         Union(ZMetalTank, "Z-Metal Tank", 600, new CardIdFilter([XHeadCannon, YDragonHead])),
+        Union(HeavyMech, "Heavy Mech Support Platform", 500, new MonsterTypeFilter([Machine]), DestructionCause.Any),
+        EquipWithGraveyardEffect(4317, "Black Pendant", 500, 0, "The equipped monster gains 500 ATK. When sent from the field to the Graveyard: inflict 500 damage to your opponent.", [new DealDamageStep(500)], TriggerRequirement.Mandatory),
+        EquipWithGraveyardEffect(4320, "Horn of the Unicorn", 700, 700, "The equipped monster gains 700 ATK and DEF. When sent from the field to the Graveyard: place it on top of the Deck.", [new ReturnSourceToDeckTopStep()], TriggerRequirement.Mandatory),
+        EquipWithGraveyardEffect(4327, "Malevolent Nuzzler", 700, 0, "The equipped monster gains 700 ATK. When sent from the field to the Graveyard: you can pay 500 LP to place it on top of the Deck.", [new ReturnSourceToDeckTopStep()], TriggerRequirement.Optional, "Graveyard effect: pay 500 LP.", lifePoints: 500),
+        EquipWithGraveyardEffect(4319, "Horn of Light", 0, 800, "The equipped monster gains 800 DEF. When sent from the field to the Graveyard: you can pay 500 LP to place it on top of the Deck.", [new ReturnSourceToDeckTopStep()], TriggerRequirement.Optional, "Graveyard effect: pay 500 LP.", lifePoints: 500),
+        EquipWithGraveyardEffect(4310, "Axe of Despair", 1000, 0, "The equipped monster gains 1000 ATK. When sent from the field to the Graveyard: you can Tribute 1 monster to place it on top of the Deck.", [new ReturnSourceToDeckTopStep()], TriggerRequirement.Optional, "Graveyard effect: Tribute 1 monster.", tribute: true),
         new(Profile(5108, "Mask of Brutality", CardKind.Spell, MaskOfBrutality, "The equipped monster gains 1000 ATK and loses 1000 DEF. Each of your Standby Phases, pay 1000 LP or destroy this card.", "Own Main Phase, with a face-up monster to equip.", "none", "1 face-up monster on the field.",
             "The upkeep is not an effect: it uses no chain and is still owed while this card is negated."), [MaskOfBrutality], [], SpellKind, IconEquip, SpellRules),
+        new(Profile(5395, "Magic Reflector", CardKind.Spell, MagicReflector, "Place 1 counter on the target. If it would be destroyed, remove the counter instead.", "Own Main Phase, with a face-up Spell you control.", "none", "1 face-up Spell Card you control."), [MagicReflector], [], SpellKind, 0, SpellRules),
         new(Profile(4518, "Cannon Soldier", CardKind.Monster, CannonSoldier, "Inflict 500 damage to your opponent.", "Own Main Phase.", "Tribute 1 monster, which can be this card.", "none"), [CannonSoldier], [], EffectMonsterKind, 0, MonsterRules),
         new(Profile(5323, "Exiled Force", CardKind.Monster, ExiledForce, "Destroy the target.", "Own Main Phase.", "Tribute this card.", "1 monster on the field."), [ExiledForce], [], EffectMonsterKind, 0, MonsterRules),
         new(Profile(5655, "Breaker the Magical Warrior", CardKind.Monster, BreakerEffect, "When Normal Summoned, place 1 Spell Counter (max. 1). Gains 300 ATK for each. Remove 1 to destroy the target.", "Own Main Phase; a Spell Counter on it.", "Remove 1 Spell Counter.", "1 Spell/Trap Card on the field."),

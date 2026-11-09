@@ -62,17 +62,28 @@ public sealed record EquipTargetStep : EffectStep;
 /// <summary>Moves the resolving Union monster to a Spell/Trap Zone as an Equip Card on its bound target.</summary>
 public sealed record UnionEquipStep : EffectStep;
 
-/// <summary>Places counters on the bound face-up monster, up to <see cref="Max"/> in total.</summary>
+/// <summary>
+/// Places counters on the bound face-up monster or Spell/Trap, up to <see cref="Max"/> in total. Protective counters
+/// are removed instead of the card being destroyed.
+/// </summary>
 public sealed record PlaceCounterStep : EffectStep
 {
     public int Count { get; }
     public int Max { get; }
-    public PlaceCounterStep(int count, int max)
+    public bool Protective { get; }
+    public PlaceCounterStep(int count, int max, bool protective = false)
     {
         if (count < 1 || max < count) throw new ArgumentOutOfRangeException(nameof(count));
-        Count = count; Max = max;
+        Count = count; Max = max; Protective = protective;
     }
 }
+
+/// <summary>Places the source card from the Graveyard on top of its owner's Deck; skipped if it is no longer there.</summary>
+public sealed record ReturnSourceToDeckTopStep : EffectStep;
+
+/// <summary>What a destruction replacement applies to.</summary>
+[Flags]
+public enum DestructionCause { Battle = 1, Effect = 2, Any = Battle | Effect }
 
 /// <summary>Tribute the activating monster itself (never refunded). The effect still resolves.</summary>
 public sealed record TributeSelfCost : EffectCost;
@@ -100,6 +111,8 @@ public sealed record BanishFromGraveyardCost : EffectCost
 public sealed record ActivateMonsterEffect(PlayerId Player, int MonsterZone) : DuelCommand(Player);
 /// <summary>A face-up monster's quick effect as the next chain link.</summary>
 public sealed record ActivateMonsterChainResponse(PlayerId Player, long DecisionId, int MonsterZone) : DuelCommand(Player);
+/// <summary>A face-up monster's quick effect starting a chain in an open battle window.</summary>
+public sealed record ActivateMonsterBattleResponse(PlayerId Player, long DecisionId, int MonsterZone) : DuelCommand(Player);
 /// <summary>Unequips a Union monster and Special Summons it; shares the Union's once-per-turn use.</summary>
 public sealed record UnequipUnion(PlayerId Player, int SpellTrapZone) : DuelCommand(Player);
 /// <summary>Settles a Standby Phase upkeep by paying LP or destroying the card.</summary>
@@ -128,6 +141,10 @@ public sealed record FieldSpellReplaced(PlayerId Player, CardInstance Card) : Du
 public sealed record UnionEquipped(PlayerId Player, CardInstance Card, int SpellTrapZone, MonsterBinding Target) : DuelEvent;
 /// <summary>A destruction was replaced: the Union equip was destroyed and the monster stayed.</summary>
 public sealed record DestructionReplaced(MonsterBinding Monster, CardInstance Replacement) : DuelEvent;
+/// <summary>A protective counter was removed so the Spell/Trap in that zone was not destroyed.</summary>
+public sealed record SpellTrapDestructionReplaced(PlayerId Player, int Zone, CardInstance Card) : DuelEvent;
+public sealed record SpellTrapCountersPlaced(PlayerId Player, int Zone, CardInstance Card, int Count, int Total) : DuelEvent;
+public sealed record CardPlacedOnDeckTop(PlayerId Owner, CardInstance Card, string EffectId) : DuelEvent;
 public sealed record CountersPlaced(MonsterBinding Monster, int Count, int Total) : DuelEvent;
 public sealed record CountersRemoved(MonsterBinding Monster, int Count, int Total) : DuelEvent;
 public sealed record UpkeepSettled(PlayerId Player, CardInstance Card, bool Paid) : DuelEvent;

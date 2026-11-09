@@ -143,18 +143,71 @@ public sealed partial class DuelEngine
             DecisionCardSource.Hand, events, sourceAlreadyRemoved: true);
     }
 
-    /// <summary>Places counters on a face-up monster; counters cannot go on a face-down card.</summary>
+    /// <summary>Places counters on a face-up card; counters cannot go on a face-down card.</summary>
     private static DuelState PlaceCounters(DuelState state, FieldCardTarget target, PlaceCounterStep step, List<DuelEvent> events)
     {
         var player = state.GetPlayer(target.Player);
+        if (target.Location == FieldLocation.SpellTrapZone)
+        {
+            if (player.SpellTrapAt(target.Zone) is not { IsFaceUp: true } field) return state;
+            int held = step.Protective ? field.ProtectionCounters : field.Counters;
+            if (held >= step.Max) return state;
+            int sum = Math.Min(step.Max, held + step.Count);
+            events.Add(new SpellTrapCountersPlaced(player.Id, target.Zone, field.Card, sum - held, sum));
+            return state.With(player: player.WithSpellTrapAt(target.Zone, step.Protective ? field with { ProtectionCounters = sum } : field with { Counters = sum }));
+        }
         if (player.MonsterZones[target.Zone] is not { Position: not BattlePosition.FaceDownDefense } monster) return state;
-        int current = monster.Counters;
+        int current = step.Protective ? monster.ProtectionCounters : monster.Counters;
         if (current >= step.Max) return state;
         int total = Math.Min(step.Max, current + step.Count);
         var monsters = player.MonsterZones.ToArray();
-        monsters[target.Zone] = monster with { Counters = total };
+        monsters[target.Zone] = step.Protective ? monster with { ProtectionCounters = total } : monster with { Counters = total };
         events.Add(new CountersPlaced(new(target.Player, target.Zone, target.Card, target.PlacementId), total - current, total));
         return state.With(player: player.With(monsters: monsters));
+    }
+
+    private bool? spellCounterGain;
+    private bool HasSpellCounterGain => spellCounterGain ??= definitions.Values.Any(d => d.SpellCounterMax != 0);
+
+    /// <summary>Each face-up card that collects Spell counters gains one when another card's Spell resolves.</summary>
+    private DuelState AddSpellCounters(DuelState state, CardInstance resolved, List<DuelEvent> events)
+    {
+        if (!HasSpellCounterGain) return state;
+        bool spellsNegated = IsSpellsNegated(state);
+        foreach (var (player, zone, field) in ActiveCards(state).ToArray())
+            if (field.Card != resolved && !(spellsNegated && IsSpellCard(field)) && definitions.TryGetValue(field.Card.GameCardId, out var definition) &&
+                definition.SpellCounterMax > field.Counters)
+                state = PlaceCounters(state, new(player, FieldLocation.SpellTrapZone, zone, field.Card, field.PlacementId), new(1, definition.SpellCounterMax), events);
+        foreach (var (binding, monster) in FieldMonsters(state).ToArray())
+            if (monster.Position != BattlePosition.FaceDownDefense && !monster.BattleDestroyed && !state.EventEffects.NegatedMonsters.Contains(binding) &&
+                definitions.TryGetValue(monster.Card.GameCardId, out var definition) && definition.SpellCounterMax > monster.Counters)
+                state = PlaceCounters(state, new(binding.Player, FieldLocation.MonsterZone, binding.Zone, binding.Card, binding.PlacementId), new(1, definition.SpellCounterMax), events);
+        return state;
+    }
+
+    /// <summary>Places the source on top of its owner's Deck, provided it is still in their Graveyard.</summary>
+    private static DuelState ReturnSourceToDeckTop(DuelState state, ChainLink link, string effectId, List<DuelEvent> events)
+    {
+        var card = link.Activation.Spell;
+        var owner = state.GetPlayer(card.Owner);
+        if (!owner.Graveyard.Contains(card))
+        {
+            events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
+            return state;
+        }
+        events.Add(new CardPlacedOnDeckTop(owner.Id, card, effectId));
+        return state.With(player: owner.With(graveyard: owner.Graveyard.Where(c => c != card), deck: new[] { card }.Concat(owner.Deck)));
+    }
+
+    /// <summary>The state after a replacement took a card effect's destruction instead; null when none applies.</summary>
+    private DuelState? ReplacedDestruction(DuelState state, FieldCardTarget target, List<DuelEvent> events)
+    {
+        if (target.Location == FieldLocation.MonsterZone)
+            return ReplaceDestruction(state, new(target.Player, target.Zone, target.Card, target.PlacementId), DestructionCause.Effect, events);
+        var player = state.GetPlayer(target.Player);
+        if (target.Location != FieldLocation.SpellTrapZone || player.SpellTrapAt(target.Zone) is not { ProtectionCounters: > 0 } field) return null;
+        events.Add(new SpellTrapDestructionReplaced(player.Id, target.Zone, field.Card));
+        return state.With(player: player.WithSpellTrapAt(target.Zone, field with { ProtectionCounters = field.ProtectionCounters - 1 }));
     }
 
     private static IEnumerable<(PlayerId Player, int Zone, FieldSpellTrap Field)> LinkedCards(DuelState state) =>
@@ -174,7 +227,7 @@ public sealed partial class DuelEngine
         {
             var target = NextLinkedDestruction(known.Concat(LinkedCards(next)).DistinctBy(e => (e.Field.Card.InstanceId, e.Field.PlacementId)), next, events);
             if (target is null) break;
-            next = DestroyFieldCard(next, target, events);
+            next = DestroyFieldCard(next, target, events, replaceable: false);
         }
         return next;
     }
@@ -209,37 +262,54 @@ public sealed partial class DuelEngine
     }
 
     /// <summary>
-    /// The monster's Union equip is destroyed instead of it in battle, and the monster is then not treated as
-    /// destroyed. Null when nothing replaces this destruction.
+    /// A protective counter, or the monster's Union equip, is lost instead of the monster, which is then not treated
+    /// as destroyed. Null when nothing replaces this destruction.
     /// </summary>
-    private DuelState? ReplaceDestruction(DuelState state, MonsterBinding monster, List<DuelEvent> events)
+    private DuelState? ReplaceDestruction(DuelState state, MonsterBinding monster, DestructionCause cause, List<DuelEvent> events)
     {
         var player = state.GetPlayer(monster.Player);
+        if (player.MonsterZones[monster.Zone] is { ProtectionCounters: > 0 } guarded)
+        {
+            var monsters = player.MonsterZones.ToArray();
+            monsters[monster.Zone] = guarded with { ProtectionCounters = guarded.ProtectionCounters - 1 };
+            events.Add(new DestructionReplaced(monster, monster.Card));
+            return state.With(player: player.With(monsters: monsters));
+        }
         if (IsSpellsNegated(state)) return null;
         for (int zone = 0; zone < 5; zone++)
-            if (player.SpellTrapFields[zone] is { IsUnion: true, EffectActive: true } union && union.EquippedTo == monster)
+            if (player.SpellTrapFields[zone] is { IsUnion: true, EffectActive: true } union && union.EquippedTo == monster &&
+                definitions[union.Card.GameCardId].UnionReplaces.HasFlag(cause))
             {
                 events.Add(new DestructionReplaced(monster, union.Card));
-                return DestroyFieldCard(state, new(player.Id, FieldLocation.SpellTrapZone, zone, union.Card, union.PlacementId), events);
+                return DestroyFieldCard(state, new(player.Id, FieldLocation.SpellTrapZone, zone, union.Card, union.PlacementId), events, replaceable: false);
             }
         return null;
     }
 
-    /// <summary>Starts a monster effect in an open state or as a chain response.</summary>
-    private DuelActionResult BeginMonsterEffect(PlayerId playerId, int zone, PendingChain? chain)
+    private bool? quickMonsters;
+    private bool HasQuickMonsters => quickMonsters ??= definitions.Values.Any(d => d.Kind == EffectKind.MonsterQuick);
+
+    /// <summary>True when the player has a face-up monster whose quick effect could be activated in an open window now.</summary>
+    private bool QuickMonsterReady(PlayerId playerId) => HasQuickMonsters && State.GetPlayer(playerId).MonsterZones.Any(m =>
+        m is { Position: not BattlePosition.FaceDownDefense, BattleDestroyed: false } && definitions.TryGetValue(m.Card.GameCardId, out var definition) &&
+        definition.Kind == EffectKind.MonsterQuick && !(definition.OncePerTurn && UsedThisTurn(m.Card)) &&
+        DefinitionActivationError(definition, ActivationContext.MonsterWindow, playerId, m.Card, null) == DuelError.None);
+
+    /// <summary>Starts a monster effect in an open state, as a chain response, or in an open or battle window.</summary>
+    private DuelActionResult BeginMonsterEffect(PlayerId playerId, int zone, PendingChain? chain, DuelState? from = null, bool window = false)
     {
         if (zone is < 0 or >= 5) return Reject(DuelError.InvalidMonsterZone);
-        if (chain is null && State.Phase is not (DuelPhase.Main1 or DuelPhase.Main2)) return Reject(DuelError.WrongPhase);
+        if (chain is null && !window && State.Phase is not (DuelPhase.Main1 or DuelPhase.Main2)) return Reject(DuelError.WrongPhase);
         var monster = State.GetPlayer(playerId).MonsterZones[zone];
         if (monster is null) return Reject(DuelError.MonsterZoneEmpty);
         if (monster.Position == BattlePosition.FaceDownDefense || monster.BattleDestroyed ||
             !definitions.TryGetValue(monster.Card.GameCardId, out var definition) || !definition.IsMonsterEffect)
             return Reject(DuelError.UnsupportedMonsterEffect);
         if (definition.OncePerTurn && UsedThisTurn(monster.Card)) return Reject(DuelError.EffectAlreadyUsed);
-        var context = chain is null ? ActivationContext.MonsterField : ActivationContext.MonsterChainResponse;
+        var context = window ? ActivationContext.MonsterWindow : chain is null ? ActivationContext.MonsterField : ActivationContext.MonsterChainResponse;
         if (DefinitionActivationError(definition, context, playerId, monster.Card, null, chain?.Links[^1]) is not DuelError.None and var error)
             return Reject(error);
-        var next = State;
+        var next = from ?? State;
         if (definition.OncePerTurn) next = RecordUse(next, monster.Card);
         DuelEvent[] head = [new MonsterEffectActivated(playerId, definition.EffectId, monster.Card, zone)];
         MonsterBinding binding = new(playerId, zone, monster.Card, monster.PlacementId);
@@ -286,7 +356,7 @@ public sealed partial class DuelEngine
 
     private bool UpkeepDue(PlayerId playerId, int zone, FieldSpellTrap field) =>
         field.EffectActive && field.IsFaceUp && field.UpkeepSettledTurn != State.TurnNumber && playerId == State.ActivePlayer &&
-        definitions.TryGetValue(field.Card.GameCardId, out var definition) && definition.UpkeepLifePoints > 0 && State.Phase == DuelPhase.Standby && zone < 5;
+        definitions.TryGetValue(field.Card.GameCardId, out var definition) && definition.UpkeepLifePoints > 0 && definition.UpkeepPhase == State.Phase && zone < 5;
 
     private bool AnyUpkeepDue(PlayerId playerId)
     {
@@ -297,7 +367,7 @@ public sealed partial class DuelEngine
     /// <summary>A maintenance cost is not an effect: it uses no chain, cannot be negated and is still owed while the card is negated.</summary>
     private DuelActionResult ExecuteUpkeep(ResolveUpkeep command)
     {
-        if (State.Phase != DuelPhase.Standby) return Reject(DuelError.WrongPhase);
+        if (State.Phase is not (DuelPhase.Standby or DuelPhase.End)) return Reject(DuelError.WrongPhase);
         if (command.SpellTrapZone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
         var player = State.GetPlayer(command.Player);
         if (player.SpellTrapFields[command.SpellTrapZone] is not { } field || !UpkeepDue(player.Id, command.SpellTrapZone, field))
@@ -306,15 +376,17 @@ public sealed partial class DuelEngine
         if (!command.Pay)
         {
             List<DuelEvent> events = [new UpkeepSettled(player.Id, field.Card, false)];
-            var destroyed = DestroyFieldCard(State, new(player.Id, FieldLocation.SpellTrapZone, command.SpellTrapZone, field.Card, field.PlacementId), events);
+            var destroyed = DestroyFieldCard(State, new(player.Id, FieldLocation.SpellTrapZone, command.SpellTrapZone, field.Card, field.PlacementId), events, replaceable: false);
             return Accept(destroyed, events.ToArray());
         }
         int amount = definition.UpkeepLifePoints;
-        if (player.LifePoints <= amount) return Reject(DuelError.InsufficientLifePoints);
+        if (player.LifePoints < amount) return Reject(DuelError.InsufficientLifePoints);
         int left = player.LifePoints - amount;
         var paid = State.With(player: player.With(lifePoints: left).WithSpellTrapAt(command.SpellTrapZone, field with { UpkeepSettledTurn = State.TurnNumber }));
         DuelEvent[] settled = [new LifePointsPaid(player.Id, amount, player.LifePoints, left, definition.EffectId), new UpkeepSettled(player.Id, field.Card, true)];
-        return Accept(paid, settled);
+        if (left != 0) return Accept(paid, settled);
+        var outcome = new DuelOutcome(Other(player.Id), player.Id, DuelEndReason.LifePointsDepleted);
+        return Accept(paid.With(outcome: outcome), [.. settled, new DuelEnded(outcome)]);
     }
 
     private DuelActionResult ExecuteToonSummon(ToonSummon command)

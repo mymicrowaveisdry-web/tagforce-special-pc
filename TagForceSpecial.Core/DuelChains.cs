@@ -69,7 +69,17 @@ public sealed record ChainLinkResolved(int Number, string EffectId) : DuelEvent;
 public sealed record ChainLinkNegated(int Number, int ByLinkNumber, ChainNegation Negation) : DuelEvent;
 public sealed record ChainLinkSkipped(int Number, ChainSkipReason Reason) : DuelEvent;
 public sealed record ChainResponseActivated(PlayerId Player, string EffectId, CardInstance Card, int Zone) : DuelEvent;
-public sealed record ChainTrapSentToGraveyard(PlayerId Player, CardInstance Card, int Zone) : DuelEvent;
+public sealed record ChainTrapSentToGraveyard(PlayerId Player, CardInstance Card, int Zone) : DuelEvent
+{
+    /// <summary>A negated activation goes to the Graveyard without counting as sent from the field.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool ActivationNegated { get; internal init; }
+}
 public sealed record ChainCompleted : DuelEvent;
-public sealed record SpellTrapDestroyed(PlayerId Player, int Zone, CardInstance Card, bool IsPendulumZone = false) : DuelEvent;
+public sealed record SpellTrapDestroyed(PlayerId Player, int Zone, CardInstance Card, bool IsPendulumZone = false) : DuelEvent
+{
+    /// <summary>Destroyed while its activation was negated, so it does not count as sent from the field.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool ActivationNegated { get; internal init; }
+}
 public sealed record TokenSpecialSummoned(PlayerId Player, int Zone, FieldMonster Monster) : DuelEvent;

@@ -100,6 +100,8 @@ public sealed class TriggerEffectProfile
     public TriggerEventCause Cause { get; }
     /// <summary>The source must be a Gemini monster that has gained its effects.</summary>
     public bool RequiresGeminiActive { get; }
+    /// <summary>Activating this trigger costs Tributing 1 monster its controller chooses.</summary>
+    public bool TributeCost { get; init; }
 
     /// <summary>A trigger whose resolution is a <see cref="EffectKind.MonsterTrigger"/> definition.</summary>
     public TriggerEffectProfile(EffectDefinition definition, MonsterEventKind eventKind, EffectRelation relation, TriggerRequirement requirement,

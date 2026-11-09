@@ -61,6 +61,10 @@ public sealed partial class DuelEngine
                 (next, trigger) = PayTriggerCost(next, trigger, null, events);
                 queue[0] = trigger;
             }
+            if (trigger.Profile.TributeCost && trigger.TributedCost is null)
+                return RequestTriggerCommitment(next, remaining, committed, queue,
+                    new(checked(State.Revision + 1), trigger, TriggerCommitmentKind.TributeCost,
+                        targets: FieldMonsters(next).Where(e => e.Binding.Player == trigger.Player && !e.Monster.BattleDestroyed).Select(e => e.Binding)), events);
             if (trigger.Profile.Target is not null && trigger.Target is null)
                 return RequestTriggerCommitment(next, remaining, committed, queue,
                     new(checked(State.Revision + 1), trigger, TriggerCommitmentKind.MonsterTarget,
@@ -182,6 +186,15 @@ public sealed partial class DuelEngine
                 if (chosen is null || !chosen.IsStillPresent(State)) return Reject(DuelError.InvalidTriggerCommitment);
                 trigger = trigger with { TargetCard = chosen };
                 events.Add(new TriggerZoneTargetChosen(trigger, chosen));
+                break;
+            }
+            case ChooseTriggerMonsterTarget tribute when pending.Kind == TriggerCommitmentKind.TributeCost:
+            {
+                var paid = pending.TargetOptions.SingleOrDefault(t => t.Player == tribute.TargetPlayer && t.Zone == tribute.MonsterZone && t.Card.InstanceId == tribute.CardInstanceId);
+                if (paid is null || !paid.IsStillPresent(State)) return Reject(DuelError.InvalidTriggerCommitment);
+                next = SendFieldCardToGraveyard(RemovePlacement(next, new(paid.Player, FieldLocation.MonsterZone, paid.Zone, paid.Card, paid.PlacementId)),
+                    paid.Card, new MonsterTributed(paid), events);
+                trigger = trigger with { TributedCost = paid };
                 break;
             }
             case ChooseTriggerMonsterTarget target:

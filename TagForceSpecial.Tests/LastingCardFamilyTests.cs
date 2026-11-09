@@ -740,6 +740,267 @@ public sealed class LastingCardFamilyTests
         Assert.Equal(8000, P(e, PlayerId.One).LifePoints);
     }
 
+    // Graveyard effects of Spells and Traps
+
+    private const uint Pendant = 4317, Unicorn = 4320, Nuzzler = 4327, Axe = 4310, HeavyMech = 6181, Reflector = 5395,
+        Quicky = 920, Collector = 921, EndUpkeep = 922, Watcher = 923, Shield = 924;
+
+    private static DuelEngine EquippedThenAttacked(uint equip, uint attacker)
+    {
+        var e = Engine(Deck(equip), Deck(attacker));
+        EnterMain(e); Summon(e, W, 0);
+        Activate(e, equip);
+        Target(e, PlayerId.One, FieldLocation.MonsterZone, 0);
+        Resolve(e);
+        Next(e); Activate(e, attacker);
+        Resolve(e);
+        return e;
+    }
+
+    [Fact]
+    public void EquipSentFromTheFieldActivatesItsGraveyardEffect()
+    {
+        var e = EquippedThenAttacked(Pendant, Storm);
+        EventEffectScenario.Drain(e);
+        Assert.Equal(7500, P(e, PlayerId.Two).LifePoints);
+    }
+
+    [Fact]
+    public void EquipDestroyedByLosingItsMonsterCountsAsSentFromTheField()
+    {
+        var e = EquippedThenAttacked(Pendant, Hole);
+        EventEffectScenario.Drain(e);
+        Assert.Equal(7500, P(e, PlayerId.Two).LifePoints);
+    }
+
+    [Fact]
+    public void NegatedActivationDoesNotCountAsSentFromTheField()
+    {
+        var e = Engine(Deck(Pendant), Deck(Negate));
+        EnterMain(e); Next(e);
+        SetCard(e, Negate, 0); Next(e);
+        Summon(e, W, 0);
+        Activate(e, Pendant);
+        Target(e, PlayerId.One, FieldLocation.MonsterZone, 0);
+        Respond(e, PlayerId.Two, 0);
+        Resolve(e);
+        Assert.Null(e.State.EventEffects.PendingTriggers);
+        Assert.Equal(8000, P(e, PlayerId.Two).LifePoints);
+    }
+
+    [Fact]
+    public void GraveyardEffectCanPlaceTheCardOnTopOfTheDeck()
+    {
+        var e = EquippedThenAttacked(Unicorn, Storm);
+        EventEffectScenario.Drain(e);
+        Assert.Equal(Unicorn, P(e, PlayerId.One).Deck[0].GameCardId);
+        Assert.False(InGraveyard(e, PlayerId.One, Unicorn));
+    }
+
+    [Fact]
+    public void OptionalGraveyardEffectPaysItsCostAtActivation()
+    {
+        var e = EquippedThenAttacked(Nuzzler, Storm);
+        EventEffectScenario.Drain(e);
+        Assert.Equal(7500, P(e, PlayerId.One).LifePoints);
+        Assert.Equal(Nuzzler, P(e, PlayerId.One).Deck[0].GameCardId);
+    }
+
+    [Fact]
+    public void TriggerCanTributeAMonsterAsItsCost()
+    {
+        var e = EquippedThenAttacked(Axe, Storm);
+        Assert.Equal(TriggerCommitmentKind.TributeCost, TriggerCommitmentKindOfNext(e));
+        EventEffectScenario.Drain(e);
+        Assert.Null(P(e, PlayerId.One).MonsterZones[0]);
+        Assert.Equal(Axe, P(e, PlayerId.One).Deck[0].GameCardId);
+
+        static TriggerCommitmentKind TriggerCommitmentKindOfNext(DuelEngine e)
+        {
+            var batch = e.State.EventEffects.PendingTriggers!;
+            Ok(e, new ChooseTriggerOrder(batch.Player, batch.DecisionId, batch.Options.Select(t => t.Id).ToArray()));
+            return e.State.EventEffects.PendingCommitment!.Kind;
+        }
+    }
+
+    [Fact]
+    public void SpellTrapLeavingDoesNotFireMonsterTriggers()
+    {
+        var watch = new TriggerEffectProfile("watch", Watcher, MonsterEventKind.Destroyed, EffectRelation.Any, TriggerRequirement.Optional, TriggerOperation.GainLifePoints, lifePointGain: 100);
+        var e = EngineWith(Deck(Watcher, Yami), Deck(Storm), [], [watch]);
+        EnterMain(e); Summon(e, Watcher, 0);
+        Activate(e, Yami, FieldZone); Resolve(e);
+        Next(e); Activate(e, Storm); Resolve(e);
+        Assert.Null(e.State.EventEffects.PendingTriggers);
+    }
+
+    // Quick monster effects
+
+    private static readonly EffectDefinition QuickBurn = new("quick-burn", Quicky, EffectKind.MonsterQuick, [new DealDamageStep(200)]);
+
+    private static DuelEngine QuickOpposingAttack()
+    {
+        var e = EngineWith(Deck(), Deck(Quicky), [QuickBurn]);
+        EnterMain(e); Summon(e, W, 0); Next(e);
+        Summon(e, Quicky, 0); Next(e);
+        Phase(e, DuelPhase.Battle);
+        BattleFlowScenario.Ready(e);
+        return e;
+    }
+
+    [Fact]
+    public void QuickEffectCanBeUsedInABattleWindow()
+    {
+        var e = QuickOpposingAttack();
+        BattleFlowScenario.Declare(e);
+        Ok(e, new ActivateMonsterBattleResponse(PlayerId.Two, e.State.Battle!.Window.DecisionId, 0));
+        Resolve(e);
+        Assert.Equal(7800, P(e, PlayerId.One).LifePoints);
+    }
+
+    [Fact]
+    public void QuickEffectWithoutADamageStepTimingCannotBeUsedInTheDamageStep()
+    {
+        var e = QuickOpposingAttack();
+        BattleFlowScenario.Declare(e);
+        BattleFlowScenario.ToDamage(e, DamageStep.BeforeCalculation);
+        var window = e.State.Battle!.Window;
+        Ok(e, new PassBattleResponse(window.Responder, window.DecisionId));
+        Reject(e, new ActivateMonsterBattleResponse(PlayerId.Two, e.State.Battle!.Window.DecisionId, 0), DuelError.ActivationTimingNotAllowed);
+    }
+
+    [Fact]
+    public void QuickEffectCanAnswerAPhaseChange()
+    {
+        var e = EngineWith(Deck(), Deck(Quicky), [QuickBurn]);
+        EnterMain(e); Next(e);
+        Summon(e, Quicky, 0); Next(e);
+        Ok(e, new ChangePhase(PlayerId.One, DuelPhase.End));
+        Ok(e, new ActivateMonsterChainResponse(PlayerId.Two, e.State.OpenWindow!.DecisionId, 0));
+        Resolve(e);
+        Assert.Equal(7800, P(e, PlayerId.One).LifePoints);
+        Assert.Equal(DuelPhase.Main1, e.State.Phase);
+    }
+
+    // Upkeep
+
+    private static EffectDefinition UpkeepAtEnd(int amount) =>
+        new("end-upkeep", EndUpkeep, EffectKind.ContinuousSpell, [], upkeepLifePoints: amount, upkeepPhase: DuelPhase.End, isMarker: true);
+
+    [Fact]
+    public void EndPhaseUpkeepMustBeSettledBeforeTheTurnEnds()
+    {
+        var e = EngineWith(Deck(EndUpkeep), Deck(), [UpkeepAtEnd(500)]);
+        EnterMain(e); Activate(e, EndUpkeep); Resolve(e);
+        Reject(e, new ResolveUpkeep(PlayerId.One, 4, true), DuelError.WrongPhase);
+        Phase(e, DuelPhase.End);
+        Reject(e, new EndTurn(PlayerId.One), DuelError.UpkeepPending);
+        Ok(e, new ResolveUpkeep(PlayerId.One, 4, true));
+        Assert.Equal(7500, P(e, PlayerId.One).LifePoints);
+        Ok(e, new EndTurn(PlayerId.One));
+    }
+
+    [Fact]
+    public void PayingAnUpkeepWithExactlyEnoughLifePointsEndsTheDuel()
+    {
+        var e = EngineWith(Deck(EndUpkeep), Deck(), [UpkeepAtEnd(8000)]);
+        EnterMain(e); Activate(e, EndUpkeep); Resolve(e);
+        Phase(e, DuelPhase.End);
+        Ok(e, new ResolveUpkeep(PlayerId.One, 4, true));
+        Assert.Equal(PlayerId.One, e.State.Outcome!.Loser);
+    }
+
+    [Fact]
+    public void UpkeepIsStillOwedWhileTheCardIsNegated()
+    {
+        var e = EngineWith(Deck(EndUpkeep, Imperial), Deck(), [UpkeepAtEnd(500)]);
+        EnterMain(e); SetCard(e, Imperial, 0); Next(e); Next(e);
+        Ok(e, new ActivateSetSpell(PlayerId.One, 0)); Resolve(e);
+        Activate(e, EndUpkeep); Resolve(e);
+        Phase(e, DuelPhase.End);
+        Reject(e, new EndTurn(PlayerId.One), DuelError.UpkeepPending);
+    }
+
+    // Counters and replacement
+
+    private static readonly EffectDefinition SpellCollector = new("collector", Collector, EffectKind.ContinuousSpell, [], spellCounterMax: 2, isMarker: true);
+    private static readonly EffectDefinition MonsterShield = new("shield", Shield, EffectKind.NormalSpell, [new PlaceCounterStep(1, 1, protective: true)],
+        fieldTargets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Own, FieldCardFilter.FaceUp)]);
+
+    [Fact]
+    public void LastingCardCollectsOneCounterForEachOtherSpellUpToItsMaximum()
+    {
+        var e = EngineWith(Deck(Collector, Burn, Burn, Burn), Deck(), [SpellCollector]);
+        EnterMain(e); Activate(e, Collector); Resolve(e);
+        Assert.Equal(0, P(e, PlayerId.One).SpellTrapFields[4]!.Counters);
+        for (int zone = 0; zone < 3; zone++) { Activate(e, Burn, zone); Resolve(e); }
+        Assert.Equal(2, P(e, PlayerId.One).SpellTrapFields[4]!.Counters);
+    }
+
+    [Fact]
+    public void NegatedSpellActivationAddsNoCounter()
+    {
+        var e = EngineWith(Deck(Collector, Burn), Deck(Negate), [SpellCollector]);
+        EnterMain(e); Activate(e, Collector); Resolve(e); Next(e);
+        SetCard(e, Negate, 0); Next(e);
+        Activate(e, Burn, 0);
+        Respond(e, PlayerId.Two, 0);
+        Resolve(e);
+        Assert.Equal(0, P(e, PlayerId.One).SpellTrapFields[4]!.Counters);
+    }
+
+    [Fact]
+    public void ProtectiveCounterIsLostInsteadOfTheSpellBeingDestroyed()
+    {
+        var e = Engine(Deck(Yami, Reflector), Deck(Storm));
+        EnterMain(e);
+        Reject(e, new ActivateSpell(PlayerId.One, Hand(e, Reflector).InstanceId, 4), DuelError.DecisionUnavailable);
+        Activate(e, Yami, FieldZone); Resolve(e);
+        Activate(e, Reflector);
+        Target(e, PlayerId.One, FieldLocation.SpellTrapZone, FieldZone);
+        Resolve(e);
+        Assert.Equal(1, P(e, PlayerId.One).FieldSpell!.ProtectionCounters);
+
+        Next(e); Activate(e, Storm);
+        var events = Resolve(e);
+        Assert.Contains(events, ev => ev is SpellTrapDestructionReplaced { Zone: FieldZone });
+        Assert.DoesNotContain(events, ev => ev is SpellTrapDestroyed { Zone: FieldZone });
+        Assert.Equal(0, P(e, PlayerId.One).FieldSpell!.ProtectionCounters);
+    }
+
+    [Fact]
+    public void ProtectiveCounterIsLostInsteadOfTheMonsterBeingDestroyed()
+    {
+        var e = EngineWith(Deck(Shield), Deck(Hole, Hole), [MonsterShield]);
+        EnterMain(e); Summon(e, W, 0);
+        Activate(e, Shield);
+        Target(e, PlayerId.One, FieldLocation.MonsterZone, 0);
+        Resolve(e);
+        Next(e); Activate(e, Hole);
+        var events = Resolve(e);
+        Assert.Contains(events, ev => ev is DestructionReplaced);
+        Assert.DoesNotContain(events, ev => ev is MonsterDestroyed);
+        Assert.NotNull(P(e, PlayerId.One).MonsterZones[0]);
+        Activate(e, Hole, 3); Resolve(e);
+        Assert.Null(P(e, PlayerId.One).MonsterZones[0]);
+    }
+
+    [Fact]
+    public void UnionThatReplacesAnyDestructionAlsoCoversCardEffects()
+    {
+        var e = Engine(Deck(XCannon, HeavyMech), Deck(Hole));
+        EnterMain(e); Summon(e, XCannon, 0); Next(e); Next(e);
+        Summon(e, HeavyMech, 1);
+        Ok(e, new ActivateMonsterEffect(PlayerId.One, 1));
+        Target(e, PlayerId.One, FieldLocation.MonsterZone, 0);
+        Resolve(e);
+        Next(e); Activate(e, Hole);
+        var events = Resolve(e);
+        Assert.Contains(events, ev => ev is DestructionReplaced);
+        Assert.NotNull(P(e, PlayerId.One).MonsterZones[0]);
+        Assert.True(InGraveyard(e, PlayerId.One, HeavyMech));
+    }
+
     // Adapter
 
     [Fact]

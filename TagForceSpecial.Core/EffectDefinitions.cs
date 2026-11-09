@@ -272,6 +272,12 @@ public sealed class EffectDefinition
     public bool OncePerTurn { get; }
     /// <summary>ATK this monster gains for each counter on it.</summary>
     public int AttackPerCounter { get; }
+    /// <summary>The phase of its controller's turn in which the upkeep is owed.</summary>
+    public DuelPhase UpkeepPhase { get; }
+    /// <summary>The destructions of the equipped monster this Union takes instead.</summary>
+    public DestructionCause UnionReplaces { get; }
+    /// <summary>When above zero, this card gains a counter each time a Spell resolves, up to this total.</summary>
+    public int SpellCounterMax { get; }
 
     public ChainSpellSpeed SpellSpeed => Kind switch
     {
@@ -304,7 +310,8 @@ public sealed class EffectDefinition
         IEnumerable<EffectCondition>? conditions = null, EffectCost? cost = null, EffectTarget? target = null,
         bool locksOtherSummonsThisTurn = false, IEnumerable<EffectTarget>? fieldTargets = null,
         IEnumerable<LastingStatModifier>? lastingModifiers = null, LastingNegation negation = LastingNegation.None, int upkeepLifePoints = 0,
-        bool oncePerTurn = false, int attackPerCounter = 0, bool isMarker = false)
+        bool oncePerTurn = false, int attackPerCounter = 0, bool isMarker = false, DuelPhase upkeepPhase = DuelPhase.Standby,
+        DestructionCause unionReplaces = DestructionCause.Battle, int spellCounterMax = 0)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(effectId);
         ArgumentNullException.ThrowIfNull(steps);
@@ -322,6 +329,9 @@ public sealed class EffectDefinition
             (negation != LastingNegation.None || upkeepLifePoints != 0) && !lastingKind ||
             (oncePerTurn || attackPerCounter != 0) && !monsterKind)
             throw new ArgumentException("Negation and upkeep belong to lasting cards; once-per-turn and counter stats to activated monster effects.", nameof(negation));
+        if (upkeepPhase is not (DuelPhase.Standby or DuelPhase.End) || unionReplaces is not (DestructionCause.Battle or DestructionCause.Any) ||
+            spellCounterMax < 0 || spellCounterMax != 0 && !lastingKind && !monsterKind)
+            throw new ArgumentException("Upkeep runs in the Standby or End Phase; a Union replaces battle or any destruction; Spell counters need a card that stays.", nameof(upkeepPhase));
         // A marker has no effect of its own: other cards' rules read it on the field.
         if (snapshot.Length > 32 || snapshot.Length == 0 && lasting.Length == 0 && negation == LastingNegation.None && !(isMarker && lastingKind) ||
             isMarker && (snapshot.Length != 0 || lasting.Length != 0 || negation != LastingNegation.None))
@@ -343,6 +353,7 @@ public sealed class EffectDefinition
                     AddTargetsToHandStep or BanishTargetsStep or ReturnTargetsToGraveyardStep or ShuffleTargetsIntoDeckStep => false,
                     SpecialSummonTargetStep s => s.Position is not (null or BattlePosition.FaceUpAttack or BattlePosition.FaceUpDefense) || !Enum.IsDefined(s.Link),
                     EquipTargetStep or UnionEquipStep or PlaceCounterStep => false,
+                    ReturnSourceToDeckTopStep => kind != EffectKind.MonsterTrigger,
                     BanishFieldTargetsStep or NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep or DestroyAndBanishTargetsStep => false,
                     ModifyCombatantStatsStep s => s.Attack == 0 && s.Defense == 0,
                     BanishAllStep s => !Enum.IsDefined(s.Side) || !Enum.IsDefined(s.Filter),
@@ -396,7 +407,7 @@ public sealed class EffectDefinition
             attaches && fields is not [FieldTarget { Kind: FieldCardKind.Monster, Count: 1, Filter: FieldCardFilter.FaceUp }] ||
             snapshot.Any(s => s is SpecialSummonTargetStep { Link: RevivalLink.Haunted }) && kind != EffectKind.ContinuousTrap ||
             unionEquip && (kind != EffectKind.MonsterIgnition || !oncePerTurn || fields is not [FieldTarget { Kind: FieldCardKind.Monster, Count: 1, Side: TargetSide.Own, Filter: FieldCardFilter.FaceUp, NoUnionEquipped: true }]) ||
-            snapshot.Any(s => s is PlaceCounterStep) && fields is not ([TriggerSourceMonster] or [FieldTarget { Kind: FieldCardKind.Monster, Count: 1 }]))
+            snapshot.Any(s => s is PlaceCounterStep) && fields is not ([TriggerSourceMonster] or [FieldTarget { Count: 1 }]))
             throw new ArgumentException("Equip, revival, Union and counter steps need their card kinds and bound targets.", nameof(steps));
         if (kind == EffectKind.MonsterTrigger && (required.Length != 0 || cost is not null || target is not null || fields is not ([] or [TriggerTargetedMonster] or [TriggerSourceMonster] or [ZoneTarget { MinCount: 1, MaxCount: 1 }]) || locksOtherSummonsThisTurn) ||
             kind != EffectKind.MonsterTrigger && fields.Any(f => f is TriggerTargetedMonster or TriggerSourceMonster))
@@ -415,6 +426,9 @@ public sealed class EffectDefinition
         UpkeepLifePoints = upkeepLifePoints;
         OncePerTurn = oncePerTurn;
         AttackPerCounter = attackPerCounter;
+        UpkeepPhase = upkeepPhase;
+        UnionReplaces = unionReplaces;
+        SpellCounterMax = spellCounterMax;
     }
 }
 

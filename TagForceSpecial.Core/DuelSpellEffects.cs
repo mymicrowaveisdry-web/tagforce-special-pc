@@ -19,6 +19,12 @@ public sealed record FieldSpellTrap(CardInstance Card, bool IsFaceUp, long Place
     /// <summary>The turn this card's Standby Phase upkeep was last settled.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public int UpkeepSettledTurn { get; internal init; }
+    /// <summary>Counters on this card; a card effect places and removes them.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int Counters { get; internal init; }
+    /// <summary>Counters removed instead of this card being destroyed.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int ProtectionCounters { get; internal init; }
 }
 /// <summary>
 /// An activation placed or flipped but still answering its cost/target decisions. A chain response records the
@@ -35,7 +41,12 @@ public sealed record ActivateSpell(PlayerId Player, int CardInstanceId, int Spel
 public sealed record SpellActivated(PlayerId Player, string EffectId, CardInstance Card, int Zone) : DuelEvent;
 public sealed record MonsterSpecialSummoned(PlayerId Player, FieldMonster Monster, int Zone, DecisionCardSource Source,
     string? ProcedureId = null, long? AttemptId = null, string? ProperProcedureId = null) : DuelEvent;
-public sealed record SpellSentToGraveyard(PlayerId Player, CardInstance Card, int Zone, bool IsPendulumZone = false) : DuelEvent;
+public sealed record SpellSentToGraveyard(PlayerId Player, CardInstance Card, int Zone, bool IsPendulumZone = false) : DuelEvent
+{
+    /// <summary>A negated activation goes to the Graveyard without counting as sent from the field.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool ActivationNegated { get; internal init; }
+}
 /// <summary>
 /// Bound to the summoned instance and its uninterrupted field placement; due in the End Phase of
 /// <see cref="DueTurn"/>. If that placement is gone by then, the banishment expires.

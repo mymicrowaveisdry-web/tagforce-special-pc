@@ -55,6 +55,13 @@ public sealed partial class DuelEngine
             if (hand.Player != battle.Window.Responder) return Reject(DuelError.NotBattleResponder);
             return BeginBattleHandDefinition(hand);
         }
+        if (command is ActivateMonsterBattleResponse quick)
+        {
+            if (quick.DecisionId != battle.Window.DecisionId) return Reject(DuelError.StaleBattleDecision);
+            if (battle.Window.Closed) return Reject(DuelError.BattleWindowClosed);
+            if (quick.Player != battle.Window.Responder) return Reject(DuelError.NotBattleResponder);
+            return BeginMonsterEffect(quick.Player, quick.MonsterZone, null, window: true);
+        }
         if (command.Player != State.ActivePlayer) return Reject(DuelError.NotActivePlayer);
         if (command is AdvanceBattle advance && advance.DecisionId != battle.Window.DecisionId ||
             command is ChooseAttackReplay replay && replay.DecisionId != battle.Window.DecisionId)
@@ -227,7 +234,7 @@ public sealed partial class DuelEngine
             }
             void Mark(MonsterBinding binding)
             {
-                if (ReplaceDestruction(next, binding, events) is { } replaced)
+                if (ReplaceDestruction(next, binding, DestructionCause.Battle, events) is { } replaced)
                 {
                     next = replaced;
                     return;

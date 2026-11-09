@@ -37,6 +37,8 @@ public sealed partial class DuelEngine
             state.GetPlayer(trigger.Player).MonsterZones[trigger.Source.Zone]!.XyzMaterials.Count < trigger.Profile.DetachMaterialCount) return false;
         if (trigger.Profile is { Requirement: TriggerRequirement.Optional, Definition: { } definition } && !DefinitionTriggerAvailable(state, trigger, definition)) return false;
         if (trigger is { TargetCard: null, Profile.Definition.FieldTargets: [ZoneTarget zone] } && !ZoneMatches(state, trigger.Player, zone).Any()) return false;
+        if (trigger.Profile.TributeCost && trigger.TributedCost is null &&
+            !FieldMonsters(state).Any(e => e.Binding.Player == trigger.Player && !e.Monster.BattleDestroyed)) return false;
         if (trigger.DiscardedCost is not null || trigger.PaidLifePoints > 0 || trigger.DetachedCost.Count > 0) return true;
         var player = state.GetPlayer(trigger.Player);
         return player.LifePoints > trigger.Profile.LifePointCost &&
@@ -63,9 +65,15 @@ public sealed partial class DuelEngine
             CardDiscarded e => new(e.Player, -1, e.Card, 0),
             ActivationCostPaid e => new(e.Player, -1, e.Card, 0),
             TriggerCostPaid { DiscardedCard: { } card } e => new(e.Trigger.Player, -1, card, 0),
+            // A negated activation or a Pendulum scale is not a Spell/Trap sent from the field.
+            SpellTrapDestroyed { IsPendulumZone: false, ActivationNegated: false } e => new(e.Player, e.Zone, e.Card, 0),
+            SpellSentToGraveyard { IsPendulumZone: false, ActivationNegated: false } e => new(e.Player, e.Zone, e.Card, 0),
+            ChainTrapSentToGraveyard { ActivationNegated: false } e => new(e.Player, e.Zone, e.Card, 0),
+            FieldSpellReplaced e => new(e.Player, DuelPlayerState.FieldZoneIndex, e.Card, 0),
             _ => null
         };
-        if (subject is null || !rules.TryGetValue(subject.Card.GameCardId, out var rule) || rule.Category != CardCategory.Monster) yield break;
+        bool spellTrapLeaving = emitted is SpellTrapDestroyed or SpellSentToGraveyard or ChainTrapSentToGraveyard or FieldSpellReplaced;
+        if (subject is null || !rules.TryGetValue(subject.Card.GameCardId, out var rule) || !spellTrapLeaving && rule.Category != CardCategory.Monster) yield break;
         bool cost = emitted is ActivationCostPaid or TriggerCostPaid or XyzMaterialSentToGraveyard { IsCost: true };
         var point = new EffectTimingPoint(checked(State.Revision + 1), cost ? -1 : emitted.TimingGroup ?? 0);
         var kind = emitted switch
@@ -74,16 +82,16 @@ public sealed partial class DuelEngine
             MonsterSpecialSummoned or TokenSpecialSummoned => MonsterEventKind.SpecialSummoned,
             MonsterFlipSummoned => MonsterEventKind.FlipSummoned,
             BattleFlipEffectWindowOpened => MonsterEventKind.FlippedFaceUp,
-            MonsterDestroyed or SummonNegated => MonsterEventKind.Destroyed,
+            MonsterDestroyed or SummonNegated or SpellTrapDestroyed => MonsterEventKind.Destroyed,
             _ => MonsterEventKind.SentToGraveyard
         };
         // Neither the face-up Extra Deck nor a removed Token is "sent to the Graveyard"; destruction still counts.
         bool notToGraveyard = emitted.FieldDestination is FieldCardDestination.FaceUpExtraDeck or FieldCardDestination.Removed;
         if (kind == MonsterEventKind.SentToGraveyard && notToGraveyard) yield break;
         bool byBattle = emitted is MonsterDestroyed { ByBattle: true };
-        yield return new(kind, subject, point, cost, byBattle);
+        yield return new(kind, subject, point, cost, byBattle) { FromSpellTrapZone = spellTrapLeaving };
         if (kind == MonsterEventKind.Destroyed && !notToGraveyard)
-            yield return new(MonsterEventKind.SentToGraveyard, subject, point, ByBattle: byBattle);
+            yield return new(MonsterEventKind.SentToGraveyard, subject, point, ByBattle: byBattle) { FromSpellTrapZone = spellTrapLeaving };
         if (emitted is MonsterDestroyed { DestroyedBy: { } destroyer } && !notToGraveyard)
             yield return new(MonsterEventKind.DestroyedOpponentByBattle, destroyer, point, ByBattle: true);
         if (emitted is MonsterNormalSummoned summoned)
@@ -132,6 +140,7 @@ public sealed partial class DuelEngine
                     ? destructionSources : FieldMonsters(after);
                 foreach (var profile in triggerEffects.Where(p => p.EventKind == occurrence.Kind && CauseMatches(p, occurrence)).OrderBy(p => p.EffectId, StringComparer.Ordinal))
                 {
+                    if (occurrence.FromSpellTrapZone && profile.SourceLocation == TriggerSourceLocation.FaceUpMonster) continue;
                     if (profile.SourceLocation != TriggerSourceLocation.FaceUpMonster)
                     {
                         // A definition effect in the Graveyard belongs to the card's owner, who may not have controlled it.
