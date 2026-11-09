@@ -58,6 +58,10 @@ public static class CardSupportInventory
         bool fullLastingCatalog = lastingCards.Keys.All(catalogIds.Contains);
         if (fullLastingCatalog) LastingCardFamily.ValidateCatalog(catalog);
         string[] lastingTests = ["LastingCardFamilyTests", "LastingSpellTrapTests", "LastingCardFamilyLocalReferenceTests"];
+        var procedureCards = SummonProcedureFamily.Cards.ToDictionary(c => c.CardId);
+        bool fullProcedureCatalog = procedureCards.Keys.All(catalogIds.Contains);
+        if (fullProcedureCatalog) SummonProcedureFamily.ValidateCatalog(catalog);
+        string[] procedureTests = ["SummonProcedureFamilyTests", "SummonProcedureFamilyLocalReferenceTests"];
         string[] chainTests = ["ChainCardFamilyTests", "ChainInteractionTests", "DuelChainTests", "EmergencyTeleportTests",
             "EmergencyTeleportLifecycleTests", "ChainCardFamilyLocalReferenceTests"];
         string[] subtypeTests = ["MonsterSubtypeFamilyTests", "MonsterSubtypeFamilyLocalReferenceTests"];
@@ -96,6 +100,8 @@ public static class CardSupportInventory
                 ? DefinitionEntry(c, subtype, MonsterSubtypeFamily.FamilyId, MonsterSubtypeFamily.BatchId, subtypeTests, "decoded-metadata; synthetic-rule-test")
             : fullLastingCatalog && lastingCards.TryGetValue(c.GameCardId, out var lasting)
                 ? DefinitionEntry(c, lasting, LastingCardFamily.FamilyId, LastingCardFamily.BatchId, lastingTests, "decoded-metadata; synthetic-rule-test")
+            : fullProcedureCatalog && procedureCards.TryGetValue(c.GameCardId, out var procedureCard)
+                ? DefinitionEntry(c, procedureCard, SummonProcedureFamily.FamilyId, SummonProcedureFamily.BatchId, procedureTests, "decoded-metadata; synthetic-rule-test")
             : PreviewEntry(c);
         object DefinitionEntry(CardDefinition c, DefinitionCardProfile p, string family, string batch, string[] tests, string evidenceClass) => new
         {
@@ -207,7 +213,8 @@ public static class CardSupportInventory
                     fullNegationCatalog ? new { id = SummonNegationFamily.BatchId, family = SummonNegationFamily.FamilyId, cardIds = negationCards.Keys.Order().ToArray() } : null,
                     fullTriggerCatalog ? new { id = MonsterTriggerFamily.BatchId, family = MonsterTriggerFamily.FamilyId, cardIds = triggerCards.Keys.Order().ToArray() } : null,
                     fullSubtypeCatalog ? new { id = MonsterSubtypeFamily.BatchId, family = MonsterSubtypeFamily.FamilyId, cardIds = subtypeCards.Keys.Order().ToArray() } : null,
-                    fullLastingCatalog ? new { id = LastingCardFamily.BatchId, family = LastingCardFamily.FamilyId, cardIds = lastingCards.Keys.Order().ToArray() } : null
+                    fullLastingCatalog ? new { id = LastingCardFamily.BatchId, family = LastingCardFamily.FamilyId, cardIds = lastingCards.Keys.Order().ToArray() } : null,
+                    fullProcedureCatalog ? new { id = SummonProcedureFamily.BatchId, family = SummonProcedureFamily.FamilyId, cardIds = procedureCards.Keys.Order().ToArray() } : null
                 }.OfType<object>().ToArray(),
             unclassifiedCardCount = catalog.Cards.Count(c => !tokens.Contains(c.GameCardId) && !preview.ContainsKey(c.GameCardId) &&
                 !(fullFamilyCatalog && normalMonsters.Contains(c.GameCardId)) && !(fullChainCatalog && chainCards.ContainsKey(c.GameCardId)) &&
@@ -220,7 +227,8 @@ public static class CardSupportInventory
                 !(fullNegationCatalog && negationCards.ContainsKey(c.GameCardId)) &&
                 !(fullTriggerCatalog && triggerCards.ContainsKey(c.GameCardId)) &&
                 !(fullSubtypeCatalog && subtypeCards.ContainsKey(c.GameCardId)) &&
-                !(fullLastingCatalog && lastingCards.ContainsKey(c.GameCardId))),
+                !(fullLastingCatalog && lastingCards.ContainsKey(c.GameCardId)) &&
+                !(fullProcedureCatalog && procedureCards.ContainsKey(c.GameCardId))),
             exampleDeck = PlayablePreview.ExampleDeck
         };
     }

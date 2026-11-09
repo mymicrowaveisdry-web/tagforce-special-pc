@@ -26,7 +26,7 @@ public sealed class SpecialSummonCardProfile
     }
 }
 
-/// <summary>Costless authored procedure, not an activated effect or an inferred real card contract.</summary>
+/// <summary>Authored procedure performed without a chain; any cost is not an effect and stays paid if the Summon is negated.</summary>
 public sealed class SpecialSummonProcedureProfile
 {
     public string ProcedureId { get; }
@@ -35,10 +35,16 @@ public sealed class SpecialSummonProcedureProfile
     public IReadOnlyList<BattlePosition> Positions { get; }
     public bool RequiresEmptyOwnField { get; }
     public bool RequiresOpposingMonster { get; }
+    /// <summary>One filter per card the player must banish from their Graveyard to perform this procedure.</summary>
+    public IReadOnlyList<CardFilter> GraveyardBanishCost { get; }
     public SpecialSummonProcedureProfile(string procedureId, IEnumerable<uint> cardIds,
         DecisionCardSource source = DecisionCardSource.Hand, IEnumerable<BattlePosition>? positions = null,
-        bool requiresEmptyOwnField = false, bool requiresOpposingMonster = false)
+        bool requiresEmptyOwnField = false, bool requiresOpposingMonster = false, IEnumerable<CardFilter>? graveyardBanishCost = null)
     {
+        var banishes = (graveyardBanishCost ?? []).ToArray();
+        if (banishes.Length > 5 || banishes.Any(f => f is null))
+            throw new ArgumentException("Supply up to five Graveyard banish filters.", nameof(graveyardBanishCost));
+        GraveyardBanishCost = Array.AsReadOnly(banishes);
         ArgumentException.ThrowIfNullOrWhiteSpace(procedureId);
         ArgumentNullException.ThrowIfNull(cardIds);
         var ids = cardIds.ToArray();
@@ -55,4 +61,6 @@ public sealed class SpecialSummonProcedureProfile
 }
 
 public sealed record SpecialSummonByProcedure(PlayerId Player, long ExpectedRevision, string ProcedureId,
-    int CardInstanceId, int MonsterZone, BattlePosition Position = BattlePosition.FaceUpAttack) : DuelCommand(Player);
+    int CardInstanceId, int MonsterZone, BattlePosition Position = BattlePosition.FaceUpAttack,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<int>? CostInstanceIds = null) : DuelCommand(Player);

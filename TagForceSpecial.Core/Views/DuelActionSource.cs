@@ -22,7 +22,7 @@ public sealed class DuelActionSource
         var state = engine.State;
         PlayerId actor = Actor(state);
         string unsupported = state.ResearchSliceComplete ? "Research boundary reached"
-            : state.PendingChain?.SummonDecision is not null ? "Effect summon choice is outside this action adapter" : "";
+            : "";
         var status = state.Outcome is not null ? ActionAvailability.Finished
             : unsupported.Length > 0 ? ActionAvailability.Unsupported
             : actor == player ? ActionAvailability.Ready : ActionAvailability.Waiting;
@@ -197,6 +197,21 @@ public sealed class DuelActionSource
             yield return B(new PassSummonResponse(player, summonAttempt.DecisionId), ActionKind.ChainPass, "Pass");
             yield break;
         }
+        if (state.PendingChain?.SummonDecision is { } effectSummon)
+        {
+            int ordinal = 0;
+            foreach (var target in effectSummon.Targets)
+                foreach (var materials in DuelEngine.Subsets(effectSummon.Materials, 5).Take(1024))
+                {
+                    int? empty = Enumerable.Range(0, 5).Where(z => own.MonsterZones[z] is null).Select(z => (int?)z).FirstOrDefault();
+                    if ((empty ?? materials.Select(m => m.Field?.Zone).FirstOrDefault(z => z is not null)) is not int zone) continue;
+                    var ids = materials.Select(m => m.Card.InstanceId).ToArray();
+                    foreach (var position in new[] { BattlePosition.FaceUpAttack, BattlePosition.FaceUpDefense })
+                        yield return B(new ChooseEffectSummon(player, effectSummon.DecisionId, target.InstanceId, ids, zone, position), ActionKind.ChooseCard,
+                            $"Summon {catalog[target.GameCardId].Name} using {string.Join(", ", materials.Select(m => catalog[m.Card.GameCardId].Name))}", target.InstanceId, zone, ordinal++, position);
+                }
+            yield break;
+        }
         if (state.PendingChain?.DefinitionSummon is { } summon)
         {
             foreach (var option in summon.Options)
@@ -272,10 +287,23 @@ public sealed class DuelActionSource
                             $"Toon Summon {name} [{z + 1}] {position}", card.InstanceId, z, position: position, target: tributes.Aggregate(0, (mask, t) => mask | 1 << t));
         }
         yield return B(new ActivateSetSpell(player, DuelPlayerState.FieldZoneIndex), ActionKind.ActivateSetSpell, "Activate set [Field]", own.FieldSpell?.Card.InstanceId, DuelPlayerState.FieldZoneIndex);
+        foreach (var (command, instance, zone, position, tag) in engine.SummonProcedureOptions(state, player))
+            yield return B(command, ActionKind.Summon, $"Special Summon {tag}", instance, zone, tag, position);
         for (int z = 0; z < 5; z++)
         {
             if (own.MonsterZones[z] is { } activated)
-                yield return B(new ActivateMonsterEffect(player, z), ActionKind.MonsterEffect, $"Activate {catalog[activated.Card.GameCardId].Name} [{z + 1}]", activated.Card.InstanceId, z);
+            {
+                int detachCount = engine.DetachCostFor(activated.Card.GameCardId);
+                if (detachCount == 0)
+                    yield return B(new ActivateMonsterEffect(player, z), ActionKind.MonsterEffect, $"Activate {catalog[activated.Card.GameCardId].Name} [{z + 1}]", activated.Card.InstanceId, z);
+                else
+                {
+                    int choice = 0;
+                    foreach (var cards in Combinations(activated.XyzMaterials, detachCount, 0).Take(MaximumTriggerOrders))
+                        yield return B(new ActivateMonsterEffect(player, z, cards.Select(c => c.InstanceId).ToArray()), ActionKind.MonsterEffect,
+                            $"Activate {catalog[activated.Card.GameCardId].Name} [{z + 1}] detaching {string.Join(", ", cards.Select(c => catalog[c.GameCardId].Name))}", activated.Card.InstanceId, z, choice++);
+                }
+            }
             if (own.SpellTrapFields[z] is { } equipped)
             {
                 yield return B(new UnequipUnion(player, z), ActionKind.Unequip, $"Unequip {catalog[equipped.Card.GameCardId].Name}", equipped.Card.InstanceId, z);

@@ -102,6 +102,8 @@ public sealed class TriggerEffectProfile
     public bool RequiresGeminiActive { get; }
     /// <summary>Activating this trigger costs Tributing 1 monster its controller chooses.</summary>
     public bool TributeCost { get; init; }
+    /// <summary>When set, a Special Summon only triggers this if that procedure performed it.</summary>
+    public string? RequiredProcedureId { get; init; }
 
     /// <summary>A trigger whose resolution is a <see cref="EffectKind.MonsterTrigger"/> definition.</summary>
     public TriggerEffectProfile(EffectDefinition definition, MonsterEventKind eventKind, EffectRelation relation, TriggerRequirement requirement,
@@ -205,6 +207,8 @@ public sealed class ContinuousEffectProfile
     public EffectRelation Affects { get; }
     public int AttackDelta { get; }
     public int DefenseDelta { get; }
+    /// <summary>When set, only matching monsters are affected.</summary>
+    public CardFilter? Filter { get; init; }
 
     public ContinuousEffectProfile(string effectId, uint cardId, EffectRelation affects, int attackDelta, int defenseDelta)
     {

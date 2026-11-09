@@ -25,7 +25,7 @@ public sealed partial class DuelEngine
         {
             var monster = player.MonsterZones[material.Zone]!;
             if (monster.BattleDestroyed || profile.RequireFaceUp && monster.Position == BattlePosition.FaceDownDefense ||
-                !profile.MaterialCardIds.Contains(material.Card.GameCardId) ||
+                !profile.AnyMaterial && !profile.MaterialCardIds.Contains(material.Card.GameCardId) ||
                 !rules.TryGetValue(material.Card.GameCardId, out var rule) || !rule.AllowsSummonMaterial ||
                 State.SummonHistory.Any(h => h.Card == material.Card && h.Method == SummonMethod.Token))
                 return Reject(DuelError.SummonMaterialNotAllowed);
@@ -33,7 +33,8 @@ public sealed partial class DuelEngine
         if (profile.Synchro is { } synchro)
         {
             var targetLevel = catalog[target.GameCardId].Statistics.Level;
-            if (IsXyzCard(target) || selected.Any(m => IsXyzCard(m.Card)) || targetLevel == 0 || selected.Count(m => synchro.TunerCardIds.Contains(m.Card.GameCardId)) != 1 ||
+            bool IsTuner(uint id) => synchro.ByTunerRule ? rules[id].IsTuner : synchro.TunerCardIds.Contains(id);
+            if (IsXyzCard(target) || selected.Any(m => IsXyzCard(m.Card)) || targetLevel == 0 || selected.Count(m => IsTuner(m.Card.GameCardId)) != 1 ||
                 selected.Any(m => catalog[m.Card.GameCardId].Statistics.Level == 0) ||
                 selected.Sum(m => (long)catalog[m.Card.GameCardId].Statistics.Level) != targetLevel)
                 return Reject(DuelError.InvalidSummonMaterials);

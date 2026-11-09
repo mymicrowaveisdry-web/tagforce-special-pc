@@ -11,10 +11,12 @@ objects: catalog monster ID, allowed effect-source mask, and an optional require
 proper procedure ID. A policy narrows existing Spell/battle effect allowlists;
 it does not grant an effect, activation or a standalone summon command.
 
-`experimentalSpecialSummonProcedures` registers costless, non-activated
+`experimentalSpecialSummonProcedures` registers non-activated
 `SpecialSummonProcedureProfile` objects: unique ID, explicit card IDs, own Hand /
-Graveyard / Banished source, allowed face-up positions, and optional empty-own-field
-and opposing-monster requirements. Every target needs a card profile. These are
+Graveyard / Banished source, allowed face-up positions, optional empty-own-field
+and opposing-monster requirements, and an optional Graveyard banish cost chosen in
+the command's `CostInstanceIds`. A cost is not an effect and stays paid if the Summon
+is negated. Every target needs a card profile. These are
 authored procedures, not inferred support for real cards. Source Deck is reserved
 for registered effects; there is no unrestricted deck-search procedure.
 
@@ -81,7 +83,7 @@ and [era rulebook](https://img.yugioh-card.com/ygo_cms/ygo/all/uploads/Rulebook_
 They are rules references, not proof that each PSP branch has been reproduced.
 
 Own-source/own-field, single-monster, face-up placement is the supported slice.
-Opponent-source summons, simultaneous groups, material/cost procedures, protection,
+Opponent-source summons, simultaneous groups, protection,
 general Special Summon restrictions, and Ritual/Fusion/Synchro/Xyz/Pendulum proper
 methods need separate profiles and tests. They must not be simulated by overloading
 the main deck or by treating a card-type code as summon eligibility.

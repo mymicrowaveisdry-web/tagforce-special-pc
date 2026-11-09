@@ -22,6 +22,7 @@ public static class ReviewedCardMetadata
             .Concat(MonsterTriggerFamily.Reviewed)
             .Concat(MonsterSubtypeFamily.Reviewed)
             .Concat(LastingCardFamily.Reviewed)
+            .Concat(SummonProcedureFamily.Reviewed)
             .ToFrozenDictionary();
 
     /// <summary>Full reviewed overlay for the reviewed build; throws for any other source.</summary>

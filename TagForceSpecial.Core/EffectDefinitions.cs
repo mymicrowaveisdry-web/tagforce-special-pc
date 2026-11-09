@@ -278,6 +278,8 @@ public sealed class EffectDefinition
     public DestructionCause UnionReplaces { get; }
     /// <summary>When above zero, this card gains a counter each time a Spell resolves, up to this total.</summary>
     public int SpellCounterMax { get; }
+    /// <summary>This monster cannot attack the turn this effect is activated, and cannot activate it after attacking.</summary>
+    public bool LocksOwnAttack { get; }
 
     public ChainSpellSpeed SpellSpeed => Kind switch
     {
@@ -311,7 +313,7 @@ public sealed class EffectDefinition
         bool locksOtherSummonsThisTurn = false, IEnumerable<EffectTarget>? fieldTargets = null,
         IEnumerable<LastingStatModifier>? lastingModifiers = null, LastingNegation negation = LastingNegation.None, int upkeepLifePoints = 0,
         bool oncePerTurn = false, int attackPerCounter = 0, bool isMarker = false, DuelPhase upkeepPhase = DuelPhase.Standby,
-        DestructionCause unionReplaces = DestructionCause.Battle, int spellCounterMax = 0)
+        DestructionCause unionReplaces = DestructionCause.Battle, int spellCounterMax = 0, bool locksOwnAttack = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(effectId);
         ArgumentNullException.ThrowIfNull(steps);
@@ -327,7 +329,7 @@ public sealed class EffectDefinition
             throw new ArgumentException("Only lasting cards and Union equips take up to 8 distinct lasting modifiers.", nameof(lastingModifiers));
         if (!Enum.IsDefined(negation) || upkeepLifePoints < 0 || attackPerCounter < 0 ||
             (negation != LastingNegation.None || upkeepLifePoints != 0) && !lastingKind ||
-            (oncePerTurn || attackPerCounter != 0) && !monsterKind)
+            (oncePerTurn || attackPerCounter != 0 || locksOwnAttack) && !monsterKind)
             throw new ArgumentException("Negation and upkeep belong to lasting cards; once-per-turn and counter stats to activated monster effects.", nameof(negation));
         if (upkeepPhase is not (DuelPhase.Standby or DuelPhase.End) || unionReplaces is not (DestructionCause.Battle or DestructionCause.Any) ||
             spellCounterMax < 0 || spellCounterMax != 0 && !lastingKind && !monsterKind)
@@ -372,8 +374,8 @@ public sealed class EffectDefinition
         if (required.OfType<BattleTimingCondition>().Any(c => c.Windows == BattleTiming.None || (c.Windows & ~BattleTiming.All) != 0 ||
                 c.Windows.HasFlag(BattleTiming.Calculation) && !c.DuringCalculation))
             throw new ArgumentException("A battle timing condition needs supported timings; during calculation needs an explicit exception.", nameof(conditions));
-        if (cost is not (null or DiscardCost or PayLifePointsCost or TributeCost or PayHalfLifePointsCost or TributeSelfCost or RemoveCounterCost or BanishFromGraveyardCost) ||
-            cost is TributeSelfCost or RemoveCounterCost && !monsterKind) throw new ArgumentOutOfRangeException(nameof(cost));
+        if (cost is not (null or DiscardCost or PayLifePointsCost or TributeCost or PayHalfLifePointsCost or TributeSelfCost or RemoveCounterCost or BanishFromGraveyardCost or DetachCost) ||
+            cost is TributeSelfCost or RemoveCounterCost or DetachCost && !monsterKind) throw new ArgumentOutOfRangeException(nameof(cost));
         if (required.OfType<MonsterWouldBeSummonedCondition>().Any(c => c.Kinds is <= 0 || (c.Kinds & ~(SummonKinds.Normal | SummonKinds.Special)) != 0) ||
             snapshot.Any(s => s is NegateSummonStep) != required.Any(c => c is MonsterWouldBeSummonedCondition) || snapshot.Any(s => s is NegateSummonStep) && kind != EffectKind.CounterTrap)
             throw new ArgumentException("Summon negation needs a Counter Trap with a Normal/Special would-be-Summoned condition.", nameof(steps));
@@ -429,6 +431,7 @@ public sealed class EffectDefinition
         UpkeepPhase = upkeepPhase;
         UnionReplaces = unionReplaces;
         SpellCounterMax = spellCounterMax;
+        LocksOwnAttack = locksOwnAttack;
     }
 }
 

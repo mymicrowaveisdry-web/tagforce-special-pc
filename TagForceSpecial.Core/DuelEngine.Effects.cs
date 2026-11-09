@@ -100,6 +100,7 @@ public sealed partial class DuelEngine
         if (definition.Cost is TributeCost && !player.MonsterZones.Any(m => m is not null)) return DuelError.DecisionUnavailable;
         if (definition.Cost is RemoveCounterCost remove && !player.MonsterZones.Any(m => m?.Card == card && m.Counters >= remove.Count)) return DuelError.DecisionUnavailable;
         if (definition.Steps.Any(s => s is UnionEquipStep) && player.SpellTrapFields.All(f => f is not null)) return DuelError.DecisionUnavailable;
+        if (definition.Cost is DetachCost detach && !player.MonsterZones.Any(m => m?.Card == card && m.XyzMaterials.Count >= detach.Count)) return DuelError.DecisionUnavailable;
         if (definitionDecisions.TryGetValue(definition.CardId, out var sequence))
         {
             // Simulate one pick per field target so several targets need distinct cards.
@@ -142,6 +143,8 @@ public sealed partial class DuelEngine
         if (State.Phase is not (DuelPhase.Main1 or DuelPhase.Main2)) return Reject(DuelError.WrongPhase);
         if (zone is < 0 or > DuelPlayerState.FieldZoneIndex) return Reject(DuelError.InvalidSpellTrapZone);
         var source = State.GetPlayer(State.ActivePlayer).SpellTrapAt(zone);
+        if (source is { IsFaceUp: false } && summonEffects.TryGetValue(source.Card.GameCardId, out var summon))
+            return ActivateSummonEffect(source.Card, zone, summon, source);
         if (source is null || source.IsFaceUp || !definitions.TryGetValue(source.Card.GameCardId, out var definition))
             return Reject(DuelError.UnsupportedSpellEffect);
         if (DefinitionActivationError(definition, ActivationContext.OwnSetCard, State.ActivePlayer, source.Card, source) is not DuelError.None and var error)
@@ -452,7 +455,7 @@ public sealed partial class DuelEngine
         }
         if (command is PassChainResponse)
             return Advance(window.RequestedPhase, cleared, new OpenWindowPassed(window.Responder));
-        if (command is ActivateMonsterChainResponse quick) return BeginMonsterEffect(quick.Player, quick.MonsterZone, null, cleared, window: true);
+        if (command is ActivateMonsterChainResponse quick) return BeginMonsterEffect(quick.Player, quick.MonsterZone, null, cleared, window: true, detach: quick.DetachInstanceIds);
         var response = (ActivateChainResponse)command;
         if (response.SpellTrapZone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
         var source = State.GetPlayer(window.Responder).SpellTrapFields[response.SpellTrapZone];
@@ -717,6 +720,9 @@ public sealed partial class DuelEngine
         CardCategoryFilter category => rule.Category == category.Category,
         MonsterTypeFilter types => rule.Category == CardCategory.Monster && catalog[card.GameCardId].Codes is { } codes && types.TypeCodes.Contains(codes.Type),
         NormalMonsterFilter normal => normal.CardIds.Contains(card.GameCardId) || inGraveyard && rule.IsGemini,
+        MonsterAttributeFilter attribute => rule.Category == CardCategory.Monster && catalog[card.GameCardId].Codes?.Attribute == attribute.AttributeCode,
+        MonsterLevelFilter limit => rule.Category == CardCategory.Monster && !IsXyzCard(card) && catalog[card.GameCardId].Statistics.Level is > 0 and var level &&
+            level <= limit.MaxLevel && (limit.TypeCode is not { } typeCode || catalog[card.GameCardId].Codes?.Type == typeCode),
         MonsterTraitFilter trait => rule.Category == CardCategory.Monster && !trait.ExcludedCardIds.Contains(card.GameCardId) &&
             (trait.AttributeCode is not { } code || catalog[card.GameCardId].Codes?.Attribute == code) &&
             (trait.Stat == MonsterStat.Attack ? catalog[card.GameCardId].Statistics.Attack : catalog[card.GameCardId].Statistics.Defense) is int value &&

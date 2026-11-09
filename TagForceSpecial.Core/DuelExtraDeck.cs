@@ -13,22 +13,27 @@ public sealed class ExtraDeckMaterialProcedureProfile
     public bool RequireFaceUp { get; }
     public SynchroMaterialRequirements? Synchro { get; }
     public XyzMaterialRequirements? Xyz { get; }
+    /// <summary>Any monster allowed as a Summon material qualifies; rank or Tuner and Level rules still apply.</summary>
+    public bool AnyMaterial { get; }
 
     public ExtraDeckMaterialProcedureProfile(string procedureId, IEnumerable<uint> targetCardIds,
         IEnumerable<uint> materialCardIds, int materialCount, MaterialDestination destination = MaterialDestination.Graveyard,
-        bool requireFaceUp = true, SynchroMaterialRequirements? synchro = null, XyzMaterialRequirements? xyz = null)
+        bool requireFaceUp = true, SynchroMaterialRequirements? synchro = null, XyzMaterialRequirements? xyz = null, bool anyMaterial = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(procedureId);
         ArgumentNullException.ThrowIfNull(targetCardIds);
         ArgumentNullException.ThrowIfNull(materialCardIds);
         var targets = targetCardIds.ToArray(); var materials = materialCardIds.ToArray();
-        if (targets.Length == 0 || materials.Length == 0 || targets.Any(id => id == 0) || materials.Any(id => id == 0) ||
+        if (anyMaterial && (materials.Length != 0 || synchro is null && xyz is null))
+            throw new ArgumentException("An any-material procedure is a Synchro or Xyz procedure with no explicit material list.", nameof(anyMaterial));
+        AnyMaterial = anyMaterial;
+        if (targets.Length == 0 || materials.Length == 0 && !anyMaterial || targets.Any(id => id == 0) || materials.Any(id => id == 0) ||
             targets.Distinct().Count() != targets.Length || materials.Distinct().Count() != materials.Length ||
             materialCount is < 1 or > 5 || !Enum.IsDefined(destination))
             throw new ArgumentException("Supply distinct target and material IDs, one to five materials and a supported destination.");
         if (synchro is not null && (!requireFaceUp || destination != MaterialDestination.Graveyard ||
             materialCount != synchro.MinimumNonTuners + 1 ||
-            !materials.Order().SequenceEqual(synchro.TunerCardIds.Concat(synchro.NonTunerCardIds).Order())))
+            !anyMaterial && !materials.Order().SequenceEqual(synchro.TunerCardIds.Concat(synchro.NonTunerCardIds).Order())))
             throw new ArgumentException("Synchro profiles require face-up Graveyard materials, a matching allowlist and minimum count.");
         if ((destination == MaterialDestination.Attached) != (xyz is not null) ||
             xyz is not null && (!requireFaceUp || materialCount < 2 || synchro is not null))
@@ -45,6 +50,19 @@ public sealed class SynchroMaterialRequirements
     public IReadOnlyList<uint> NonTunerCardIds { get; }
     public int MinimumNonTuners { get; }
     public int MaximumNonTuners { get; }
+    /// <summary>Tuners are read from card rules, so no card ID lists are needed.</summary>
+    public bool ByTunerRule { get; }
+
+    /// <summary>"1 Tuner + N or more non-Tuner monsters": Tuners come from <see cref="DuelCardRules.IsTuner"/>.</summary>
+    public static SynchroMaterialRequirements AnyTuner(int minimumNonTuners = 1, int maximumNonTuners = 4) => new(minimumNonTuners, maximumNonTuners);
+
+    private SynchroMaterialRequirements(int minimumNonTuners, int maximumNonTuners)
+    {
+        if (minimumNonTuners < 1 || maximumNonTuners > 4 || minimumNonTuners > maximumNonTuners)
+            throw new ArgumentException("Supply one to four non-Tuners.");
+        ByTunerRule = true; MinimumNonTuners = minimumNonTuners; MaximumNonTuners = maximumNonTuners;
+        TunerCardIds = Array.AsReadOnly(Array.Empty<uint>()); NonTunerCardIds = Array.AsReadOnly(Array.Empty<uint>());
+    }
 
     public SynchroMaterialRequirements(IEnumerable<uint> tunerCardIds, IEnumerable<uint> nonTunerCardIds,
         int minimumNonTuners = 1, int maximumNonTuners = 4)

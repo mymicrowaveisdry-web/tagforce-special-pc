@@ -89,7 +89,7 @@ public sealed partial class DuelEngine
         bool notToGraveyard = emitted.FieldDestination is FieldCardDestination.FaceUpExtraDeck or FieldCardDestination.Removed;
         if (kind == MonsterEventKind.SentToGraveyard && notToGraveyard) yield break;
         bool byBattle = emitted is MonsterDestroyed { ByBattle: true };
-        yield return new(kind, subject, point, cost, byBattle) { FromSpellTrapZone = spellTrapLeaving };
+        yield return new(kind, subject, point, cost, byBattle) { FromSpellTrapZone = spellTrapLeaving, ProcedureId = (emitted as MonsterSpecialSummoned)?.ProcedureId };
         if (kind == MonsterEventKind.Destroyed && !notToGraveyard)
             yield return new(MonsterEventKind.SentToGraveyard, subject, point, ByBattle: byBattle) { FromSpellTrapZone = spellTrapLeaving };
         if (emitted is MonsterDestroyed { DestroyedBy: { } destroyer } && !notToGraveyard)
@@ -141,6 +141,7 @@ public sealed partial class DuelEngine
                 foreach (var profile in triggerEffects.Where(p => p.EventKind == occurrence.Kind && CauseMatches(p, occurrence)).OrderBy(p => p.EffectId, StringComparer.Ordinal))
                 {
                     if (occurrence.FromSpellTrapZone && profile.SourceLocation == TriggerSourceLocation.FaceUpMonster) continue;
+                    if (profile.RequiredProcedureId is { } procedure && occurrence.ProcedureId != procedure) continue;
                     if (profile.SourceLocation != TriggerSourceLocation.FaceUpMonster)
                     {
                         // A definition effect in the Graveyard belongs to the card's owner, who may not have controlled it.
@@ -286,7 +287,7 @@ public sealed partial class DuelEngine
         foreach (var (source, monster) in monsters)
             foreach (var profile in continuousEffects.Where(p => p.CardId == monster.Card.GameCardId && !negated.Contains(source)).OrderBy(p => p.EffectId, StringComparer.Ordinal))
                 foreach (var (target, _) in monsters)
-                    if (Relates(profile.Affects, source, target))
+                    if (Relates(profile.Affects, source, target) && (profile.Filter is null || MatchesFilter(target.Card, profile.Filter)))
                         result.Add(new(profile.EffectId, source, target, profile.AttackDelta, profile.DefenseDelta));
         if (HasLastingModifiers) AddLastingModifiers(state, monsters, negated, result);
         return result.ToArray();

@@ -13,7 +13,7 @@
 [`MonsterTriggerFamily`](MonsterTriggerFamily.cs) supports 13 monsters that trigger on leaving the field, such as Sangan and Mystic Tomato; register `Triggers` as trigger effects and supply a seed. `TfspSummonRestrictions` lists monsters an effect cannot Special Summon from the Deck.
 [`MonsterSubtypeFamily`](MonsterSubtypeFamily.cs) supports 12 Flip, Spirit and Gemini monsters; register `Triggers` and `CardRules`. A duel with flip or battle-window definitions runs the staged battle flow.
 
-[`LastingCardFamily`](LastingCardFamily.cs) supports 26 representative Field, Equip, revival, negation, Toon, Union, activated and counter cards; register `Definitions`, `Triggers`, `CardRules` and `SpecialSummonCards`.
+[`LastingCardFamily`](LastingCardFamily.cs) supports 26 representative Field, Equip, revival, negation, Toon, Union, activated and counter cards; [`SummonProcedureFamily`](SummonProcedureFamily.cs) supports 24 hand-procedure, Fusion, Ritual, Synchro, Xyz and Pendulum cards; register `Definitions`, `Triggers`, `CardRules` and `SpecialSummonCards`.
 [`ReviewedCardMetadata`](ReviewedCardMetadata.cs) overlays reviewed metadata when a catalog is opened; converted packages keep the frozen Cards baseline, so review batches never change pinned cache bytes or artwork bindings.
 
 ```csharp

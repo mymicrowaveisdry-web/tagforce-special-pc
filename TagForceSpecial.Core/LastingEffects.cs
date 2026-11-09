@@ -56,6 +56,28 @@ public sealed record MonsterTypeFilter : CardFilter
     }
 }
 
+/// <summary>Monsters with this raw Attribute code. Codes are decoded metadata, reviewed against known monsters.</summary>
+public sealed record MonsterAttributeFilter(uint AttributeCode) : CardFilter;
+
+/// <summary>Monsters of this printed Level or lower and, when set, this raw type code. Xyz Monsters have no Level.</summary>
+public sealed record MonsterLevelFilter : CardFilter
+{
+    public uint MaxLevel { get; }
+    public uint? TypeCode { get; }
+    public MonsterLevelFilter(uint maxLevel, uint? typeCode = null)
+    {
+        MaxLevel = maxLevel is >= 1 and <= 12 ? maxLevel : throw new ArgumentOutOfRangeException(nameof(maxLevel));
+        TypeCode = typeCode;
+    }
+}
+
+/// <summary>Detach Xyz Materials from the activating monster; the choice travels with the activation command.</summary>
+public sealed record DetachCost : EffectCost
+{
+    public int Count { get; }
+    public DetachCost(int count) => Count = count is >= 1 and <= 5 ? count : throw new ArgumentOutOfRangeException(nameof(count));
+}
+
 /// <summary>Attaches the resolving Equip Spell to its bound monster target.</summary>
 public sealed record EquipTargetStep : EffectStep;
 
@@ -108,11 +130,11 @@ public sealed record BanishFromGraveyardCost : EffectCost
 }
 
 /// <summary>A face-up monster's controller activates its ignition or quick effect in an open Main Phase state.</summary>
-public sealed record ActivateMonsterEffect(PlayerId Player, int MonsterZone) : DuelCommand(Player);
+public sealed record ActivateMonsterEffect(PlayerId Player, int MonsterZone, IReadOnlyList<int>? DetachInstanceIds = null) : DuelCommand(Player);
 /// <summary>A face-up monster's quick effect as the next chain link.</summary>
-public sealed record ActivateMonsterChainResponse(PlayerId Player, long DecisionId, int MonsterZone) : DuelCommand(Player);
+public sealed record ActivateMonsterChainResponse(PlayerId Player, long DecisionId, int MonsterZone, IReadOnlyList<int>? DetachInstanceIds = null) : DuelCommand(Player);
 /// <summary>A face-up monster's quick effect starting a chain in an open battle window.</summary>
-public sealed record ActivateMonsterBattleResponse(PlayerId Player, long DecisionId, int MonsterZone) : DuelCommand(Player);
+public sealed record ActivateMonsterBattleResponse(PlayerId Player, long DecisionId, int MonsterZone, IReadOnlyList<int>? DetachInstanceIds = null) : DuelCommand(Player);
 /// <summary>Unequips a Union monster and Special Summons it; shares the Union's once-per-turn use.</summary>
 public sealed record UnequipUnion(PlayerId Player, int SpellTrapZone) : DuelCommand(Player);
 /// <summary>Settles a Standby Phase upkeep by paying LP or destroying the card.</summary>

@@ -40,7 +40,7 @@ public sealed partial class DuelEngine
         if (command is ResolveNextChainLink) return Reject(DuelError.ChainPending);
         if (command.Player != chain.Responder) return Reject(DuelError.NotChainResponder);
         if (command is ActivateHandChainResponse hand) return BeginHandDefinitionResponse(chain, hand);
-        if (command is ActivateMonsterChainResponse monsterResponse) return BeginMonsterEffect(monsterResponse.Player, monsterResponse.MonsterZone, chain);
+        if (command is ActivateMonsterChainResponse monsterResponse) return BeginMonsterEffect(monsterResponse.Player, monsterResponse.MonsterZone, chain, detach: monsterResponse.DetachInstanceIds);
         if (command is ActivateChainResponse response)
         {
             if (response.SpellTrapZone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);

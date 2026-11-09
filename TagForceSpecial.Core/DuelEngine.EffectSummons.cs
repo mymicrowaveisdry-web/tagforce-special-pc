@@ -35,8 +35,11 @@ public sealed partial class DuelEngine
         var allowed = profile.Kind == EffectSummonKind.Fusion
             ? profile.FusionRecipes.Single(r => r.TargetCardId == target.GameCardId).MaterialCardIds
             : profile.RitualRecipes.Single(r => r.TargetCardId == target.GameCardId).TributeCardIds;
-        bool Eligible(CardInstance card) => card != target && allowed.Contains(card.GameCardId) &&
-            !state.SummonHistory.Any(h => h.Card == card && h.Method == SummonMethod.Token) &&
+        bool anyTribute = profile.Kind == EffectSummonKind.Ritual && profile.RitualRecipes.Single(r => r.TargetCardId == target.GameCardId).OrMore;
+        // An "any Tribute" Ritual also accepts Tokens; explicit lists keep their Token exclusion.
+        bool Eligible(CardInstance card) => card != target &&
+            (anyTribute ? rules.TryGetValue(card.GameCardId, out var rule) && rule.Category == CardCategory.Monster && rule.AllowsTributeForSummon && catalog[card.GameCardId].Statistics.Level > 0
+                : allowed.Contains(card.GameCardId) && !state.SummonHistory.Any(h => h.Card == card && h.Method == SummonMethod.Token)) &&
             (profile.Kind != EffectSummonKind.Ritual || !IsXyzCard(card));
         // Field first also gives the Fusion existence check a freed slot when the field is full.
         for (int z = 0; z < 5; z++)
@@ -54,16 +57,26 @@ public sealed partial class DuelEngine
         if (profile.Kind == EffectSummonKind.Fusion)
         {
             var recipe = profile.FusionRecipes.Single(r => r.TargetCardId == target.GameCardId);
-            var chosen = new List<EffectSummonMaterial>();
-            foreach (var group in recipe.MaterialCardIds.GroupBy(id => id))
+            var used = new bool[pool.Length];
+            var chosen = new EffectSummonMaterial[recipe.MaterialSlots.Count];
+            bool Fill(int slot)
             {
-                var matches = pool.Where(m => m.Card.GameCardId == group.Key).Take(group.Count()).ToArray();
-                if (matches.Length != group.Count()) return null;
-                chosen.AddRange(matches);
+                if (slot == chosen.Length) return !needsField || chosen.Any(m => m.Field is not null);
+                for (int i = 0; i < pool.Length; i++)
+                    if (!used[i] && recipe.MaterialSlots[slot].Contains(pool[i].Card.GameCardId))
+                    {
+                        used[i] = true; chosen[slot] = pool[i];
+                        if (Fill(slot + 1)) return true;
+                        used[i] = false;
+                    }
+                return false;
             }
-            return needsField && chosen.All(m => m.Field is null) ? null : chosen.ToArray();
+            return Fill(0) ? chosen : null;
         }
-        var level = profile.RitualRecipes.Single(r => r.TargetCardId == target.GameCardId).RequiredLevel;
+        var ritual = profile.RitualRecipes.Single(r => r.TargetCardId == target.GameCardId);
+        var level = ritual.RequiredLevel;
+        if (ritual.OrMore)
+            return Subsets(pool, 5).FirstOrDefault(s => RitualPayment(s, ritual) && (!needsField || s.Any(m => m.Field is not null)));
         var failed = new HashSet<(int Index, int Count, long Total, bool Field)>();
         var selection = new List<EffectSummonMaterial>();
         bool Search(int index, long total, bool hasField)
@@ -82,6 +95,14 @@ public sealed partial class DuelEngine
         return Search(0, 0, false) ? selection.ToArray() : null;
     }
 
+    /// <summary>The Tribute Levels meet the recipe, and for an "or more" recipe no Tribute is unnecessary.</summary>
+    private bool RitualPayment(IReadOnlyList<EffectSummonMaterial> tributes, RitualSummonRecipe recipe)
+    {
+        long Level(EffectSummonMaterial m) => catalog[m.Card.GameCardId].Statistics.Level;
+        long total = tributes.Sum(Level);
+        return recipe.OrMore ? total >= recipe.RequiredLevel && tributes.All(m => total - Level(m) < recipe.RequiredLevel) : total == recipe.RequiredLevel;
+    }
+
     private IEnumerable<CardInstance> LegalEffectSummonTargets(DuelState state, PlayerId player,
         SummonEffectProfile profile)
     {
@@ -95,14 +116,14 @@ public sealed partial class DuelEngine
         }
     }
 
-    private DuelActionResult ActivateSummonEffect(CardInstance spell, int zone, SummonEffectProfile profile)
+    private DuelActionResult ActivateSummonEffect(CardInstance spell, int zone, SummonEffectProfile profile, FieldSpellTrap? source = null)
     {
         var player = State.GetPlayer(State.ActivePlayer);
-        if (player.SpellTrapFields[zone] is not null) return Reject(DuelError.SpellTrapZoneOccupied);
+        if (source is null && player.SpellTrapFields[zone] is not null) return Reject(DuelError.SpellTrapZoneOccupied);
         if (!LegalEffectSummonTargets(State, player.Id, profile).Any()) return Reject(DuelError.DecisionUnavailable);
         var slots = player.SpellTrapFields.ToArray();
-        long placement = checked(State.Revision + 1);
-        slots[zone] = new(spell, true, placement);
+        long placement = source?.PlacementId ?? checked(State.Revision + 1);
+        slots[zone] = source is null ? new(spell, true, placement) : source with { IsFaceUp = true };
         var receipt = new CommittedActivation(player.Id, profile.EffectId, spell, zone, null, null);
         var link = new ChainLink(1, receipt, placement, ChainOperation.EffectSummon);
         var chain = new PendingChain(placement, [link], Other(player.Id));
@@ -131,11 +152,10 @@ public sealed partial class DuelEngine
         if (profile.Kind == EffectSummonKind.Fusion)
         {
             var recipe = profile.FusionRecipes.Single(r => r.TargetCardId == target.GameCardId);
-            if (!materials.Select(m => m.Card.GameCardId).Order().SequenceEqual(recipe.MaterialCardIds.Order()))
+            if (!SlotsMatch(materials, recipe.MaterialSlots.Count, (m, slot) => recipe.MaterialSlots[slot].Contains(m.Card.GameCardId)))
                 return Reject(DuelError.InvalidSummonMaterials);
         }
-        else if (materials.Sum(m => (long)catalog[m.Card.GameCardId].Statistics.Level) !=
-            profile.RitualRecipes.Single(r => r.TargetCardId == target.GameCardId).RequiredLevel)
+        else if (!RitualPayment(materials, profile.RitualRecipes.Single(r => r.TargetCardId == target.GameCardId)))
             return Reject(DuelError.InvalidSummonMaterials);
         var next = MoveEffectSummonMaterials(State, command.Player, materials, profile, []);
         var error = CheckSpecialSummon(next, command.Player, target, command.MonsterZone, command.Position,

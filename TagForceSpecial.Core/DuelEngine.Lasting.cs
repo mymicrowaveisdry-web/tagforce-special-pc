@@ -24,6 +24,9 @@ public sealed partial class DuelEngine
 
     internal bool IsToonCard(uint cardId) => rules.TryGetValue(cardId, out var rule) && rule.IsToon;
 
+    /// <summary>The materials a monster's activated effect detaches as its cost; 0 when it has no such cost.</summary>
+    internal int DetachCostFor(uint cardId) => definitions.TryGetValue(cardId, out var d) && d.Cost is DetachCost detach ? detach.Count : 0;
+
     private static IEnumerable<(PlayerId Player, int Zone, FieldSpellTrap Field)> ActiveCards(DuelState state) =>
         state.Players.SelectMany(p => Enumerable.Range(0, DuelPlayerState.FieldZoneIndex + 1).Select(zone => (Player: p.Id, Zone: zone, Field: p.SpellTrapAt(zone))))
             .Where(e => e.Field is { IsFaceUp: true, EffectActive: true }).Select(e => (e.Player, e.Zone, e.Field!));
@@ -296,7 +299,8 @@ public sealed partial class DuelEngine
         DefinitionActivationError(definition, ActivationContext.MonsterWindow, playerId, m.Card, null) == DuelError.None);
 
     /// <summary>Starts a monster effect in an open state, as a chain response, or in an open or battle window.</summary>
-    private DuelActionResult BeginMonsterEffect(PlayerId playerId, int zone, PendingChain? chain, DuelState? from = null, bool window = false)
+    private DuelActionResult BeginMonsterEffect(PlayerId playerId, int zone, PendingChain? chain, DuelState? from = null, bool window = false,
+        IReadOnlyList<int>? detach = null)
     {
         if (zone is < 0 or >= 5) return Reject(DuelError.InvalidMonsterZone);
         if (chain is null && !window && State.Phase is not (DuelPhase.Main1 or DuelPhase.Main2)) return Reject(DuelError.WrongPhase);
@@ -309,6 +313,15 @@ public sealed partial class DuelEngine
         var context = window ? ActivationContext.MonsterWindow : chain is null ? ActivationContext.MonsterField : ActivationContext.MonsterChainResponse;
         if (DefinitionActivationError(definition, context, playerId, monster.Card, null, chain?.Links[^1]) is not DuelError.None and var error)
             return Reject(error);
+        if (definition.LocksOwnAttack && monster.LastAttackTurn == State.TurnNumber) return Reject(DuelError.ActivationConditionNotMet);
+        CardInstance[] detached = [];
+        if (definition.Cost is DetachCost detachCost)
+        {
+            var ids = detach ?? [];
+            detached = monster.XyzMaterials.Where(c => ids.Contains(c.InstanceId)).ToArray();
+            if (ids.Count != detachCost.Count || ids.Distinct().Count() != ids.Count || detached.Length != ids.Count) return Reject(DuelError.InvalidDecisionChoice);
+        }
+        else if (detach is { Count: > 0 }) return Reject(DuelError.InvalidDecisionChoice);
         var next = from ?? State;
         if (definition.OncePerTurn) next = RecordUse(next, monster.Card);
         DuelEvent[] head = [new MonsterEffectActivated(playerId, definition.EffectId, monster.Card, zone)];
@@ -324,6 +337,23 @@ public sealed partial class DuelEngine
             monsters[zone] = monster with { Counters = monster.Counters - remove.Count };
             next = next.With(player: player.With(monsters: monsters));
             paid.Add(new CountersRemoved(binding, remove.Count, monster.Counters - remove.Count));
+        }
+        else if (definition.Cost is DetachCost)
+        {
+            var player = next.GetPlayer(playerId);
+            var monsters = player.MonsterZones.ToArray();
+            monsters[zone] = monster with { XyzMaterials = Array.AsReadOnly(monster.XyzMaterials.Except(detached).ToArray()) };
+            next = SendXyzMaterials(next.With(player: player.With(monsters: monsters)), monster.Card, detached, true, paid);
+        }
+        if (definition.LocksOwnAttack)
+        {
+            var player = next.GetPlayer(playerId);
+            if (player.MonsterZones[zone] is { } current && current.Card == monster.Card)
+            {
+                var monsters = player.MonsterZones.ToArray();
+                monsters[zone] = current with { AttackLockedTurn = State.TurnNumber };
+                next = next.With(player: player.With(monsters: monsters));
+            }
         }
         (next, head) = PayLifePointCost(next, playerId, definition, [.. paid]);
         return ContinueCommit(next, head, playerId, monster.Card, zone, definition, monster.PlacementId, chain);
@@ -425,9 +455,10 @@ public sealed partial class DuelEngine
         return Accept(next, events.ToArray());
     }
 
-    /// <summary>A Toon's attack rules, including its LP cost.</summary>
+    /// <summary>Attack limits from a monster's own effect, then a Toon's rules including its LP cost.</summary>
     private DuelError AttackRestrictionError(DuelPlayerState player, DuelPlayerState opponent, FieldMonster attacker, int? targetZone)
     {
+        if (attacker.AttackLockedTurn == State.TurnNumber) return DuelError.AttackLocked;
         if (!IsToonCard(attacker.Card.GameCardId)) return DuelError.None;
         if (attacker.SummonedOnTurn == State.TurnNumber) return DuelError.ToonCannotAttack;
         if (player.LifePoints <= ToonAttackCost) return DuelError.InsufficientLifePoints;

@@ -15,7 +15,7 @@ public sealed record DuelCardRules(CardCategory Category, bool AllowsNormalSummo
     bool AllowsTributeSummon = false, bool AllowsTributeForSummon = false,
     bool RequiresRegisteredTributeProcedure = false, bool AllowsExtraDeck = false,
     bool AllowsSummonMaterial = false, bool AllowsPendulumSummon = false, bool IsToken = false,
-    bool CannotBeSpecialSummoned = false, bool IsGemini = false, bool IsToon = false, bool IsToonWorld = false);
+    bool CannotBeSpecialSummoned = false, bool IsGemini = false, bool IsToon = false, bool IsToonWorld = false, bool IsTuner = false);
 public sealed record CardInstance(int InstanceId, uint GameCardId, PlayerId Owner);
 public sealed record FieldMonster(CardInstance Card, BattlePosition Position, int SummonedOnTurn = 0,
     int PositionChangedOnTurn = 0, int LastAttackTurn = 0, long PlacementId = 0, bool BattleDestroyed = false)
@@ -33,6 +33,9 @@ public sealed record FieldMonster(CardInstance Card, BattlePosition Position, in
     /// <summary>Counters removed instead of this monster being destroyed.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public int ProtectionCounters { get; internal init; }
+    /// <summary>The turn this monster's own effect stopped it from attacking.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int AttackLockedTurn { get; internal init; }
 }
 /// <summary>A finished duel. A draw (both players at 0 LP at once) has no winner or loser.</summary>
 public sealed record DuelOutcome(PlayerId? Winner, PlayerId? Loser, DuelEndReason Reason)
@@ -284,7 +287,7 @@ public enum DuelError
     UnsupportedMaterialProcedure, InvalidSummonMaterials, SummonMaterialNotAllowed,
     UnsupportedPendulumCard, InvalidPendulumZone, PendulumZoneOccupied, PendulumScalesUnavailable, PendulumSummonLimitReached,
     ActivationTimingNotAllowed, SetThisTurn, OpenWindowPending, ActivationConditionNotMet, SummonLocked, NotGeminiMonster, GeminiAlreadyActive,
-    UnsupportedMonsterEffect, EffectAlreadyUsed, UpkeepPending, NoUpkeepDue, ToonSummonUnavailable, ToonCannotAttack, ToonMustAttackToon
+    UnsupportedMonsterEffect, EffectAlreadyUsed, UpkeepPending, NoUpkeepDue, ToonSummonUnavailable, ToonCannotAttack, ToonMustAttackToon, AttackLocked
 }
 
 public abstract record DuelEvent

@@ -59,7 +59,8 @@ Exactly one Tuner and at least one non-Tuner must be face-up on the controller's
 field, and their nonzero printed levels must exactly equal the target's nonzero
 printed level. The profile uses the minimum total as `materialCount` and sends
 materials to the Graveyard. Selection, movement and negation use the shared flow.
-These authored profiles do not infer Tuner identity from card data. Field-level
+`SynchroMaterialRequirements.AnyTuner` with `anyMaterial: true` reads Tuners from
+`DuelCardRules.IsTuner` instead of listed IDs. Identity is never inferred from card data. Field-level
 modifiers, multiple Tuners, card-specific material conditions and alternative
 material destinations are unsupported; do not register profiles that need them.
 
@@ -73,8 +74,10 @@ to their owners' Graveyards without destruction or field-departure events; reviv
 does not restore them. A trigger's `detachMaterialCount` requests
 `ChooseTriggerXyzMaterials` through `PendingTriggerCommitment.CardOptions` before
 responses; paid materials stay detached if the activation/effect is negated.
-This covers trigger costs only, not general ignition/quick effects, attachment
-effects, alternate Xyz procedures, level modifiers or material replacement.
+An activated monster effect with `DetachCost` carries its choice in the command's
+`DetachInstanceIds`. With `anyMaterial: true`, any allowed monster of the right Level
+can be used. Attachment effects, alternate Xyz procedures, level modifiers and
+material replacement remain outside this contract.
 The rules contract follows [official rulebook v9.0](https://www.yugioh-card.com/eu/wp-content/uploads/2022/07/Rulebook_v9_en.pdf),
 pages 14–15 and 47; Xyz original-game comparisons remain pending.
 

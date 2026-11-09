@@ -272,7 +272,7 @@ public sealed partial class DuelEngine
             SetSpellTrap set => SetBackRow(set.CardInstanceId, set.SpellTrapZone),
             ChangeMonsterPosition change => ChangePosition(change.MonsterZone, change.Target),
             GeminiSummon gemini => ExecuteGeminiSummon(gemini.MonsterZone),
-            ActivateMonsterEffect effect => BeginMonsterEffect(effect.Player, effect.MonsterZone, null),
+            ActivateMonsterEffect effect => BeginMonsterEffect(effect.Player, effect.MonsterZone, null, detach: effect.DetachInstanceIds),
             UnequipUnion unequip => ExecuteUnequip(unequip.Player, unequip.SpellTrapZone),
             ResolveUpkeep upkeep => ExecuteUpkeep(upkeep),
             ToonSummon toon => ExecuteToonSummon(toon),
