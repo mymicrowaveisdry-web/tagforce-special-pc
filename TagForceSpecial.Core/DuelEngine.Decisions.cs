@@ -21,10 +21,12 @@ public sealed partial class DuelEngine
                 .Select(s => new SpellTrapTarget(p.Id, s.zone, s.field!.Card, s.field.PlacementId))
                 .Concat(p.PendulumZones.Select((field, zone) => (field, zone))
                     .Where(s => s.field is not null && s.field.Card.InstanceId != excluded)
-                    .Select(s => new SpellTrapTarget(p.Id, s.zone, s.field!.Card, s.field.PlacementId, true)))).ToArray() : [];
+                    .Select(s => new SpellTrapTarget(p.Id, s.zone, s.field!.Card, s.field.PlacementId, true)))
+                .Concat(p.FieldSpell is { } field && field.Card.InstanceId != excluded
+                    ? [new SpellTrapTarget(p.Id, DuelPlayerState.FieldZoneIndex, field.Card, field.PlacementId)] : Array.Empty<SpellTrapTarget>())).ToArray() : [];
         FieldCardTarget[]? fieldTargets = (step.FieldTargetSpec switch
             {
-                FieldTarget spec => FieldMatches(State, player.Id, spec.Kind, spec.Side, spec.Filter, excluded),
+                FieldTarget spec => FieldMatches(State, player.Id, spec.Kind, spec.Side, spec.Filter, excluded).Where(t => TargetPasses(State, spec, t)),
                 ZoneTarget zone => ZoneMatches(State, player.Id, zone),
                 _ => null
             })?.Where(t => !answers.Any(a => a.FieldTarget is { } chosen && chosen.Card == t.Card)).ToArray();

@@ -5,7 +5,7 @@ public enum ActionKind
     Draw, Summon, ActivateSpell, ActivateSetSpell, SetMonster, SetSpellTrap, Position, Attack,
     Discard, Phase, EndTurn, ChooseCard, ChoosePosition, ChooseZone, ChooseTarget,
     ChainResponse, ChainPass, ResolveChain, BattleResponse, BattlePass, AdvanceBattle, ReplayAttack, CancelReplay, FinishChoice,
-    OrderTriggers, DeclineTriggers
+    OrderTriggers, DeclineTriggers, MonsterEffect, Unequip, Upkeep
 }
 public enum ActionAvailability { Ready, Waiting, Finished, Unsupported }
 

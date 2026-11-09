@@ -6,9 +6,13 @@ public sealed partial class DuelEngine
         List<DuelEvent> events, bool activationNegated = false)
     {
         var player = next.GetPlayer(target.Player);
-        var zones = (target.IsPendulumZone ? player.PendulumZones : player.SpellTrapFields).ToArray();
-        zones[target.Zone] = null;
-        next = next.With(player: target.IsPendulumZone ? player.With(pendulumZones: zones) : player.With(spellTraps: zones));
+        if (target.IsPendulumZone)
+        {
+            var scales = player.PendulumZones.ToArray();
+            scales[target.Zone] = null;
+            next = next.With(player: player.With(pendulumZones: scales));
+        }
+        else next = next.With(player: player.WithSpellTrapAt(target.Zone, null));
         return SendFieldCardToGraveyard(next, target.Card, cause, events, activationNegated);
     }
     // The single field-departure path; the caller removes the placement. A Token goes to no zone: its cause event is

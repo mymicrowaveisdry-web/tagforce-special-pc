@@ -169,7 +169,7 @@ public sealed partial class DuelEngine
 
     private DuelState PrepareEventEffects(DuelState before, DuelState next, List<DuelEvent> events)
     {
-        if (triggerEffects.Length == 0 && continuousEffects.Length == 0 && continuousNegations.Length == 0 && !HasTimedCombatModifiers) return next;
+        if (triggerEffects.Length == 0 && continuousEffects.Length == 0 && continuousNegations.Length == 0 && !HasTimedCombatModifiers && !HasLastingModifiers && !HasMonsterNegators) return next;
         var current = next.EventEffects;
         var timed = current.TimedModifiers.Where(m => m.Target.IsStillPresent(next) &&
             next.GetPlayer(m.Target.Player).MonsterZones[m.Target.Zone]!.Position != BattlePosition.FaceDownDefense &&
@@ -254,10 +254,7 @@ public sealed partial class DuelEngine
         }
         if (action.Operation == TriggerOperation.DestroyTargetMonster)
         {
-            var player = next.GetPlayer(subject.Player);
-            var monsters = player.MonsterZones.ToArray(); monsters[subject.Zone] = null;
-            next = next.With(player: player.With(monsters: monsters));
-            return SendFieldCardToGraveyard(next, subject.Card, new MonsterDestroyed(player.Id, subject.Zone, subject.Card), events);
+            return DestroyFieldCard(next, new(subject.Player, FieldLocation.MonsterZone, subject.Zone, subject.Card, subject.PlacementId), events);
         }
         var effects = next.EventEffects;
         if (action.Operation == TriggerOperation.NegateTargetMonsterUntilEndPhase)
@@ -282,8 +279,10 @@ public sealed partial class DuelEngine
                 foreach (var (target, _) in monsters)
                     if (Relates(profile.Affects, source, target))
                         result.Add(new(profile.EffectId, source, target, profile.AttackDelta, profile.DefenseDelta));
+        if (HasLastingModifiers) AddLastingModifiers(state, monsters, negated, result);
         return result.ToArray();
     }
+
 
     private EffectiveMonsterStatistics CalculateStatistics(MonsterBinding monster, IEnumerable<StatModifier> modifiers)
     {

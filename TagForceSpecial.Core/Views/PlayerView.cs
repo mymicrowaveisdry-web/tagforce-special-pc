@@ -7,7 +7,8 @@ public sealed record CardView(int? InstanceId, uint? CardId, string Name, string
 public sealed record PlayerView(PlayerId Id, int LifePoints, int DeckCount, int ExtraDeckCount,
     IReadOnlyList<CardView> Hand, IReadOnlyList<CardView?> Monsters,
     IReadOnlyList<CardView?> SpellTraps, IReadOnlyList<CardView?> Pendulum,
-    IReadOnlyList<CardView> Graveyard, IReadOnlyList<CardView> FaceUpExtraDeck);
+    IReadOnlyList<CardView> Graveyard, IReadOnlyList<CardView> FaceUpExtraDeck,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] CardView? FieldSpell = null);
 
 /// <summary>The shared visibility boundary for human and opponent presentation.</summary>
 public static class PlayerProjection
@@ -24,7 +25,8 @@ public static class PlayerProjection
             Read(p.SpellTrapFields.Select(f => f is null ? null : Card(f.Card, own || f.IsFaceUp, null, catalog))),
             Read(p.PendulumZones.Select(f => f is null ? null : Card(f.Card, own || f.IsFaceUp, null, catalog))),
             Read(p.Graveyard.Select(c => Card(c, true, null, catalog))),
-            Read(p.FaceUpExtraDeck.Select(c => Card(c, true, null, catalog))));
+            Read(p.FaceUpExtraDeck.Select(c => Card(c, true, null, catalog))),
+            p.FieldSpell is { } field ? Card(field.Card, own || field.IsFaceUp, null, catalog) : null);
     }
 
     internal static CardView Card(CardInstance card, bool visible, BattlePosition? position, CardCatalog catalog)

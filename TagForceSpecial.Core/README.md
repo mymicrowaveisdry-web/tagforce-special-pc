@@ -23,6 +23,8 @@ Costs and targets are answered as decisions before the link is added; targets bi
 
 Two consecutive passes close a window; `ResolveNextChainLink` resolves in reverse order. Missing bound targets skip destruction; cleanup handles surviving sources once. Definitions answer staged battle windows outside the Damage Step (an attack-declaration condition binds the attacker; the turn player may use a hand Quick-Play Spell via `ActivateHandBattleResponse`). After a successful Summon, a summon-response open window goes to the turn player, then the other player, when they have a set card whose summon condition is met; that Summon stays answerable by later links until play reopens. A Normal, Tribute or Special Summon attempt also pauses ("would be Summoned") when the responder has a set Counter Trap definition that can negate it; the action adapter drives that window.
 
+Continuous, Field and Equip cards stay on the field and apply once resolved; the Field Zone is Spell/Trap zone index 5. Activated monster effects use `ActivateMonsterEffect`.
+
 Negation responses are definitions (`RespondsToActivationCondition`, `NegateActivationStep`/`NegateEffectStep`, optional filtered discard) and answer open, trigger, battle and summon chains. See [Effects](../TagForceSpecial.Effects/README.md) for supported cards.
 
 ## Event-driven triggers and continuous stats

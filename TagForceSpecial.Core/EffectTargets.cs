@@ -21,7 +21,7 @@ public sealed record FieldCardTarget(PlayerId Player, FieldLocation Location, in
         (CardInstance? card, long placement) = Location switch
         {
             FieldLocation.MonsterZone => (player.MonsterZones[Zone]?.Card, player.MonsterZones[Zone]?.PlacementId ?? 0),
-            FieldLocation.SpellTrapZone => (player.SpellTrapFields[Zone]?.Card, player.SpellTrapFields[Zone]?.PlacementId ?? 0),
+            FieldLocation.SpellTrapZone => (player.SpellTrapAt(Zone)?.Card, player.SpellTrapAt(Zone)?.PlacementId ?? 0),
             FieldLocation.PendulumZone => (player.PendulumZones[Zone]?.Card, player.PendulumZones[Zone]?.PlacementId ?? 0),
             FieldLocation.Graveyard => (player.Graveyard.Contains(Card) ? Card : null, 0),
             _ => (player.Banished.Contains(Card) ? Card : null, 0)
@@ -37,12 +37,17 @@ public sealed record FieldTarget : EffectTarget
     public TargetSide Side { get; }
     public FieldCardFilter Filter { get; }
     public int Count { get; }
+    /// <summary>When set, only matching cards qualify.</summary>
+    public CardFilter? CardFilter { get; }
+    /// <summary>Monsters already equipped with a Union monster do not qualify.</summary>
+    public bool NoUnionEquipped { get; }
 
-    public FieldTarget(FieldCardKind kind, TargetSide side = TargetSide.Either, FieldCardFilter filter = FieldCardFilter.Any, int count = 1)
+    public FieldTarget(FieldCardKind kind, TargetSide side = TargetSide.Either, FieldCardFilter filter = FieldCardFilter.Any, int count = 1,
+        CardFilter? cardFilter = null, bool noUnionEquipped = false)
     {
         if (!Enum.IsDefined(kind) || !Enum.IsDefined(side) || !Enum.IsDefined(filter)) throw new ArgumentOutOfRangeException(nameof(kind));
         if (count is < 1 or > 5) throw new ArgumentOutOfRangeException(nameof(count));
-        Kind = kind; Side = side; Filter = filter; Count = count;
+        Kind = kind; Side = side; Filter = filter; Count = count; CardFilter = cardFilter; NoUnionEquipped = noUnionEquipped;
     }
 }
 
@@ -133,8 +138,11 @@ public sealed record ReturnTargetsToGraveyardStep : EffectStep;
 /// </summary>
 public sealed record ShuffleTargetsIntoDeckStep(bool StopUnlessAll = false) : EffectStep;
 
-/// <summary>Special Summons the single Graveyard target to the activating player's field; zone and position chosen at resolution.</summary>
-public sealed record SpecialSummonTargetStep : EffectStep;
+/// <summary>
+/// Special Summons the single Graveyard target to the activating player's field; the zone, and the position unless
+/// fixed, are chosen at resolution. <paramref name="Link"/> ties the monster to the resolving card.
+/// </summary>
+public sealed record SpecialSummonTargetStep(BattlePosition? Position = null, RevivalLink Link = RevivalLink.None) : EffectStep;
 
 /// <summary>Ends an optional run of target choices early.</summary>
 public sealed record FinishDecision(PlayerId Player, long DecisionId) : DecisionCommand(Player, DecisionId);

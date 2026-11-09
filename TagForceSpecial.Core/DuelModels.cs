@@ -15,7 +15,7 @@ public sealed record DuelCardRules(CardCategory Category, bool AllowsNormalSummo
     bool AllowsTributeSummon = false, bool AllowsTributeForSummon = false,
     bool RequiresRegisteredTributeProcedure = false, bool AllowsExtraDeck = false,
     bool AllowsSummonMaterial = false, bool AllowsPendulumSummon = false, bool IsToken = false,
-    bool CannotBeSpecialSummoned = false, bool IsGemini = false);
+    bool CannotBeSpecialSummoned = false, bool IsGemini = false, bool IsToon = false, bool IsToonWorld = false);
 public sealed record CardInstance(int InstanceId, uint GameCardId, PlayerId Owner);
 public sealed record FieldMonster(CardInstance Card, BattlePosition Position, int SummonedOnTurn = 0,
     int PositionChangedOnTurn = 0, int LastAttackTurn = 0, long PlacementId = 0, bool BattleDestroyed = false)
@@ -27,6 +27,9 @@ public sealed record FieldMonster(CardInstance Card, BattlePosition Position, in
     /// <summary>A Gemini monster that has been Normal Summoned again and has its effects.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public bool GeminiActive { get; internal init; }
+    /// <summary>Counters on this monster; a card effect places and removes them.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int Counters { get; internal init; }
 }
 /// <summary>A finished duel. A draw (both players at 0 LP at once) has no winner or loser.</summary>
 public sealed record DuelOutcome(PlayerId? Winner, PlayerId? Loser, DuelEndReason Reason)
@@ -53,7 +56,22 @@ public sealed class DuelPlayerState
     /// <summary>Compatibility card view; inspect SpellTrapFields for face-up versus set state.</summary>
     public IReadOnlyList<CardInstance?> SpellTrapZones { get; }
     public IReadOnlyList<FieldSpellTrap?> SpellTrapFields { get; }
-    public CardInstance? FieldZone => null;
+    /// <summary>The zone index that addresses the Field Zone in Spell/Trap commands, targets and events.</summary>
+    public const int FieldZoneIndex = 5;
+    public CardInstance? FieldZone => FieldSpell?.Card;
+    /// <summary>The card in the Field Zone, face-up or set.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public FieldSpellTrap? FieldSpell => FieldZones[0];
+    internal IReadOnlyList<FieldSpellTrap?> FieldZones { get; }
+    internal FieldSpellTrap? SpellTrapAt(int zone) => zone == FieldZoneIndex ? FieldZones[0] : SpellTrapFields[zone];
+
+    internal DuelPlayerState WithSpellTrapAt(int zone, FieldSpellTrap? card)
+    {
+        if (zone == FieldZoneIndex) return With(fieldZones: new[] { card });
+        var slots = SpellTrapFields.ToArray();
+        slots[zone] = card;
+        return With(spellTraps: slots);
+    }
     public IReadOnlyList<CardInstance> Graveyard { get; }
     public IReadOnlyList<CardInstance> Banished { get; }
 
@@ -62,8 +80,9 @@ public sealed class DuelPlayerState
         IEnumerable<FieldSpellTrap?>? spellTraps = null, int lifePoints = 8000,
         IEnumerable<CardInstance>? banished = null, IEnumerable<CardInstance>? extraDeck = null,
         IEnumerable<CardInstance>? faceUpExtraDeck = null, IEnumerable<FieldSpellTrap?>? pendulumZones = null,
-        int lastPendulumSummonTurn = 0)
+        int lastPendulumSummonTurn = 0, IEnumerable<FieldSpellTrap?>? fieldZones = null)
     {
+        FieldZones = Array.AsReadOnly(fieldZones?.ToArray() ?? new FieldSpellTrap?[1]);
         Id = id;
         LifePoints = lifePoints;
         Deck = Array.AsReadOnly(deck.ToArray());
@@ -84,10 +103,11 @@ public sealed class DuelPlayerState
         IEnumerable<FieldSpellTrap?>? spellTraps = null, int? lifePoints = null,
         IEnumerable<CardInstance>? banished = null, IEnumerable<CardInstance>? extraDeck = null,
         IEnumerable<CardInstance>? faceUpExtraDeck = null, IEnumerable<FieldSpellTrap?>? pendulumZones = null,
-        int? lastPendulumSummonTurn = null) =>
+        int? lastPendulumSummonTurn = null, IEnumerable<FieldSpellTrap?>? fieldZones = null) =>
         new(Id, deck ?? Deck, hand ?? Hand, monsters ?? MonsterZones, graveyard ?? Graveyard,
             spellTraps ?? SpellTrapFields, lifePoints ?? LifePoints, banished ?? Banished, extraDeck ?? ExtraDeck,
-            faceUpExtraDeck ?? FaceUpExtraDeck, pendulumZones ?? PendulumZones, lastPendulumSummonTurn ?? LastPendulumSummonTurn);
+            faceUpExtraDeck ?? FaceUpExtraDeck, pendulumZones ?? PendulumZones, lastPendulumSummonTurn ?? LastPendulumSummonTurn,
+            fieldZones ?? FieldZones);
 }
 
 public sealed class DuelState
@@ -260,7 +280,8 @@ public enum DuelError
     UnsupportedSpecialSummon, SpecialSummonSourceUnavailable, ProperSummonRequired, SpecialSummonConditionsNotMet,
     UnsupportedMaterialProcedure, InvalidSummonMaterials, SummonMaterialNotAllowed,
     UnsupportedPendulumCard, InvalidPendulumZone, PendulumZoneOccupied, PendulumScalesUnavailable, PendulumSummonLimitReached,
-    ActivationTimingNotAllowed, SetThisTurn, OpenWindowPending, ActivationConditionNotMet, SummonLocked, NotGeminiMonster, GeminiAlreadyActive
+    ActivationTimingNotAllowed, SetThisTurn, OpenWindowPending, ActivationConditionNotMet, SummonLocked, NotGeminiMonster, GeminiAlreadyActive,
+    UnsupportedMonsterEffect, EffectAlreadyUsed, UpkeepPending, NoUpkeepDue, ToonSummonUnavailable, ToonCannotAttack, ToonMustAttackToon
 }
 
 public abstract record DuelEvent

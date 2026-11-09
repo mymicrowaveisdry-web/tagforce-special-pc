@@ -5,11 +5,15 @@ public enum ChainOperation
 {
     TriggerEffect, EffectSummon, ActivatePendulumScale,
     /// <summary>Resolves the ordered steps of the link's <see cref="EffectDefinition"/>.</summary>
-    Definition
+    Definition,
+    /// <summary>A face-up monster's activated effect; resolves its definition's steps.</summary>
+    MonsterEffect,
+    /// <summary>Special Summons a Union monster from its equip.</summary>
+    UnionUnequip
 }
 public enum ChainSpellSpeed { One = 1, Two = 2, Three = 3 }
 public enum ChainNegation { None, Effect, Activation }
-public enum ChainSkipReason { ActivationNegated, EffectNegated, TargetUnavailable, SourceEffectsNegated, SummonUnavailable, NoMatchingCard }
+public enum ChainSkipReason { ActivationNegated, EffectNegated, TargetUnavailable, SourceEffectsNegated, SummonUnavailable, NoMatchingCard, SourceLeftField }
 
 public sealed record ChainLink(int Number, CommittedActivation Activation, long SourcePlacementId,
     ChainOperation Operation, ChainSpellSpeed SpellSpeed = ChainSpellSpeed.One,

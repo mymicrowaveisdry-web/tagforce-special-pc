@@ -1,12 +1,36 @@
 namespace TagForceSpecial.Core;
 
-public sealed record FieldSpellTrap(CardInstance Card, bool IsFaceUp, long PlacementId = 0, int SetOnTurn = 0);
+public sealed record FieldSpellTrap(CardInstance Card, bool IsFaceUp, long PlacementId = 0, int SetOnTurn = 0)
+{
+    /// <summary>A lasting card whose activation resolved; its continuing effects apply while it stays in place.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool EffectActive { get; internal init; }
+    /// <summary>The monster this Equip Card is attached to.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public MonsterBinding? EquippedTo { get; internal init; }
+    /// <summary>A monster card sitting here as a Union equip.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsUnion { get; internal init; }
+    /// <summary>The monster this card revived, and how the two are tied together.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public MonsterBinding? LinkedMonster { get; internal init; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public RevivalLink Revival { get; internal init; }
+    /// <summary>The turn this card's Standby Phase upkeep was last settled.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int UpkeepSettledTurn { get; internal init; }
+}
 /// <summary>
 /// An activation placed or flipped but still answering its cost/target decisions. A chain response records the
 /// link it answers (<see cref="ResponseToLink"/>); the source keeps <see cref="SourcePlacementId"/>.
 /// </summary>
 public sealed record PendingSpellActivation(PlayerId Player, string EffectId, CardInstance Spell, int SpellTrapZone,
-    CardInstance? DiscardedCost = null, int ResponseToLink = 0, long SourcePlacementId = 0);
+    CardInstance? DiscardedCost = null, int ResponseToLink = 0, long SourcePlacementId = 0)
+{
+    /// <summary>The source is a monster in that Monster Zone, not a Spell/Trap card.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsMonsterEffect { get; init; }
+}
 public sealed record ActivateSpell(PlayerId Player, int CardInstanceId, int SpellTrapZone) : DuelCommand(Player);
 public sealed record SpellActivated(PlayerId Player, string EffectId, CardInstance Card, int Zone) : DuelEvent;
 public sealed record MonsterSpecialSummoned(PlayerId Player, FieldMonster Monster, int Zone, DecisionCardSource Source,

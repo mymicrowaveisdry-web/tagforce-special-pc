@@ -6,7 +6,7 @@ namespace TagForceSpecial.Core;
 public sealed record SpellTrapTarget(PlayerId Player, int Zone, CardInstance Card, long PlacementId, bool IsPendulumZone = false)
 {
     public FieldSpellTrap? Current(DuelState state) => IsPendulumZone
-        ? state.GetPlayer(Player).PendulumZones[Zone] : state.GetPlayer(Player).SpellTrapFields[Zone];
+        ? state.GetPlayer(Player).PendulumZones[Zone] : state.GetPlayer(Player).SpellTrapAt(Zone);
     public bool IsStillPresent(FieldSpellTrap? current) => current is not null &&
         current.Card == Card && current.PlacementId == PlacementId;
 }

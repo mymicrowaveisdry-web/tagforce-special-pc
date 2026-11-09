@@ -10,7 +10,11 @@ internal sealed record DuelBookkeeping(int NextInstanceId = 1, DuelRandomState? 
     public IReadOnlyList<SummonLock> SummonLocks { get; init; } = SummonLocks ?? Array.AsReadOnly(Array.Empty<SummonLock>());
     /// <summary>The latest Summon, kept until play returns to an open state so summon conditions can answer it.</summary>
     public IReadOnlyList<SummonedMonster>? RecentSummon { get; init; }
+    /// <summary>Once-per-turn activated effects used so far this turn, by card instance.</summary>
+    public IReadOnlyList<ActivatedEffectUse> ActivatedUses { get; init; } = Array.AsReadOnly(Array.Empty<ActivatedEffectUse>());
 }
+
+internal sealed record ActivatedEffectUse(int InstanceId, int TurnNumber);
 
 /// <summary>
 /// A turn player's phase-change request, or a just-completed Summon, paused so the other player can activate a set

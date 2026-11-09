@@ -33,6 +33,8 @@ public sealed partial class DuelEngine
                         foreach (var (target, _) in monsters)
                             if (profile.TargetCardIds.Contains(target.Card.GameCardId) && Relates(profile.Affects, source, target))
                                 negated.Add(target);
+        if (HasMonsterNegators && ActiveCards(state).Any(e => definitions.TryGetValue(e.Field.Card.GameCardId, out var d) && d.Negation == LastingNegation.FaceUpMonsters))
+            negated.UnionWith(monsters.Select(e => e.Binding));
         return negated.OrderBy(n => n.Player).ThenBy(n => n.Zone).ToArray();
     }
 

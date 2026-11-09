@@ -1,7 +1,14 @@
 namespace TagForceSpecial.Core;
 
 /// <summary>Card activation kinds. Spell Speed and set-turn rules derive from the kind.</summary>
-public enum EffectKind { NormalSpell, QuickPlaySpell, NormalTrap, CounterTrap, MonsterTrigger }
+public enum EffectKind
+{
+    NormalSpell, QuickPlaySpell, NormalTrap, CounterTrap, MonsterTrigger, ContinuousSpell, ContinuousTrap, FieldSpell, EquipSpell,
+    /// <summary>A face-up monster's Spell Speed 1 effect, activated in its controller's open Main Phase.</summary>
+    MonsterIgnition,
+    /// <summary>A face-up monster's Spell Speed 2 effect, also usable as a chain response.</summary>
+    MonsterQuick
+}
 
 /// <summary>One ordered resolution operation from a closed, Core-defined set.</summary>
 public abstract record EffectStep
@@ -252,10 +259,24 @@ public sealed class EffectDefinition
     /// legal). Applied at commit, so it holds even if the activation is later negated.
     /// </summary>
     public bool LocksOtherSummonsThisTurn { get; }
+    /// <summary>Stat changes that hold while a lasting card's effect is active.</summary>
+    public IReadOnlyList<LastingStatModifier> LastingModifiers { get; }
+    /// <summary>The card stays face-up on the field after resolving, unless its activation was negated.</summary>
+    public bool IsLasting => Kind is EffectKind.ContinuousSpell or EffectKind.ContinuousTrap or EffectKind.FieldSpell or EffectKind.EquipSpell;
+    public bool IsMonsterEffect => Kind is EffectKind.MonsterIgnition or EffectKind.MonsterQuick;
+    /// <summary>What this card negates while its effect is active.</summary>
+    public LastingNegation Negation { get; }
+    /// <summary>LP its controller pays each of their Standby Phases, or destroys the card; 0 for none.</summary>
+    public int UpkeepLifePoints { get; }
+    /// <summary>This monster's activated effect can be used once per turn, per card.</summary>
+    public bool OncePerTurn { get; }
+    /// <summary>ATK this monster gains for each counter on it.</summary>
+    public int AttackPerCounter { get; }
 
     public ChainSpellSpeed SpellSpeed => Kind switch
     {
-        EffectKind.NormalSpell or EffectKind.MonsterTrigger => ChainSpellSpeed.One,
+        EffectKind.NormalSpell or EffectKind.MonsterTrigger or EffectKind.ContinuousSpell or EffectKind.FieldSpell or EffectKind.EquipSpell or
+            EffectKind.MonsterIgnition => ChainSpellSpeed.One,
         EffectKind.CounterTrap => ChainSpellSpeed.Three,
         _ => ChainSpellSpeed.Two
     };
@@ -268,7 +289,10 @@ public sealed class EffectDefinition
         _ => EffectCount.None
     }).Where(c => c != EffectCount.None);
     internal static bool IsFieldTargetStep(EffectStep s) => s is DestroyTargetsStep or ReturnTargetsToHandStep or ChangeTargetsToDefenseStep or
-        BanishFieldTargetsStep or NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep or DestroyAndBanishTargetsStep or ModifyCombatantStatsStep;
+        BanishFieldTargetsStep or NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep or DestroyAndBanishTargetsStep or ModifyCombatantStatsStep or
+        EquipTargetStep or UnionEquipStep or PlaceCounterStep;
+    /// <summary>Cost choices answered before the target choices, each binding a field target answer.</summary>
+    internal int CostTargetSteps => Cost switch { TributeCost => 1, BanishFromGraveyardCost banish => banish.Count, _ => 0 };
     internal static bool IsAutomatic(EffectTarget t) => t is AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget or TriggerTargetedMonster or TriggerSourceMonster;
     internal static bool IsZoneTargetStep(EffectStep s) => s is AddTargetsToHandStep or BanishTargetsStep or ReturnTargetsToGraveyardStep or
         ShuffleTargetsIntoDeckStep or SpecialSummonTargetStep;
@@ -278,15 +302,30 @@ public sealed class EffectDefinition
 
     public EffectDefinition(string effectId, uint cardId, EffectKind kind, IEnumerable<EffectStep> steps,
         IEnumerable<EffectCondition>? conditions = null, EffectCost? cost = null, EffectTarget? target = null,
-        bool locksOtherSummonsThisTurn = false, IEnumerable<EffectTarget>? fieldTargets = null)
+        bool locksOtherSummonsThisTurn = false, IEnumerable<EffectTarget>? fieldTargets = null,
+        IEnumerable<LastingStatModifier>? lastingModifiers = null, LastingNegation negation = LastingNegation.None, int upkeepLifePoints = 0,
+        bool oncePerTurn = false, int attackPerCounter = 0, bool isMarker = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(effectId);
         ArgumentNullException.ThrowIfNull(steps);
         if (cardId == 0) throw new ArgumentOutOfRangeException(nameof(cardId));
         if (!Enum.IsDefined(kind)) throw new ArgumentOutOfRangeException(nameof(kind));
         var snapshot = steps.Take(33).ToArray();
-        if (snapshot.Length is 0 or > 32)
-            throw new ArgumentException("A definition needs 1–32 resolution steps.", nameof(steps));
+        var lasting = (lastingModifiers ?? []).Take(9).ToArray();
+        bool lastingKind = kind is EffectKind.ContinuousSpell or EffectKind.ContinuousTrap or EffectKind.FieldSpell or EffectKind.EquipSpell;
+        bool monsterKind = kind is EffectKind.MonsterIgnition or EffectKind.MonsterQuick;
+        bool unionEquip = snapshot.Any(s => s is UnionEquipStep);
+        if (lasting.Length > 8 || lasting.Any(m => m is null) || lasting.Distinct().Count() != lasting.Length ||
+            lasting.Length != 0 && !lastingKind && !unionEquip)
+            throw new ArgumentException("Only lasting cards and Union equips take up to 8 distinct lasting modifiers.", nameof(lastingModifiers));
+        if (!Enum.IsDefined(negation) || upkeepLifePoints < 0 || attackPerCounter < 0 ||
+            (negation != LastingNegation.None || upkeepLifePoints != 0) && !lastingKind ||
+            (oncePerTurn || attackPerCounter != 0) && !monsterKind)
+            throw new ArgumentException("Negation and upkeep belong to lasting cards; once-per-turn and counter stats to activated monster effects.", nameof(negation));
+        // A marker has no effect of its own: other cards' rules read it on the field.
+        if (snapshot.Length > 32 || snapshot.Length == 0 && lasting.Length == 0 && negation == LastingNegation.None && !(isMarker && lastingKind) ||
+            isMarker && (snapshot.Length != 0 || lasting.Length != 0 || negation != LastingNegation.None))
+            throw new ArgumentException("A definition needs 1–32 resolution steps, or a lasting effect instead.", nameof(steps));
         foreach (var step in snapshot)
             if (step switch
                 {
@@ -301,7 +340,9 @@ public sealed class EffectDefinition
                     SendFromDeckToGraveyardStep s => s.Filter is null,
                     DestroyTargetStep or DestroyOpponentFaceUpMonstersStep or NegateActivationStep or NegateEffectStep or NegateSummonStep => false,
                     DestroyTargetsStep or ReturnTargetsToHandStep or ChangeTargetsToDefenseStep => false,
-                    AddTargetsToHandStep or BanishTargetsStep or ReturnTargetsToGraveyardStep or ShuffleTargetsIntoDeckStep or SpecialSummonTargetStep => false,
+                    AddTargetsToHandStep or BanishTargetsStep or ReturnTargetsToGraveyardStep or ShuffleTargetsIntoDeckStep => false,
+                    SpecialSummonTargetStep s => s.Position is not (null or BattlePosition.FaceUpAttack or BattlePosition.FaceUpDefense) || !Enum.IsDefined(s.Link),
+                    EquipTargetStep or UnionEquipStep or PlaceCounterStep => false,
                     BanishFieldTargetsStep or NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep or DestroyAndBanishTargetsStep => false,
                     ModifyCombatantStatsStep s => s.Attack == 0 && s.Defense == 0,
                     BanishAllStep s => !Enum.IsDefined(s.Side) || !Enum.IsDefined(s.Filter),
@@ -320,7 +361,8 @@ public sealed class EffectDefinition
         if (required.OfType<BattleTimingCondition>().Any(c => c.Windows == BattleTiming.None || (c.Windows & ~BattleTiming.All) != 0 ||
                 c.Windows.HasFlag(BattleTiming.Calculation) && !c.DuringCalculation))
             throw new ArgumentException("A battle timing condition needs supported timings; during calculation needs an explicit exception.", nameof(conditions));
-        if (cost is not (null or DiscardCost or PayLifePointsCost or TributeCost or PayHalfLifePointsCost)) throw new ArgumentOutOfRangeException(nameof(cost));
+        if (cost is not (null or DiscardCost or PayLifePointsCost or TributeCost or PayHalfLifePointsCost or TributeSelfCost or RemoveCounterCost or BanishFromGraveyardCost) ||
+            cost is TributeSelfCost or RemoveCounterCost && !monsterKind) throw new ArgumentOutOfRangeException(nameof(cost));
         if (required.OfType<MonsterWouldBeSummonedCondition>().Any(c => c.Kinds is <= 0 || (c.Kinds & ~(SummonKinds.Normal | SummonKinds.Special)) != 0) ||
             snapshot.Any(s => s is NegateSummonStep) != required.Any(c => c is MonsterWouldBeSummonedCondition) || snapshot.Any(s => s is NegateSummonStep) && kind != EffectKind.CounterTrap)
             throw new ArgumentException("Summon negation needs a Counter Trap with a Normal/Special would-be-Summoned condition.", nameof(steps));
@@ -328,8 +370,8 @@ public sealed class EffectDefinition
         bool responds = required.Any(c => c is RespondsToSpellActivationCondition or RespondsToActivationCondition);
         if (required.OfType<RespondsToActivationCondition>().Any(c => c.Category is not (null or CardCategory.Monster or CardCategory.Spell or CardCategory.Trap)))
             throw new ArgumentOutOfRangeException(nameof(conditions));
-        if (responds && kind == EffectKind.NormalSpell)
-            throw new ArgumentException("A Normal Spell cannot be a chain response.", nameof(conditions));
+        if (responds && kind is EffectKind.NormalSpell or EffectKind.ContinuousSpell or EffectKind.FieldSpell or EffectKind.EquipSpell)
+            throw new ArgumentException("A Spell Speed 1 Spell cannot be a chain response.", nameof(conditions));
         if (snapshot.Any(s => s is NegateActivationStep or NegateEffectStep) && !responds)
             throw new ArgumentException("Negating an activation requires a response condition.", nameof(steps));
         if ((target is not null) != snapshot.Any(s => s is DestroyTargetStep))
@@ -348,6 +390,14 @@ public sealed class EffectDefinition
             snapshot.Any(s => s is ChangeTargetsToDefenseStep) && fields.Any(f => f is FieldTarget { Kind: not FieldCardKind.Monster }) ||
             snapshot.Any(s => s is SpecialSummonTargetStep) && (fields.Length != 1 || fields[0] is not ZoneTarget { MaxCount: 1, MustBeSummonable: true, Zone: CardZone.Graveyard }))
             throw new ArgumentException("Field targets (up to 5) and the steps that use them go together.", nameof(fieldTargets));
+        bool revivalEquip = snapshot.Any(s => s is SpecialSummonTargetStep { Link: RevivalLink.Equip });
+        bool attaches = snapshot.Any(s => s is EquipTargetStep);
+        if (kind == EffectKind.EquipSpell && attaches == revivalEquip || attaches && kind != EffectKind.EquipSpell || revivalEquip && kind != EffectKind.EquipSpell ||
+            attaches && fields is not [FieldTarget { Kind: FieldCardKind.Monster, Count: 1, Filter: FieldCardFilter.FaceUp }] ||
+            snapshot.Any(s => s is SpecialSummonTargetStep { Link: RevivalLink.Haunted }) && kind != EffectKind.ContinuousTrap ||
+            unionEquip && (kind != EffectKind.MonsterIgnition || !oncePerTurn || fields is not [FieldTarget { Kind: FieldCardKind.Monster, Count: 1, Side: TargetSide.Own, Filter: FieldCardFilter.FaceUp, NoUnionEquipped: true }]) ||
+            snapshot.Any(s => s is PlaceCounterStep) && fields is not ([TriggerSourceMonster] or [FieldTarget { Kind: FieldCardKind.Monster, Count: 1 }]))
+            throw new ArgumentException("Equip, revival, Union and counter steps need their card kinds and bound targets.", nameof(steps));
         if (kind == EffectKind.MonsterTrigger && (required.Length != 0 || cost is not null || target is not null || fields is not ([] or [TriggerTargetedMonster] or [TriggerSourceMonster] or [ZoneTarget { MinCount: 1, MaxCount: 1 }]) || locksOtherSummonsThisTurn) ||
             kind != EffectKind.MonsterTrigger && fields.Any(f => f is TriggerTargetedMonster or TriggerSourceMonster))
             throw new ArgumentException("A monster trigger takes its timing and costs from its trigger profile.", nameof(kind));
@@ -360,6 +410,11 @@ public sealed class EffectDefinition
         Target = target;
         FieldTargets = Array.AsReadOnly(fields);
         LocksOtherSummonsThisTurn = locksOtherSummonsThisTurn;
+        LastingModifiers = Array.AsReadOnly(lasting);
+        Negation = negation;
+        UpkeepLifePoints = upkeepLifePoints;
+        OncePerTurn = oncePerTurn;
+        AttackPerCounter = attackPerCounter;
     }
 }
 

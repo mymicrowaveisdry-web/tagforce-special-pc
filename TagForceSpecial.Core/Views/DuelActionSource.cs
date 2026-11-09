@@ -217,6 +217,8 @@ public sealed class DuelActionSource
         {
             for (int z = 0; z < 5; z++)
                 yield return B(new ActivateChainResponse(player, chain.DecisionId, z), ActionKind.ChainResponse, $"Respond zone {z + 1}", zone: z);
+            for (int z = 0; z < 5; z++)
+                yield return B(new ActivateMonsterChainResponse(player, chain.DecisionId, z), ActionKind.MonsterEffect, $"Respond with monster [{z + 1}]", own.MonsterZones[z]?.Card.InstanceId, z);
             foreach (var card in own.Hand)
                 for (int z = 0; z < 5; z++)
                     yield return B(new ActivateHandChainResponse(player, chain.DecisionId, card.InstanceId, z), ActionKind.ChainResponse,
@@ -254,7 +256,27 @@ public sealed class DuelActionSource
                 yield return B(new SetMonster(player, card.InstanceId, z), ActionKind.SetMonster, $"Set {name} [{z + 1}]", card.InstanceId, z);
                 yield return B(new SetSpellTrap(player, card.InstanceId, z), ActionKind.SetSpellTrap, $"Set {name} [{z + 1}]", card.InstanceId, z);
             }
+            yield return B(new ActivateSpell(player, card.InstanceId, DuelPlayerState.FieldZoneIndex), ActionKind.ActivateSpell, $"Activate {name} [Field]", card.InstanceId, DuelPlayerState.FieldZoneIndex);
+            yield return B(new SetSpellTrap(player, card.InstanceId, DuelPlayerState.FieldZoneIndex), ActionKind.SetSpellTrap, $"Set {name} [Field]", card.InstanceId, DuelPlayerState.FieldZoneIndex);
             yield return B(new DiscardForHandLimit(player, card.InstanceId), ActionKind.Discard, $"Discard {name}", card.InstanceId);
+            if (!engine.IsToonCard(card.GameCardId)) continue;
+            foreach (var tributes in ZoneSubsets(own))
+                for (int z = 0; z < 5; z++)
+                    foreach (var position in new[] { BattlePosition.FaceUpAttack, BattlePosition.FaceUpDefense })
+                        yield return B(new ToonSummon(player, card.InstanceId, z, position, tributes, state.Revision), ActionKind.Summon,
+                            $"Toon Summon {name} [{z + 1}] {position}", card.InstanceId, z, position: position, target: tributes.Aggregate(0, (mask, t) => mask | 1 << t));
+        }
+        yield return B(new ActivateSetSpell(player, DuelPlayerState.FieldZoneIndex), ActionKind.ActivateSetSpell, "Activate set [Field]", own.FieldSpell?.Card.InstanceId, DuelPlayerState.FieldZoneIndex);
+        for (int z = 0; z < 5; z++)
+        {
+            if (own.MonsterZones[z] is { } activated)
+                yield return B(new ActivateMonsterEffect(player, z), ActionKind.MonsterEffect, $"Activate {catalog[activated.Card.GameCardId].Name} [{z + 1}]", activated.Card.InstanceId, z);
+            if (own.SpellTrapFields[z] is { } equipped)
+            {
+                yield return B(new UnequipUnion(player, z), ActionKind.Unequip, $"Unequip {catalog[equipped.Card.GameCardId].Name}", equipped.Card.InstanceId, z);
+                yield return B(new ResolveUpkeep(player, z, true), ActionKind.Upkeep, $"Pay upkeep for {catalog[equipped.Card.GameCardId].Name}", equipped.Card.InstanceId, z, target: 1);
+                yield return B(new ResolveUpkeep(player, z, false), ActionKind.Upkeep, $"Destroy {catalog[equipped.Card.GameCardId].Name}", equipped.Card.InstanceId, z, target: 0);
+            }
         }
         for (int z = 0; z < 5; z++)
             if (own.MonsterZones[z] is { } gemini)
@@ -270,6 +292,18 @@ public sealed class DuelActionSource
         for (int z = 0; z < 5; z++)
             foreach (var position in Enum.GetValues<BattlePosition>())
                 yield return B(new ChangeMonsterPosition(player, z, position), ActionKind.Position, $"Position {z + 1}: {position}", own.MonsterZones[z]?.Card.InstanceId, z, position: position);
+    }
+
+    /// <summary>Sets of 0 to 2 occupied Monster Zones, the Tribute choices a Toon Summon can use.</summary>
+    private static IEnumerable<int[]> ZoneSubsets(DuelPlayerState own)
+    {
+        int[] occupied = Enumerable.Range(0, 5).Where(z => own.MonsterZones[z] is not null).ToArray();
+        yield return [];
+        for (int i = 0; i < occupied.Length; i++)
+        {
+            yield return [occupied[i]];
+            for (int j = i + 1; j < occupied.Length; j++) yield return [occupied[i], occupied[j]];
+        }
     }
 
     private static IEnumerable<Bound> Attacks(DuelPlayerState own, PlayerId player)

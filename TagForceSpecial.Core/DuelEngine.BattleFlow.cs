@@ -80,7 +80,8 @@ public sealed partial class DuelEngine
         if (attacker.LastAttackTurn == State.TurnNumber) return Reject(DuelError.AlreadyAttacked);
         var defender = targetZone is int zone ? opponent.MonsterZones[zone] : null;
         if (targetZone is not null && defender is null) return Reject(DuelError.MonsterZoneEmpty);
-        if (targetZone is null && opponent.MonsterZones.Any(m => m is not null)) return Reject(DuelError.DirectAttackBlocked);
+        if (targetZone is null && !CanAttackDirectly(opponent, attacker)) return Reject(DuelError.DirectAttackBlocked);
+        if (AttackRestrictionError(player, opponent, attacker, targetZone) is not DuelError.None and var toonError) return Reject(toonError);
         if (!rules[attacker.Card.GameCardId].AllowsBasicBattle || defender is not null && !rules[defender.Card.GameCardId].AllowsBasicBattle)
             return Reject(DuelError.UnsupportedBattleCard);
         var stats = catalog[attacker.Card.GameCardId].Statistics;
@@ -94,8 +95,10 @@ public sealed partial class DuelEngine
             FieldMonsters(State).Where(e => e.Binding.Player == opponent.Id).Select(e => e.Binding));
         var monsters = player.MonsterZones.ToArray(); monsters[attackerZone] = attacker with { LastAttackTurn = State.TurnNumber };
         var window = NewBattleWindow(BattleTiming.AttackDeclaration, opponent.Id);
+        List<DuelEvent> declared = [];
+        player = PayToonAttack(player, attacker, declared);
         return Accept(State.With(player: player.With(monsters: monsters)).WithBattle(battle with { Attack = attack, Window = window }),
-            new AttackDeclared(player.Id, attackerZone, targetZone), new BattleResponseRequested(window));
+            [.. declared, new AttackDeclared(player.Id, attackerZone, targetZone), new BattleResponseRequested(window)]);
     }
 
     private DuelActionResult ChooseBattleReplay(ChooseAttackReplay command)
@@ -224,6 +227,11 @@ public sealed partial class DuelEngine
             }
             void Mark(MonsterBinding binding)
             {
+                if (ReplaceDestruction(next, binding, events) is { } replaced)
+                {
+                    next = replaced;
+                    return;
+                }
                 var player = next.GetPlayer(binding.Player); var monsters = player.MonsterZones.ToArray();
                 monsters[binding.Zone] = monsters[binding.Zone]! with { BattleDestroyed = true };
                 next = next.With(player: player.With(monsters: monsters));
