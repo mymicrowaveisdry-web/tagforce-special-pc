@@ -149,7 +149,7 @@ public sealed partial class DuelEngine
         var usedEffectIds = eventIds.Concat(summonIds)
             .Concat(summonEffects.Values.Select(p => p.EffectId)).ToHashSet(StringComparer.Ordinal);
         // Definitions need matching settable card rules, Token rules for Token steps and a seed for shuffles.
-        if (definitionList.Any(d => d is null || d.Cost is DiscardCost { Filter: { } discardFilter } && discardFilter.CardIds.Any(id => !knownIds.Contains(id)) ||
+        if (definitionList.Any(d => d is null || d.Cost is DiscardCost { Filter: CardIdFilter discardFilter } && discardFilter.CardIds.Any(id => !knownIds.Contains(id)) ||
                 d.Steps.OfType<SummonTokensStep>().Any(s => s.TokenCardIds.Any(id => !IsTokenId(id))) ||
                 d.Kind == EffectKind.MonsterTrigger || shuffleSeed is null && NeedsShuffle(d) ||
                 !this.rules.TryGetValue(d.CardId, out var rule) || (d.IsMonsterEffect ? rule.Category != CardCategory.Monster : !rule.AllowsSpellTrapSet ||
@@ -167,8 +167,13 @@ public sealed partial class DuelEngine
         definitions = definitionList.ToFrozenDictionary(d => d.CardId);
         definitionDecisions = definitionList.Where(d => d.Cost is DiscardCost or TributeCost or BanishFromGraveyardCost || d.Target is not null || d.FieldTargets.Any(t => !EffectDefinition.IsAutomatic(t)))
             .ToFrozenDictionary(d => d.CardId, d => new DecisionSequence(DefinitionSequenceId(d),
-                [.. d.Cost is DiscardCost discard ? [discard.Filter is { } only ? DecisionStep.Card(DecisionCardSource.Hand, only.CardIds) : DecisionStep.AnyCard(DecisionCardSource.Hand)] : Array.Empty<DecisionStep>(),
-                 .. d.Cost is TributeCost ? [DecisionStep.FieldTargetChoice(new FieldTarget(FieldCardKind.Monster, TargetSide.Own), optional: false)] : Array.Empty<DecisionStep>(),
+                [.. d.Cost is DiscardCost discard ? Enumerable.Repeat(discard.Filter switch
+                     {
+                         CardIdFilter only => DecisionStep.Card(DecisionCardSource.Hand, only.CardIds),
+                         { } other => DecisionStep.FilteredCard(DecisionCardSource.Hand, other),
+                         null => DecisionStep.AnyCard(DecisionCardSource.Hand)
+                     }, discard.Count) : Array.Empty<DecisionStep>(),
+                 .. d.Cost is TributeCost tribute ? Enumerable.Repeat(DecisionStep.FieldTargetChoice(new FieldTarget(FieldCardKind.Monster, TargetSide.Own, tribute.Position, cardFilter: tribute.Filter), optional: false), tribute.Count) : Array.Empty<DecisionStep>(),
                  .. d.Cost is BanishFromGraveyardCost banish ? Enumerable.Repeat(DecisionStep.FieldTargetChoice(new ZoneTarget(CardZone.Graveyard, TargetSide.Own, banish.Filter)), banish.Count) : Array.Empty<DecisionStep>(),
                  .. d.Target is SpellTrapOnFieldTarget ? [DecisionStep.SpellTrapTarget()] : Array.Empty<DecisionStep>(),
                  .. d.FieldTargets.Where(t => !EffectDefinition.IsAutomatic(t)).SelectMany(spec => Enumerable.Range(0, EffectDefinition.MaxCount(spec))
@@ -349,9 +354,9 @@ public sealed partial class DuelEngine
         if (level == 0) return Reject(DuelError.UnsupportedMonsterLevel);
         if (level > 4) return Reject(DuelError.TributeSummonNotSupported);
         if (player.MonsterZones[zone] is not null) return Reject(DuelError.MonsterZoneOccupied);
-        if (State.NormalSummonUsed) return Reject(DuelError.NormalSummonLimitReached);
+        if (!NormalSummonAvailable(State)) return Reject(DuelError.NormalSummonLimitReached);
         if (!faceDown && IsSummonLocked(State, player.Id)) return Reject(DuelError.SummonLocked);
-        var next = State.With(player: player.With(hand: player.Hand.Where(c => c.InstanceId != instanceId)), normalSummonUsed: true);
+        var next = SpendNormalSummon(State.With(player: player.With(hand: player.Hand.Where(c => c.InstanceId != instanceId))));
         return CommitSummon(next, player.Id, card, zone, faceDown, []);
     }
 

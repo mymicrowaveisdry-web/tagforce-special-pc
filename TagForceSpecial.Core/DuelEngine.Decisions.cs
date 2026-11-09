@@ -11,7 +11,7 @@ public sealed partial class DuelEngine
         var step = sequence.Steps[index];
         CardInstance[] cards = step.Kind == DecisionKind.Card
             ? SpecialSourceCards(player, step.CardSource!.Value)
-                .Where(c => c.InstanceId != excludeInstanceId && step.Allows(c.GameCardId)).ToArray()
+                .Where(c => c.InstanceId != excludeInstanceId && step.Allows(c.GameCardId) && (step.CardMatch is null || MatchesFilter(c, step.CardMatch))).ToArray()
             : [];
         int[] zones = step.Kind == DecisionKind.MonsterZone
             ? Enumerable.Range(0, 5).Where(z => player.MonsterZones[z] is null).ToArray()

@@ -226,8 +226,8 @@ public abstract record EffectCost
     private protected EffectCost() { }
 }
 
-/// <summary>Discard 1 card from the hand other than the source; <see cref="Filter"/> limits which cards qualify.</summary>
-public sealed record DiscardCost(CardIdFilter? Filter = null) : EffectCost;
+/// <summary>Discard cards from the hand other than the source; <see cref="Filter"/> limits which cards qualify.</summary>
+public sealed record DiscardCost(CardFilter? Filter = null, int Count = 1) : EffectCost;
 
 /// <summary>An activation-time target, bound by instance and placement.</summary>
 public abstract record EffectTarget
@@ -298,9 +298,9 @@ public sealed class EffectDefinition
     }).Where(c => c != EffectCount.None);
     internal static bool IsFieldTargetStep(EffectStep s) => s is DestroyTargetsStep or ReturnTargetsToHandStep or ChangeTargetsToDefenseStep or
         BanishFieldTargetsStep or NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep or DestroyAndBanishTargetsStep or ModifyCombatantStatsStep or
-        EquipTargetStep or UnionEquipStep or PlaceCounterStep;
+        EquipTargetStep or UnionEquipStep or PlaceCounterStep or ModifyTargetsUntilEndStep or FlipTargetsFaceDownStep or FlipTargetsFaceUpStep;
     /// <summary>Cost choices answered before the target choices, each binding a field target answer.</summary>
-    internal int CostTargetSteps => Cost switch { TributeCost => 1, BanishFromGraveyardCost banish => banish.Count, _ => 0 };
+    internal int CostTargetSteps => Cost switch { TributeCost tribute => tribute.Count, BanishFromGraveyardCost banish => banish.Count, _ => 0 };
     internal static bool IsAutomatic(EffectTarget t) => t is AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget or TriggerTargetedMonster or TriggerSourceMonster;
     internal static bool IsZoneTargetStep(EffectStep s) => s is AddTargetsToHandStep or BanishTargetsStep or ReturnTargetsToGraveyardStep or
         ShuffleTargetsIntoDeckStep or SpecialSummonTargetStep;
@@ -354,7 +354,9 @@ public sealed class EffectDefinition
                     DestroyTargetsStep or ReturnTargetsToHandStep or ChangeTargetsToDefenseStep => false,
                     AddTargetsToHandStep or BanishTargetsStep or ReturnTargetsToGraveyardStep or ShuffleTargetsIntoDeckStep => false,
                     SpecialSummonTargetStep s => s.Position is not (null or BattlePosition.FaceUpAttack or BattlePosition.FaceUpDefense) || !Enum.IsDefined(s.Link),
-                    EquipTargetStep or UnionEquipStep or PlaceCounterStep => false,
+                    EquipTargetStep or UnionEquipStep or PlaceCounterStep or FlipTargetsFaceDownStep or GrantNormalSummonStep => false,
+                    ModifyTargetsUntilEndStep s => s.Attack == 0 && s.Defense == 0,
+                    FlipTargetsFaceUpStep s => s.Position is not (BattlePosition.FaceUpAttack or BattlePosition.FaceUpDefense),
                     ReturnSourceToDeckTopStep => kind != EffectKind.MonsterTrigger,
                     BanishFieldTargetsStep or NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep or DestroyAndBanishTargetsStep => false,
                     ModifyCombatantStatsStep s => s.Attack == 0 && s.Defense == 0,
@@ -375,7 +377,8 @@ public sealed class EffectDefinition
                 c.Windows.HasFlag(BattleTiming.Calculation) && !c.DuringCalculation))
             throw new ArgumentException("A battle timing condition needs supported timings; during calculation needs an explicit exception.", nameof(conditions));
         if (cost is not (null or DiscardCost or PayLifePointsCost or TributeCost or PayHalfLifePointsCost or TributeSelfCost or RemoveCounterCost or BanishFromGraveyardCost or DetachCost) ||
-            cost is TributeSelfCost or RemoveCounterCost or DetachCost && !monsterKind) throw new ArgumentOutOfRangeException(nameof(cost));
+            cost is TributeSelfCost or RemoveCounterCost or DetachCost && !monsterKind ||
+            cost is DiscardCost { Count: < 1 or > 5 } or TributeCost { Count: < 1 or > 5 }) throw new ArgumentOutOfRangeException(nameof(cost));
         if (required.OfType<MonsterWouldBeSummonedCondition>().Any(c => c.Kinds is <= 0 || (c.Kinds & ~(SummonKinds.Normal | SummonKinds.Special)) != 0) ||
             snapshot.Any(s => s is NegateSummonStep) != required.Any(c => c is MonsterWouldBeSummonedCondition) || snapshot.Any(s => s is NegateSummonStep) && kind != EffectKind.CounterTrap)
             throw new ArgumentException("Summon negation needs a Counter Trap with a Normal/Special would-be-Summoned condition.", nameof(steps));

@@ -55,6 +55,7 @@ public sealed partial class DuelEngine
             TokenSpecialSummoned e => new(e.Player, e.Zone, e.Monster.Card, e.Monster.PlacementId),
             MonsterFlipSummoned e => new(e.Player, e.Zone, e.Monster.Card, e.Monster.PlacementId),
             BattleFlipEffectWindowOpened e => e.Monster,
+            MonsterFlippedByEffect e => e.Monster,
             MonsterDestroyed e when before.GetPlayer(e.Player).MonsterZones[e.Zone] is { } m => new(e.Player, e.Zone, e.Card, m.PlacementId),
             MonsterTributed e => e.Monster,
             SummonMaterialSentToGraveyard e => e.Material,
@@ -81,7 +82,7 @@ public sealed partial class DuelEngine
             MonsterNormalSummoned => MonsterEventKind.NormalSummoned,
             MonsterSpecialSummoned or TokenSpecialSummoned => MonsterEventKind.SpecialSummoned,
             MonsterFlipSummoned => MonsterEventKind.FlipSummoned,
-            BattleFlipEffectWindowOpened => MonsterEventKind.FlippedFaceUp,
+            BattleFlipEffectWindowOpened or MonsterFlippedByEffect => MonsterEventKind.FlippedFaceUp,
             MonsterDestroyed or SummonNegated or SpellTrapDestroyed => MonsterEventKind.Destroyed,
             _ => MonsterEventKind.SentToGraveyard
         };

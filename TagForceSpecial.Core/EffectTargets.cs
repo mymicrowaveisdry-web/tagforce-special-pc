@@ -7,7 +7,7 @@ public enum FieldCardKind { Monster, SpellTrap, Any }
 public enum TargetSide { Either, Own, Opponent }
 
 /// <summary>Position requirement on a field card; Spell/Trap cards only use <see cref="FaceUp"/>.</summary>
-public enum FieldCardFilter { Any, FaceUp, AttackPosition, DefensePosition, FaceUpAttack }
+public enum FieldCardFilter { Any, FaceUp, AttackPosition, DefensePosition, FaceUpAttack, FaceDown }
 
 /// <summary>Where a targeted card sits; Graveyard and banished cards have no zone or placement.</summary>
 public enum FieldLocation { MonsterZone, SpellTrapZone, PendulumZone, Graveyard, Banished }
@@ -75,6 +75,23 @@ public sealed record ReturnAllToHandStep(FieldCardKind Kind, TargetSide Side = T
 
 /// <summary>Changes every Attack Position monster on the given side to face-up Defense Position.</summary>
 public sealed record ChangeAllToDefenseStep(TargetSide Side = TargetSide.Either) : EffectStep;
+
+/// <summary>Changes each bound monster's ATK and DEF until the End Phase begins.</summary>
+public sealed record ModifyTargetsUntilEndStep(int Attack, int Defense = 0) : EffectStep;
+
+/// <summary>Turns each bound face-up monster face-down.</summary>
+public sealed record FlipTargetsFaceDownStep : EffectStep;
+
+/// <summary>Flips each bound face-down monster face-up in the given position.</summary>
+public sealed record FlipTargetsFaceUpStep(BattlePosition Position = BattlePosition.FaceUpAttack) : EffectStep;
+
+/// <summary>The turn player can conduct one more Normal Summon or Set this turn.</summary>
+public sealed record GrantNormalSummonStep : EffectStep;
+
+/// <summary>An effect flipped this monster face-up; it was not Flip Summoned.</summary>
+public sealed record MonsterFlippedByEffect(MonsterBinding Monster) : DuelEvent;
+
+public sealed record ExtraNormalSummonGranted(PlayerId Player, string EffectId) : DuelEvent;
 
 public enum MonsterStat { Attack, Defense }
 public enum StatExtreme { Lowest, Highest }
@@ -205,8 +222,8 @@ public sealed record MonsterWouldBeSummonedCondition(SummonKinds Kinds, bool ByO
 /// <summary>Negates the pending Summon and destroys that monster; as a chain response, negates that activation and destroys the card.</summary>
 public sealed record NegateSummonStep : EffectStep;
 
-/// <summary>Tribute 1 monster you control, chosen at activation (never refunded).</summary>
-public sealed record TributeCost : EffectCost;
+/// <summary>Tribute monsters you control, chosen at activation (never refunded). <paramref name="Filter"/> and <paramref name="Position"/> limit which qualify.</summary>
+public sealed record TributeCost(CardFilter? Filter = null, int Count = 1, FieldCardFilter Position = FieldCardFilter.Any) : EffectCost;
 
 /// <summary>Pay half your LP, rounded down (never refunded).</summary>
 public sealed record PayHalfLifePointsCost : EffectCost;

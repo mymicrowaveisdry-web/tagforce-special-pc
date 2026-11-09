@@ -95,9 +95,8 @@ public sealed class GraveyardFamilyTests
     [Fact]
     public void MonsterReincarnationCanTargetTheMonsterItJustDiscarded()
     {
-        var e = Engine(Deck(Reincarnation, Effect, Burial), Deck());
-        EnterMain(e);
-        Bury(e, N1); // activation needs a Graveyard monster before the discard
+        var e = Engine(Deck(Reincarnation, Effect), Deck());
+        EnterMain(e); // The Graveyard is empty: the card about to be discarded is the only possible target.
         Activate(e, Reincarnation);
         var cost = e.State.PendingDecision!;
         Ok(e, new ChooseDecisionCard(PlayerId.One, cost.DecisionId, cost.CardOptions.First(c => c.GameCardId == Effect).InstanceId));

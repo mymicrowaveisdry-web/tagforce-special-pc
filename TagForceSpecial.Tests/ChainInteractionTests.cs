@@ -338,8 +338,9 @@ public sealed class ChainInteractionTests
         uint[] costs = [1];
         var cost = new DiscardCost(new CardIdFilter(costs));
         costs[0] = 4;
-        Assert.Equal(1u, Assert.Single(cost.Filter!.CardIds));
-        Assert.Throws<NotSupportedException>(() => ((IList<uint>)cost.Filter.CardIds).Clear());
+        var filter = Assert.IsType<CardIdFilter>(cost.Filter);
+        Assert.Equal(1u, Assert.Single(filter.CardIds));
+        Assert.Throws<NotSupportedException>(() => ((IList<uint>)filter.CardIds).Clear());
         // Negation needs a response condition, and a Normal Spell cannot respond.
         Assert.Throws<ArgumentException>(() => new EffectDefinition("bad", 2, EffectKind.NormalTrap, [new NegateEffectStep(false)]));
         Assert.Throws<ArgumentException>(() => new EffectDefinition("bad", 2, EffectKind.NormalSpell, [new NegateEffectStep(false)],

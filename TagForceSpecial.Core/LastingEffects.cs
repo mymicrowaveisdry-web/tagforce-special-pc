@@ -59,16 +59,34 @@ public sealed record MonsterTypeFilter : CardFilter
 /// <summary>Monsters with this raw Attribute code. Codes are decoded metadata, reviewed against known monsters.</summary>
 public sealed record MonsterAttributeFilter(uint AttributeCode) : CardFilter;
 
-/// <summary>Monsters of this printed Level or lower and, when set, this raw type code. Xyz Monsters have no Level.</summary>
+/// <summary>Monsters within this printed Level range and, when set, this raw type code. Xyz Monsters have no Level.</summary>
 public sealed record MonsterLevelFilter : CardFilter
 {
     public uint MaxLevel { get; }
+    public uint MinLevel { get; }
     public uint? TypeCode { get; }
-    public MonsterLevelFilter(uint maxLevel, uint? typeCode = null)
+    public MonsterLevelFilter(uint maxLevel, uint? typeCode = null, uint minLevel = 1)
     {
         MaxLevel = maxLevel is >= 1 and <= 12 ? maxLevel : throw new ArgumentOutOfRangeException(nameof(maxLevel));
+        MinLevel = minLevel >= 1 && minLevel <= maxLevel ? minLevel : throw new ArgumentOutOfRangeException(nameof(minLevel));
         TypeCode = typeCode;
     }
+}
+
+/// <summary>Cards matching at least one of the filters.</summary>
+public sealed record AnyOfFilter : CardFilter
+{
+    public IReadOnlyList<CardFilter> Filters { get; }
+    public AnyOfFilter(params CardFilter[] filters) => Filters = Array.AsReadOnly(filters is { Length: >= 2 } && filters.All(f => f is not null)
+        ? filters.ToArray() : throw new ArgumentException("Supply at least two filters.", nameof(filters)));
+}
+
+/// <summary>Cards matching every one of the filters.</summary>
+public sealed record AllOfFilter : CardFilter
+{
+    public IReadOnlyList<CardFilter> Filters { get; }
+    public AllOfFilter(params CardFilter[] filters) => Filters = Array.AsReadOnly(filters is { Length: >= 2 } && filters.All(f => f is not null)
+        ? filters.ToArray() : throw new ArgumentException("Supply at least two filters.", nameof(filters)));
 }
 
 /// <summary>Detach Xyz Materials from the activating monster; the choice travels with the activation command.</summary>

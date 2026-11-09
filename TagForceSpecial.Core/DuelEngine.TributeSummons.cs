@@ -25,7 +25,7 @@ public sealed partial class DuelEngine
         // Preserve the original high-level command boundary unless a profile explicitly changes it.
         if (level == 0 || procedure is null && level < 5 && catalog[card.GameCardId].Statistics.Level < 5)
             return Reject(DuelError.UnsupportedMonsterLevel);
-        if (State.NormalSummonUsed) return Reject(DuelError.NormalSummonLimitReached);
+        if (!NormalSummonAvailable(State)) return Reject(DuelError.NormalSummonLimitReached);
         if (!command.FaceDown && IsSummonLocked(State, player.Id)) return Reject(DuelError.SummonLocked);
         int count = procedure?.TributeCount ?? (level <= 4 ? 0 : level <= 6 ? 1 : 2);
         var selected = command.Tributes;
@@ -44,8 +44,8 @@ public sealed partial class DuelEngine
         var monsters = player.MonsterZones.ToArray();
         var ordered = selected.OrderBy(t => t.Zone).ToArray();
         foreach (var tribute in ordered) monsters[tribute.Zone] = null;
-        var next = State.With(player: player.With(monsters: monsters,
-            hand: player.Hand.Where(c => c.InstanceId != card.InstanceId)), normalSummonUsed: true);
+        var next = SpendNormalSummon(State.With(player: player.With(monsters: monsters,
+            hand: player.Hand.Where(c => c.InstanceId != card.InstanceId))));
         List<DuelEvent> events = [];
         foreach (var tribute in ordered)
             next = SendFieldCardToGraveyard(next, tribute.Card, new MonsterTributed(tribute) { TimingGroup = 0 }, events);

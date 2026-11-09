@@ -18,7 +18,7 @@ public sealed class ChainCatalogIdentityTests
 
         Assert.Equal(custom, definition.CardId);
         Assert.Equal(custom, response.CardId);
-        Assert.Equal(custom, Assert.Single(Assert.IsType<DiscardCost>(response.Cost).Filter!.CardIds));
+        Assert.Equal(custom, Assert.Single(Assert.IsType<CardIdFilter>(Assert.IsType<DiscardCost>(response.Cost).Filter).CardIds));
         Assert.Equal(custom, tokens.TokenCardIds[0]);
         Assert.Equal(custom, Assert.Single(summon.EligibleCardIds));
     }

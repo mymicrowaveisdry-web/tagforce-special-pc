@@ -30,6 +30,14 @@ public sealed class DecisionStep
     public static DecisionStep AnyCard(DecisionCardSource source) => Enum.IsDefined(source)
         ? new(DecisionKind.Card, source, [], [], anyCard: true) : throw new ArgumentOutOfRangeException(nameof(source));
 
+    /// <summary>When set, only cards matching this filter can be chosen.</summary>
+    [JsonIgnore]
+    public CardFilter? CardMatch { get; private init; }
+
+    /// <summary>One card from the source that matches a filter.</summary>
+    public static DecisionStep FilteredCard(DecisionCardSource source, CardFilter filter) =>
+        new(DecisionKind.Card, source, [], [], anyCard: true) { CardMatch = filter ?? throw new ArgumentNullException(nameof(filter)) };
+
     public static DecisionStep Card(DecisionCardSource source, IEnumerable<uint> allowedCardIds)
     {
         ArgumentNullException.ThrowIfNull(allowedCardIds);

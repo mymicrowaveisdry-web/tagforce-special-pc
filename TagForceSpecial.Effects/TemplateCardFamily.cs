@@ -10,7 +10,9 @@ public static class TemplateCardFamily
     public const string FamilyId = "template-card-definition";
     public const string BatchId = "tfsp-family-batch-10d-01";
 
+    private const string EndsWithEndPhase = "The change ends when the End Phase begins.";
     private static readonly CardTable T = new("template");
+    private static readonly FieldTarget FaceUpMonster = new(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUp);
 
     private static MonsterTypeFilter OfType(uint type) => new([type]);
     private static MonsterAttributeFilter OfAttribute(uint attribute) => new(attribute);
@@ -75,7 +77,18 @@ public static class TemplateCardFamily
         T.Trap(9364, "Gleipnir, the Fetters of Fenrir", SearchFor(CardArchetypes.Nordic)),
         T.Trap(4992, "Enchanted Javelin", [new GainByTargetAttackStep()], targets: TrapTiming.Attacker, conditions: TrapTiming.OpponentAttacks),
         T.WhenSummoned(5510, "Gravekeeper's Curse", [new DealDamageStep(500)]),
-        T.WhenBattleDestroyed(6506, "Scarr, Scout of Dark World", SearchFor(CardArchetypes.DarkWorldLevelFourOrLower))
+        T.WhenBattleDestroyed(6506, "Scarr, Scout of Dark World", SearchFor(CardArchetypes.DarkWorldLevelFourOrLower)),
+        T.QuickPlay(4905, "Rush Recklessly", [new ModifyTargetsUntilEndStep(700)], targets: [FaceUpMonster], exceptions: EndsWithEndPhase),
+        T.QuickPlay(5432, "Book of Moon", [new FlipTargetsFaceDownStep()], targets: [FaceUpMonster], exceptions: "Tokens and Xyz Monsters stay face-up."),
+        T.Normal(5431, "Book of Taiyou", [new FlipTargetsFaceUpStep()], targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceDown)],
+            exceptions: "Handled as a targeted flip. It counts as flipped for Flip effects; it is not a Flip Summon."),
+        T.Normal(7219, "Double Summon", [new GrantNormalSummonStep()], exceptions: "A second copy in the same turn adds nothing."),
+        T.Normal(7248, "Trade-In", [new DrawCardsStep(2)], new DiscardCost(new MonsterLevelFilter(8, minLevel: 8))),
+        T.Normal(5688, "Magical Stone Excavation", [new AddTargetsToHandStep()], new DiscardCost(Count: 2),
+            [new ZoneTarget(CardZone.Graveyard, TargetSide.Own, new CardCategoryFilter(CardCategory.Spell))]),
+        T.Trap(6709, "Icarus Attack", [new DestroyTargetsStep()], new TributeCost(OfType(WingedBeast)), [new FieldTarget(FieldCardKind.Any, count: 2)]),
+        T.Normal(9666, "Surface", [new SpecialSummonTargetStep(BattlePosition.FaceUpDefense)], targets:
+            [new ZoneTarget(CardZone.Graveyard, TargetSide.Own, new AllOfFilter(new MonsterLevelFilter(3), new MonsterTypeFilter([Fish, SeaSerpent, Aqua])), mustBeSummonable: true)])
     ];
 
     public static CardFamily Family { get; } = CardTable.Family(FamilyId, BatchId, ["TemplateCardFamilyTests", "CardPoolTests"], Cards);

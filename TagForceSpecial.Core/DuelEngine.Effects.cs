@@ -98,6 +98,7 @@ public sealed partial class DuelEngine
         if (definition.SummonsMonsters && IsSummonLocked(State, playerId)) return DuelError.SummonLocked;
         if (definition.Cost is PayLifePointsCost pay && player.LifePoints <= pay.Amount) return DuelError.InsufficientLifePoints;
         if (definition.Cost is TributeCost && !player.MonsterZones.Any(m => m is not null)) return DuelError.DecisionUnavailable;
+        if (definition.Cost is DiscardCost discards && player.Hand.Count(c => c != card && DiscardQualifies(c, discards.Filter)) < discards.Count) return DuelError.DecisionUnavailable;
         if (definition.Cost is RemoveCounterCost remove && !player.MonsterZones.Any(m => m?.Card == card && m.Counters >= remove.Count)) return DuelError.DecisionUnavailable;
         if (definition.Steps.Any(s => s is UnionEquipStep) && player.SpellTrapFields.All(f => f is not null)) return DuelError.DecisionUnavailable;
         if (definition.Cost is DetachCost detach && !player.MonsterZones.Any(m => m?.Card == card && m.XyzMaterials.Count >= detach.Count)) return DuelError.DecisionUnavailable;
@@ -105,9 +106,11 @@ public sealed partial class DuelEngine
         {
             // Simulate one pick per field target so several targets need distinct cards.
             List<DecisionAnswer> simulated = [];
+            var preview = DiscardPreview(playerId, card, definition);
             for (int i = 0; i < sequence.Steps.Count && !sequence.Steps[i].Optional; i++)
             {
-                var decision = CreateDecision(sequence, i, simulated, DecisionExclusion(definition, card, i), playerId);
+                var decision = CreateDecision(sequence, i, simulated, DecisionExclusion(definition, card, i), playerId,
+                    sequence.Steps[i].Kind == DecisionKind.Card ? null : preview);
                 if (decision is null) return DuelError.DecisionUnavailable;
                 if (decision.FieldTargetOptions is { } options) simulated.Add(new(DecisionKind.FieldTarget, FieldTarget: options[0]));
             }
@@ -194,7 +197,7 @@ public sealed partial class DuelEngine
     }
 
     private bool? timedCombatModifiers;
-    private bool HasTimedCombatModifiers => timedCombatModifiers ??= definitions.Values.Any(d => d.Steps.Any(s => s is ModifyCombatantStatsStep));
+    private bool HasTimedCombatModifiers => timedCombatModifiers ??= definitions.Values.Any(d => d.Steps.Any(s => s is ModifyCombatantStatsStep or ModifyTargetsUntilEndStep));
 
     private bool? summonNegators;
     private bool SummonNegators => summonNegators ??= definitions.Values.Any(d => d.Conditions.Any(c => c is MonsterWouldBeSummonedCondition));
@@ -275,7 +278,7 @@ public sealed partial class DuelEngine
 
     /// <summary>A monster may Tribute itself as a cost; every other choice excludes the source.</summary>
     private static int? DecisionExclusion(EffectDefinition definition, CardInstance card, int step) =>
-        definition.IsMonsterEffect && definition.Cost is TributeCost && step == 0 ? null : card.InstanceId;
+        definition.IsMonsterEffect && definition.Cost is TributeCost && step < definition.CostTargetSteps ? null : card.InstanceId;
 
     /// <summary>Asks for the remaining cost and target decisions, or adds the link at once.</summary>
     private DuelActionResult ContinueCommit(DuelState placed, DuelEvent[] head, PlayerId playerId, CardInstance card, int zone,
@@ -316,15 +319,14 @@ public sealed partial class DuelEngine
         if (pending.Kind == DecisionKind.Card)
         {
             var cost = player.Hand.SingleOrDefault(c => c.InstanceId == answer.CardInstanceId);
-            if (cost is null || activation.DiscardedCost is not null || cost == activation.Spell ||
-                definition.Cost is DiscardCost { Filter: { } only } && !only.CardIds.Contains(cost.GameCardId))
+            if (cost is null || definition.Cost is not DiscardCost discard || pending.StepIndex >= discard.Count || cost == activation.Spell || !DiscardQualifies(cost, discard.Filter))
                 return Reject(DuelError.InvalidEffectState);
-            activation = activation with { DiscardedCost = cost };
+            activation = activation with { DiscardedCost = activation.DiscardedCost ?? cost };
             next = next.With(player: player.With(hand: player.Hand.Where(c => c != cost),
                 graveyard: player.Graveyard.Append(cost))).WithActivation(activation);
             events.Add(new ActivationCostPaid(player.Id, definition.EffectId, cost));
         }
-        else if (definition.Cost is TributeCost && pending.StepIndex == 0)
+        else if (definition.Cost is TributeCost tributes && pending.StepIndex < tributes.Count)
         {
             if (answer.FieldTarget is not { Location: FieldLocation.MonsterZone } tribute || tribute.Player != player.Id || !tribute.IsStillPresent(next))
                 return Reject(DuelError.InvalidEffectState);
@@ -555,6 +557,9 @@ public sealed partial class DuelEngine
                         DestroyTargetsStep => DestroyFieldCard(state, target, events),
                         ReturnTargetsToHandStep => ReturnFieldCardToHand(state, target, definition.EffectId, events),
                         ChangeTargetsToDefenseStep => ChangeToDefense(state, target, events),
+                        ModifyTargetsUntilEndStep stats => ModifyUntilEnd(state, target, stats, definition.EffectId, events),
+                        FlipTargetsFaceDownStep => FlipFaceDown(state, target, events),
+                        FlipTargetsFaceUpStep flip => FlipFaceUp(state, target, flip, events),
                         BanishFieldTargetsStep => BanishFieldCard(state, target, definition.EffectId, events),
                         DestroyAndBanishTargetsStep => DestroyAndBanishFieldCard(state, target, definition.EffectId, events),
                         ModifyCombatantStatsStep stats => ModifyCombatant(state, link, target, stats, definition.EffectId, events),
@@ -609,6 +614,7 @@ public sealed partial class DuelEngine
                     DamageBothPlayersStep both => DamageBothPlayers(state, controller, both, definition.EffectId, events),
                     SummonTokensStep tokens => SummonTokens(state, link, tokens, events),
                     ShuffleDeckStep => ShuffleDeck(state, controller, definition.EffectId, events),
+                    GrantNormalSummonStep => GrantNormalSummon(state, definition.EffectId, events),
                     ReturnSourceToDeckTopStep => ReturnSourceToDeckTop(state, link, definition.EffectId, events),
                     DestroyTargetStep => DestroyTarget(state, link, events),
                     DestroyOpponentFaceUpMonstersStep => DestroyOpponentFaceUpMonsters(state, Other(controller), events),
@@ -656,6 +662,7 @@ public sealed partial class DuelEngine
                             FieldCardFilter.FaceUp => monster.Position != BattlePosition.FaceDownDefense,
                             FieldCardFilter.AttackPosition or FieldCardFilter.FaceUpAttack => monster.Position == BattlePosition.FaceUpAttack,
                             FieldCardFilter.DefensePosition => monster.Position != BattlePosition.FaceUpAttack,
+                            FieldCardFilter.FaceDown => monster.Position == BattlePosition.FaceDownDefense,
                             _ => false
                         })
                         yield return new(id, FieldLocation.MonsterZone, zone, monster.Card, monster.PlacementId);
@@ -722,7 +729,9 @@ public sealed partial class DuelEngine
         NormalMonsterFilter normal => normal.CardIds.Contains(card.GameCardId) || inGraveyard && rule.IsGemini,
         MonsterAttributeFilter attribute => rule.Category == CardCategory.Monster && catalog[card.GameCardId].Codes?.Attribute == attribute.AttributeCode,
         MonsterLevelFilter limit => rule.Category == CardCategory.Monster && !IsXyzCard(card) && catalog[card.GameCardId].Statistics.Level is > 0 and var level &&
-            level <= limit.MaxLevel && (limit.TypeCode is not { } typeCode || catalog[card.GameCardId].Codes?.Type == typeCode),
+            level <= limit.MaxLevel && level >= limit.MinLevel && (limit.TypeCode is not { } typeCode || catalog[card.GameCardId].Codes?.Type == typeCode),
+        AnyOfFilter any => any.Filters.Any(f => MatchesFilter(card, f, inGraveyard)),
+        AllOfFilter all => all.Filters.All(f => MatchesFilter(card, f, inGraveyard)),
         MonsterTraitFilter trait => rule.Category == CardCategory.Monster && !trait.ExcludedCardIds.Contains(card.GameCardId) &&
             (trait.AttributeCode is not { } code || catalog[card.GameCardId].Codes?.Attribute == code) &&
             (trait.Stat == MonsterStat.Attack ? catalog[card.GameCardId].Statistics.Attack : catalog[card.GameCardId].Statistics.Defense) is int value &&

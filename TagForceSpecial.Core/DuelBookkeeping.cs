@@ -12,6 +12,9 @@ internal sealed record DuelBookkeeping(int NextInstanceId = 1, DuelRandomState? 
     public IReadOnlyList<SummonedMonster>? RecentSummon { get; init; }
     /// <summary>Once-per-turn activated effects used so far this turn, by card instance.</summary>
     public IReadOnlyList<ActivatedEffectUse> ActivatedUses { get; init; } = Array.AsReadOnly(Array.Empty<ActivatedEffectUse>());
+    /// <summary>The turn an effect allowed one more Normal Summon or Set.</summary>
+    public int ExtraNormalSummonTurn { get; init; }
+    public bool ExtraNormalSummonUsed { get; init; }
 }
 
 internal sealed record ActivatedEffectUse(int InstanceId, int TurnNumber);
