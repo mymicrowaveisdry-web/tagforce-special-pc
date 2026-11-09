@@ -73,7 +73,7 @@ public sealed class NormalMonsterFamilyTests
         Assert.Empty(ids.Intersect(PlayablePreview.Cards.Where(c => c.Spell is not null).Select(c => c.CardId)));
         Assert.Subset(ids.ToHashSet(), PlayablePreview.Cards.Where(c => c.Spell is null).Select(c => c.CardId).ToHashSet());
         Assert.Subset(ids.ToHashSet(), TfspNormalMonsters.ArchfiendMembers.ToHashSet());
-        Assert.Equal(665 + 6, ReviewedCardMetadata.Reviewed.Count);
+        Assert.Subset(ReviewedCardMetadata.Reviewed.Keys.ToHashSet(), ids.ToHashSet());
     }
 
     [Fact]

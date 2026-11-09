@@ -339,7 +339,7 @@ public sealed partial class DuelEngine
         }
         if (pending.StepIndex + 1 < sequence.Steps.Count)
         {
-            var decision = CreateDecision(sequence, pending.StepIndex + 1, answers);
+            var decision = CreateDecision(sequence, pending.StepIndex + 1, answers, from: next);
             // An optional pick with nothing left to choose ends the choices.
             if (decision is null && !sequence.Steps[pending.StepIndex + 1].Optional) return Reject(DuelError.DecisionUnavailable);
             if (decision is not null)

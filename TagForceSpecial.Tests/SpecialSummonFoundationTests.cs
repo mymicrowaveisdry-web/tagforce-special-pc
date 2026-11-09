@@ -411,11 +411,12 @@ public sealed class SpecialSummonFoundationTests
     [Fact]
     public void BattleHandSummonIsSkippedWhenItsOnlyCardLeavesTheHand()
     {
-        var e = BattleFlowScenario.Engine(defender: false, profiles: [BattleSummoning()],
+        // The defender is the other copy of B, so the selected card is the only one in hand.
+        var e = BattleFlowScenario.Engine(defender: true, profiles: [BattleSummoning()],
             chains: [ResponseProbe.Negate("negate-summon-link", BattleFlowScenario.Counter, ResponseNegation.Effect, ChainSpellSpeed.Two),
                 ResponseProbe.Negate("discard-selected", BattleFlowScenario.Stats, ResponseNegation.Effect, ChainSpellSpeed.Three,
                     discardCardIds: [BattleFlowScenario.B])]);
-        BattleFlowScenario.Ready(e); BattleFlowScenario.Declare(e, null);
+        BattleFlowScenario.Ready(e); BattleFlowScenario.Declare(e, 0);
         int selected = Hand(e, BattleFlowScenario.B, PlayerId.Two);
         BattleFlowScenario.Respond(e, 2, selected, 1);
         Ok(e, new ActivateChainResponse(PlayerId.One, e.State.PendingChain!.DecisionId, 1));

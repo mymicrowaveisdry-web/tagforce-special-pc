@@ -61,7 +61,7 @@ public sealed class GraveyardFamilyTests
     [Fact]
     public void MonsterRebornRevivesFromEitherGraveyardAndTheOwnerKeepsTheCard()
     {
-        var e = Engine(Deck(Reborn, Reborn, DarkHole, Burial), Deck(Burial, N2));
+        var e = Engine(Deck(Reborn, Reborn, DarkHole, Burial), Deck(Burial, N1, N1, N1, N1, N1, N1, N2)); // N2 stays in the Deck
         EnterMain(e);
         Reject(e, new ActivateSpell(PlayerId.One, Hand(e, PlayerId.One, Reborn).InstanceId, 4), DuelError.DecisionUnavailable);
         Bury(e, N1);

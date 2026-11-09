@@ -257,7 +257,8 @@ public sealed class MonsterTriggerFamilyTests
     [Fact]
     public void ASummonTrapCannotAnswerAFloaterInTheDamageStep()
     {
-        var e = Engine(Stacked(Tomato, DarkLow), Deck(Attacker, BottomlessHole), SummonTrapFamily.Definitions.Where(d => d.CardId == BottomlessHole));
+        // Player One draws once before the attack, so the search target sits behind a Filler.
+        var e = Engine(Stacked(Tomato, Filler, DarkLow), Deck(Attacker, BottomlessHole), SummonTrapFamily.Definitions.Where(d => d.CardId == BottomlessHole));
         EnterMain(e); Play(e, Tomato); Next(e);
         Play(e, Attacker); Ok(e, new SetSpellTrap(PlayerId.Two, Hand(e, BottomlessHole), 0)); Next(e); Next(e);
         Phase(e, DuelPhase.Battle); S.Ready(e);

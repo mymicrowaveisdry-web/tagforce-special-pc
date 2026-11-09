@@ -3,9 +3,11 @@ namespace TagForceSpecial.Core;
 public sealed partial class DuelEngine
 {
     private PendingDecision? CreateDecision(DecisionSequence sequence, int index, IEnumerable<DecisionAnswer> answers,
-        int? excludeInstanceId = null, PlayerId? decisionPlayer = null)
+        int? excludeInstanceId = null, PlayerId? decisionPlayer = null, DuelState? from = null)
     {
-        var player = State.GetPlayer(decisionPlayer ?? State.PendingSpellActivation?.Player ?? State.ActivePlayer);
+        // A paid cost has already moved cards, so later choices read the state after it.
+        var state = from ?? State;
+        var player = state.GetPlayer(decisionPlayer ?? state.PendingSpellActivation?.Player ?? state.ActivePlayer);
         var step = sequence.Steps[index];
         CardInstance[] cards = step.Kind == DecisionKind.Card
             ? SpecialSourceCards(player, step.CardSource!.Value)
@@ -14,9 +16,9 @@ public sealed partial class DuelEngine
         int[] zones = step.Kind == DecisionKind.MonsterZone
             ? Enumerable.Range(0, 5).Where(z => player.MonsterZones[z] is null).ToArray()
             : [];
-        var excluded = excludeInstanceId ?? State.PendingSpellActivation?.Spell.InstanceId;
+        var excluded = excludeInstanceId ?? state.PendingSpellActivation?.Spell.InstanceId;
         var targets = step.Kind == DecisionKind.SpellTrapTarget
-            ? State.Players.SelectMany(p => p.SpellTrapFields.Select((field, zone) => (field, zone))
+            ? state.Players.SelectMany(p => p.SpellTrapFields.Select((field, zone) => (field, zone))
                 .Where(s => s.field is not null && s.field.Card.InstanceId != excluded)
                 .Select(s => new SpellTrapTarget(p.Id, s.zone, s.field!.Card, s.field.PlacementId))
                 .Concat(p.PendulumZones.Select((field, zone) => (field, zone))
@@ -26,8 +28,8 @@ public sealed partial class DuelEngine
                     ? [new SpellTrapTarget(p.Id, DuelPlayerState.FieldZoneIndex, field.Card, field.PlacementId)] : Array.Empty<SpellTrapTarget>())).ToArray() : [];
         FieldCardTarget[]? fieldTargets = (step.FieldTargetSpec switch
             {
-                FieldTarget spec => FieldMatches(State, player.Id, spec.Kind, spec.Side, spec.Filter, excluded).Where(t => TargetPasses(State, spec, t)),
-                ZoneTarget zone => ZoneMatches(State, player.Id, zone),
+                FieldTarget spec => FieldMatches(state, player.Id, spec.Kind, spec.Side, spec.Filter, excluded).Where(t => TargetPasses(state, spec, t)),
+                ZoneTarget zone => ZoneMatches(state, player.Id, zone),
                 _ => null
             })?.Where(t => !answers.Any(a => a.FieldTarget is { } chosen && chosen.Card == t.Card)).ToArray();
         if (step.Kind == DecisionKind.Card && cards.Length == 0 ||

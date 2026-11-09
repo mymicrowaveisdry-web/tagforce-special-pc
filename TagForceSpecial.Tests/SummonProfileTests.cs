@@ -55,6 +55,7 @@ public sealed class SummonProfileTests
         if (donors == 2)
         {
             Ok(e, new NormalSummon(PlayerId.One, Hand(e, Low), 1));
+            while (e.State.PendingSummon is not null) PassSummon(e);
             NextMain(e); NextMain(e);
         }
     }

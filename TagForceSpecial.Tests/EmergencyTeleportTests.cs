@@ -85,6 +85,12 @@ public sealed class EmergencyTeleportTests
     private static DuelActionResult Resolve(DuelEngine engine, int zone = 1)
     {
         Activate(engine);
+        return Finish(engine, zone);
+    }
+
+    /// <summary>Resolves an activation already on the chain, choosing the first Deck copy.</summary>
+    private static DuelActionResult Finish(DuelEngine engine, int zone)
+    {
         var choice = ReachChoice(engine);
         var deckCopy = choice.Options.First(o => o.Source == DecisionCardSource.Deck).Card;
         return Ok(engine, new ChooseDefinitionSummon(choice.Player, choice.DecisionId, deckCopy.InstanceId, zone, BattlePosition.FaceUpAttack));
@@ -299,8 +305,8 @@ public sealed class EmergencyTeleportTests
         EnterMain(a); EnterMain(b);
         Activate(a); Activate(b);
         Assert.Equal(JsonSerializer.Serialize(a.State), JsonSerializer.Serialize(b.State));
-        var first = Resolve(a, 1);
-        var second = Resolve(b, 1);
+        var first = Finish(a, 1);
+        var second = Finish(b, 1);
         Assert.Equal(JsonSerializer.Serialize(first), JsonSerializer.Serialize(second));
     }
 

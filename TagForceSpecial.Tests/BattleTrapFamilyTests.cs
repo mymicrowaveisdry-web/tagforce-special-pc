@@ -77,7 +77,8 @@ public sealed class BattleTrapFamilyTests
         Assert.Single(events.OfType<MonsterDestroyed>(), d => d.Card.GameCardId == B);
         Assert.Null(Monster(e, PlayerId.Two, 0));
         Assert.NotNull(Monster(e, PlayerId.Two, 1));
-        Assert.Contains(S.FinishAttack(e), ev => ev is AttackCancelled { Reason: BattleAttackCancellation.AttackerUnavailable });
+        Assert.Contains(events, ev => ev is AttackCancelled { Reason: BattleAttackCancellation.AttackerUnavailable });
+        S.FinishAttack(e);
         Assert.Equal(8000, e.State.GetPlayer(PlayerId.One).LifePoints);
     }
 
@@ -122,9 +123,10 @@ public sealed class BattleTrapFamilyTests
     public void SakuretsuArmorDestroysTheAttacker()
     {
         var e = Attack(Sakuretsu);
-        Assert.Contains(Trigger(e), ev => ev is MonsterDestroyed { Player: PlayerId.Two, Zone: 0 });
+        var events = Trigger(e);
+        Assert.Contains(events, ev => ev is MonsterDestroyed { Player: PlayerId.Two, Zone: 0 });
         Assert.Contains(e.State.GetPlayer(PlayerId.Two).Graveyard, c => c.GameCardId == B);
-        Assert.Contains(S.FinishAttack(e), ev => ev is AttackCancelled { Reason: BattleAttackCancellation.AttackerUnavailable });
+        Assert.Contains(events, ev => ev is AttackCancelled { Reason: BattleAttackCancellation.AttackerUnavailable });
     }
 
     [Fact]

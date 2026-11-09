@@ -82,11 +82,18 @@ public sealed class LifePointFamilyTests
     [Fact]
     public void BothPlayersEffectsOrderTheActivatingPlayerFirstAndTheThiefDamagesBeforeItGains()
     {
-        var mercy = Activate(Engine(Deck(Mercy), Deck()), PlayerId.One, Mercy).OfType<LifePointsGained>().ToArray();
+        static DuelEngine Ready(uint id)
+        {
+            var e = Engine(Deck(id), Deck());
+            EnterMain(e);
+            return e;
+        }
+
+        var mercy = Activate(Ready(Mercy), PlayerId.One, Mercy).OfType<LifePointsGained>().ToArray();
         Assert.Equal([PlayerId.One, PlayerId.Two], mercy.Select(g => g.Player));
-        var thief = Activate(Engine(Deck(Thief), Deck()), PlayerId.One, Thief);
+        var thief = Activate(Ready(Thief), PlayerId.One, Thief);
         Assert.True(thief.FindIndex(ev => ev is EffectDamageDealt) < thief.FindIndex(ev => ev is LifePointsGained));
-        var fire = Activate(Engine(Deck(Fire), Deck()), PlayerId.One, Fire).OfType<EffectDamageDealt>().ToArray();
+        var fire = Activate(Ready(Fire), PlayerId.One, Fire).OfType<EffectDamageDealt>().ToArray();
         Assert.Equal([PlayerId.Two, PlayerId.One], fire.Select(d => d.Player));
         Assert.Equal([1000, 500], fire.Select(d => d.Damage));
     }
