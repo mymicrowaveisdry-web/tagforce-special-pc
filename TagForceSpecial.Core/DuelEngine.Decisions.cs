@@ -28,8 +28,8 @@ public sealed partial class DuelEngine
                     ? [new SpellTrapTarget(p.Id, DuelPlayerState.FieldZoneIndex, field.Card, field.PlacementId)] : Array.Empty<SpellTrapTarget>())).ToArray() : [];
         FieldCardTarget[]? fieldTargets = (step.FieldTargetSpec switch
             {
-                FieldTarget spec => FieldMatches(state, player.Id, spec.Kind, spec.Side, spec.Filter, excluded).Where(t => TargetPasses(state, spec, t) && SelectionAllowed(state, spec, t, player.Id, sequence)),
-                ZoneTarget zone => ZoneMatches(state, player.Id, zone),
+                FieldTarget spec => FieldMatches(state, player.Id, spec.Kind, spec.Side, spec.Filter, excluded).Where(t => TargetPasses(state, spec, t) && SelectionAllowed(state, spec, t, player.Id, sequence) && MoveAllowed(state, sequence, index, t)),
+                ZoneTarget zone => ZoneMatches(state, player.Id, zone).Where(t => MoveAllowed(state, sequence, index, t)),
                 _ => null
             })?.Where(t => !answers.Any(a => a.FieldTarget is { } chosen && chosen.Card == t.Card)).ToArray();
         if (step.Kind == DecisionKind.Card && cards.Length == 0 ||

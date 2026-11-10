@@ -250,7 +250,7 @@ public sealed partial class DuelEngine
             }
             void Mark(MonsterBinding binding)
             {
-                if (ReplaceDestruction(next, binding, DestructionCause.Battle, events) is { } replaced)
+                if (ReplaceDestruction(next, binding, DestructionCause.Battle, events, binding == attack.Attacker ? attack.Defender : attack.Attacker) is { } replaced)
                 {
                     next = replaced;
                     return;

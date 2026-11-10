@@ -104,6 +104,7 @@ public sealed partial class DuelEngine
         if (error != DuelError.None) return Reject(error);
         if (ProcedureCostCards(player, procedure, card, command.CostInstanceIds) is not { } costCards)
             return Reject(DuelError.InvalidSummonMaterials);
+        if (costCards.Any(c => RuleLocked(State, LockedAction.BeBanished, player.Id, c, onField: false))) return Reject(DuelError.LockedByEffect);
         List<DuelEvent> events = [];
         var paid = State;
         if (costCards.Length != 0)

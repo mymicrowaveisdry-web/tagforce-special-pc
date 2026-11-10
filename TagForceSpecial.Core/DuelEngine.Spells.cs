@@ -33,6 +33,11 @@ public sealed partial class DuelEngine
                 events.Add(new EndPhaseBanishmentExpired(delayed.Player, delayed.Monster, delayed.EffectId));
                 continue;
             }
+            if (RuleLocked(state, LockedAction.BeBanished, delayed.Player, monster.Card, monster))
+            {
+                events.Add(new EndPhaseBanishmentExpired(delayed.Player, delayed.Monster, delayed.EffectId));
+                continue;
+            }
             var zones = player.MonsterZones.ToArray();
             zones[delayed.MonsterZone] = null;
             state = state.With(player: player.With(monsters: zones));

@@ -45,6 +45,9 @@ public sealed partial class DuelEngine
         if (player.MonsterZones[command.MonsterZone] is not null && !selected.Any(m => m.Zone == command.MonsterZone))
             return Reject(DuelError.MonsterZoneOccupied);
         var ordered = selected.OrderBy(m => m.Zone).ToArray();
+        if (profile.Destination == MaterialDestination.Banished &&
+            ordered.Any(m => RuleLocked(State, LockedAction.BeBanished, m.Player, m.Card, State.GetPlayer(m.Player).MonsterZones[m.Zone])))
+            return Reject(DuelError.LockedByEffect);
         List<DuelEvent> events = [];
         var next = MoveSummonMaterials(State, player.Id, ordered, profile.Destination, profile.ProcedureId, events);
         var attachments = Array.AsReadOnly(profile.Xyz is null ? Array.Empty<CardInstance>() : ordered.Select(m => m.Card).ToArray());

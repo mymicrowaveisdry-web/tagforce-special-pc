@@ -9,7 +9,8 @@ namespace TagForceSpecial.Tests;
 /// <summary>Continuous "cannot" rules and the actions that consult them.</summary>
 public sealed class RuleLockTests
 {
-    private const uint W = 901, Low = 902, High = 903, Big = 904, DragonA = 905, Weak = 906, Burn = 907, QuickBurn = 908, TrapBurn = 909, Hole = 910, Storm = 911, Shield = 912, Snipe = 913, Imperial = 914, Drain = 915, Reviver = 916, Mach = 917, Potion = 4878,
+    private const uint W = 901, Low = 902, High = 903, Big = 904, DragonA = 905, Weak = 906, Burn = 907, QuickBurn = 908, TrapBurn = 909, Hole = 910, Storm = 911, Shield = 912, Snipe = 913, Imperial = 914, Drain = 915, Reviver = 916, Mach = 917, Potion = 4878, Exile = 918, Pit = 919, Bounce = 920, Pot = 921, Sanctity = 922, Recycle = 923,
+        IronWall = 7858, Hunter = 8191, Protector = 6027, Chick = 7686,
         Bind = 5134, Bog = 5281, Mask = 5106, PowerFilter = 7787, Prison = 9953, MistBody = 6546, Gyroid = 6385, Shields = 7990, LordOfD = 4747, Sphinx = 6321, Invader = 5922, Warwolf = 6195, Rod = 11557, GuardDog = 6697, Feint = 5332;
 
     private static CardCatalog Catalog() => new(new(null, "synthetic-rule-locks"),
@@ -22,7 +23,7 @@ public sealed class RuleLockTests
             new(DragonA, "Dragon", "", new(1500, 1000, 4), new(1, MonsterTypes.Dragon, 1, 1, 0, 0, 0)),
             new(Weak, "Weak", "", new(900, 900, 4), new(1, MonsterTypes.Warrior, 1, 1, 0, 0, 0)),
             new(Mach, "Machine", "", new(1500, 1000, 4), new(1, MonsterTypes.Machine, 1, 1, 0, 0, 0))
-        ]).Concat(new uint[] { Burn, QuickBurn, TrapBurn, Hole, Storm, Shield, Snipe, Imperial, Drain, Reviver }.Select(id => new CardDefinition(id, $"Probe {id}", "", new(0, 0, 1)))));
+        ]).Concat(new uint[] { Burn, QuickBurn, TrapBurn, Hole, Storm, Shield, Snipe, Imperial, Drain, Reviver, Exile, Pit, Bounce, Pot, Sanctity, Recycle }.Select(id => new CardDefinition(id, $"Probe {id}", "", new(0, 0, 1)))));
 
     private static DuelEngine Engine(uint[] first, uint[] second, RuleLockProfile[]? locks = null)
     {
@@ -30,7 +31,7 @@ public sealed class RuleLockTests
         DuelCardRules monster = new(CardCategory.Monster, AllowsNormalSummon: true, AllowsBasicBattle: true, AllowsTributeForSummon: true);
         foreach (uint id in new[] { W, Low, Big, DragonA, Weak, Mach }) rules[id] = monster;
         rules[High] = monster with { AllowsTributeSummon = true };
-        foreach (uint id in new[] { Burn, QuickBurn, Hole, Storm, Reviver, Snipe }) rules[id] = new(CardCategory.Spell, AllowsSpellTrapSet: true);
+        foreach (uint id in new[] { Burn, QuickBurn, Hole, Storm, Reviver, Snipe, Exile, Pit, Bounce, Pot, Sanctity, Recycle }) rules[id] = new(CardCategory.Spell, AllowsSpellTrapSet: true);
         foreach (uint id in new[] { TrapBurn, Shield, Imperial, Drain }) rules[id] = new(CardCategory.Trap, AllowsSpellTrapSet: true);
         return new(Catalog(), rules, first, second, experimentalTriggerEffects: TemplateCardFamily.Family.Triggers,
             effectDefinitions: [.. TemplateCardFamily.Family.Definitions,
@@ -43,7 +44,13 @@ public sealed class RuleLockTests
                 new("shield", Shield, EffectKind.ContinuousTrap, [], isMarker: true),
                 new("imperial", Imperial, EffectKind.ContinuousTrap, [], negation: LastingNegation.Spells),
                 new("drain", Drain, EffectKind.ContinuousTrap, [], negation: LastingNegation.FaceUpMonsters),
-                new("reviver", Reviver, EffectKind.NormalSpell, [new SpecialSummonTargetStep()], fieldTargets: [new ZoneTarget(CardZone.Graveyard, TargetSide.Own, new AnyMonsterFilter(), mustBeSummonable: true)])],
+                new("reviver", Reviver, EffectKind.NormalSpell, [new SpecialSummonTargetStep()], fieldTargets: [new ZoneTarget(CardZone.Graveyard, TargetSide.Own, new AnyMonsterFilter(), mustBeSummonable: true)]),
+                new("exile", Exile, EffectKind.NormalSpell, [new BanishFieldTargetsStep()], fieldTargets: [new FieldTarget(FieldCardKind.Monster)]),
+                new("pit", Pit, EffectKind.NormalSpell, [new DestroyAndBanishTargetsStep()], fieldTargets: [new FieldTarget(FieldCardKind.Monster)]),
+                new("bounce", Bounce, EffectKind.NormalSpell, [new ReturnTargetsToHandStep()], fieldTargets: [new FieldTarget(FieldCardKind.Monster)]),
+                new("pot", Pot, EffectKind.NormalSpell, [new DrawCardsStep(2)]),
+                new("sanctity", Sanctity, EffectKind.NormalSpell, [new DrawCardsStep(1, EffectPlayers.Both)]),
+                new("recycle", Recycle, EffectKind.NormalSpell, [new ShuffleTargetsIntoDeckStep()], fieldTargets: [new ZoneTarget(CardZone.Graveyard, TargetSide.Own, new AnyMonsterFilter())])],
             shuffleSeed: 6, ruleLocks: [.. TemplateCardFamily.Family.RuleLocks, .. locks ?? []]);
     }
 
@@ -305,5 +312,86 @@ public sealed class RuleLockTests
         Assert.Throws<ArgumentException>(() => Engine(deck, deck, [new("bad", W, new RuleLock(LockedAction.None))]));
         Assert.Throws<ArgumentException>(() => Engine(deck, deck, [new("bad", W, new RuleLock(LockedAction.Attack, UsesPerTurn: 1))]));
         Assert.Throws<ArgumentException>(() => Engine(deck, deck, [new("bad", Burn, new RuleLock(LockedAction.Attack, Scope: LockScope.Self))]));
+    }
+
+    private static void TargetCard(DuelEngine e, uint id)
+    {
+        var p = e.State.PendingDecision!;
+        var t = p.FieldTargetOptions!.First(o => o.Card.GameCardId == id);
+        Ok(e, new ChooseDecisionFieldTarget(p.Player, p.DecisionId, t.Player, t.Location, t.Zone, t.Card.InstanceId));
+    }
+
+    [Fact]
+    public void ACardThatCannotBeBanishedCannotBeChosenAndADestroyAndBanishSendsItToTheGraveyard()
+    {
+        var e = Engine(Deck(IronWall, W), Deck(Pit, Exile));
+        EnterMain(e); SetCard(e, IronWall, 0); Summon(e, W, 0); Next(e);
+        Activate(e, Pit);
+        Target(e, PlayerId.One, FieldLocation.MonsterZone, 0);
+        Ok(e, new ActivateChainResponse(PlayerId.One, e.State.PendingChain!.DecisionId, 0));
+        Resolve(e);
+        Assert.Null(P(e, PlayerId.One).MonsterZones[0]);
+        Assert.Contains(P(e, PlayerId.One).Graveyard, c => c.GameCardId == W);
+        Assert.Empty(P(e, PlayerId.One).Banished);
+
+        Summon(e, W, 0);
+        Reject(e, new ActivateSpell(PlayerId.Two, Hand(e, Exile), 4), DuelError.DecisionUnavailable);
+    }
+
+    [Fact]
+    public void AReturnALockStopsCannotBeChosenAndAnEarlierOneResolvesWithoutEffect()
+    {
+        RuleLockProfile stay = new("shield-return", Shield, new RuleLock(LockedAction.BeReturnedToHand));
+        var e = Engine(Deck(Shield, W), Deck(Bounce, Bounce), [stay]);
+        EnterMain(e); SetCard(e, Shield, 0); Summon(e, W, 0); Next(e);
+        Activate(e, Bounce);
+        Target(e, PlayerId.One, FieldLocation.MonsterZone, 0);
+        Ok(e, new ActivateChainResponse(PlayerId.One, e.State.PendingChain!.DecisionId, 0));
+        Resolve(e);
+        Assert.NotNull(P(e, PlayerId.One).MonsterZones[0]);
+        Reject(e, new ActivateSpell(PlayerId.Two, Hand(e, Bounce), 4), DuelError.DecisionUnavailable);
+    }
+
+    [Fact]
+    public void AFieldOnlyDeckLockLeavesTheGraveyardFree()
+    {
+        var e = Engine(Deck(W, Hunter, Recycle), Deck(Hole));
+        EnterMain(e); Summon(e, W, 0); Next(e);
+        Activate(e, Hole); Resolve(e); Next(e);
+        Summon(e, Hunter, 0);
+        Activate(e, Recycle);
+        TargetCard(e, W);
+        Resolve(e);
+        Assert.DoesNotContain(P(e, PlayerId.One).Graveyard, c => c.GameCardId == W);
+    }
+
+    [Fact]
+    public void ADrawLockBlocksOwnDrawCardsAndSkipsOtherDrawsOutsideTheDrawPhase()
+    {
+        var e = Engine(Deck(Protector), Deck(Pot, Sanctity));
+        EnterMain(e); Summon(e, Protector, 0); Next(e);
+        Assert.Equal(6, P(e, PlayerId.Two).Hand.Count);
+        int first = P(e, PlayerId.One).Hand.Count;
+        Reject(e, new ActivateSpell(PlayerId.Two, Hand(e, Pot), 4), DuelError.LockedByEffect);
+        Activate(e, Sanctity); Resolve(e);
+        Assert.Equal(5, P(e, PlayerId.Two).Hand.Count);
+        Assert.Equal(first + 1, P(e, PlayerId.One).Hand.Count);
+    }
+
+    [Fact]
+    public void BattleProtectionDependsOnTheCurrentOpponent()
+    {
+        var e = Engine(Deck(Chick), Deck(Big, W));
+        EnterMain(e); Summon(e, Chick, 0); Next(e);
+        Summon(e, Big, 0); ToBattle(e);
+        Ok(e, new DeclareAttack(PlayerId.Two, 0, 0));
+        Assert.Contains(S.FinishAttack(e), ev => ev is DestructionPrevented);
+        Assert.NotNull(P(e, PlayerId.One).MonsterZones[0]);
+        LeaveBattle(e); Next(e); Next(e);
+
+        Summon(e, W, 1); ToBattle(e);
+        Ok(e, new DeclareAttack(PlayerId.Two, 1, 0));
+        Assert.DoesNotContain(S.FinishAttack(e), ev => ev is DestructionPrevented);
+        Assert.Null(P(e, PlayerId.One).MonsterZones[0]);
     }
 }

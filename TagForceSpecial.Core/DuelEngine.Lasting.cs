@@ -189,11 +189,11 @@ public sealed partial class DuelEngine
     }
 
     /// <summary>Places the source on top of its owner's Deck, provided it is still in their Graveyard.</summary>
-    private static DuelState ReturnSourceToDeckTop(DuelState state, ChainLink link, string effectId, List<DuelEvent> events)
+    private DuelState ReturnSourceToDeckTop(DuelState state, ChainLink link, string effectId, List<DuelEvent> events)
     {
         var card = link.Activation.Spell;
         var owner = state.GetPlayer(card.Owner);
-        if (!owner.Graveyard.Contains(card))
+        if (!owner.Graveyard.Contains(card) || RuleLocked(state, LockedAction.BeReturnedToDeck, owner.Id, card, onField: false))
         {
             events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
             return state;
@@ -269,10 +269,10 @@ public sealed partial class DuelEngine
     /// A protective counter, or the monster's Union equip, is lost instead of the monster, which is then not treated
     /// as destroyed. Null when nothing replaces this destruction.
     /// </summary>
-    private DuelState? ReplaceDestruction(DuelState state, MonsterBinding monster, DestructionCause cause, List<DuelEvent> events)
+    private DuelState? ReplaceDestruction(DuelState state, MonsterBinding monster, DestructionCause cause, List<DuelEvent> events, MonsterBinding? versus = null)
     {
         var player = state.GetPlayer(monster.Player);
-        if (PreventDestruction(state, cause == DestructionCause.Battle ? LockedAction.BeDestroyedByBattle : LockedAction.BeDestroyedByEffect, monster.Player, monster.Card, player.MonsterZones[monster.Zone], events) is { } kept) return kept;
+        if (PreventDestruction(state, cause == DestructionCause.Battle ? LockedAction.BeDestroyedByBattle : LockedAction.BeDestroyedByEffect, monster.Player, monster.Card, player.MonsterZones[monster.Zone], events, versus) is { } kept) return kept;
         if (player.MonsterZones[monster.Zone] is { ProtectionCounters: > 0 } guarded)
         {
             var monsters = player.MonsterZones.ToArray();

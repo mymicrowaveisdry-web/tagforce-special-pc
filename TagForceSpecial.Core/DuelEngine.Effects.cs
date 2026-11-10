@@ -810,8 +810,9 @@ public sealed partial class DuelEngine
     }
 
     /// <summary>Banishes a Graveyard card, or returns a banished card to the Graveyard.</summary>
-    private static DuelState MoveZoneCard(DuelState state, FieldCardTarget target, bool toBanished, string effectId, List<DuelEvent> events)
+    private DuelState MoveZoneCard(DuelState state, FieldCardTarget target, bool toBanished, string effectId, List<DuelEvent> events)
     {
+        if (toBanished && MoveLocked(state, LockedAction.BeBanished, target)) return state;
         state = RemoveFromZone(state, target);
         var owner = state.GetPlayer(target.Card.Owner);
         state = state.With(player: toBanished ? owner.With(banished: owner.Banished.Append(target.Card))
@@ -826,6 +827,7 @@ public sealed partial class DuelEngine
         HashSet<PlayerId> shuffled = [];
         foreach (var target in targets)
         {
+            if (MoveLocked(state, LockedAction.BeReturnedToDeck, target)) continue;
             state = RemoveFromZone(state, target);
             var owner = state.GetPlayer(target.Card.Owner);
             bool extra = rules.TryGetValue(target.Card.GameCardId, out var rule) && rule.AllowsExtraDeck;
@@ -865,8 +867,11 @@ public sealed partial class DuelEngine
     /// <summary>Returns a field card to its owner's hand; Extra Deck monsters go to the Extra Deck and Tokens cease to exist.</summary>
     private DuelState ReturnFieldCardToHand(DuelState state, FieldCardTarget target, string effectId, List<DuelEvent> events)
     {
-        state = RemovePlacement(state, target);
         var card = target.Card;
+        // An Extra Deck monster returned to the hand goes to the Extra Deck, so a Deck lock stops it; a stopped return has no effect.
+        if (!IsTokenId(card.GameCardId) && MoveLocked(state, rules.TryGetValue(card.GameCardId, out var moved) && moved.AllowsExtraDeck
+            ? LockedAction.BeReturnedToDeck : LockedAction.BeReturnedToHand, target)) return state;
+        state = RemovePlacement(state, target);
         if (IsTokenId(card.GameCardId))
         {
             events.Add(new CardReturnedToHand(card.Owner, card, effectId) { FieldDestination = FieldCardDestination.Removed });
@@ -907,6 +912,8 @@ public sealed partial class DuelEngine
     private DuelState DestroyAndBanishFieldCard(DuelState state, FieldCardTarget target, string effectId, List<DuelEvent> events)
     {
         if (ReplacedDestruction(state, target, events) is { } kept) return kept;
+        // A card that cannot be banished is still destroyed, and goes to the Graveyard.
+        if (MoveLocked(state, LockedAction.BeBanished, target)) return DestroyFieldCard(state, target, events, replaceable: false);
         state = RemovePlacement(state, target);
         var card = target.Card;
         bool token = IsTokenId(card.GameCardId);
@@ -980,6 +987,7 @@ public sealed partial class DuelEngine
     /// <summary>Banishes a field monster to its owner's banished zone; a Token ceases to exist.</summary>
     private DuelState BanishFieldCard(DuelState state, FieldCardTarget target, string effectId, List<DuelEvent> events)
     {
+        if (MoveLocked(state, LockedAction.BeBanished, target)) return state;
         state = RemovePlacement(state, target);
         var card = target.Card;
         if (IsTokenId(card.GameCardId))
@@ -1015,10 +1023,11 @@ public sealed partial class DuelEngine
         state.GetPlayer(playerId).Deck.Where(c => MatchesFilter(c, filter));
 
     /// <summary>Draws one card at a time; a player who must draw from an empty Deck loses at once.</summary>
-    private static DuelState DrawCards(DuelState state, PlayerId playerId, int count, List<DuelEvent> events)
+    private DuelState DrawCards(DuelState state, PlayerId playerId, int count, List<DuelEvent> events)
     {
         for (int i = 0; i < count; i++)
         {
+            if (RuleLocked(state, LockedAction.Draw, playerId, null)) break;
             var player = state.GetPlayer(playerId);
             if (player.Deck.Count == 0)
             {

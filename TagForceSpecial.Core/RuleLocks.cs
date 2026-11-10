@@ -19,19 +19,27 @@ public enum LockedAction
     BeDestroyedByBattle = 2048,
     BeDestroyedByEffect = 4096,
     BeTargeted = 8192,
-    BeTributed = 16384
+    BeTributed = 16384,
+    BeBanished = 32768,
+    BeReturnedToHand = 65536,
+    BeReturnedToDeck = 131072,
+    Draw = 262144
 }
 
 /// <summary>Who or what a lock applies to.</summary>
 public enum LockScope { Side, Self, Equipped }
 
 /// <summary>
-/// A "cannot" rule. Side is relative to the lock's controller and names who is restricted (for BeAttacked, BeTargeted
-/// and destruction, whose monster is protected). The optional fields narrow when it applies.
+/// A "cannot" rule. Side is relative to the lock's controller and names who is restricted (for BeAttacked, BeTargeted,
+/// moves and destruction, whose card is protected). The optional fields narrow when it applies.
 /// </summary>
 public sealed record RuleLock(LockedAction Actions, TargetSide Side = TargetSide.Either, CardFilter? Cards = null, LockScope Scope = LockScope.Side,
     FieldCardFilter Position = FieldCardFilter.Any, bool SummonedThisTurnOnly = false, DuelPhase? Phase = null, EffectKind? Kind = null,
-    SpecialSummonSources From = SpecialSummonSources.None, int UsesPerTurn = 0, bool ByOpponentOnly = false, CardCategory? ByCategory = null);
+    SpecialSummonSources From = SpecialSummonSources.None, int UsesPerTurn = 0, bool ByOpponentOnly = false, CardCategory? ByCategory = null,
+    DuelPhase? ExceptPhase = null, BattleOpponent? Versus = null, bool OnFieldOnly = false);
+
+/// <summary>The monster a battle is with, by card filter and current ATK; used for battle destruction.</summary>
+public sealed record BattleOpponent(CardFilter? Cards = null, int MinAttack = 0, int MaxAttack = int.MaxValue);
 
 /// <summary>A lock that holds while the card is face-up: a monster not negated, or a Spell or Trap whose effect is active.</summary>
 public sealed record RuleLockProfile(string EffectId, uint CardId, RuleLock Lock);
@@ -69,7 +77,7 @@ public sealed partial class DuelEngine
     }
 
     private bool LockApplies(DuelState state, ActiveLock active, LockedAction action, PlayerId subject, CardInstance? card, FieldMonster? monster,
-        DecisionCardSource? from, EffectKind? kind, PlayerId? targeter, CardCategory? byCategory)
+        DecisionCardSource? from, EffectKind? kind, PlayerId? targeter, CardCategory? byCategory, MonsterBinding? versus = null, bool onField = true)
     {
         var rule = active.Lock;
         if (!rule.Actions.HasFlag(action)) return false;
@@ -80,12 +88,19 @@ public sealed partial class DuelEngine
         if (rule.Position != FieldCardFilter.Any && (monster is null || !PositionMatches(monster.Position, rule.Position))) return false;
         if (rule.SummonedThisTurnOnly && (monster is null || monster.SummonedOnTurn != state.TurnNumber)) return false;
         if (rule.Phase is { } phase && phase != state.Phase) return false;
+        if (rule.ExceptPhase is { } except && except == state.Phase) return false;
+        if (rule.OnFieldOnly && !onField) return false;
+        if (rule.Versus is { } opponent && (versus is not { } other || !VersusMatches(state, opponent, other))) return false;
         if (rule.Kind is { } required && required != kind) return false;
         if (rule.From != SpecialSummonSources.None && (from is not { } source || !rule.From.HasFlag(SourceFlag(source)))) return false;
         if (rule.ByOpponentOnly && targeter == active.Controller) return false;
         if (rule.ByCategory is { } category && category != byCategory) return false;
         return rule.UsesPerTurn == 0 || state.Bookkeeping.LockUses.Count(u => u.InstanceId == active.InstanceId && u.EffectId == active.EffectId && u.TurnNumber == state.TurnNumber) < rule.UsesPerTurn;
     }
+
+    private bool VersusMatches(DuelState state, BattleOpponent opponent, MonsterBinding other) =>
+        (opponent.Cards is null || MatchesFilter(other.Card, opponent.Cards)) &&
+        GetMonsterStatistics(state, other.Player, other.Zone)?.Attack is int attack && attack >= opponent.MinAttack && attack <= opponent.MaxAttack;
 
     private static bool PositionMatches(BattlePosition position, FieldCardFilter filter) => filter switch
     {
@@ -99,14 +114,43 @@ public sealed partial class DuelEngine
 
     /// <summary>True when an active "cannot" rule forbids this action.</summary>
     private bool RuleLocked(DuelState state, LockedAction action, PlayerId subject, CardInstance? card, FieldMonster? monster = null,
-        DecisionCardSource? from = null, EffectKind? kind = null, PlayerId? targeter = null, CardCategory? byCategory = null) =>
-        ActiveLocks(state).Any(active => LockApplies(state, active, action, subject, card, monster, from, kind, targeter, byCategory));
+        DecisionCardSource? from = null, EffectKind? kind = null, PlayerId? targeter = null, CardCategory? byCategory = null, bool onField = true) =>
+        ActiveLocks(state).Any(active => LockApplies(state, active, action, subject, card, monster, from, kind, targeter, byCategory, onField: onField));
+
+    /// <summary>True when a lock stops this card from being moved: banished, or returned to the hand or Deck.</summary>
+    private bool MoveLocked(DuelState state, LockedAction action, FieldCardTarget target) =>
+        RuleLocked(state, action, target.Player, target.Card,
+            target.Location == FieldLocation.MonsterZone ? state.GetPlayer(target.Player).MonsterZones[target.Zone] : null,
+            onField: target.Location is not (FieldLocation.Graveyard or FieldLocation.Banished));
+
+    /// <summary>The move a choice for this effect makes; a card that cannot make it cannot be chosen.</summary>
+    private LockedAction ChoiceMove(EffectDefinition definition, int index, CardInstance card)
+    {
+        if (index < definition.CostTargetSteps) return definition.Cost is BanishFromGraveyardCost ? LockedAction.BeBanished : LockedAction.None;
+        if (definition.Steps.Any(s => s is BanishFieldTargetsStep or DestroyAndBanishTargetsStep or BanishTargetsStep)) return LockedAction.BeBanished;
+        if (definition.Steps.Any(s => s is ShuffleTargetsIntoDeckStep)) return LockedAction.BeReturnedToDeck;
+        if (definition.Steps.Any(s => s is ReturnTargetsToHandStep))
+            return rules.TryGetValue(card.GameCardId, out var rule) && rule.AllowsExtraDeck ? LockedAction.BeReturnedToDeck : LockedAction.BeReturnedToHand;
+        return LockedAction.None;
+    }
+
+    private bool MoveAllowed(DuelState state, DecisionSequence sequence, int index, FieldCardTarget target) =>
+        SequenceDefinition(sequence) is not { } definition || ChoiceMove(definition, index, target.Card) is var move && (move == LockedAction.None || !MoveLocked(state, move, target));
+
+    private EffectDefinition? SequenceDefinition(DecisionSequence sequence)
+    {
+        const string prefix = "activation:";
+        return sequence.Id.StartsWith(prefix, StringComparison.Ordinal) && effectsById.TryGetValue(sequence.Id[prefix.Length..], out var effect) ? effect : null;
+    }
 
     private static FieldMonster? MonsterOf(DuelState state, CardInstance card) =>
         state.Players.SelectMany(p => p.MonsterZones).FirstOrDefault(m => m?.Card == card);
 
     private bool ActivationLocked(DuelState state, PlayerId player, CardInstance card, EffectDefinition definition)
     {
+        // A player cannot activate a card whose own draw they could not perform.
+        if (definition.Steps.Any(s => s is DrawCardsStep { Players: EffectPlayers.Self }) && RuleLocked(state, LockedAction.Draw, player, null)) return true;
+        if (definition.Cost is SendSelfCost { Destination: SelfDestination.Banish } && RuleLocked(state, LockedAction.BeBanished, player, card, onField: false)) return true;
         if (definition.IsMonsterEffect) return RuleLocked(state, LockedAction.ActivateMonsterEffect, player, card, kind: definition.Kind);
         // A face-up card's own effects and Graveyard effects are not activations of a Spell or Trap Card.
         if (definition.IsFaceUpEffect || definition.Origin != EffectOrigin.Field) return false;
@@ -119,18 +163,17 @@ public sealed partial class DuelEngine
     {
         var monster = target.Location == FieldLocation.MonsterZone ? state.GetPlayer(target.Player).MonsterZones[target.Zone] : null;
         if (spec.ForTribute) return !RuleLocked(state, LockedAction.BeTributed, target.Player, target.Card, monster);
-        const string prefix = "activation:";
-        CardCategory? category = sequence.Id.StartsWith(prefix, StringComparison.Ordinal) && effectsById.TryGetValue(sequence.Id[prefix.Length..], out var effect)
-            ? rules[effect.CardId].Category : null;
+        CardCategory? category = SequenceDefinition(sequence) is { } effect ? rules[effect.CardId].Category : null;
         return !RuleLocked(state, LockedAction.BeTargeted, target.Player, target.Card, monster, targeter: chooser, byCategory: category);
     }
 
     /// <summary>The state after a "cannot be destroyed" effect kept the card, spending any per-turn use; null when none applies.</summary>
-    private DuelState? PreventDestruction(DuelState state, LockedAction action, PlayerId subject, CardInstance card, FieldMonster? monster, List<DuelEvent> events)
+    private DuelState? PreventDestruction(DuelState state, LockedAction action, PlayerId subject, CardInstance card, FieldMonster? monster, List<DuelEvent> events,
+        MonsterBinding? versus = null)
     {
         foreach (var active in ActiveLocks(state))
         {
-            if (!LockApplies(state, active, action, subject, card, monster, null, null, null, null)) continue;
+            if (!LockApplies(state, active, action, subject, card, monster, null, null, null, null, versus)) continue;
             events.Add(new DestructionPrevented(card, active.EffectId));
             return active.Lock.UsesPerTurn == 0 ? state
                 : state.WithBookkeeping(state.Bookkeeping with { LockUses = Array.AsReadOnly(state.Bookkeeping.LockUses.Where(u => u.TurnNumber == state.TurnNumber)

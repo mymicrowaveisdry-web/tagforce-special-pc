@@ -317,6 +317,8 @@ public sealed partial class DuelEngine
             var outcome = new DuelOutcome(Other(player.Id), player.Id, DuelEndReason.UnableToDraw);
             return Accept(State.With(outcome: outcome), new DuelEnded(outcome));
         }
+        if (RuleLocked(State, LockedAction.Draw, player.Id, null))
+            return Accept(State.With(phase: DuelPhase.Standby), new PhaseChanged(DuelPhase.Draw, DuelPhase.Standby));
         var card = player.Deck[0];
         var next = player.With(deck: player.Deck.Skip(1), hand: player.Hand.Append(card));
         return Accept(State.With(player: next, phase: DuelPhase.Standby), new CardDrawn(player.Id, card),
@@ -501,7 +503,7 @@ public sealed partial class DuelEngine
             var player = next.GetPlayer(playerId);
             var zones = player.MonsterZones.ToArray();
             var card = zones[zone]!.Card;
-            if (ReplaceDestruction(next, new(playerId, zone, card, zones[zone]!.PlacementId), DestructionCause.Battle, events) is { } replaced)
+            if (ReplaceDestruction(next, new(playerId, zone, card, zones[zone]!.PlacementId), DestructionCause.Battle, events, destroyedBy) is { } replaced)
             {
                 next = replaced;
                 return;
