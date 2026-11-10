@@ -43,7 +43,7 @@ public sealed record PassBattleResponse(PlayerId Player, long DecisionId) : Duel
 public sealed record ChooseAttackReplay(PlayerId Player, long DecisionId, int? TargetZone = null,
     bool Cancel = false) : DuelCommand(Player);
 /// <summary>A set card activated in an open battle window.</summary>
-public sealed record ActivateBattleResponse(PlayerId Player, long DecisionId, int SpellTrapZone) : DuelCommand(Player);
+public sealed record ActivateBattleResponse(PlayerId Player, long DecisionId, int SpellTrapZone, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] int EffectIndex = 0) : DuelCommand(Player);
 /// <summary>The turn player's Quick-Play Spell activated from the hand in an open battle window.</summary>
 public sealed record ActivateHandBattleResponse(PlayerId Player, long DecisionId, int CardInstanceId, int SpellTrapZone) : DuelCommand(Player);
 public sealed record BattleStepChanged(BattleStep? From, BattleStep To) : DuelEvent;

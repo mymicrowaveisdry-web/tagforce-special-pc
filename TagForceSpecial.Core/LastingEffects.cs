@@ -148,11 +148,13 @@ public sealed record BanishFromGraveyardCost : EffectCost
 }
 
 /// <summary>A face-up monster's controller activates its ignition or quick effect in an open Main Phase state.</summary>
-public sealed record ActivateMonsterEffect(PlayerId Player, int MonsterZone, IReadOnlyList<int>? DetachInstanceIds = null) : DuelCommand(Player);
+public sealed record ActivateMonsterEffect(PlayerId Player, int MonsterZone, IReadOnlyList<int>? DetachInstanceIds = null, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] int EffectIndex = 0) : DuelCommand(Player);
+/// <summary>A face-up Spell or Trap's activated effect in its controller's open Main Phase.</summary>
+public sealed record ActivateCardEffect(PlayerId Player, int SpellTrapZone, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] int EffectIndex = 0) : DuelCommand(Player);
 /// <summary>A face-up monster's quick effect as the next chain link.</summary>
-public sealed record ActivateMonsterChainResponse(PlayerId Player, long DecisionId, int MonsterZone, IReadOnlyList<int>? DetachInstanceIds = null) : DuelCommand(Player);
+public sealed record ActivateMonsterChainResponse(PlayerId Player, long DecisionId, int MonsterZone, IReadOnlyList<int>? DetachInstanceIds = null, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] int EffectIndex = 0) : DuelCommand(Player);
 /// <summary>A face-up monster's quick effect starting a chain in an open battle window.</summary>
-public sealed record ActivateMonsterBattleResponse(PlayerId Player, long DecisionId, int MonsterZone, IReadOnlyList<int>? DetachInstanceIds = null) : DuelCommand(Player);
+public sealed record ActivateMonsterBattleResponse(PlayerId Player, long DecisionId, int MonsterZone, IReadOnlyList<int>? DetachInstanceIds = null, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] int EffectIndex = 0) : DuelCommand(Player);
 /// <summary>Unequips a Union monster and Special Summons it; shares the Union's once-per-turn use.</summary>
 public sealed record UnequipUnion(PlayerId Player, int SpellTrapZone) : DuelCommand(Player);
 /// <summary>Settles a Standby Phase upkeep by paying LP or destroying the card.</summary>
@@ -176,6 +178,7 @@ public sealed record ToonSummon : DuelCommand
 }
 
 public sealed record MonsterEffectActivated(PlayerId Player, string EffectId, CardInstance Card, int Zone) : DuelEvent;
+public sealed record FieldEffectActivated(PlayerId Player, string EffectId, CardInstance Card, int Zone) : DuelEvent;
 /// <summary>A controller's old Field Spell went to the Graveyard because they placed a new one; it was not destroyed.</summary>
 public sealed record FieldSpellReplaced(PlayerId Player, CardInstance Card) : DuelEvent;
 public sealed record UnionEquipped(PlayerId Player, CardInstance Card, int SpellTrapZone, MonsterBinding Target) : DuelEvent;

@@ -66,6 +66,42 @@ public sealed partial class DuelEngine
         return State.With(player: player.With(graveyard: player.Graveyard.Concat(player.Hand.Where(c => c != source && DiscardQualifies(c, discard.Filter)))));
     }
 
+    /// <summary>Several effects are allowed on monsters, as "choose 1" options of one kind, or as activated effects after a lasting card's own.</summary>
+    private static bool EffectGroupsValid(EffectDefinition[] effects) => effects.GroupBy(d => d.CardId).All(group =>
+    {
+        var kinds = group.Select(d => d.Kind).ToArray();
+        if (kinds.Contains(EffectKind.SpellTrapIgnition))
+            return kinds[0] is EffectKind.ContinuousSpell or EffectKind.ContinuousTrap or EffectKind.FieldSpell or EffectKind.EquipSpell && kinds.Skip(1).All(k => k == EffectKind.SpellTrapIgnition);
+        return kinds.Length == 1 || kinds.All(k => k is EffectKind.MonsterIgnition or EffectKind.MonsterQuick) ||
+            kinds.All(k => k == kinds[0] && k is EffectKind.NormalSpell or EffectKind.QuickPlaySpell or EffectKind.NormalTrap);
+    });
+
+    private bool EffectAt(uint cardId, int index, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out EffectDefinition? definition)
+    {
+        definition = effectsByCard.TryGetValue(cardId, out var effects) && index >= 0 && index < effects.Length ? effects[index] : null;
+        return definition is not null;
+    }
+
+    /// <summary>How many separately chosen effects this card has; 1 when it has none registered.</summary>
+    internal int EffectTotal(uint cardId) => effectsByCard.TryGetValue(cardId, out var effects) ? effects.Length : 1;
+
+    private EffectDefinition LinkDefinition(ChainLink link) => link.Trigger?.Profile.Definition ?? effectsById[link.Activation.EffectId];
+
+    /// <summary>Starts a face-up Spell or Trap's activated effect. The card stays in place and the effect resolves even if the card then leaves.</summary>
+    private DuelActionResult BeginFieldEffect(PlayerId playerId, int zone, int effectIndex)
+    {
+        if (State.Phase is not (DuelPhase.Main1 or DuelPhase.Main2)) return Reject(DuelError.WrongPhase);
+        if (zone is < 0 or > DuelPlayerState.FieldZoneIndex) return Reject(DuelError.InvalidSpellTrapZone);
+        var field = State.GetPlayer(playerId).SpellTrapAt(zone);
+        if (field is not { IsFaceUp: true, EffectActive: true } || !EffectAt(field.Card.GameCardId, effectIndex, out var definition) || definition.Kind != EffectKind.SpellTrapIgnition)
+            return Reject(DuelError.UnsupportedSpellEffect);
+        if (definition.OncePerTurn && UsedThisTurn(field.Card, definition)) return Reject(DuelError.EffectAlreadyUsed);
+        if (DefinitionActivationError(definition, ActivationContext.SpellTrapField, playerId, field.Card, field) is not DuelError.None and var error) return Reject(error);
+        var next = definition.OncePerTurn ? RecordUse(State, field.Card, definition) : State;
+        var (paid, head) = PayLifePointCost(next, playerId, definition, [new FieldEffectActivated(playerId, definition.EffectId, field.Card, zone)]);
+        return ContinueCommit(paid, head, playerId, field.Card, zone, definition, field.PlacementId, null);
+    }
+
     private bool DiscardQualifies(CardInstance card, CardFilter? filter) => filter switch
     {
         null => true,

@@ -137,7 +137,7 @@ public static class PoolDuels
 
     private static readonly HashSet<ActionKind> Interesting =
     [
-        ActionKind.ActivateSpell, ActionKind.ActivateSetSpell, ActionKind.MonsterEffect, ActionKind.Unequip, ActionKind.ChainResponse, ActionKind.BattleResponse,
+        ActionKind.ActivateSpell, ActionKind.ActivateSetSpell, ActionKind.MonsterEffect, ActionKind.CardEffect, ActionKind.Unequip, ActionKind.ChainResponse, ActionKind.BattleResponse,
         ActionKind.Summon, ActionKind.SetMonster, ActionKind.SetSpellTrap, ActionKind.Attack, ActionKind.ChooseCard, ActionKind.ChooseZone, ActionKind.ChooseTarget,
         ActionKind.ChoosePosition, ActionKind.OrderTriggers, ActionKind.DeclineTriggers, ActionKind.Upkeep, ActionKind.Discard, ActionKind.Draw
     ];

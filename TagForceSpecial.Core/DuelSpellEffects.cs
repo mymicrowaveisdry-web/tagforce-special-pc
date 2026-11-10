@@ -37,7 +37,7 @@ public sealed record PendingSpellActivation(PlayerId Player, string EffectId, Ca
     [System.Text.Json.Serialization.JsonIgnore]
     public bool IsMonsterEffect { get; init; }
 }
-public sealed record ActivateSpell(PlayerId Player, int CardInstanceId, int SpellTrapZone) : DuelCommand(Player);
+public sealed record ActivateSpell(PlayerId Player, int CardInstanceId, int SpellTrapZone, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] int EffectIndex = 0) : DuelCommand(Player);
 public sealed record SpellActivated(PlayerId Player, string EffectId, CardInstance Card, int Zone) : DuelEvent;
 public sealed record MonsterSpecialSummoned(PlayerId Player, FieldMonster Monster, int Zone, DecisionCardSource Source,
     string? ProcedureId = null, long? AttemptId = null, string? ProperProcedureId = null) : DuelEvent;

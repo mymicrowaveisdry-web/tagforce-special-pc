@@ -2,14 +2,15 @@ namespace TagForceSpecial.Core;
 
 public sealed partial class DuelEngine
 {
-    private DuelActionResult Activate(int instanceId, int zone)
+    private DuelActionResult Activate(int instanceId, int zone, int effectIndex = 0)
     {
         if (State.Phase is not (DuelPhase.Main1 or DuelPhase.Main2)) return Reject(DuelError.WrongPhase);
         if (zone is < 0 or > DuelPlayerState.FieldZoneIndex) return Reject(DuelError.InvalidSpellTrapZone);
         var player = State.GetPlayer(State.ActivePlayer);
         var card = player.Hand.SingleOrDefault(c => c.InstanceId == instanceId);
         if (card is null) return Reject(DuelError.CardNotInHand);
-        if (definitions.TryGetValue(card.GameCardId, out var definition)) return ActivateDefinition(card, zone, definition);
+        if (definitions.ContainsKey(card.GameCardId))
+            return EffectAt(card.GameCardId, effectIndex, out var definition) ? ActivateDefinition(card, zone, definition) : Reject(DuelError.UnsupportedSpellEffect);
         if (zone == DuelPlayerState.FieldZoneIndex) return Reject(DuelError.InvalidSpellTrapZone);
         if (summonEffects.TryGetValue(card.GameCardId, out var summon)) return ActivateSummonEffect(card, zone, summon);
         return Reject(DuelError.UnsupportedSpellEffect);

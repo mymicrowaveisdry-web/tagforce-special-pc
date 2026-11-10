@@ -9,7 +9,9 @@ public enum ChainOperation
     /// <summary>A face-up monster's activated effect; resolves its definition's steps.</summary>
     MonsterEffect,
     /// <summary>Special Summons a Union monster from its equip.</summary>
-    UnionUnequip
+    UnionUnequip,
+    /// <summary>An activated effect of a face-up Spell or Trap; the card stays where it is.</summary>
+    FieldEffect
 }
 public enum ChainSpellSpeed { One = 1, Two = 2, Three = 3 }
 public enum ChainNegation { None, Effect, Activation }
@@ -58,7 +60,7 @@ public sealed class PendingChain
 
 public sealed record PassChainResponse(PlayerId Player, long DecisionId) : DuelCommand(Player);
 /// <summary>Activate a previously set card as the next chain link (or in an open window).</summary>
-public sealed record ActivateChainResponse(PlayerId Player, long DecisionId, int SpellTrapZone) : DuelCommand(Player);
+public sealed record ActivateChainResponse(PlayerId Player, long DecisionId, int SpellTrapZone, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] int EffectIndex = 0) : DuelCommand(Player);
 /// <summary>Explicit PC stepping boundary; the active turn player advances resolution.</summary>
 public sealed record ResolveNextChainLink(PlayerId Player, long DecisionId) : DuelCommand(Player);
 public sealed record ChainLinkAdded(ChainLink Link) : DuelEvent;

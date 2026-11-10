@@ -44,7 +44,7 @@ public sealed partial class DuelEngine
             if (activate.Player != battle.Window.Responder) return Reject(DuelError.NotBattleResponder);
             if (activate.SpellTrapZone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
             var source = State.GetPlayer(command.Player).SpellTrapFields[activate.SpellTrapZone];
-            if (source is null || !definitions.TryGetValue(source.Card.GameCardId, out var definition))
+            if (source is null || !EffectAt(source.Card.GameCardId, activate.EffectIndex, out var definition))
                 return Reject(DuelError.UnsupportedBattleResponse);
             return BeginBattleDefinition(command.Player, activate.SpellTrapZone, source, definition);
         }
@@ -60,7 +60,7 @@ public sealed partial class DuelEngine
             if (quick.DecisionId != battle.Window.DecisionId) return Reject(DuelError.StaleBattleDecision);
             if (battle.Window.Closed) return Reject(DuelError.BattleWindowClosed);
             if (quick.Player != battle.Window.Responder) return Reject(DuelError.NotBattleResponder);
-            return BeginMonsterEffect(quick.Player, quick.MonsterZone, null, window: true, detach: quick.DetachInstanceIds);
+            return BeginMonsterEffect(quick.Player, quick.MonsterZone, null, window: true, detach: quick.DetachInstanceIds, effectIndex: quick.EffectIndex);
         }
         if (command.Player != State.ActivePlayer) return Reject(DuelError.NotActivePlayer);
         if (command is AdvanceBattle advance && advance.DecisionId != battle.Window.DecisionId ||

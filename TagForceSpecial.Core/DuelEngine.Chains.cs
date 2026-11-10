@@ -40,12 +40,12 @@ public sealed partial class DuelEngine
         if (command is ResolveNextChainLink) return Reject(DuelError.ChainPending);
         if (command.Player != chain.Responder) return Reject(DuelError.NotChainResponder);
         if (command is ActivateHandChainResponse hand) return BeginHandDefinitionResponse(chain, hand);
-        if (command is ActivateMonsterChainResponse monsterResponse) return BeginMonsterEffect(monsterResponse.Player, monsterResponse.MonsterZone, chain, detach: monsterResponse.DetachInstanceIds);
+        if (command is ActivateMonsterChainResponse monsterResponse) return BeginMonsterEffect(monsterResponse.Player, monsterResponse.MonsterZone, chain, detach: monsterResponse.DetachInstanceIds, effectIndex: monsterResponse.EffectIndex);
         if (command is ActivateChainResponse response)
         {
             if (response.SpellTrapZone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
             var source = State.GetPlayer(command.Player).SpellTrapFields[response.SpellTrapZone];
-            if (source is not null && definitions.TryGetValue(source.Card.GameCardId, out var definition))
+            if (source is not null && EffectAt(source.Card.GameCardId, response.EffectIndex, out var definition))
             {
                 // In a summon chain only Spell Speed 3 can follow the first Counter Trap.
                 return BeginDefinitionResponse(chain, response.SpellTrapZone, source, definition);
@@ -84,7 +84,7 @@ public sealed partial class DuelEngine
             events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.SourceEffectsNegated));
         else if (IsLastingLink(link) && !LastingSourceInPlace(next, link))
             events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.SourceLeftField));
-        else if (link.Operation is ChainOperation.Definition or ChainOperation.EffectSummon && rules[activation.Spell.GameCardId].Category == CardCategory.Spell && IsSpellsNegated(next))
+        else if (link.Operation is ChainOperation.Definition or ChainOperation.EffectSummon or ChainOperation.FieldEffect && rules[activation.Spell.GameCardId].Category == CardCategory.Spell && IsSpellsNegated(next))
         {
             // A negated lasting Spell still stays; it starts applying if the negation ends.
             events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.SourceEffectsNegated));
@@ -103,6 +103,7 @@ public sealed partial class DuelEngine
                 break;
             case ChainOperation.Definition:
             case ChainOperation.MonsterEffect:
+            case ChainOperation.FieldEffect:
             case ChainOperation.TriggerEffect when link.Trigger is not null:
             {
                 (next, var pause) = ResolveDefinitionSteps(next, links, link, chain.DefinitionChoice?.StepIndex ?? 0,
@@ -161,7 +162,7 @@ public sealed partial class DuelEngine
         foreach (var entry in links.Reverse())
         {
             // Monster effects, including a Union's unequip, are not Spell activations.
-            if (entry.Trigger is not null || entry.Operation is ChainOperation.MonsterEffect or ChainOperation.UnionUnequip) continue;
+            if (entry.Trigger is not null || entry.Operation is ChainOperation.MonsterEffect or ChainOperation.UnionUnequip or ChainOperation.FieldEffect) continue;
             var receipt = entry.Activation;
             var player = next.GetPlayer(receipt.Player);
             if (entry.IsPendulumScale)
@@ -176,7 +177,7 @@ public sealed partial class DuelEngine
             if (field is null || field.Card != receipt.Spell || field.PlacementId != entry.SourcePlacementId) continue;
             // An Equip Spell that never got attached has nothing to stay on.
             if (IsLastingLink(entry) && !entry.ActivationNegated &&
-                !(definitions[receipt.Spell.GameCardId].Kind == EffectKind.EquipSpell && field.EquippedTo is null)) continue;
+                !(LinkDefinition(entry).Kind == EffectKind.EquipSpell && field.EquippedTo is null)) continue;
             next = next.With(player: player.WithSpellTrapAt(receipt.SpellTrapZone, null).With(graveyard: player.Graveyard.Append(receipt.Spell)));
             events.Add(rules[receipt.Spell.GameCardId].Category == CardCategory.Trap
                 ? new ChainTrapSentToGraveyard(player.Id, receipt.Spell, receipt.SpellTrapZone) { ActivationNegated = entry.ActivationNegated }
@@ -189,7 +190,7 @@ public sealed partial class DuelEngine
     }
 
     private bool IsLastingLink(ChainLink link) => link.Trigger is null && link.Operation == ChainOperation.Definition &&
-        definitions[link.Activation.Spell.GameCardId].IsLasting;
+        LinkDefinition(link).IsLasting;
 
     private static bool LastingSourceInPlace(DuelState state, ChainLink link) =>
         state.GetPlayer(link.Activation.Player).SpellTrapAt(link.Activation.SpellTrapZone) is { IsFaceUp: true } field &&

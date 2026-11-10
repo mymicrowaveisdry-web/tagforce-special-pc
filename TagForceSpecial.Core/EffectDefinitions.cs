@@ -7,7 +7,9 @@ public enum EffectKind
     /// <summary>A face-up monster's Spell Speed 1 effect, activated in its controller's open Main Phase.</summary>
     MonsterIgnition,
     /// <summary>A face-up monster's Spell Speed 2 effect, also usable as a chain response.</summary>
-    MonsterQuick
+    MonsterQuick,
+    /// <summary>A face-up Continuous, Field or Equip card's Spell Speed 1 effect, activated in its controller's open Main Phase.</summary>
+    SpellTrapIgnition
 }
 
 /// <summary>One ordered resolution operation from a closed, Core-defined set.</summary>
@@ -217,6 +219,12 @@ public sealed record RespondsToSpellActivationCondition : EffectCondition;
 /// <summary>Requires a preceding link (any activation or trigger), of <see cref="Category"/> when set.</summary>
 public sealed record RespondsToActivationCondition(CardCategory? Category = null) : EffectCondition;
 
+/// <summary>The activating player controls no monsters.</summary>
+public sealed record ControlsNoMonstersCondition : EffectCondition;
+
+/// <summary>Ends the effect unless the activating player controls no monsters at this point of resolution.</summary>
+public sealed record StopUnlessNoOwnMonstersStep : EffectStep;
+
 /// <summary>The activating player has not Summoned a monster this turn; Sets do not count.</summary>
 public sealed record NoSummonThisTurnCondition : EffectCondition;
 
@@ -268,8 +276,10 @@ public sealed class EffectDefinition
     public LastingNegation Negation { get; }
     /// <summary>LP its controller pays each of their Standby Phases, or destroys the card; 0 for none.</summary>
     public int UpkeepLifePoints { get; }
-    /// <summary>This monster's activated effect can be used once per turn, per card.</summary>
+    /// <summary>This activated effect can be used once per turn, per card.</summary>
     public bool OncePerTurn { get; }
+    /// <summary>Effects with the same key share one use per turn; by default each effect has its own.</summary>
+    public string OncePerTurnKey { get; }
     /// <summary>ATK this monster gains for each counter on it.</summary>
     public int AttackPerCounter { get; }
     /// <summary>The phase of its controller's turn in which the upkeep is owed.</summary>
@@ -284,7 +294,7 @@ public sealed class EffectDefinition
     public ChainSpellSpeed SpellSpeed => Kind switch
     {
         EffectKind.NormalSpell or EffectKind.MonsterTrigger or EffectKind.ContinuousSpell or EffectKind.FieldSpell or EffectKind.EquipSpell or
-            EffectKind.MonsterIgnition => ChainSpellSpeed.One,
+            EffectKind.MonsterIgnition or EffectKind.SpellTrapIgnition => ChainSpellSpeed.One,
         EffectKind.CounterTrap => ChainSpellSpeed.Three,
         _ => ChainSpellSpeed.Two
     };
@@ -313,7 +323,7 @@ public sealed class EffectDefinition
         bool locksOtherSummonsThisTurn = false, IEnumerable<EffectTarget>? fieldTargets = null,
         IEnumerable<LastingStatModifier>? lastingModifiers = null, LastingNegation negation = LastingNegation.None, int upkeepLifePoints = 0,
         bool oncePerTurn = false, int attackPerCounter = 0, bool isMarker = false, DuelPhase upkeepPhase = DuelPhase.Standby,
-        DestructionCause unionReplaces = DestructionCause.Battle, int spellCounterMax = 0, bool locksOwnAttack = false)
+        DestructionCause unionReplaces = DestructionCause.Battle, int spellCounterMax = 0, bool locksOwnAttack = false, string? oncePerTurnKey = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(effectId);
         ArgumentNullException.ThrowIfNull(steps);
@@ -329,7 +339,8 @@ public sealed class EffectDefinition
             throw new ArgumentException("Only lasting cards and Union equips take up to 8 distinct lasting modifiers.", nameof(lastingModifiers));
         if (!Enum.IsDefined(negation) || upkeepLifePoints < 0 || attackPerCounter < 0 ||
             (negation != LastingNegation.None || upkeepLifePoints != 0) && !lastingKind ||
-            (oncePerTurn || attackPerCounter != 0 || locksOwnAttack) && !monsterKind)
+            oncePerTurn && !monsterKind && kind != EffectKind.SpellTrapIgnition || oncePerTurnKey is not null && (!oncePerTurn || oncePerTurnKey.Length == 0) ||
+            (attackPerCounter != 0 || locksOwnAttack) && !monsterKind)
             throw new ArgumentException("Negation and upkeep belong to lasting cards; once-per-turn and counter stats to activated monster effects.", nameof(negation));
         if (upkeepPhase is not (DuelPhase.Standby or DuelPhase.End) || unionReplaces is not (DestructionCause.Battle or DestructionCause.Any) ||
             spellCounterMax < 0 || spellCounterMax != 0 && !lastingKind && !monsterKind)
@@ -354,7 +365,7 @@ public sealed class EffectDefinition
                     DestroyTargetsStep or ReturnTargetsToHandStep or ChangeTargetsToDefenseStep => false,
                     AddTargetsToHandStep or BanishTargetsStep or ReturnTargetsToGraveyardStep or ShuffleTargetsIntoDeckStep => false,
                     SpecialSummonTargetStep s => s.Position is not (null or BattlePosition.FaceUpAttack or BattlePosition.FaceUpDefense) || !Enum.IsDefined(s.Link),
-                    EquipTargetStep or UnionEquipStep or PlaceCounterStep or FlipTargetsFaceDownStep or GrantNormalSummonStep => false,
+                    EquipTargetStep or UnionEquipStep or PlaceCounterStep or FlipTargetsFaceDownStep or GrantNormalSummonStep or StopUnlessNoOwnMonstersStep => false,
                     ModifyTargetsUntilEndStep s => s.Attack == 0 && s.Defense == 0,
                     FlipTargetsFaceUpStep s => s.Position is not (BattlePosition.FaceUpAttack or BattlePosition.FaceUpDefense),
                     ReturnSourceToDeckTopStep => kind != EffectKind.MonsterTrigger,
@@ -386,7 +397,7 @@ public sealed class EffectDefinition
         bool responds = required.Any(c => c is RespondsToSpellActivationCondition or RespondsToActivationCondition);
         if (required.OfType<RespondsToActivationCondition>().Any(c => c.Category is not (null or CardCategory.Monster or CardCategory.Spell or CardCategory.Trap)))
             throw new ArgumentOutOfRangeException(nameof(conditions));
-        if (responds && kind is EffectKind.NormalSpell or EffectKind.ContinuousSpell or EffectKind.FieldSpell or EffectKind.EquipSpell)
+        if (responds && kind is EffectKind.NormalSpell or EffectKind.ContinuousSpell or EffectKind.FieldSpell or EffectKind.EquipSpell or EffectKind.SpellTrapIgnition)
             throw new ArgumentException("A Spell Speed 1 Spell cannot be a chain response.", nameof(conditions));
         if (snapshot.Any(s => s is NegateActivationStep or NegateEffectStep) && !responds)
             throw new ArgumentException("Negating an activation requires a response condition.", nameof(steps));
@@ -430,6 +441,7 @@ public sealed class EffectDefinition
         Negation = negation;
         UpkeepLifePoints = upkeepLifePoints;
         OncePerTurn = oncePerTurn;
+        OncePerTurnKey = oncePerTurnKey ?? effectId;
         AttackPerCounter = attackPerCounter;
         UpkeepPhase = upkeepPhase;
         UnionReplaces = unionReplaces;
@@ -438,7 +450,7 @@ public sealed class EffectDefinition
     }
 }
 
-public sealed record ActivateSetSpell(PlayerId Player, int SpellTrapZone) : DuelCommand(Player);
+public sealed record ActivateSetSpell(PlayerId Player, int SpellTrapZone, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] int EffectIndex = 0) : DuelCommand(Player);
 /// <summary>The turn player activates a Quick-Play Spell from the hand as the next chain link.</summary>
 public sealed record ActivateHandChainResponse(PlayerId Player, long DecisionId, int CardInstanceId, int SpellTrapZone)
     : DuelCommand(Player);

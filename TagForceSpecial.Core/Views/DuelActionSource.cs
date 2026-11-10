@@ -129,6 +129,11 @@ public sealed class DuelActionSource
 
     private const int MaximumTriggerOrders = 256;
 
+    private int EffectsOf(CardInstance? card) => card is null ? 1 : engine.EffectTotal(card.GameCardId);
+
+    /// <summary>The first effect keeps the action keys it always had.</summary>
+    private static int? Option(int effectIndex) => effectIndex == 0 ? null : effectIndex;
+
     /// <summary>Every legal activation order; optional triggers also allow any subset, including none.</summary>
     private static IEnumerable<TriggerActivation[]> TriggerOrders(IReadOnlyList<TriggerActivation> options, bool mandatory, TriggerActivation[] prefix)
     {
@@ -233,9 +238,11 @@ public sealed class DuelActionSource
         if (state.PendingChain is { } chain)
         {
             for (int z = 0; z < 5; z++)
-                yield return B(new ActivateChainResponse(player, chain.DecisionId, z), ActionKind.ChainResponse, $"Respond zone {z + 1}", zone: z);
+                for (int i = 0; i < EffectsOf(own.SpellTrapFields[z]?.Card); i++)
+                    yield return B(new ActivateChainResponse(player, chain.DecisionId, z, i), ActionKind.ChainResponse, $"Respond zone {z + 1}", zone: z, target: Option(i));
             for (int z = 0; z < 5; z++)
-                yield return B(new ActivateMonsterChainResponse(player, chain.DecisionId, z), ActionKind.MonsterEffect, $"Respond with monster [{z + 1}]", own.MonsterZones[z]?.Card.InstanceId, z);
+                for (int i = 0; i < EffectsOf(own.MonsterZones[z]?.Card); i++)
+                    yield return B(new ActivateMonsterChainResponse(player, chain.DecisionId, z, EffectIndex: i), ActionKind.MonsterEffect, $"Respond with monster [{z + 1}]", own.MonsterZones[z]?.Card.InstanceId, z, Option(i));
             foreach (var card in own.Hand)
                 for (int z = 0; z < 5; z++)
                     yield return B(new ActivateHandChainResponse(player, chain.DecisionId, card.InstanceId, z), ActionKind.ChainResponse,
@@ -248,8 +255,10 @@ public sealed class DuelActionSource
         {
             for (int z = 0; z < 5; z++)
             {
-                yield return B(new ActivateBattleResponse(player, battle.Window.DecisionId, z), ActionKind.BattleResponse, $"Battle response [{z + 1}]", zone: z);
-                yield return B(new ActivateMonsterBattleResponse(player, battle.Window.DecisionId, z), ActionKind.MonsterEffect, $"Battle monster effect [{z + 1}]", own.MonsterZones[z]?.Card.InstanceId, z);
+                for (int i = 0; i < EffectsOf(own.SpellTrapFields[z]?.Card); i++)
+                    yield return B(new ActivateBattleResponse(player, battle.Window.DecisionId, z, i), ActionKind.BattleResponse, $"Battle response [{z + 1}]", zone: z, target: Option(i));
+                for (int i = 0; i < EffectsOf(own.MonsterZones[z]?.Card); i++)
+                    yield return B(new ActivateMonsterBattleResponse(player, battle.Window.DecisionId, z, EffectIndex: i), ActionKind.MonsterEffect, $"Battle monster effect [{z + 1}]", own.MonsterZones[z]?.Card.InstanceId, z, Option(i));
             }
             foreach (var card in own.Hand)
                 for (int z = 0; z < 5; z++)
@@ -272,7 +281,8 @@ public sealed class DuelActionSource
             for (int z = 0; z < 5; z++)
             {
                 yield return B(new NormalSummon(player, card.InstanceId, z), ActionKind.Summon, $"Summon {name} [{z + 1}]", card.InstanceId, z);
-                yield return B(new ActivateSpell(player, card.InstanceId, z), ActionKind.ActivateSpell, $"Activate {name} [{z + 1}]", card.InstanceId, z);
+                for (int i = 0; i < EffectsOf(card); i++)
+                    yield return B(new ActivateSpell(player, card.InstanceId, z, i), ActionKind.ActivateSpell, $"Activate {name} [{z + 1}]", card.InstanceId, z, Option(i));
                 yield return B(new SetMonster(player, card.InstanceId, z), ActionKind.SetMonster, $"Set {name} [{z + 1}]", card.InstanceId, z);
                 yield return B(new SetSpellTrap(player, card.InstanceId, z), ActionKind.SetSpellTrap, $"Set {name} [{z + 1}]", card.InstanceId, z);
             }
@@ -293,15 +303,18 @@ public sealed class DuelActionSource
         {
             if (own.MonsterZones[z] is { } activated)
             {
-                int detachCount = engine.DetachCostFor(activated.Card.GameCardId);
-                if (detachCount == 0)
-                    yield return B(new ActivateMonsterEffect(player, z), ActionKind.MonsterEffect, $"Activate {catalog[activated.Card.GameCardId].Name} [{z + 1}]", activated.Card.InstanceId, z);
-                else
+                for (int i = 0; i < EffectsOf(activated.Card); i++)
                 {
-                    int choice = 0;
-                    foreach (var cards in Combinations(activated.XyzMaterials, detachCount, 0).Take(MaximumTriggerOrders))
-                        yield return B(new ActivateMonsterEffect(player, z, cards.Select(c => c.InstanceId).ToArray()), ActionKind.MonsterEffect,
-                            $"Activate {catalog[activated.Card.GameCardId].Name} [{z + 1}] detaching {string.Join(", ", cards.Select(c => catalog[c.GameCardId].Name))}", activated.Card.InstanceId, z, choice++);
+                    int detachCount = engine.DetachCostFor(activated.Card.GameCardId, i);
+                    if (detachCount == 0)
+                        yield return B(new ActivateMonsterEffect(player, z, EffectIndex: i), ActionKind.MonsterEffect, $"Activate {catalog[activated.Card.GameCardId].Name} [{z + 1}]", activated.Card.InstanceId, z, Option(i));
+                    else
+                    {
+                        int choice = i * 1000;
+                        foreach (var cards in Combinations(activated.XyzMaterials, detachCount, 0).Take(MaximumTriggerOrders))
+                            yield return B(new ActivateMonsterEffect(player, z, cards.Select(c => c.InstanceId).ToArray(), i), ActionKind.MonsterEffect,
+                                $"Activate {catalog[activated.Card.GameCardId].Name} [{z + 1}] detaching {string.Join(", ", cards.Select(c => catalog[c.GameCardId].Name))}", activated.Card.InstanceId, z, choice++);
+                    }
                 }
             }
             if (own.SpellTrapFields[z] is { } equipped)
@@ -316,8 +329,13 @@ public sealed class DuelActionSource
                 yield return B(new GeminiSummon(player, z), ActionKind.Summon, $"Gemini Summon {catalog[gemini.Card.GameCardId].Name} [{z + 1}]", gemini.Card.InstanceId, z);
         for (int z = 0; z < 5; z++)
         {
-            yield return B(new ActivateSetSpell(player, z), ActionKind.ActivateSetSpell, $"Activate set [{z + 1}]", own.SpellTrapFields[z]?.Card.InstanceId, z);
+            for (int i = 0; i < EffectsOf(own.SpellTrapFields[z]?.Card); i++)
+                yield return B(new ActivateSetSpell(player, z, i), ActionKind.ActivateSetSpell, $"Activate set [{z + 1}]", own.SpellTrapFields[z]?.Card.InstanceId, z, Option(i));
         }
+        foreach (int z in Enumerable.Range(0, DuelPlayerState.FieldZoneIndex + 1))
+            if ((z == DuelPlayerState.FieldZoneIndex ? own.FieldSpell : own.SpellTrapFields[z]) is { IsFaceUp: true } faceUp)
+                for (int i = 0; i < EffectsOf(faceUp.Card); i++)
+                    yield return B(new ActivateCardEffect(player, z, i), ActionKind.CardEffect, $"Use {catalog[faceUp.Card.GameCardId].Name} effect", faceUp.Card.InstanceId, z, Option(i));
         foreach (var attack in Attacks(own, player)) yield return attack;
         foreach (var phase in Enum.GetValues<DuelPhase>())
             yield return B(new ChangePhase(player, phase), ActionKind.Phase, $"Phase: {phase}", phase: phase);

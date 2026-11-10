@@ -9,7 +9,7 @@ namespace TagForceSpecial.Core;
 public sealed partial class DuelEngine
 {
     /// <summary>Where an activation is requested; each context has its own timing rules.</summary>
-    private enum ActivationContext { Hand, OwnSetCard, OpenWindow, ChainResponse, HandChainResponse, BattleWindow, BattleHand, SummonWindow, MonsterField, MonsterChainResponse, MonsterWindow }
+    private enum ActivationContext { Hand, OwnSetCard, OpenWindow, ChainResponse, HandChainResponse, BattleWindow, BattleHand, SummonWindow, MonsterField, MonsterChainResponse, MonsterWindow, SpellTrapField }
 
     private const BattleTiming DamageStepTimings = BattleTiming.DamageStart | BattleTiming.BeforeCalculation |
         BattleTiming.Calculation | BattleTiming.AfterCalculation | BattleTiming.DamageEnd;
@@ -27,7 +27,7 @@ public sealed partial class DuelEngine
             return DuelError.ActivationTimingNotAllowed;
         bool fromHand = context is ActivationContext.Hand or ActivationContext.HandChainResponse or ActivationContext.BattleHand;
         bool setThisTurn = source is not null && source.SetOnTurn >= State.TurnNumber;
-        bool fromMonster = context is ActivationContext.MonsterField or ActivationContext.MonsterChainResponse or ActivationContext.MonsterWindow;
+        bool fromMonster = context is ActivationContext.MonsterField or ActivationContext.MonsterChainResponse or ActivationContext.MonsterWindow or ActivationContext.SpellTrapField;
         if (!fromHand && !fromMonster && (source is null || source.IsFaceUp))
             return context switch
             {
@@ -42,6 +42,7 @@ public sealed partial class DuelEngine
             (ActivationContext.MonsterField, EffectKind.MonsterIgnition or EffectKind.MonsterQuick) => DuelError.None,
             (ActivationContext.MonsterChainResponse, EffectKind.MonsterQuick) => slowerThanPreceding ? DuelError.ChainResponseSpeedNotAllowed : DuelError.None,
             (ActivationContext.MonsterWindow, EffectKind.MonsterQuick) => DuelError.None,
+            (ActivationContext.SpellTrapField, EffectKind.SpellTrapIgnition) => DuelError.None,
             (ActivationContext.Hand, EffectKind.NormalSpell or EffectKind.QuickPlaySpell or EffectKind.ContinuousSpell or EffectKind.FieldSpell or EffectKind.EquipSpell) => DuelError.None,
             (ActivationContext.Hand, _) => DuelError.ActivationTimingNotAllowed,
             (ActivationContext.BattleHand, EffectKind.QuickPlaySpell) => DuelError.None,
@@ -69,6 +70,7 @@ public sealed partial class DuelEngine
             bool met = condition switch
             {
                 FreeMonsterZonesCondition free => player.MonsterZones.Count(m => m is null) >= free.Count,
+                ControlsNoMonstersCondition => player.MonsterZones.All(m => m is null),
                 // A Pendulum scale activation counts as a Spell activation; monster/trigger effects never do.
                 RespondsToActivationCondition responds => preceding is not null && (responds.Category is not { } category ||
                     (preceding.IsPendulumScale ? CardCategory.Spell : rules[preceding.Activation.Spell.GameCardId].Category) == category),
@@ -102,7 +104,7 @@ public sealed partial class DuelEngine
         if (definition.Cost is RemoveCounterCost remove && !player.MonsterZones.Any(m => m?.Card == card && m.Counters >= remove.Count)) return DuelError.DecisionUnavailable;
         if (definition.Steps.Any(s => s is UnionEquipStep) && player.SpellTrapFields.All(f => f is not null)) return DuelError.DecisionUnavailable;
         if (definition.Cost is DetachCost detach && !player.MonsterZones.Any(m => m?.Card == card && m.XyzMaterials.Count >= detach.Count)) return DuelError.DecisionUnavailable;
-        if (definitionDecisions.TryGetValue(definition.CardId, out var sequence))
+        if (definitionDecisions.TryGetValue(definition.EffectId, out var sequence))
         {
             // Simulate one pick per field target so several targets need distinct cards.
             List<DecisionAnswer> simulated = [];
@@ -141,14 +143,14 @@ public sealed partial class DuelEngine
         return DuelError.None;
     }
 
-    private DuelActionResult ActivateSetDefinition(int zone)
+    private DuelActionResult ActivateSetDefinition(int zone, int effectIndex = 0)
     {
         if (State.Phase is not (DuelPhase.Main1 or DuelPhase.Main2)) return Reject(DuelError.WrongPhase);
         if (zone is < 0 or > DuelPlayerState.FieldZoneIndex) return Reject(DuelError.InvalidSpellTrapZone);
         var source = State.GetPlayer(State.ActivePlayer).SpellTrapAt(zone);
         if (source is { IsFaceUp: false } && summonEffects.TryGetValue(source.Card.GameCardId, out var summon))
             return ActivateSummonEffect(source.Card, zone, summon, source);
-        if (source is null || source.IsFaceUp || !definitions.TryGetValue(source.Card.GameCardId, out var definition))
+        if (source is null || source.IsFaceUp || !EffectAt(source.Card.GameCardId, effectIndex, out var definition))
             return Reject(DuelError.UnsupportedSpellEffect);
         if (DefinitionActivationError(definition, ActivationContext.OwnSetCard, State.ActivePlayer, source.Card, source) is not DuelError.None and var error)
             return Reject(error);
@@ -197,10 +199,10 @@ public sealed partial class DuelEngine
     }
 
     private bool? timedCombatModifiers;
-    private bool HasTimedCombatModifiers => timedCombatModifiers ??= definitions.Values.Any(d => d.Steps.Any(s => s is ModifyCombatantStatsStep or ModifyTargetsUntilEndStep));
+    private bool HasTimedCombatModifiers => timedCombatModifiers ??= allEffects.Any(d => d.Steps.Any(s => s is ModifyCombatantStatsStep or ModifyTargetsUntilEndStep));
 
     private bool? summonNegators;
-    private bool SummonNegators => summonNegators ??= definitions.Values.Any(d => d.Conditions.Any(c => c is MonsterWouldBeSummonedCondition));
+    private bool SummonNegators => summonNegators ??= allEffects.Any(d => d.Conditions.Any(c => c is MonsterWouldBeSummonedCondition));
 
     /// <summary>
     /// True when a Summon attempt pauses for responses: its card opted in, or the responder of
@@ -284,7 +286,7 @@ public sealed partial class DuelEngine
     private DuelActionResult ContinueCommit(DuelState placed, DuelEvent[] head, PlayerId playerId, CardInstance card, int zone,
         EffectDefinition definition, long placement, PendingChain? chain)
     {
-        if (definitionDecisions.TryGetValue(definition.CardId, out var sequence))
+        if (definitionDecisions.TryGetValue(definition.EffectId, out var sequence))
         {
             var decision = CreateDecision(sequence, 0, [], DecisionExclusion(definition, card, 0), playerId)!;
             var pending = new PendingSpellActivation(playerId, definition.EffectId, card, zone,
@@ -307,8 +309,8 @@ public sealed partial class DuelEngine
     private DuelActionResult AnswerDefinitionDecision(PendingDecision pending, DecisionAnswer answer, DecisionAnswer[] answers)
     {
         var activation = State.PendingSpellActivation!;
-        var definition = definitions[activation.Spell.GameCardId];
-        var sequence = definitionDecisions[definition.CardId];
+        var definition = effectsById[activation.EffectId];
+        var sequence = definitionDecisions[definition.EffectId];
         var player = State.GetPlayer(activation.Player);
         var chain = State.PendingChain;
         if (pending.SequenceId != sequence.Id || pending.Player != player.Id || !ActivationSourceIntact(activation, player, definition) ||
@@ -358,7 +360,7 @@ public sealed partial class DuelEngine
     {
         var activation = State.PendingSpellActivation!;
         var player = State.GetPlayer(activation.Player);
-        if (pending.Player != player.Id || !ActivationSourceIntact(activation, player, definitions[activation.Spell.GameCardId]))
+        if (pending.Player != player.Id || !ActivationSourceIntact(activation, player, effectsById[activation.EffectId]))
             return Reject(DuelError.InvalidEffectState);
         return CompleteDefinitionDecisions(pending, pending.Answers.ToArray(), State, activation, []);
     }
@@ -373,7 +375,7 @@ public sealed partial class DuelEngine
     private DuelActionResult CompleteDefinitionDecisions(PendingDecision pending, DecisionAnswer[] answers, DuelState next,
         PendingSpellActivation activation, List<DuelEvent> events)
     {
-        var definition = definitions[activation.Spell.GameCardId];
+        var definition = effectsById[activation.EffectId];
         var result = new DecisionSequenceResult(pending, answers);
         var target = answers.SingleOrDefault(a => a.Kind == DecisionKind.SpellTrapTarget)?.Target;
         var receipt = new CommittedActivation(activation.Player, definition.EffectId, activation.Spell,
@@ -390,7 +392,7 @@ public sealed partial class DuelEngine
         long placement, PendingChain? chain, List<DuelEvent> events)
     {
         var link = new ChainLink((chain?.Links.Count ?? 0) + 1, receipt, placement,
-            definition.IsMonsterEffect ? ChainOperation.MonsterEffect : ChainOperation.Definition, definition.SpellSpeed,
+            definition.IsMonsterEffect ? ChainOperation.MonsterEffect : definition.Kind == EffectKind.SpellTrapIgnition ? ChainOperation.FieldEffect : ChainOperation.Definition, definition.SpellSpeed,
             TargetLinkNumber: definition.Steps.Any(s => s is NegateActivationStep or NegateEffectStep) || chain is not null && definition.Steps.Any(s => s is NegateSummonStep)
                 ? chain!.Links[^1].Number : null,
             SummonAttemptId: chain is null && definition.Steps.Any(s => s is NegateSummonStep) ? State.PendingSummon?.AttemptId : null);
@@ -475,11 +477,17 @@ public sealed partial class DuelEngine
     private (DuelState State, PendingDefinitionChoice? Pause) ResolveDefinitionSteps(DuelState state, ChainLink[] links,
         ChainLink link, int start, DuelCommand? choice, List<DuelEvent> events)
     {
-        var definition = link.Trigger?.Profile.Definition ?? definitions[link.Activation.Spell.GameCardId];
+        var definition = LinkDefinition(link);
         var controller = link.Activation.Player;
         for (int i = start; i < definition.Steps.Count; i++)
         {
             var step = definition.Steps[i];
+            if (step is StopUnlessNoOwnMonstersStep)
+            {
+                if (state.GetPlayer(controller).MonsterZones.All(m => m is null)) continue;
+                events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
+                break;
+            }
             if (step is AddFromDeckToHandStep or SendFromDeckToGraveyardStep)
             {
                 if (choice is not ChooseDefinitionCard picked)
@@ -897,7 +905,7 @@ public sealed partial class DuelEngine
     }
 
     private bool? summonResponders;
-    private bool SummonResponders => summonResponders ??= definitions.Values.Any(d => d.Conditions.Any(c => c is MonsterSummonedCondition));
+    private bool SummonResponders => summonResponders ??= allEffects.Any(d => d.Conditions.Any(c => c is MonsterSummonedCondition));
 
     /// <summary>
     /// Records the latest Summon for summon conditions. In an open state it offers a summon-response window to the
@@ -1065,7 +1073,7 @@ public sealed partial class DuelEngine
         if (CheckSpecialSummon(State, pending.Player, option.Card, command.MonsterZone, command.Position, option.Source,
                 lockExemptSource: link.Activation.Spell, sourcePlayer: option.From, allowFaceDown: true) is not DuelError.None and var error)
             return Reject(error);
-        var definition = link.Trigger?.Profile.Definition ?? definitions[link.Activation.Spell.GameCardId];
+        var definition = LinkDefinition(link);
         var remaining = pending.Options.Where(o => o != option).ToArray();
         var zones = pending.MonsterZoneOptions.Where(z => z != command.MonsterZone).ToArray();
         if (definition.Steps[pending.StepIndex] is not SpecialSummonStep { AnyNumber: true } || remaining.Length == 0 || zones.Length == 0)

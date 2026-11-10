@@ -17,7 +17,7 @@ internal sealed record DuelBookkeeping(int NextInstanceId = 1, DuelRandomState? 
     public bool ExtraNormalSummonUsed { get; init; }
 }
 
-internal sealed record ActivatedEffectUse(int InstanceId, int TurnNumber);
+internal sealed record ActivatedEffectUse(int InstanceId, int TurnNumber, string Key);
 
 /// <summary>
 /// A turn player's phase-change request, or a just-completed Summon, paused so the other player can activate a set

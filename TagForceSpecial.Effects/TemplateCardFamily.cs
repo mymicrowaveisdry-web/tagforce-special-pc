@@ -24,6 +24,10 @@ public static class TemplateCardFamily
     private static AuthoredCard Search(uint id, string name, uint maxLevel, uint type) =>
         T.Normal(id, name, [new AddFromDeckToHandStep(new MonsterLevelFilter(maxLevel, type))]);
 
+    /// <summary>"Once per turn: Special Summon 1 monster of this Type from your hand; control no monsters to activate and to resolve."</summary>
+    private static AuthoredCard OnlyWithNoMonsters(uint id, string name, uint type) => T.ContinuousWithEffects(id, name, trap: false,
+        new EffectOption([new StopUnlessNoOwnMonstersStep(), new SpecialSummonStep(SpecialSummonSources.Hand, OfType(type))], Conditions: [new ControlsNoMonstersCondition()]));
+
     private static EffectStep[] SearchFor(IReadOnlyList<uint> ids) => [new AddFromDeckToHandStep(new CardIdFilter(ids))];
 
     private static AuthoredCard Recover(uint id, string name, CardFilter filter, int count = 1, CardZone zone = CardZone.Graveyard, EffectCost? cost = null) =>
@@ -87,6 +91,9 @@ public static class TemplateCardFamily
         T.Normal(5688, "Magical Stone Excavation", [new AddTargetsToHandStep()], new DiscardCost(Count: 2),
             [new ZoneTarget(CardZone.Graveyard, TargetSide.Own, new CardCategoryFilter(CardCategory.Spell))]),
         T.Trap(6709, "Icarus Attack", [new DestroyTargetsStep()], new TributeCost(OfType(WingedBeast)), [new FieldTarget(FieldCardKind.Any, count: 2)]),
+        T.Modal(5607, "Poison of the Old Man", EffectKind.QuickPlaySpell, "The option is chosen at activation.", new EffectOption([new GainLifePointsStep(1200)]), new EffectOption([new DealDamageStep(800)])),
+        OnlyWithNoMonsters(5435, "Call of the Mummy", Zombie),
+        OnlyWithNoMonsters(7573, "Valhalla, Hall of the Fallen", Fairy),
         T.Normal(9666, "Surface", [new SpecialSummonTargetStep(BattlePosition.FaceUpDefense)], targets:
             [new ZoneTarget(CardZone.Graveyard, TargetSide.Own, new AllOfFilter(new MonsterLevelFilter(3), new MonsterTypeFilter([Fish, SeaSerpent, Aqua])), mustBeSummonable: true)])
     ];

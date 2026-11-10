@@ -10,22 +10,22 @@ public sealed partial class DuelEngine
     private const int ToonAttackCost = 500;
 
     private bool? lastingModifiers;
-    private bool HasLastingModifiers => lastingModifiers ??= definitions.Values.Any(d => d.LastingModifiers.Count != 0 || d.AttackPerCounter != 0);
+    private bool HasLastingModifiers => lastingModifiers ??= allEffects.Any(d => d.LastingModifiers.Count != 0 || d.AttackPerCounter != 0);
 
     private bool? monsterNegators;
-    private bool HasMonsterNegators => monsterNegators ??= definitions.Values.Any(d => d.Negation == LastingNegation.FaceUpMonsters);
+    private bool HasMonsterNegators => monsterNegators ??= allEffects.Any(d => d.Negation == LastingNegation.FaceUpMonsters);
 
     private bool? spellNegators;
-    private bool HasSpellNegators => spellNegators ??= definitions.Values.Any(d => d.Negation == LastingNegation.Spells);
+    private bool HasSpellNegators => spellNegators ??= allEffects.Any(d => d.Negation == LastingNegation.Spells);
 
     private bool? fieldLinks;
-    private bool HasFieldLinks => fieldLinks ??= rules.Values.Any(r => r.IsToon) || definitions.Values.Any(d => d.Kind == EffectKind.EquipSpell ||
+    private bool HasFieldLinks => fieldLinks ??= rules.Values.Any(r => r.IsToon) || allEffects.Any(d => d.Kind == EffectKind.EquipSpell ||
         d.Steps.Any(s => s is UnionEquipStep || s is SpecialSummonTargetStep { Link: not RevivalLink.None }));
 
     internal bool IsToonCard(uint cardId) => rules.TryGetValue(cardId, out var rule) && rule.IsToon;
 
     /// <summary>The materials a monster's activated effect detaches as its cost; 0 when it has no such cost.</summary>
-    internal int DetachCostFor(uint cardId) => definitions.TryGetValue(cardId, out var d) && d.Cost is DetachCost detach ? detach.Count : 0;
+    internal int DetachCostFor(uint cardId, int effectIndex = 0) => EffectAt(cardId, effectIndex, out var d) && d.Cost is DetachCost detach ? detach.Count : 0;
 
     private static IEnumerable<(PlayerId Player, int Zone, FieldSpellTrap Field)> ActiveCards(DuelState state) =>
         state.Players.SelectMany(p => Enumerable.Range(0, DuelPlayerState.FieldZoneIndex + 1).Select(zone => (Player: p.Id, Zone: zone, Field: p.SpellTrapAt(zone))))
@@ -101,7 +101,7 @@ public sealed partial class DuelEngine
     private DuelState BindNegatedEquip(DuelState state, ChainLink link)
     {
         if (!IsLastingLink(link) || !LastingSourceInPlace(state, link)) return state;
-        var definition = definitions[link.Activation.Spell.GameCardId];
+        var definition = LinkDefinition(link);
         if (!definition.Steps.Any(s => s is EquipTargetStep)) return state;
         return QualifyingTargets(state, link, definition).FirstOrDefault() is { } target ? AttachEquip(state, link, target) : state;
     }
@@ -170,7 +170,7 @@ public sealed partial class DuelEngine
     }
 
     private bool? spellCounterGain;
-    private bool HasSpellCounterGain => spellCounterGain ??= definitions.Values.Any(d => d.SpellCounterMax != 0);
+    private bool HasSpellCounterGain => spellCounterGain ??= allEffects.Any(d => d.SpellCounterMax != 0);
 
     /// <summary>Each face-up card that collects Spell counters gains one when another card's Spell resolves.</summary>
     private DuelState AddSpellCounters(DuelState state, CardInstance resolved, List<DuelEvent> events)
@@ -290,26 +290,26 @@ public sealed partial class DuelEngine
     }
 
     private bool? quickMonsters;
-    private bool HasQuickMonsters => quickMonsters ??= definitions.Values.Any(d => d.Kind == EffectKind.MonsterQuick);
+    private bool HasQuickMonsters => quickMonsters ??= allEffects.Any(d => d.Kind == EffectKind.MonsterQuick);
 
     /// <summary>True when the player has a face-up monster whose quick effect could be activated in an open window now.</summary>
     private bool QuickMonsterReady(PlayerId playerId) => HasQuickMonsters && State.GetPlayer(playerId).MonsterZones.Any(m =>
-        m is { Position: not BattlePosition.FaceDownDefense, BattleDestroyed: false } && definitions.TryGetValue(m.Card.GameCardId, out var definition) &&
-        definition.Kind == EffectKind.MonsterQuick && !(definition.OncePerTurn && UsedThisTurn(m.Card)) &&
-        DefinitionActivationError(definition, ActivationContext.MonsterWindow, playerId, m.Card, null) == DuelError.None);
+        m is { Position: not BattlePosition.FaceDownDefense, BattleDestroyed: false } && effectsByCard.TryGetValue(m.Card.GameCardId, out var effects) &&
+        effects.Any(definition => definition.Kind == EffectKind.MonsterQuick && !(definition.OncePerTurn && UsedThisTurn(m.Card, definition)) &&
+            DefinitionActivationError(definition, ActivationContext.MonsterWindow, playerId, m.Card, null) == DuelError.None));
 
     /// <summary>Starts a monster effect in an open state, as a chain response, or in an open or battle window.</summary>
     private DuelActionResult BeginMonsterEffect(PlayerId playerId, int zone, PendingChain? chain, DuelState? from = null, bool window = false,
-        IReadOnlyList<int>? detach = null)
+        IReadOnlyList<int>? detach = null, int effectIndex = 0)
     {
         if (zone is < 0 or >= 5) return Reject(DuelError.InvalidMonsterZone);
         if (chain is null && !window && State.Phase is not (DuelPhase.Main1 or DuelPhase.Main2)) return Reject(DuelError.WrongPhase);
         var monster = State.GetPlayer(playerId).MonsterZones[zone];
         if (monster is null) return Reject(DuelError.MonsterZoneEmpty);
         if (monster.Position == BattlePosition.FaceDownDefense || monster.BattleDestroyed ||
-            !definitions.TryGetValue(monster.Card.GameCardId, out var definition) || !definition.IsMonsterEffect)
+            !EffectAt(monster.Card.GameCardId, effectIndex, out var definition) || !definition.IsMonsterEffect)
             return Reject(DuelError.UnsupportedMonsterEffect);
-        if (definition.OncePerTurn && UsedThisTurn(monster.Card)) return Reject(DuelError.EffectAlreadyUsed);
+        if (definition.OncePerTurn && UsedThisTurn(monster.Card, definition)) return Reject(DuelError.EffectAlreadyUsed);
         var context = window ? ActivationContext.MonsterWindow : chain is null ? ActivationContext.MonsterField : ActivationContext.MonsterChainResponse;
         if (DefinitionActivationError(definition, context, playerId, monster.Card, null, chain?.Links[^1]) is not DuelError.None and var error)
             return Reject(error);
@@ -323,7 +323,7 @@ public sealed partial class DuelEngine
         }
         else if (detach is { Count: > 0 }) return Reject(DuelError.InvalidDecisionChoice);
         var next = from ?? State;
-        if (definition.OncePerTurn) next = RecordUse(next, monster.Card);
+        if (definition.OncePerTurn) next = RecordUse(next, monster.Card, definition);
         DuelEvent[] head = [new MonsterEffectActivated(playerId, definition.EffectId, monster.Card, zone)];
         MonsterBinding binding = new(playerId, zone, monster.Card, monster.PlacementId);
         List<DuelEvent> paid = [.. head];
@@ -359,11 +359,12 @@ public sealed partial class DuelEngine
         return ContinueCommit(next, head, playerId, monster.Card, zone, definition, monster.PlacementId, chain);
     }
 
-    private bool UsedThisTurn(CardInstance card) => State.Bookkeeping.ActivatedUses.Any(u => u.InstanceId == card.InstanceId && u.TurnNumber == State.TurnNumber);
+    private bool UsedThisTurn(CardInstance card, EffectDefinition effect) =>
+        State.Bookkeeping.ActivatedUses.Any(u => u.InstanceId == card.InstanceId && u.TurnNumber == State.TurnNumber && u.Key == effect.OncePerTurnKey);
 
-    private DuelState RecordUse(DuelState state, CardInstance card) => state.WithBookkeeping(state.Bookkeeping with
+    private DuelState RecordUse(DuelState state, CardInstance card, EffectDefinition effect) => state.WithBookkeeping(state.Bookkeeping with
     {
-        ActivatedUses = Array.AsReadOnly(state.Bookkeeping.ActivatedUses.Where(u => u.TurnNumber == State.TurnNumber).Append(new(card.InstanceId, State.TurnNumber)).ToArray())
+        ActivatedUses = Array.AsReadOnly(state.Bookkeeping.ActivatedUses.Where(u => u.TurnNumber == State.TurnNumber).Append(new(card.InstanceId, State.TurnNumber, effect.OncePerTurnKey)).ToArray())
     });
 
     private DuelActionResult ExecuteUnequip(PlayerId playerId, int zone)
@@ -373,13 +374,13 @@ public sealed partial class DuelEngine
         var player = State.GetPlayer(playerId);
         if (player.SpellTrapFields[zone] is not { IsUnion: true } field || !definitions.TryGetValue(field.Card.GameCardId, out var definition))
             return Reject(DuelError.UnsupportedMonsterEffect);
-        if (UsedThisTurn(field.Card)) return Reject(DuelError.EffectAlreadyUsed);
+        if (UsedThisTurn(field.Card, definition)) return Reject(DuelError.EffectAlreadyUsed);
         if (player.MonsterZones.All(m => m is not null)) return Reject(DuelError.DecisionUnavailable);
         if (IsSummonLocked(State, playerId)) return Reject(DuelError.SummonLocked);
         var receipt = new CommittedActivation(playerId, definition.EffectId, field.Card, zone, null, null);
         var link = new ChainLink(1, receipt, field.PlacementId, ChainOperation.UnionUnequip, ChainSpellSpeed.One);
         var chain = new PendingChain(checked(State.Revision + 1), [link], Other(playerId));
-        return Accept(RecordUse(State, field.Card).WithCommittedActivation(receipt).WithChain(chain),
+        return Accept(RecordUse(State, field.Card, definition).WithCommittedActivation(receipt).WithChain(chain),
             new MonsterEffectActivated(playerId, definition.EffectId, field.Card, zone), new ActivationCommitted(receipt),
             new ChainLinkAdded(link), new ChainResponseRequested(chain.Responder, chain.DecisionId));
     }

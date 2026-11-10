@@ -26,8 +26,12 @@ public sealed partial class DuelEngine
     private readonly FrozenDictionary<uint, PendulumCardProfile> pendulumCards;
     /// <summary>Definition-driven card effects, keyed by source card ID.</summary>
     private readonly FrozenDictionary<uint, EffectDefinition> definitions;
+    /// <summary>Every effect of each card in registration order; <see cref="definitions"/> holds the first.</summary>
+    private readonly FrozenDictionary<uint, EffectDefinition[]> effectsByCard;
+    private readonly FrozenDictionary<string, EffectDefinition> effectsById;
+    private readonly EffectDefinition[] allEffects;
     /// <summary>Activation-time cost/target decisions of definitions that have any, keyed by source card ID.</summary>
-    private readonly FrozenDictionary<uint, DecisionSequence> definitionDecisions;
+    private readonly FrozenDictionary<string, DecisionSequence> definitionDecisions;
     public DuelState State { get; private set; }
 
     /// <summary>
@@ -152,21 +156,24 @@ public sealed partial class DuelEngine
         if (definitionList.Any(d => d is null || d.Cost is DiscardCost { Filter: CardIdFilter discardFilter } && discardFilter.CardIds.Any(id => !knownIds.Contains(id)) ||
                 d.Steps.OfType<SummonTokensStep>().Any(s => s.TokenCardIds.Any(id => !IsTokenId(id))) ||
                 d.Kind == EffectKind.MonsterTrigger || shuffleSeed is null && NeedsShuffle(d) ||
-                !this.rules.TryGetValue(d.CardId, out var rule) || (d.IsMonsterEffect ? rule.Category != CardCategory.Monster : !rule.AllowsSpellTrapSet ||
+                !this.rules.TryGetValue(d.CardId, out var rule) || (d.IsMonsterEffect ? rule.Category != CardCategory.Monster : d.Kind == EffectKind.SpellTrapIgnition ? rule.Category is not (CardCategory.Spell or CardCategory.Trap) : !rule.AllowsSpellTrapSet ||
                 rule.Category != (d.Kind is EffectKind.NormalSpell or EffectKind.QuickPlaySpell or EffectKind.ContinuousSpell or EffectKind.FieldSpell or EffectKind.EquipSpell ? CardCategory.Spell : CardCategory.Trap)) ||
 
                 summonEffects.ContainsKey(d.CardId) || usedEffectIds.Contains(d.EffectId) ||
                 this.decisionSequences.ContainsKey(DefinitionSequenceId(d))) ||
-            definitionList.Select(d => d.CardId).Distinct().Count() != definitionList.Length ||
+            !EffectGroupsValid(definitionList) ||
             definitionList.Select(d => d.EffectId).Distinct(StringComparer.Ordinal).Count() != definitionList.Length)
             throw new ArgumentException("Effect definitions require distinct, unreserved IDs, matching settable card rules, Token rules for Token steps and a seed for shuffle steps.", nameof(effectDefinitions));
         if (shuffleSeed is null && triggerEffects.Any(p => p.Definition is { } d && NeedsShuffle(d)))
             throw new ArgumentException("Triggers that search or Summon from the Deck need a seed.", nameof(shuffleSeed));
         // Attack-declaration and Damage Step responses only have a window in the staged flow.
         this.experimentalBattleFlow = this.experimentalBattleFlow || definitionList.Any(d => d.Kind == EffectKind.MonsterQuick || d.Conditions.Any(c => c is OpponentAttackDeclaredCondition or BattleTimingCondition));
-        definitions = definitionList.ToFrozenDictionary(d => d.CardId);
+        definitions = definitionList.GroupBy(d => d.CardId).ToFrozenDictionary(g => g.Key, g => g.First());
+        effectsByCard = definitionList.GroupBy(d => d.CardId).ToFrozenDictionary(g => g.Key, g => g.ToArray());
+        effectsById = definitionList.ToFrozenDictionary(d => d.EffectId, StringComparer.Ordinal);
+        allEffects = definitionList;
         definitionDecisions = definitionList.Where(d => d.Cost is DiscardCost or TributeCost or BanishFromGraveyardCost || d.Target is not null || d.FieldTargets.Any(t => !EffectDefinition.IsAutomatic(t)))
-            .ToFrozenDictionary(d => d.CardId, d => new DecisionSequence(DefinitionSequenceId(d),
+            .ToFrozenDictionary(d => d.EffectId, d => new DecisionSequence(DefinitionSequenceId(d),
                 [.. d.Cost is DiscardCost discard ? Enumerable.Repeat(discard.Filter switch
                      {
                          CardIdFilter only => DecisionStep.Card(DecisionCardSource.Hand, only.CardIds),
@@ -263,8 +270,9 @@ public sealed partial class DuelEngine
         return command switch
         {
             BeginDecisionSequence begin => BeginDecisions(begin.SequenceId),
-            ActivateSpell activate => Activate(activate.CardInstanceId, activate.SpellTrapZone),
-            ActivateSetSpell activate => ActivateSetDefinition(activate.SpellTrapZone),
+            ActivateSpell activate => Activate(activate.CardInstanceId, activate.SpellTrapZone, activate.EffectIndex),
+            ActivateSetSpell activate => ActivateSetDefinition(activate.SpellTrapZone, activate.EffectIndex),
+            ActivateCardEffect effect => BeginFieldEffect(effect.Player, effect.SpellTrapZone, effect.EffectIndex),
             ActivatePendulumScale scale => ActivateScale(scale),
             PendulumSummon pendulum => ExecutePendulumSummon(pendulum),
             ResolveDrawStep => Draw(),
@@ -277,7 +285,7 @@ public sealed partial class DuelEngine
             SetSpellTrap set => SetBackRow(set.CardInstanceId, set.SpellTrapZone),
             ChangeMonsterPosition change => ChangePosition(change.MonsterZone, change.Target),
             GeminiSummon gemini => ExecuteGeminiSummon(gemini.MonsterZone),
-            ActivateMonsterEffect effect => BeginMonsterEffect(effect.Player, effect.MonsterZone, null, detach: effect.DetachInstanceIds),
+            ActivateMonsterEffect effect => BeginMonsterEffect(effect.Player, effect.MonsterZone, null, detach: effect.DetachInstanceIds, effectIndex: effect.EffectIndex),
             UnequipUnion unequip => ExecuteUnequip(unequip.Player, unequip.SpellTrapZone),
             ResolveUpkeep upkeep => ExecuteUpkeep(upkeep),
             ToonSummon toon => ExecuteToonSummon(toon),

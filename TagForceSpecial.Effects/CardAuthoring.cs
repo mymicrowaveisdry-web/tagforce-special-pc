@@ -26,6 +26,9 @@ public sealed record AuthoredCard(uint Id, string Name, CardKind Kind, uint Gett
     public IReadOnlyList<TriggerEffectProfile> Triggers { get; init; } = [];
 }
 
+/// <summary>One option of a card whose effects are chosen at activation.</summary>
+public sealed record EffectOption(EffectStep[] Steps, EffectCost? Cost = null, EffectTarget[]? Targets = null, EffectCondition[]? Conditions = null);
+
 /// <summary>Activation timings and automatic targets shared by Trap Cards.</summary>
 public static class TrapTiming
 {
@@ -74,6 +77,28 @@ public sealed class CardTable(string prefix)
     public AuthoredCard Continuous(uint id, string name, bool trap, params LastingStatModifier[] modifiers) =>
         new(id, name, trap ? CardKind.Trap : CardKind.Spell, trap ? TrapKind : SpellKind, IconContinuous, trap ? TrapRules : SpellRules,
             [new EffectDefinition(Effect(id, "continuous"), id, trap ? EffectKind.ContinuousTrap : EffectKind.ContinuousSpell, [], lastingModifiers: modifiers)]);
+
+    /// <summary>A Spell or Trap whose player chooses one of several effects when activating it.</summary>
+    public AuthoredCard Modal(uint id, string name, EffectKind kind, string exceptions, params EffectOption[] options)
+    {
+        bool trap = kind == EffectKind.NormalTrap;
+        uint icon = kind == EffectKind.QuickPlaySpell ? IconQuickPlay : IconNormal;
+        var effects = options.Select((o, i) => new EffectDefinition(Effect(id, $"option-{i + 1}"), id, kind, o.Steps, o.Conditions, o.Cost, fieldTargets: o.Targets)).ToArray();
+        return new(id, name, trap ? CardKind.Trap : CardKind.Spell, trap ? TrapKind : SpellKind, icon, trap ? TrapRules : SpellRules, effects, exceptions);
+    }
+
+    /// <summary>A Continuous card with no effect of its own beyond its activated effects, used while it stays face-up.</summary>
+    public AuthoredCard ContinuousWithEffects(uint id, string name, bool trap, params EffectOption[] effects)
+    {
+        var lasting = new EffectDefinition(Effect(id, "continuous"), id, trap ? EffectKind.ContinuousTrap : EffectKind.ContinuousSpell, [], isMarker: true);
+        var activated = effects.Select((o, i) => new EffectDefinition(Effect(id, $"effect-{i + 1}"), id, EffectKind.SpellTrapIgnition, o.Steps, o.Conditions, o.Cost, fieldTargets: o.Targets, oncePerTurn: true));
+        return new(id, name, trap ? CardKind.Trap : CardKind.Spell, trap ? TrapKind : SpellKind, IconContinuous, trap ? TrapRules : SpellRules, [lasting, .. activated]);
+    }
+
+    /// <summary>A monster with several activated effects. With <paramref name="sharedLimit"/>, they share one use per turn.</summary>
+    public AuthoredCard ActivatedEffects(uint id, string name, bool quick, bool sharedLimit, DuelCardRules? rules, params EffectOption[] effects) =>
+        new(id, name, CardKind.Monster, EffectMonsterKind, IconNormal, rules ?? MonsterRules, effects.Select((o, i) => new EffectDefinition(Effect(id, $"effect-{i + 1}"), id,
+            quick ? EffectKind.MonsterQuick : EffectKind.MonsterIgnition, o.Steps, o.Conditions, o.Cost, fieldTargets: o.Targets, oncePerTurn: true, oncePerTurnKey: sharedLimit ? Effect(id, "shared") : null)).ToArray());
 
     /// <summary>A trigger on one event; the default is a mandatory "when" effect on this face-up monster.</summary>
     public AuthoredCard Trigger(uint id, string name, MonsterEventKind when, EffectStep[] steps, TriggerRequirement requirement = TriggerRequirement.Mandatory,
@@ -161,7 +186,7 @@ public sealed class CardTable(string prefix)
         bool targets = effect.FieldTargets.Count != 0;
         string detail = effect.Kind == EffectKind.FieldSpell || effect.LastingModifiers.Count != 0 ? $" Lasting: {Describe(effect.LastingModifiers)}." : "";
         return new(card.Id, card.Name, card.Kind, effect,
-            $"{effect.Kind}: {Describe(effect.Steps)}.{detail}",
+            string.Join(" Or: ", card.Definitions.Select(d => $"{d.Kind}: {Describe(d.Steps)}.")) + detail,
             card.Triggers.Count != 0 ? string.Join("; ", card.Triggers.Select(t => $"{t.Requirement} {t.Timing} on {t.EventKind} from {t.SourceLocation}, cause {t.Cause}")) + "."
                 : effect.Conditions.Count == 0 ? $"Default timing for {effect.Kind}." : $"Default timing for {effect.Kind}, with {Describe(effect.Conditions)}.",
             effect.Cost is null ? "none" : $"{Describe(effect.Cost)} (never refunded).",

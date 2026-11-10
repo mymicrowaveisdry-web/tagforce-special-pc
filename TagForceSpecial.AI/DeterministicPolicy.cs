@@ -49,7 +49,7 @@ public sealed class DeterministicPolicy(uint seed)
             ActionKind.ReplayAttack => 150,
             ActionKind.CancelReplay => 0,
             ActionKind.AdvanceBattle => 30,
-            ActionKind.ActivateSpell or ActionKind.ActivateSetSpell or ActionKind.MonsterEffect => 300,
+            ActionKind.ActivateSpell or ActionKind.ActivateSetSpell or ActionKind.MonsterEffect or ActionKind.CardEffect => 300,
             ActionKind.Unequip => 25,
             ActionKind.Upkeep => a.TargetZone == 1 ? 950 : 940,
             ActionKind.Summon => 200 + attack / 100,
