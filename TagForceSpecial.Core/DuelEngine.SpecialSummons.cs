@@ -46,6 +46,7 @@ public sealed partial class DuelEngine
             return DuelError.UnsupportedSpecialSummon;
         if (rule.CannotBeSpecialSummoned) return DuelError.UnsupportedSpecialSummon;
         if (IsSummonLocked(state, playerId, lockExemptSource)) return DuelError.SummonLocked;
+        if (RuleLocked(state, LockedAction.SpecialSummon, playerId, card, from: source)) return DuelError.LockedByEffect;
         var player = state.GetPlayer(playerId);
         if (player.MonsterZones[zone] is not null) return DuelError.MonsterZoneOccupied;
         // A card may come from the other player's zone (e.g. their Graveyard); it keeps its owner.

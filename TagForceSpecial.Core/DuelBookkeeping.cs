@@ -15,6 +15,9 @@ internal sealed record DuelBookkeeping(int NextInstanceId = 1, DuelRandomState? 
     /// <summary>The turn an effect allowed one more Normal Summon or Set.</summary>
     public int ExtraNormalSummonTurn { get; init; }
     public bool ExtraNormalSummonUsed { get; init; }
+    /// <summary>"Cannot" rules applied until the end of a turn.</summary>
+    public IReadOnlyList<TimedRuleLock> TimedLocks { get; init; } = Array.AsReadOnly(Array.Empty<TimedRuleLock>());
+    public IReadOnlyList<RuleLockUse> LockUses { get; init; } = Array.AsReadOnly(Array.Empty<RuleLockUse>());
 }
 
 internal sealed record ActivatedEffectUse(int InstanceId, int TurnNumber, string Key);

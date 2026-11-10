@@ -13,13 +13,14 @@ public sealed partial class DuelEngine
     private static bool IsTriggerUsed(DuelState state, TriggerActivation trigger) =>
         UseKey(state, trigger) is { } key && state.EventEffects.UsedTriggers.Contains(key);
 
-    private static IEnumerable<MonsterBinding> TriggerTargets(DuelState state, TriggerActivation trigger)
+    private IEnumerable<MonsterBinding> TriggerTargets(DuelState state, TriggerActivation trigger)
     {
         var policy = trigger.Profile.Target!;
         return FieldMonsters(state).Where(e => (policy.AllowFaceDown || e.Monster.Position != BattlePosition.FaceDownDefense) && !e.Monster.BattleDestroyed &&
             Relates(policy.Relation, trigger.Source, e.Binding) &&
             (!policy.ExcludeSource || e.Binding != trigger.Source) &&
-            (policy.AllowedCardIds.Count == 0 || policy.AllowedCardIds.Contains(e.Monster.Card.GameCardId)))
+            (policy.AllowedCardIds.Count == 0 || policy.AllowedCardIds.Contains(e.Monster.Card.GameCardId)) &&
+            !RuleLocked(state, LockedAction.BeTargeted, e.Binding.Player, e.Monster.Card, e.Monster, targeter: trigger.Player, byCategory: rules[trigger.Source.Card.GameCardId].Category))
             .Select(e => e.Binding);
     }
 
@@ -64,7 +65,7 @@ public sealed partial class DuelEngine
             if (trigger.Profile.TributeCost && trigger.TributedCost is null)
                 return RequestTriggerCommitment(next, remaining, committed, queue,
                     new(checked(State.Revision + 1), trigger, TriggerCommitmentKind.TributeCost,
-                        targets: FieldMonsters(next).Where(e => e.Binding.Player == trigger.Player && !e.Monster.BattleDestroyed).Select(e => e.Binding)), events);
+                        targets: FieldMonsters(next).Where(e => e.Binding.Player == trigger.Player && !e.Monster.BattleDestroyed && !RuleLocked(next, LockedAction.BeTributed, e.Binding.Player, e.Monster.Card, e.Monster)).Select(e => e.Binding)), events);
             if (trigger.Profile.Target is not null && trigger.Target is null)
                 return RequestTriggerCommitment(next, remaining, committed, queue,
                     new(checked(State.Revision + 1), trigger, TriggerCommitmentKind.MonsterTarget,

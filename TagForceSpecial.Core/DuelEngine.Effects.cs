@@ -71,6 +71,8 @@ public sealed partial class DuelEngine
     private DuelError DefinitionRequirementsError(EffectDefinition definition, PlayerId playerId, CardInstance card, ChainLink? preceding)
     {
         var player = State.GetPlayer(playerId);
+        if (ActivationLocked(State, playerId, card, definition)) return DuelError.LockedByEffect;
+        if (definition.Cost is TributeSelfCost && RuleLocked(State, LockedAction.BeTributed, playerId, card, MonsterOf(State, card))) return DuelError.LockedByEffect;
         foreach (var condition in definition.Conditions)
         {
             bool met = condition switch
@@ -650,6 +652,7 @@ public sealed partial class DuelEngine
                     SummonTokensStep tokens => SummonTokens(state, link, tokens, events),
                     ShuffleDeckStep => ShuffleDeck(state, controller, definition.EffectId, events),
                     GrantNormalSummonStep => GrantNormalSummon(state, definition.EffectId, events),
+                    ApplyRuleLockStep apply => ApplyTimedLock(state, controller, apply.Lock, definition.EffectId, events),
                     ReturnSourceToDeckTopStep => ReturnSourceToDeckTop(state, link, definition.EffectId, events),
                     DestroyTargetStep => DestroyTarget(state, link, events),
                     DestroyOpponentFaceUpMonstersStep => DestroyOpponentFaceUpMonsters(state, Other(controller), events),
@@ -766,6 +769,7 @@ public sealed partial class DuelEngine
         MonsterLevelFilter limit => rule.Category == CardCategory.Monster && !IsXyzCard(card) && catalog[card.GameCardId].Statistics.Level is > 0 and var level &&
             level <= limit.MaxLevel && level >= limit.MinLevel && (limit.TypeCode is not { } typeCode || catalog[card.GameCardId].Codes?.Type == typeCode),
         AnyOfFilter any => any.Filters.Any(f => MatchesFilter(card, f, inGraveyard)),
+        NotFilter not => !MatchesFilter(card, not.Filter, inGraveyard),
         AllOfFilter all => all.Filters.All(f => MatchesFilter(card, f, inGraveyard)),
         MonsterTraitFilter trait => rule.Category == CardCategory.Monster && !trait.ExcludedCardIds.Contains(card.GameCardId) &&
             (trait.AttributeCode is not { } code || catalog[card.GameCardId].Codes?.Attribute == code) &&

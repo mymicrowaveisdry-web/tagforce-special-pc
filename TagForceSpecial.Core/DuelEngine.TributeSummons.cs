@@ -27,13 +27,14 @@ public sealed partial class DuelEngine
             return Reject(DuelError.UnsupportedMonsterLevel);
         if (!NormalSummonAvailable(State)) return Reject(DuelError.NormalSummonLimitReached);
         if (!command.FaceDown && IsSummonLocked(State, player.Id)) return Reject(DuelError.SummonLocked);
+        if (RuleLocked(State, command.FaceDown ? LockedAction.SetMonster : LockedAction.NormalSummon, player.Id, card)) return Reject(DuelError.LockedByEffect);
         int count = procedure?.TributeCount ?? (level <= 4 ? 0 : level <= 6 ? 1 : 2);
         var selected = command.Tributes;
         if (selected.Count != count || selected.Any(t => t is null || t.Player != command.Player ||
                 !t.IsStillPresent(State)) || selected.Select(t => t.Zone).Distinct().Count() != count)
             return Reject(DuelError.InvalidTributeSelection);
         foreach (var tribute in selected)
-            if (player.MonsterZones[tribute.Zone]!.BattleDestroyed ||
+            if (player.MonsterZones[tribute.Zone]!.BattleDestroyed || RuleLocked(State, LockedAction.BeTributed, player.Id, tribute.Card, player.MonsterZones[tribute.Zone]) ||
                 !rules.TryGetValue(tribute.Card.GameCardId, out var donorRule) || !donorRule.AllowsTributeForSummon ||
                 procedure is not null && (procedure.AllowedTributeCardIds.Count != 0 && !procedure.AllowedTributeCardIds.Contains(tribute.Card.GameCardId) ||
                     procedure.RequireFaceUpTributes && player.MonsterZones[tribute.Zone]!.Position == BattlePosition.FaceDownDefense))

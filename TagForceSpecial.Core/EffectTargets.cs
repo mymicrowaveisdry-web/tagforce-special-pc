@@ -41,6 +41,8 @@ public sealed record FieldTarget : EffectTarget
     public CardFilter? CardFilter { get; }
     /// <summary>Monsters already equipped with a Union monster do not qualify.</summary>
     public bool NoUnionEquipped { get; }
+    /// <summary>This choice pays a Tribute cost, so it is not targeting.</summary>
+    public bool ForTribute { get; init; }
 
     public FieldTarget(FieldCardKind kind, TargetSide side = TargetSide.Either, FieldCardFilter filter = FieldCardFilter.Any, int count = 1,
         CardFilter? cardFilter = null, bool noUnionEquipped = false)
@@ -155,6 +157,8 @@ public sealed record ZoneTarget : EffectTarget
 
 /// <summary>Matches any card with explicit card rules.</summary>
 public sealed record AnyCardFilter : CardFilter;
+/// <summary>Matches a card the inner filter rejects.</summary>
+public sealed record NotFilter(CardFilter Filter) : CardFilter;
 
 /// <summary>Adds every qualifying Graveyard or banished target to its owner's hand.</summary>
 public sealed record AddTargetsToHandStep : EffectStep;

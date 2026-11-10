@@ -21,6 +21,7 @@ public sealed partial class DuelEngine
 
     private bool CanActivateTrigger(DuelState state, TriggerActivation trigger)
     {
+        if (rules[trigger.Source.Card.GameCardId].Category == CardCategory.Monster && RuleLocked(state, LockedAction.ActivateMonsterEffect, trigger.Player, trigger.Source.Card, kind: EffectKind.MonsterTrigger)) return false;
         bool location = trigger.Profile.SourceLocation == TriggerSourceLocation.FaceUpSpellTrap ? SpellTrapSourcePresent(state, trigger.Source) :
             trigger.Profile.SourceLocation != TriggerSourceLocation.FaceUpMonster
             ? state.GetPlayer(trigger.Player).Graveyard.Contains(trigger.Source.Card) ||
@@ -39,7 +40,7 @@ public sealed partial class DuelEngine
         if (trigger.Profile is { Requirement: TriggerRequirement.Optional, Definition: { } definition } && !DefinitionTriggerAvailable(state, trigger, definition)) return false;
         if (trigger is { TargetCard: null, Profile.Definition.FieldTargets: [ZoneTarget zone] } && !ZoneMatches(state, trigger.Player, zone).Any()) return false;
         if (trigger.Profile.TributeCost && trigger.TributedCost is null &&
-            !FieldMonsters(state).Any(e => e.Binding.Player == trigger.Player && !e.Monster.BattleDestroyed)) return false;
+            !FieldMonsters(state).Any(e => e.Binding.Player == trigger.Player && !e.Monster.BattleDestroyed && !RuleLocked(state, LockedAction.BeTributed, e.Binding.Player, e.Monster.Card, e.Monster))) return false;
         if (trigger.DiscardedCost is not null || trigger.PaidLifePoints > 0 || trigger.DetachedCost.Count > 0) return true;
         var player = state.GetPlayer(trigger.Player);
         return player.LifePoints > trigger.Profile.LifePointCost &&

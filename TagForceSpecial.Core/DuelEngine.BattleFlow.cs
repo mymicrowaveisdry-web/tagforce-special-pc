@@ -139,7 +139,8 @@ public sealed partial class DuelEngine
         var opponent = State.GetPlayer(Other(State.ActivePlayer));
         var defender = command.TargetZone is int zone ? opponent.MonsterZones[zone] : null;
         if (command.TargetZone is not null && defender is null) return Reject(DuelError.MonsterZoneEmpty);
-        if (command.TargetZone is null && opponent.MonsterZones.Any(m => m is not null)) return Reject(DuelError.DirectAttackBlocked);
+        if (command.TargetZone is null && opponent.MonsterZones.Any(m => m is not null && !RuleLocked(State, LockedAction.BeAttacked, opponent.Id, m.Card, m))) return Reject(DuelError.DirectAttackBlocked);
+        if (defender is not null && RuleLocked(State, LockedAction.BeAttacked, opponent.Id, defender.Card, defender)) return Reject(DuelError.LockedByEffect);
         if (defender is not null && !rules[defender.Card.GameCardId].AllowsBasicBattle) return Reject(DuelError.UnsupportedBattleCard);
         if (defender is not null && (defender.Position == BattlePosition.FaceUpAttack ? catalog[defender.Card.GameCardId].Statistics.Attack :
                 catalog[defender.Card.GameCardId].Statistics.Defense) is null) return Reject(DuelError.UnsupportedBattleStatistics);

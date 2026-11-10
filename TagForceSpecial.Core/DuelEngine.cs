@@ -30,6 +30,7 @@ public sealed partial class DuelEngine
     private readonly FrozenDictionary<uint, EffectDefinition[]> effectsByCard;
     private readonly FrozenDictionary<string, EffectDefinition> effectsById;
     private readonly EffectDefinition[] allEffects;
+    private readonly FrozenDictionary<uint, RuleLockProfile[]> ruleLockProfiles;
     /// <summary>Activation-time cost/target decisions of definitions that have any, keyed by source card ID.</summary>
     private readonly FrozenDictionary<string, DecisionSequence> definitionDecisions;
     public DuelState State { get; private set; }
@@ -54,7 +55,7 @@ public sealed partial class DuelEngine
         IEnumerable<ExtraDeckMaterialProcedureProfile>? experimentalMaterialProcedures = null,
         IEnumerable<SummonEffectProfile>? experimentalSummonEffects = null,
         IEnumerable<PendulumCardProfile>? experimentalPendulumCards = null,
-        IEnumerable<EffectDefinition>? effectDefinitions = null, ulong? shuffleSeed = null)
+        IEnumerable<EffectDefinition>? effectDefinitions = null, ulong? shuffleSeed = null, IEnumerable<RuleLockProfile>? ruleLocks = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(rules);
@@ -172,6 +173,13 @@ public sealed partial class DuelEngine
         effectsByCard = definitionList.GroupBy(d => d.CardId).ToFrozenDictionary(g => g.Key, g => g.ToArray());
         effectsById = definitionList.ToFrozenDictionary(d => d.EffectId, StringComparer.Ordinal);
         allEffects = definitionList;
+        var lockList = (ruleLocks ?? []).ToArray();
+        if (lockList.Any(l => l is null || l.Lock.Actions == LockedAction.None || !this.rules.TryGetValue(l.CardId, out var rule) ||
+                l.Lock.Scope == LockScope.Equipped && rule.Category != CardCategory.Spell || l.Lock.Scope == LockScope.Self && rule.Category != CardCategory.Monster ||
+                l.Lock.UsesPerTurn < 0 || l.Lock.UsesPerTurn != 0 && (l.Lock.Actions & ~(LockedAction.BeDestroyedByBattle | LockedAction.BeDestroyedByEffect)) != 0) ||
+            lockList.Select(l => l.EffectId).Distinct(StringComparer.Ordinal).Count() != lockList.Length)
+            throw new ArgumentException("Rule locks need distinct IDs, known source cards and a scope that suits the source.", nameof(ruleLocks));
+        ruleLockProfiles = lockList.GroupBy(l => l.CardId).ToFrozenDictionary(g => g.Key, g => g.ToArray());
         definitionDecisions = definitionList.Where(d => d.Cost is DiscardCost or TributeCost or BanishFromGraveyardCost || d.Target is not null || d.FieldTargets.Any(t => !EffectDefinition.IsAutomatic(t)))
             .ToFrozenDictionary(d => d.EffectId, d => new DecisionSequence(DefinitionSequenceId(d),
                 [.. d.Cost is DiscardCost discard ? Enumerable.Repeat(discard.Filter switch
@@ -180,7 +188,7 @@ public sealed partial class DuelEngine
                          { } other => DecisionStep.FilteredCard(DecisionCardSource.Hand, other),
                          null => DecisionStep.AnyCard(DecisionCardSource.Hand)
                      }, discard.Count) : Array.Empty<DecisionStep>(),
-                 .. d.Cost is TributeCost tribute ? Enumerable.Repeat(DecisionStep.FieldTargetChoice(new FieldTarget(FieldCardKind.Monster, TargetSide.Own, tribute.Position, cardFilter: tribute.Filter), optional: false), tribute.Count) : Array.Empty<DecisionStep>(),
+                 .. d.Cost is TributeCost tribute ? Enumerable.Repeat(DecisionStep.FieldTargetChoice(new FieldTarget(FieldCardKind.Monster, TargetSide.Own, tribute.Position, cardFilter: tribute.Filter) { ForTribute = true }, optional: false), tribute.Count) : Array.Empty<DecisionStep>(),
                  .. d.Cost is BanishFromGraveyardCost banish ? Enumerable.Repeat(DecisionStep.FieldTargetChoice(new ZoneTarget(CardZone.Graveyard, TargetSide.Own, banish.Filter)), banish.Count) : Array.Empty<DecisionStep>(),
                  .. d.Target is SpellTrapOnFieldTarget ? [DecisionStep.SpellTrapTarget()] : Array.Empty<DecisionStep>(),
                  .. d.FieldTargets.Where(t => !EffectDefinition.IsAutomatic(t)).SelectMany(spec => Enumerable.Range(0, EffectDefinition.MaxCount(spec))
@@ -365,6 +373,7 @@ public sealed partial class DuelEngine
         if (player.MonsterZones[zone] is not null) return Reject(DuelError.MonsterZoneOccupied);
         if (!NormalSummonAvailable(State)) return Reject(DuelError.NormalSummonLimitReached);
         if (!faceDown && IsSummonLocked(State, player.Id)) return Reject(DuelError.SummonLocked);
+        if (RuleLocked(State, faceDown ? LockedAction.SetMonster : LockedAction.NormalSummon, player.Id, card)) return Reject(DuelError.LockedByEffect);
         var next = SpendNormalSummon(State.With(player: player.With(hand: player.Hand.Where(c => c.InstanceId != instanceId))));
         return CommitSummon(next, player.Id, card, zone, faceDown, []);
     }
@@ -380,6 +389,7 @@ public sealed partial class DuelEngine
             return Reject(DuelError.UnknownCardRules);
         if (rule.Category is not (CardCategory.Spell or CardCategory.Trap)) return Reject(DuelError.NotSpellOrTrap);
         if (!rule.AllowsSpellTrapSet) return Reject(DuelError.SpellTrapSetNotAllowed);
+        if (RuleLocked(State, LockedAction.SetSpellTrap, player.Id, card)) return Reject(DuelError.LockedByEffect);
         bool fieldSpell = definitions.TryGetValue(card.GameCardId, out var definition) && definition.Kind == EffectKind.FieldSpell;
         if (fieldSpell != (zone == DuelPlayerState.FieldZoneIndex)) return Reject(DuelError.InvalidSpellTrapZone);
         if (!fieldSpell && player.SpellTrapZones[zone] is not null) return Reject(DuelError.SpellTrapZoneOccupied);
@@ -407,6 +417,7 @@ public sealed partial class DuelEngine
         // Registered flip-summon triggers are collected after this transition.
         // Unregistered flip effects and position-change restrictions remain unsupported.
         if (!rules[monster.Card.GameCardId].AllowsBasicBattle) return Reject(DuelError.UnsupportedBattleCard);
+        if (RuleLocked(State, LockedAction.ChangePosition, player.Id, monster.Card, monster)) return Reject(DuelError.LockedByEffect);
         bool flip = monster.Position == BattlePosition.FaceDownDefense;
         if (flip && IsSummonLocked(State, player.Id)) return Reject(DuelError.SummonLocked);
         var changed = monster with { Position = target, PositionChangedOnTurn = State.TurnNumber,

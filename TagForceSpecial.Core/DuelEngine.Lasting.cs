@@ -207,6 +207,7 @@ public sealed partial class DuelEngine
     {
         if (target.Location == FieldLocation.MonsterZone)
             return ReplaceDestruction(state, new(target.Player, target.Zone, target.Card, target.PlacementId), DestructionCause.Effect, events);
+        if (target.Location == FieldLocation.SpellTrapZone && PreventDestruction(state, LockedAction.BeDestroyedByEffect, target.Player, target.Card, null, events) is { } safe) return safe;
         var player = state.GetPlayer(target.Player);
         if (target.Location != FieldLocation.SpellTrapZone || player.SpellTrapAt(target.Zone) is not { ProtectionCounters: > 0 } field) return null;
         events.Add(new SpellTrapDestructionReplaced(player.Id, target.Zone, field.Card));
@@ -271,6 +272,7 @@ public sealed partial class DuelEngine
     private DuelState? ReplaceDestruction(DuelState state, MonsterBinding monster, DestructionCause cause, List<DuelEvent> events)
     {
         var player = state.GetPlayer(monster.Player);
+        if (PreventDestruction(state, cause == DestructionCause.Battle ? LockedAction.BeDestroyedByBattle : LockedAction.BeDestroyedByEffect, monster.Player, monster.Card, player.MonsterZones[monster.Zone], events) is { } kept) return kept;
         if (player.MonsterZones[monster.Zone] is { ProtectionCounters: > 0 } guarded)
         {
             var monsters = player.MonsterZones.ToArray();
@@ -434,7 +436,7 @@ public sealed partial class DuelEngine
         int required = level <= 4 ? 0 : level <= 6 ? 1 : 2;
         var zones = command.TributeZones;
         if (zones.Count != required || zones.Distinct().Count() != zones.Count || zones.Any(z => z is < 0 or >= 5 || player.MonsterZones[z] is not { } m ||
-                !rules.TryGetValue(m.Card.GameCardId, out var tribute) || !tribute.AllowsTributeForSummon))
+                !rules.TryGetValue(m.Card.GameCardId, out var tribute) || !tribute.AllowsTributeForSummon || RuleLocked(State, LockedAction.BeTributed, player.Id, m.Card, m)))
             return Reject(DuelError.InvalidTributeSelection);
         var after = State;
         List<DuelEvent> events = [];
@@ -460,6 +462,8 @@ public sealed partial class DuelEngine
     private DuelError AttackRestrictionError(DuelPlayerState player, DuelPlayerState opponent, FieldMonster attacker, int? targetZone)
     {
         if (attacker.AttackLockedTurn == State.TurnNumber) return DuelError.AttackLocked;
+        if (RuleLocked(State, LockedAction.Attack, player.Id, attacker.Card, attacker)) return DuelError.LockedByEffect;
+        if (targetZone is int defending && opponent.MonsterZones[defending] is { } defender && RuleLocked(State, LockedAction.BeAttacked, opponent.Id, defender.Card, defender)) return DuelError.LockedByEffect;
         if (!IsToonCard(attacker.Card.GameCardId)) return DuelError.None;
         if (attacker.SummonedOnTurn == State.TurnNumber) return DuelError.ToonCannotAttack;
         if (player.LifePoints <= ToonAttackCost) return DuelError.InsufficientLifePoints;
@@ -471,7 +475,7 @@ public sealed partial class DuelEngine
         opponent.MonsterZones.Any(m => m is not null && m.Position != BattlePosition.FaceDownDefense && IsToonCard(m.Card.GameCardId));
 
     private bool CanAttackDirectly(DuelPlayerState opponent, FieldMonster attacker) =>
-        opponent.MonsterZones.All(m => m is null) || IsToonCard(attacker.Card.GameCardId) && !OpponentHasToon(opponent);
+        opponent.MonsterZones.All(m => m is null || RuleLocked(State, LockedAction.BeAttacked, opponent.Id, m.Card, m)) || IsToonCard(attacker.Card.GameCardId) && !OpponentHasToon(opponent);
 
     private DuelPlayerState PayToonAttack(DuelPlayerState player, FieldMonster attacker, List<DuelEvent> events)
     {

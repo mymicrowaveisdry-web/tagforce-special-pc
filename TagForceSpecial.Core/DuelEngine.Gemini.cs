@@ -14,6 +14,7 @@ public sealed partial class DuelEngine
         if (monster.GeminiActive) return Reject(DuelError.GeminiAlreadyActive);
         if (!NormalSummonAvailable(State)) return Reject(DuelError.NormalSummonLimitReached);
         if (IsSummonLocked(State, player.Id)) return Reject(DuelError.SummonLocked);
+        if (RuleLocked(State, LockedAction.NormalSummon, player.Id, monster.Card, monster)) return Reject(DuelError.LockedByEffect);
         var pending = new PendingSummon(checked(State.Revision + 1), checked(State.Revision + 1), player.Id, monster.Card, zone, Other(player.Id),
             Position: monster.Position) { IsGeminiSummon = true };
         var attempted = SpendNormalSummon(State.With(player: player)).WithSummon(pending);

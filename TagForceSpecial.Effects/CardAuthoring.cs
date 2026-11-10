@@ -24,6 +24,9 @@ public sealed record AuthoredCard(uint Id, string Name, CardKind Kind, uint Gett
     IReadOnlyList<EffectDefinition> Definitions, string Exceptions = "none")
 {
     public IReadOnlyList<TriggerEffectProfile> Triggers { get; init; } = [];
+    public IReadOnlyList<RuleLockProfile> Locks { get; init; } = [];
+    /// <summary>Everything the card's reviewed metadata refers to.</summary>
+    public IEnumerable<string> References => Definitions.Select(d => d.EffectId).Concat(Locks.Select(l => l.EffectId));
 }
 
 /// <summary>One option of a card whose effects are chosen at activation.</summary>
@@ -49,6 +52,7 @@ public sealed class CardTable(string prefix)
     private static readonly DuelCardRules SpellRules = new(CardCategory.Spell, AllowsSpellTrapSet: true);
     private static readonly DuelCardRules TrapRules = new(CardCategory.Trap, AllowsSpellTrapSet: true);
     private static readonly DuelCardRules MonsterRules = new(CardCategory.Monster, AllowsNormalSummon: true, AllowsBasicBattle: true, AllowsTributeForSummon: true);
+    private static readonly DuelCardRules TributeMonsterRules = MonsterRules with { AllowsTributeSummon = true };
     private static readonly FieldTarget FaceUpMonster = new(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUp);
 
     private string Effect(uint id, string role) => $"{prefix}-{id}-{role}-v1";
@@ -120,6 +124,25 @@ public sealed class CardTable(string prefix)
         new(id, name, CardKind.Monster, EffectMonsterKind, IconNormal, rules ?? MonsterRules, effects.Select((o, i) => new EffectDefinition(Effect(id, $"effect-{i + 1}"), id,
             quick ? EffectKind.MonsterQuick : EffectKind.MonsterIgnition, o.Steps, o.Conditions, o.Cost, fieldTargets: o.Targets, oncePerTurn: true, oncePerTurnKey: sharedLimit ? Effect(id, "shared") : null)).ToArray());
 
+    private RuleLockProfile Locked(uint id, RuleLock rule) => new(Effect(id, "lock"), id, rule);
+
+    /// <summary>A Continuous card whose only effect is a "cannot" rule while it stays face-up.</summary>
+    public AuthoredCard ContinuousLock(uint id, string name, bool trap, RuleLock rule, string exceptions = "none") =>
+        new(id, name, trap ? CardKind.Trap : CardKind.Spell, trap ? TrapKind : SpellKind, IconContinuous, trap ? TrapRules : SpellRules,
+            [new EffectDefinition(Effect(id, "continuous"), id, trap ? EffectKind.ContinuousTrap : EffectKind.ContinuousSpell, [], isMarker: true)], exceptions) { Locks = [Locked(id, rule)] };
+
+    /// <summary>An Equip Spell whose effect is a "cannot" rule on the equipped monster.</summary>
+    public AuthoredCard EquipLock(uint id, string name, LockedAction actions, CardFilter? only = null)
+    {
+        var target = only is null ? FaceUpMonster : new FieldTarget(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUp, cardFilter: only);
+        return new(id, name, CardKind.Spell, SpellKind, IconEquip, SpellRules, [new EffectDefinition(Effect(id, "equip"), id, EffectKind.EquipSpell, [new EquipTargetStep()], fieldTargets: [target])],
+            "Destroyed when the equipped monster leaves the field or is flipped face-down.") { Locks = [Locked(id, new RuleLock(actions, Scope: LockScope.Equipped))] };
+    }
+
+    /// <summary>A monster whose only effect is a "cannot" rule while it is face-up.</summary>
+    public AuthoredCard MonsterLock(uint id, string name, RuleLock rule, uint getterKind = EffectMonsterKind, string exceptions = "none") =>
+        new(id, name, CardKind.Monster, getterKind, IconNormal, TributeMonsterRules, [], exceptions) { Locks = [Locked(id, rule)] };
+
     /// <summary>A trigger on one event; the default is a mandatory "when" effect on this face-up monster.</summary>
     public AuthoredCard Trigger(uint id, string name, MonsterEventKind when, EffectStep[] steps, TriggerRequirement requirement = TriggerRequirement.Mandatory,
         TriggerSourceLocation location = TriggerSourceLocation.FaceUpMonster, TriggerEventCause cause = TriggerEventCause.Any, TriggerTiming timing = TriggerTiming.When,
@@ -179,11 +202,12 @@ public sealed class CardTable(string prefix)
         // Trigger definitions travel inside their trigger profiles; the engine rejects them as standalone definitions.
         var definitions = cards.SelectMany(c => c.Definitions).Where(d => d.Kind != EffectKind.MonsterTrigger).ToArray();
         return new CardFamily(familyId, batchId, Array.AsReadOnly(profiles), cards.ToFrozenDictionary(c => c.Id, c => c.Rules),
-            cards.ToFrozenDictionary(c => c.Id, c => new CardStaticMetadata(c.Kind, new(CardEffectState.Referenced, c.Definitions.Select(d => d.EffectId).ToArray()))),
+            cards.ToFrozenDictionary(c => c.Id, c => new CardStaticMetadata(c.Kind, new(CardEffectState.Referenced, c.References.ToArray()))),
             catalog => Validate(catalog, cards), tests)
         {
             Definitions = Array.AsReadOnly(definitions),
-            Triggers = Array.AsReadOnly(cards.SelectMany(c => c.Triggers).ToArray())
+            Triggers = Array.AsReadOnly(cards.SelectMany(c => c.Triggers).ToArray()),
+            RuleLocks = Array.AsReadOnly(cards.SelectMany(c => c.Locks).ToArray())
         };
     }
 
@@ -195,18 +219,19 @@ public sealed class CardTable(string prefix)
         var byId = catalog.Cards.ToDictionary(c => c.GameCardId);
         foreach (var card in cards)
             if (!byId.TryGetValue(card.Id, out var actual) || actual.Name != card.Name || actual.Kind != card.Kind ||
-                actual.Effects is not { State: CardEffectState.Referenced } effects || !effects.References.SequenceEqual(card.Definitions.Select(d => d.EffectId)) ||
+                actual.Effects is not { State: CardEffectState.Referenced } effects || !effects.References.SequenceEqual(card.References) ||
                 actual.Codes is { } codes && (codes.GetterKind != card.GetterKind || codes.Icon != card.Icon))
                 throw new InvalidDataException($"Card {card.Id} metadata differs from this family.");
     }
 
     private static DefinitionCardProfile Profile(AuthoredCard card)
     {
-        var effect = card.Definitions[0];
+        // A card with only a rule lock has no effect to activate; the placeholder is never registered with an engine.
+        var effect = card.Definitions.Count != 0 ? card.Definitions[0] : new EffectDefinition($"rule-lock-{card.Id}", card.Id, EffectKind.ContinuousSpell, [], isMarker: true);
         bool targets = effect.FieldTargets.Count != 0;
         string detail = effect.Kind == EffectKind.FieldSpell || effect.LastingModifiers.Count != 0 ? $" Lasting: {Describe(effect.LastingModifiers)}." : "";
         return new(card.Id, card.Name, card.Kind, effect,
-            string.Join(" Or: ", card.Definitions.Select(d => $"{d.Kind}: {Describe(d.Steps)}.")) + detail,
+            string.Join(" Or: ", card.Definitions.Select(d => $"{d.Kind}: {Describe(d.Steps)}.")) + detail + (card.Locks.Count == 0 ? "" : $" Rules: {Describe(card.Locks.Select(l => l.Lock))}."),
             card.Triggers.Count != 0 ? string.Join("; ", card.Triggers.Select(t => $"{t.Requirement} {t.Timing} on {t.EventKind} from {t.SourceLocation}, cause {t.Cause}")) + "."
                 : effect.Conditions.Count == 0 ? $"Default timing for {effect.Kind}." : $"Default timing for {effect.Kind}, with {Describe(effect.Conditions)}.",
             effect.Cost is null ? "none" : $"{Describe(effect.Cost)} (never refunded).",

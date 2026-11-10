@@ -372,6 +372,7 @@ public sealed class EffectDefinition
                     SpecialSummonTargetStep s => s.Position is not (null or BattlePosition.FaceUpAttack or BattlePosition.FaceUpDefense) || !Enum.IsDefined(s.Link),
                     EquipTargetStep or UnionEquipStep or PlaceCounterStep or FlipTargetsFaceDownStep or GrantNormalSummonStep or StopUnlessNoOwnMonstersStep => false,
                     SpecialSummonSelfStep s => s.Position is not (null or BattlePosition.FaceUpAttack or BattlePosition.FaceUpDefense),
+                    ApplyRuleLockStep s => s.Lock.Actions == LockedAction.None || s.Lock.Scope != LockScope.Side || s.Lock.UsesPerTurn != 0,
                     ModifyTargetsUntilEndStep s => s.Attack == 0 && s.Defense == 0,
                     FlipTargetsFaceUpStep s => s.Position is not (BattlePosition.FaceUpAttack or BattlePosition.FaceUpDefense),
                     ReturnSourceToDeckTopStep => kind != EffectKind.MonsterTrigger,

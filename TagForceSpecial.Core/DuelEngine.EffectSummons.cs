@@ -40,7 +40,7 @@ public sealed partial class DuelEngine
         bool Eligible(CardInstance card) => card != target &&
             (anyTribute ? rules.TryGetValue(card.GameCardId, out var rule) && rule.Category == CardCategory.Monster && rule.AllowsTributeForSummon && catalog[card.GameCardId].Statistics.Level > 0
                 : allowed.Contains(card.GameCardId) && !state.SummonHistory.Any(h => h.Card == card && h.Method == SummonMethod.Token)) &&
-            (profile.Kind != EffectSummonKind.Ritual || !IsXyzCard(card));
+            (profile.Kind != EffectSummonKind.Ritual || !IsXyzCard(card) && !RuleLocked(state, LockedAction.BeTributed, playerId, card, MonsterOf(state, card)));
         // Field first also gives the Fusion existence check a freed slot when the field is full.
         for (int z = 0; z < 5; z++)
             if (player.MonsterZones[z] is { BattleDestroyed: false } monster &&
@@ -106,6 +106,7 @@ public sealed partial class DuelEngine
     private IEnumerable<CardInstance> LegalEffectSummonTargets(DuelState state, PlayerId player,
         SummonEffectProfile profile)
     {
+        if (profile.Kind == EffectSummonKind.Fusion && RuleLocked(state, LockedAction.FusionSummon, player, null)) yield break;
         var ids = profile.FusionRecipes.Select(r => r.TargetCardId).Concat(profile.RitualRecipes.Select(r => r.TargetCardId));
         foreach (var target in SpecialSourceCards(state.GetPlayer(player), EffectSummonSource(profile)).Where(c => ids.Contains(c.GameCardId)))
         {
@@ -120,6 +121,7 @@ public sealed partial class DuelEngine
     {
         var player = State.GetPlayer(State.ActivePlayer);
         if (source is null && player.SpellTrapFields[zone] is not null) return Reject(DuelError.SpellTrapZoneOccupied);
+        if (RuleLocked(State, LockedAction.ActivateSpell, player.Id, spell, kind: EffectKind.NormalSpell)) return Reject(DuelError.LockedByEffect);
         if (!LegalEffectSummonTargets(State, player.Id, profile).Any()) return Reject(DuelError.DecisionUnavailable);
         var slots = player.SpellTrapFields.ToArray();
         long placement = source?.PlacementId ?? checked(State.Revision + 1);

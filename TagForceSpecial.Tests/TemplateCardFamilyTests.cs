@@ -174,7 +174,7 @@ public sealed class TemplateCardFamilyTests
     [Fact]
     public void ArchetypeListsHoldMonstersOnly()
     {
-        var spellsAndTraps = TemplateCardFamily.Family.Cards.Select(c => c.CardId).ToHashSet();
+        var spellsAndTraps = TemplateCardFamily.Family.Cards.Select(c => c.CardId).Where(id => TemplateCardFamily.Family.Rules[id].Category != CardCategory.Monster).ToHashSet();
         foreach (var list in new[] { CardArchetypes.ElementalHero, CardArchetypes.Resonator, CardArchetypes.Hieratic, CardArchetypes.IceBarrier, CardArchetypes.Nordic })
         {
             Assert.NotEmpty(list);

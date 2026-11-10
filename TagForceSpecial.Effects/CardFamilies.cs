@@ -19,6 +19,7 @@ public sealed record CardFamily(string FamilyId, string BatchId, IReadOnlyList<D
     public IReadOnlyList<ExtraDeckMaterialProcedureProfile> MaterialProcedures { get; init; } = [];
     public IReadOnlyList<SummonEffectProfile> SummonEffects { get; init; } = [];
     public IReadOnlyList<PendulumCardProfile> PendulumCards { get; init; } = [];
+    public IReadOnlyList<RuleLockProfile> RuleLocks { get; init; } = [];
 }
 
 /// <summary>Every effect family. Adding a family here adds it to the overlay, the manifest and the full card pool.</summary>
@@ -124,6 +125,6 @@ public static class CardPool
             experimentalMaterialProcedures: families.SelectMany(f => f.MaterialProcedures),
             experimentalSummonEffects: families.SelectMany(f => f.SummonEffects),
             experimentalPendulumCards: families.SelectMany(f => f.PendulumCards),
-            effectDefinitions: definitions, shuffleSeed: shuffleSeed);
+            effectDefinitions: definitions, shuffleSeed: shuffleSeed, ruleLocks: families.SelectMany(f => f.RuleLocks));
     }
 }
