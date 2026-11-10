@@ -6,7 +6,7 @@ public sealed partial class DuelEngine
         new(checked(State.Revision + 1), timing, responder);
 
     private static BattleDamageCalculation CalculateBasicBattle(int attack, int? defendingValue,
-        BattlePosition? defendingPosition, PlayerId attacker, PlayerId defender)
+        BattlePosition? defendingPosition, PlayerId attacker, PlayerId defender, bool piercing = false)
     {
         if (defendingPosition is null) return new(attack, defender, false, false);
         int difference = attack - defendingValue!.Value;
@@ -14,7 +14,7 @@ public sealed partial class DuelEngine
             return new(Math.Abs(difference), difference < 0 ? attacker : defender,
                 difference < 0 || difference == 0 && attack > 0,
                 difference > 0 || difference == 0 && attack > 0);
-        return new(Math.Max(0, -difference), difference < 0 ? attacker : defender, false, difference > 0);
+        return new(difference > 0 && piercing ? difference : Math.Max(0, -difference), difference < 0 ? attacker : defender, false, difference > 0);
     }
 
     private DuelActionResult ExecuteBattleFlow(DuelCommand command)
@@ -99,7 +99,7 @@ public sealed partial class DuelEngine
         var attacker = player.MonsterZones[attackerZone];
         if (attacker is null) return Reject(DuelError.MonsterZoneEmpty);
         if (attacker.Position != BattlePosition.FaceUpAttack) return Reject(DuelError.AttackerNotInAttackPosition);
-        if (attacker.LastAttackTurn == State.TurnNumber) return Reject(DuelError.AlreadyAttacked);
+        if (AttackAllowanceError(player, attacker, targetZone) is not DuelError.None and var allowanceError) return Reject(allowanceError);
         var defender = targetZone is int zone ? opponent.MonsterZones[zone] : null;
         if (targetZone is not null && defender is null) return Reject(DuelError.MonsterZoneEmpty);
         if (targetZone is null && !CanAttackDirectly(opponent, attacker)) return Reject(DuelError.DirectAttackBlocked);
@@ -119,7 +119,7 @@ public sealed partial class DuelEngine
         var window = NewBattleWindow(BattleTiming.AttackDeclaration, opponent.Id);
         List<DuelEvent> declared = [];
         player = PayToonAttack(player, attacker, declared);
-        return Accept(State.With(player: player.With(monsters: monsters)).WithBattle(battle with { Attack = attack, Window = window }),
+        return Accept(RecordBattleAttack(State.With(player: player.With(monsters: monsters)), attack.Id, source, target).WithBattle(battle with { Attack = attack, Window = window }),
             [.. declared, new AttackDeclared(player.Id, attackerZone, targetZone), new BattleResponseRequested(window)]);
     }
 
@@ -139,8 +139,11 @@ public sealed partial class DuelEngine
         var opponent = State.GetPlayer(Other(State.ActivePlayer));
         var defender = command.TargetZone is int zone ? opponent.MonsterZones[zone] : null;
         if (command.TargetZone is not null && defender is null) return Reject(DuelError.MonsterZoneEmpty);
-        if (command.TargetZone is null && opponent.MonsterZones.Any(m => m is not null && !RuleLocked(State, LockedAction.BeAttacked, opponent.Id, m.Card, m))) return Reject(DuelError.DirectAttackBlocked);
-        if (defender is not null && RuleLocked(State, LockedAction.BeAttacked, opponent.Id, defender.Card, defender)) return Reject(DuelError.LockedByEffect);
+        var player = State.GetPlayer(State.ActivePlayer);
+        var attacker = player.MonsterZones[attack.Attacker.Zone]!;
+        if (AttackAllowanceError(player, attacker, command.TargetZone, attack.Id) is not DuelError.None and var allowanceError) return Reject(allowanceError);
+        if (command.TargetZone is null && !CanAttackDirectly(opponent, attacker)) return Reject(DuelError.DirectAttackBlocked);
+        if (AttackRestrictionError(player, opponent, attacker, command.TargetZone, payAttackCost: false) is not DuelError.None and var restrictionError) return Reject(restrictionError);
         if (defender is not null && !rules[defender.Card.GameCardId].AllowsBasicBattle) return Reject(DuelError.UnsupportedBattleCard);
         if (defender is not null && (defender.Position == BattlePosition.FaceUpAttack ? catalog[defender.Card.GameCardId].Statistics.Attack :
                 catalog[defender.Card.GameCardId].Statistics.Defense) is null) return Reject(DuelError.UnsupportedBattleStatistics);
@@ -148,7 +151,7 @@ public sealed partial class DuelEngine
         var changed = new PendingBattleAttack(attack.Id, attack.Attacker, target,
             FieldMonsters(State).Where(e => e.Binding.Player == opponent.Id).Select(e => e.Binding));
         var window = NewBattleWindow(BattleTiming.BattleStep, State.ActivePlayer);
-        return Accept(State.WithBattle(battle with { Attack = changed, Window = window }),
+        return Accept(RecordBattleAttack(State, attack.Id, attack.Attacker, target, replay: true).WithBattle(battle with { Attack = changed, Window = window }),
             new AttackReplayChosen(attack.Id, command.TargetZone), new BattleResponseRequested(window));
     }
 
@@ -160,7 +163,11 @@ public sealed partial class DuelEngine
         if (battle.Step == BattleStep.End) return Reject(DuelError.WrongBattleStep);
         if (battle.Step == BattleStep.Battle)
         {
-            if (battle.Attack is null) return EnterBattleStage(BattleStep.End, null, BattleTiming.End);
+            if (battle.Attack is null)
+            {
+                if (RequiredAttackPending()) return Reject(DuelError.MustAttack);
+                return EnterBattleStage(BattleStep.End, null, BattleTiming.End);
+            }
             if (battle.Attack.Cancellation is not null) return FinishStagedAttack(State, []);
             if (battle.Attack.ReplayRequired) return Reject(DuelError.AttackReplayPending);
             return EnterBattleStage(BattleStep.Damage, DamageStep.Start, BattleTiming.DamageStart);
@@ -233,7 +240,8 @@ public sealed partial class DuelEngine
             var defending = defender?.Position == BattlePosition.FaceUpAttack ? defenseStats?.Attack : defenseStats?.Defense;
             if (attackStats.Attack is not int value || defender is not null && defending is null)
                 return Reject(DuelError.UnsupportedBattleStatistics);
-            calculation = CalculateBasicBattle(value, defending, defender?.Position, attack.Attacker.Player, Other(attack.Attacker.Player));
+            calculation = CalculateBasicBattle(value, defending, defender?.Position, attack.Attacker.Player, Other(attack.Attacker.Player),
+                GetBattleAbilities(next, attack.Attacker.Player, attacker).Piercing);
             events.Add(new BattleDamageCalculated(attack.Id, calculation));
             if (calculation.Damage > 0)
             {
@@ -286,8 +294,19 @@ public sealed partial class DuelEngine
         if (attack is { Cancellation: null } && (battle.Step != BattleStep.Damage ||
             battle.DamageStep is DamageStep.Start or DamageStep.BeforeCalculation or DamageStep.Calculation))
         {
-            if (!attack.Attacker.IsStillPresent(next) ||
-                next.GetPlayer(attack.Attacker.Player).MonsterZones[attack.Attacker.Zone]!.Position != BattlePosition.FaceUpAttack)
+            var currentAttacker = attack.Attacker.IsStillPresent(next)
+                ? next.GetPlayer(attack.Attacker.Player).MonsterZones[attack.Attacker.Zone] : null;
+            bool allowanceLost = false;
+            if (currentAttacker is not null)
+            {
+                var abilities = GetBattleAbilities(next, attack.Attacker.Player, currentAttacker);
+                int priorAttacks = AttacksThisTurn(next, currentAttacker).Count(a => a.Id != attack.Id);
+                allowanceLost = battle.Step == BattleStep.Battle && priorAttacks >= abilities.AttacksPerBattlePhase && !abilities.AttackAll;
+            }
+            if (currentAttacker is null || allowanceLost ||
+                currentAttacker.Position != BattlePosition.FaceUpAttack ||
+                RuleLocked(next, LockedAction.Attack, attack.Attacker.Player, attack.Attacker.Card,
+                    next.GetPlayer(attack.Attacker.Player).MonsterZones[attack.Attacker.Zone]))
             {
                 attack = attack with { Cancellation = BattleAttackCancellation.AttackerUnavailable };
                 events.Add(new AttackCancelled(attack.Id, BattleAttackCancellation.AttackerUnavailable));
@@ -296,7 +315,12 @@ public sealed partial class DuelEngine
             {
                 var oldRoster = FieldMonsters(before).Where(e => e.Binding.Player != attack.Attacker.Player).Select(e => e.Binding);
                 var newRoster = FieldMonsters(next).Where(e => e.Binding.Player != attack.Attacker.Player).Select(e => e.Binding);
-                if (!oldRoster.SequenceEqual(newRoster)) attack = attack with { ReplayRequired = true };
+                var opponent = next.GetPlayer(Other(attack.Attacker.Player));
+                var attacker = next.GetPlayer(attack.Attacker.Player).MonsterZones[attack.Attacker.Zone]!;
+                bool illegalTarget = attack.Defender is { } target
+                    ? !target.IsStillPresent(next) || RuleLocked(next, LockedAction.BeAttacked, target.Player, target.Card, opponent.MonsterZones[target.Zone])
+                    : !CanAttackDirectly(opponent, attacker, next);
+                if (!oldRoster.SequenceEqual(newRoster) || illegalTarget) attack = attack with { ReplayRequired = true };
             }
         }
         var window = battle.Window with { DecisionId = checked(State.Revision + 1) };

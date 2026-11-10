@@ -25,8 +25,9 @@ public sealed record AuthoredCard(uint Id, string Name, CardKind Kind, uint Gett
 {
     public IReadOnlyList<TriggerEffectProfile> Triggers { get; init; } = [];
     public IReadOnlyList<RuleLockProfile> Locks { get; init; } = [];
+    public IReadOnlyList<BattleAbilityProfile> BattleAbilities { get; init; } = [];
     /// <summary>Everything the card's reviewed metadata refers to.</summary>
-    public IEnumerable<string> References => Definitions.Select(d => d.EffectId).Concat(Locks.Select(l => l.EffectId));
+    public IEnumerable<string> References => Definitions.Select(d => d.EffectId).Concat(Locks.Select(l => l.EffectId)).Concat(BattleAbilities.Select(p => p.EffectId));
 }
 
 /// <summary>One option of a card whose effects are chosen at activation.</summary>
@@ -153,6 +154,11 @@ public sealed class CardTable(string prefix)
     public AuthoredCard MonsterLock(uint id, string name, RuleLock rule, uint getterKind = EffectMonsterKind, string exceptions = "none") =>
         new(id, name, CardKind.Monster, getterKind, IconNormal, TributeMonsterRules, [], exceptions) { Locks = [Locked(id, rule)] };
 
+    /// <summary>A monster whose continuous effect grants battle permissions or requirements.</summary>
+    public AuthoredCard BattleMonster(uint id, string name, BattleAbilities abilities, uint getterKind = EffectMonsterKind) =>
+        new(id, name, CardKind.Monster, getterKind, IconNormal, TributeMonsterRules, [])
+        { BattleAbilities = [new(Effect(id, "battle"), id, abilities)] };
+
     /// <summary>A trigger on one event; the default is a mandatory "when" effect on this face-up monster.</summary>
     public AuthoredCard Trigger(uint id, string name, MonsterEventKind when, EffectStep[] steps, TriggerRequirement requirement = TriggerRequirement.Mandatory,
         TriggerSourceLocation location = TriggerSourceLocation.FaceUpMonster, TriggerEventCause cause = TriggerEventCause.Any, TriggerTiming timing = TriggerTiming.When,
@@ -217,7 +223,8 @@ public sealed class CardTable(string prefix)
         {
             Definitions = Array.AsReadOnly(definitions),
             Triggers = Array.AsReadOnly(cards.SelectMany(c => c.Triggers).ToArray()),
-            RuleLocks = Array.AsReadOnly(cards.SelectMany(c => c.Locks).ToArray())
+            RuleLocks = Array.AsReadOnly(cards.SelectMany(c => c.Locks).ToArray()),
+            BattleAbilities = Array.AsReadOnly(cards.SelectMany(c => c.BattleAbilities).ToArray())
         };
     }
 
@@ -236,19 +243,22 @@ public sealed class CardTable(string prefix)
 
     private static DefinitionCardProfile Profile(AuthoredCard card)
     {
-        // A card with only a rule lock has no effect to activate; the placeholder is never registered with an engine.
+        // A card with only continuous rules has no effect to activate; the placeholder is never registered with an engine.
         var effect = card.Definitions.Count != 0 ? card.Definitions[0] : new EffectDefinition($"rule-lock-{card.Id}", card.Id, EffectKind.ContinuousSpell, [], isMarker: true);
         bool targets = effect.FieldTargets.Count != 0;
         string detail = effect.Kind == EffectKind.FieldSpell || effect.LastingModifiers.Count != 0 ? $" Lasting: {Describe(effect.LastingModifiers)}." : "";
         return new(card.Id, card.Name, card.Kind, effect,
             string.Join(" Or: ", card.Definitions.Select(d => $"{d.Kind}: {Describe(d.Steps)}.")) + detail + (card.Locks.Count == 0 ? "" : $" Rules: {Describe(card.Locks.Select(l => l.Lock))}.")
+                + (card.BattleAbilities.Count == 0 ? "" : $" Battle: {Describe(card.BattleAbilities.Select(p => p.Abilities))}.")
                 + (card.Definitions.Select(d => d.NameLimit).FirstOrDefault(l => l is not null) is { } named ? $" Limit: {named.Counts} by name, once per {(named.PerDuel ? "Duel" : "turn")}." : ""),
-            card.Triggers.Count != 0 ? string.Join("; ", card.Triggers.Select(t => $"{t.Requirement} {t.Timing} on {t.EventKind} from {t.SourceLocation}, cause {t.Cause}")) + "."
+            card.Definitions.Count == 0 && card.BattleAbilities.Count != 0 ? "Continuous while the source is face-up and not negated."
+                : card.Triggers.Count != 0 ? string.Join("; ", card.Triggers.Select(t => $"{t.Requirement} {t.Timing} on {t.EventKind} from {t.SourceLocation}, cause {t.Cause}")) + "."
                 : effect.Conditions.Count == 0 ? $"Default timing for {effect.Kind}." : $"Default timing for {effect.Kind}, with {Describe(effect.Conditions)}.",
             effect.Cost is null ? "none" : $"{Describe(effect.Cost)} (never refunded).",
             targets ? Describe(effect.FieldTargets) : "none",
             targets ? "Target at activation." : "none", "Default.",
-            targets ? "Negation skips the effect. Targets that no longer qualify are skipped; ordinary cleanup." : "Negation skips the effect; ordinary cleanup.",
+            card.Definitions.Count == 0 && card.BattleAbilities.Count != 0 ? "Negation suspends continuous battle abilities."
+                : targets ? "Negation skips the effect. Targets that no longer qualify are skipped; ordinary cleanup." : "Negation skips the effect; ordinary cleanup.",
             card.Exceptions, [], []);
     }
 

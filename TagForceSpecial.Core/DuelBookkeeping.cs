@@ -19,6 +19,7 @@ internal sealed record DuelBookkeeping(int NextInstanceId = 1, DuelRandomState? 
     public IReadOnlyList<TimedRuleLock> TimedLocks { get; init; } = Array.AsReadOnly(Array.Empty<TimedRuleLock>());
     public IReadOnlyList<RuleLockUse> LockUses { get; init; } = Array.AsReadOnly(Array.Empty<RuleLockUse>());
     /// <summary>By-name uses this turn, and once-per-Duel uses for the whole Duel.</summary>
+    public IReadOnlyList<BattleAttackUse> BattleAttacks { get; init; } = Array.AsReadOnly(Array.Empty<BattleAttackUse>());
     public IReadOnlyList<NamedUse> NamedUses { get; init; } = Array.AsReadOnly(Array.Empty<NamedUse>());
 }
 

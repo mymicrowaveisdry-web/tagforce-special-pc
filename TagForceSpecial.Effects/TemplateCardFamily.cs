@@ -38,6 +38,13 @@ public static class TemplateCardFamily
 
     private static readonly AuthoredCard[] Cards =
     [
+        T.BattleMonster(5142, "Mad Sword Beast", new(Piercing: true)),
+        T.BattleMonster(6545, "Lancer Dragonute", new(Piercing: true)),
+        T.BattleMonster(4403, "Leghul", new(DirectAttack: true)),
+        T.BattleMonster(4428, "Jinzo #7", new(DirectAttack: true)),
+        T.BattleMonster(4494, "Rainbow Flower", new(DirectAttack: true)),
+        T.BattleMonster(5137, "Hayabusa Knight", new(AttacksPerBattlePhase: 2)),
+        T.BattleMonster(8098, "Jurrac Monoloph", new(AttackAll: true), getterKind: 16),
         T.Equip(4307, "Legendary Sword", 300, 300, OfType(Warrior)),
         T.Equip(4309, "Dark Energy", 300, 300, OfType(Fiend)),
         T.Equip(4311, "Laser Cannon Armor", 300, 300, OfType(Insect)),
@@ -136,5 +143,5 @@ public static class TemplateCardFamily
             [new ZoneTarget(CardZone.Graveyard, TargetSide.Own, new AllOfFilter(new MonsterLevelFilter(3), new MonsterTypeFilter([Fish, SeaSerpent, Aqua])), mustBeSummonable: true)])
     ];
 
-    public static CardFamily Family { get; } = CardTable.Family(FamilyId, BatchId, ["TemplateCardFamilyTests", "CardPoolTests"], Cards);
+    public static CardFamily Family { get; } = CardTable.Family(FamilyId, BatchId, ["TemplateCardFamilyTests", "BattleAbilityTests", "CardPoolTests"], Cards);
 }

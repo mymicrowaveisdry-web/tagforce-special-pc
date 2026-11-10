@@ -31,6 +31,7 @@ public sealed partial class DuelEngine
     private readonly FrozenDictionary<string, EffectDefinition> effectsById;
     private readonly EffectDefinition[] allEffects;
     private readonly FrozenDictionary<uint, RuleLockProfile[]> ruleLockProfiles;
+    private readonly FrozenDictionary<uint, BattleAbilityProfile[]> battleAbilityProfiles;
     /// <summary>Activation-time cost/target decisions of definitions that have any, keyed by source card ID.</summary>
     private readonly FrozenDictionary<string, DecisionSequence> definitionDecisions;
     public DuelState State { get; private set; }
@@ -55,7 +56,7 @@ public sealed partial class DuelEngine
         IEnumerable<ExtraDeckMaterialProcedureProfile>? experimentalMaterialProcedures = null,
         IEnumerable<SummonEffectProfile>? experimentalSummonEffects = null,
         IEnumerable<PendulumCardProfile>? experimentalPendulumCards = null,
-        IEnumerable<EffectDefinition>? effectDefinitions = null, ulong? shuffleSeed = null, IEnumerable<RuleLockProfile>? ruleLocks = null)
+        IEnumerable<EffectDefinition>? effectDefinitions = null, ulong? shuffleSeed = null, IEnumerable<RuleLockProfile>? ruleLocks = null, IEnumerable<BattleAbilityProfile>? battleAbilities = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(rules);
@@ -180,6 +181,14 @@ public sealed partial class DuelEngine
             lockList.Select(l => l.EffectId).Distinct(StringComparer.Ordinal).Count() != lockList.Length)
             throw new ArgumentException("Rule locks need distinct IDs, known source cards and a scope that suits the source.", nameof(ruleLocks));
         ruleLockProfiles = lockList.GroupBy(l => l.CardId).ToFrozenDictionary(g => g.Key, g => g.ToArray());
+        var battleProfiles = (battleAbilities ?? []).ToArray();
+        if (battleProfiles.Any(p => p is null || string.IsNullOrWhiteSpace(p.EffectId) || p.Abilities is null ||
+                p.Abilities.AttacksPerBattlePhase < 1 || !Enum.IsDefined(p.Scope) || !Enum.IsDefined(p.Side) ||
+                !this.rules.TryGetValue(p.CardId, out var rule) || p.Scope == LockScope.Self && rule.Category != CardCategory.Monster ||
+                p.Scope == LockScope.Equipped && rule.Category != CardCategory.Spell) ||
+            battleProfiles.Select(p => p.EffectId).Distinct(StringComparer.Ordinal).Count() != battleProfiles.Length)
+            throw new ArgumentException("Battle abilities require distinct IDs, known sources and valid scopes and attack counts.", nameof(battleAbilities));
+        battleAbilityProfiles = battleProfiles.GroupBy(p => p.CardId).ToFrozenDictionary(g => g.Key, g => g.ToArray());
         definitionDecisions = definitionList.Where(d => d.Cost is DiscardCost or TributeCost or BanishFromGraveyardCost || d.Target is not null || d.FieldTargets.Any(t => !EffectDefinition.IsAutomatic(t)))
             .ToFrozenDictionary(d => d.EffectId, d => new DecisionSequence(DefinitionSequenceId(d),
                 [.. d.Cost is DiscardCost discard ? Enumerable.Repeat(discard.Filter switch
@@ -333,7 +342,10 @@ public sealed partial class DuelEngine
             (DuelPhase.Standby, DuelPhase.Main1) or
             (DuelPhase.Main1, DuelPhase.Battle) or (DuelPhase.Main1, DuelPhase.End) or
             (DuelPhase.Battle, DuelPhase.Main2) or (DuelPhase.Main2, DuelPhase.End);
-        return valid ? DuelError.None : DuelError.InvalidPhaseTransition;
+        if (!valid) return DuelError.InvalidPhaseTransition;
+        if ((State.Phase == DuelPhase.Main1 && target == DuelPhase.End ||
+                State.Phase == DuelPhase.Battle && target == DuelPhase.Main2) && RequiredAttackPending()) return DuelError.MustAttack;
+        return DuelError.None;
     }
 
     /// <summary>
@@ -441,7 +453,7 @@ public sealed partial class DuelEngine
         var attacker = attackerPlayer.MonsterZones[attackerZone];
         if (attacker is null) return Reject(DuelError.MonsterZoneEmpty);
         if (attacker.Position != BattlePosition.FaceUpAttack) return Reject(DuelError.AttackerNotInAttackPosition);
-        if (attacker.LastAttackTurn == State.TurnNumber) return Reject(DuelError.AlreadyAttacked);
+        if (AttackAllowanceError(attackerPlayer, attacker, targetZone) is not DuelError.None and var allowanceError) return Reject(allowanceError);
         FieldMonster? defender = targetZone is int zone ? defenderPlayer.MonsterZones[zone] : null;
         if (targetZone is not null && defender is null) return Reject(DuelError.MonsterZoneEmpty);
         if (targetZone is null && !CanAttackDirectly(defenderPlayer, attacker))
@@ -475,13 +487,17 @@ public sealed partial class DuelEngine
             defenseZones[targetZone!.Value] = defender with { Position = BattlePosition.FaceUpDefense, FlippedOnTurn = State.TurnNumber };
             events.Add(new MonsterRevealed(defenderPlayer.Id, targetZone.Value, defender.Card));
         }
-        var calculation = CalculateBasicBattle(attack, defendingValue, defender?.Position, attackerPlayer.Id, defenderPlayer.Id);
+        var calculation = CalculateBasicBattle(attack, defendingValue, defender?.Position, attackerPlayer.Id, defenderPlayer.Id,
+            GetBattleAbilities(calculationState, attackerPlayer.Id, attacker).Piercing);
         bool destroyAttacker = calculation.DestroyAttacker, destroyDefender = calculation.DestroyDefender;
         int damage = calculation.Damage;
         PlayerId damagedPlayer = calculation.DamagedPlayer;
         attackerPlayer = attackerPlayer.With(monsters: attackZones);
         defenderPlayer = defenderPlayer.With(monsters: defenseZones);
         DuelState next = State.With(player: attackerPlayer).With(player: defenderPlayer);
+        next = RecordBattleAttack(next, checked(State.Revision + 1),
+            new(attackerPlayer.Id, attackerZone, attacker.Card, attacker.PlacementId),
+            defender is null ? null : new(defenderPlayer.Id, targetZone!.Value, defender.Card, defender.PlacementId));
         if (damage > 0)
         {
             var damaged = next.GetPlayer(damagedPlayer);

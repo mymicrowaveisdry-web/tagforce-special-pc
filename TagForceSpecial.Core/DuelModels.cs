@@ -287,7 +287,7 @@ public enum DuelError
     UnsupportedMaterialProcedure, InvalidSummonMaterials, SummonMaterialNotAllowed,
     UnsupportedPendulumCard, InvalidPendulumZone, PendulumZoneOccupied, PendulumScalesUnavailable, PendulumSummonLimitReached,
     ActivationTimingNotAllowed, SetThisTurn, OpenWindowPending, ActivationConditionNotMet, SummonLocked, NotGeminiMonster, GeminiAlreadyActive,
-    UnsupportedMonsterEffect, EffectAlreadyUsed, UpkeepPending, NoUpkeepDue, ToonSummonUnavailable, ToonCannotAttack, ToonMustAttackToon, AttackLocked, LockedByEffect
+    UnsupportedMonsterEffect, EffectAlreadyUsed, UpkeepPending, NoUpkeepDue, ToonSummonUnavailable, ToonCannotAttack, ToonMustAttackToon, AttackLocked, LockedByEffect, MustAttack
 }
 
 public abstract record DuelEvent

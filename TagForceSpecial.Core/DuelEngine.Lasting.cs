@@ -462,14 +462,14 @@ public sealed partial class DuelEngine
     }
 
     /// <summary>Attack limits from a monster's own effect, then a Toon's rules including its LP cost.</summary>
-    private DuelError AttackRestrictionError(DuelPlayerState player, DuelPlayerState opponent, FieldMonster attacker, int? targetZone)
+    private DuelError AttackRestrictionError(DuelPlayerState player, DuelPlayerState opponent, FieldMonster attacker, int? targetZone, bool payAttackCost = true)
     {
         if (attacker.AttackLockedTurn == State.TurnNumber) return DuelError.AttackLocked;
         if (RuleLocked(State, LockedAction.Attack, player.Id, attacker.Card, attacker)) return DuelError.LockedByEffect;
         if (targetZone is int defending && opponent.MonsterZones[defending] is { } defender && RuleLocked(State, LockedAction.BeAttacked, opponent.Id, defender.Card, defender)) return DuelError.LockedByEffect;
         if (!IsToonCard(attacker.Card.GameCardId)) return DuelError.None;
         if (attacker.SummonedOnTurn == State.TurnNumber) return DuelError.ToonCannotAttack;
-        if (player.LifePoints <= ToonAttackCost) return DuelError.InsufficientLifePoints;
+        if (payAttackCost && player.LifePoints <= ToonAttackCost) return DuelError.InsufficientLifePoints;
         return OpponentHasToon(opponent) && (targetZone is not int zone || opponent.MonsterZones[zone] is not { } target || !IsToonCard(target.Card.GameCardId))
             ? DuelError.ToonMustAttackToon : DuelError.None;
     }
@@ -477,8 +477,12 @@ public sealed partial class DuelEngine
     private bool OpponentHasToon(DuelPlayerState opponent) =>
         opponent.MonsterZones.Any(m => m is not null && m.Position != BattlePosition.FaceDownDefense && IsToonCard(m.Card.GameCardId));
 
-    private bool CanAttackDirectly(DuelPlayerState opponent, FieldMonster attacker) =>
-        opponent.MonsterZones.All(m => m is null || RuleLocked(State, LockedAction.BeAttacked, opponent.Id, m.Card, m)) || IsToonCard(attacker.Card.GameCardId) && !OpponentHasToon(opponent);
+    private bool CanAttackDirectly(DuelPlayerState opponent, FieldMonster attacker, DuelState? state = null)
+    {
+        state ??= State;
+        return opponent.MonsterZones.All(m => m is null || RuleLocked(state, LockedAction.BeAttacked, opponent.Id, m.Card, m)) ||
+            GetBattleAbilities(state, Other(opponent.Id), attacker).DirectAttack || IsToonCard(attacker.Card.GameCardId) && !OpponentHasToon(opponent);
+    }
 
     private DuelPlayerState PayToonAttack(DuelPlayerState player, FieldMonster attacker, List<DuelEvent> events)
     {

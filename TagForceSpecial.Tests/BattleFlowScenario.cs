@@ -13,7 +13,8 @@ internal static class BattleFlowScenario
         bool defender = true, bool faceDown = false, IEnumerable<EffectDefinition>? profiles = null,
         IEnumerable<EffectDefinition>? chains = null, IEnumerable<TriggerEffectProfile>? triggers = null,
         IEnumerable<ContinuousEffectProfile>? continuous = null, bool staged = true, bool additionalAttacker = false, IEnumerable<ContinuousNegationProfile>? negations = null,
-        IEnumerable<SpecialSummonCardProfile>? specialCards = null, IEnumerable<SummonWindowProfile>? summonWindows = null)
+        IEnumerable<SpecialSummonCardProfile>? specialCards = null, IEnumerable<SummonWindowProfile>? summonWindows = null,
+        IEnumerable<BattleAbilityProfile>? battleAbilities = null, IEnumerable<RuleLockProfile>? locks = null, bool enterBattle = true, bool defenderFaceUpDefense = false)
     {
         uint[] ids = [A, B, Filler, Negate, Destroy, Summon, Stats, Counter];
         var catalog = new CardCatalog(new(null, "synthetic-stage8-v1"), ids.Select(id => new CardDefinition(id, $"Probe {id}", "",
@@ -26,13 +27,19 @@ internal static class BattleFlowScenario
         var engine = new DuelEngine(catalog, rules, first, second, effectDefinitions: [.. profiles ?? [], .. chains ?? []],
             experimentalTriggerEffects: triggers, experimentalContinuousEffects: continuous, experimentalContinuousNegations: negations,
             experimentalBattleFlow: staged,
-            experimentalSpecialSummonCards: specialCards, experimentalSummonWindows: summonWindows);
+            experimentalSpecialSummonCards: specialCards, experimentalSummonWindows: summonWindows, battleAbilities: battleAbilities, ruleLocks: locks);
         EnterMain(engine); Play(engine, A, 0); Set(engine, Stats, 0); Set(engine, Counter, 1); NextMain(engine);
         if (defender) Play(engine, B, 0, faceDown);
         Set(engine, Negate, 0); Set(engine, Destroy, 1); Set(engine, Summon, 2); Set(engine, Stats, 3);
         NextMain(engine);
+        if (defender && defenderFaceUpDefense)
+        {
+            NextMain(engine);
+            Ok(engine, new ChangeMonsterPosition(PlayerId.Two, 0, BattlePosition.FaceUpDefense));
+            NextMain(engine);
+        }
         if (additionalAttacker) Play(engine, A, 1);
-        Ok(engine, new ChangePhase(PlayerId.One, DuelPhase.Battle));
+        if (enterBattle) Ok(engine, new ChangePhase(PlayerId.One, DuelPhase.Battle));
         return engine;
     }
 
