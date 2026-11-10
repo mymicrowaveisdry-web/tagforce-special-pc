@@ -11,7 +11,7 @@ public enum EffectRelation { Self, Controller, Opponent, Any }
 public enum TriggerRequirement { Mandatory, Optional }
 public enum TriggerSourceLocation { FaceUpMonster, DestroyedSelf, GraveyardSelf, FaceUpSpellTrap }
 public enum TriggerTiming { If, When }
-public enum TriggerTurnLimit { None, PerPlacement, SharedPerPlayer }
+public enum TriggerTurnLimit { None, PerPlacement, SharedPerPlayer, SharedPerDuel }
 public enum TriggerOperation
 {
     GainLifePoints, ModifyEventMonsterUntilEndPhase, ModifyTargetMonsterUntilEndPhase,

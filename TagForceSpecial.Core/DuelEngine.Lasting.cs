@@ -297,7 +297,7 @@ public sealed partial class DuelEngine
     /// <summary>True when the player has a face-up monster whose quick effect could be activated in an open window now.</summary>
     private bool QuickMonsterReady(PlayerId playerId) => State.GetPlayer(playerId).MonsterZones.Any(m =>
         m is { Position: not BattlePosition.FaceDownDefense, BattleDestroyed: false } && effectsByCard.TryGetValue(m.Card.GameCardId, out var effects) &&
-        effects.Any(definition => definition.Kind == EffectKind.MonsterQuick && definition.Origin == EffectOrigin.Field && !(definition.OncePerTurn && UsedThisTurn(m.Card, definition)) &&
+        effects.Any(definition => definition.Kind == EffectKind.MonsterQuick && definition.Origin == EffectOrigin.Field && !(definition.OncePerTurn && UsedThisTurn(m.Card, definition, m.PlacementId)) &&
             DefinitionActivationError(definition, ActivationContext.MonsterWindow, playerId, m.Card, null) == DuelError.None));
 
     /// <summary>Starts a monster effect in an open state, as a chain response, or in an open or battle window.</summary>
@@ -311,7 +311,9 @@ public sealed partial class DuelEngine
         if (monster.Position == BattlePosition.FaceDownDefense || monster.BattleDestroyed ||
             !EffectAt(monster.Card.GameCardId, effectIndex, out var definition) || !definition.IsMonsterEffect || definition.Origin != EffectOrigin.Field)
             return Reject(DuelError.UnsupportedMonsterEffect);
-        if (definition.OncePerTurn && UsedThisTurn(monster.Card, definition)) return Reject(DuelError.EffectAlreadyUsed);
+        // A Union's equip and unequip are one action per turn while it moves between zones on the field.
+        long? placement = definition.Steps.Any(s => s is UnionEquipStep) ? null : monster.PlacementId;
+        if (definition.OncePerTurn && UsedThisTurn(monster.Card, definition, placement)) return Reject(DuelError.EffectAlreadyUsed);
         var context = window ? ActivationContext.MonsterWindow : chain is null ? ActivationContext.MonsterField : ActivationContext.MonsterChainResponse;
         if (DefinitionActivationError(definition, context, playerId, monster.Card, null, chain?.Links[^1]) is not DuelError.None and var error)
             return Reject(error);
@@ -325,7 +327,7 @@ public sealed partial class DuelEngine
         }
         else if (detach is { Count: > 0 }) return Reject(DuelError.InvalidDecisionChoice);
         var next = from ?? State;
-        if (definition.OncePerTurn) next = RecordUse(next, monster.Card, definition);
+        if (definition.OncePerTurn) next = RecordUse(next, monster.Card, definition, placement);
         DuelEvent[] head = [new MonsterEffectActivated(playerId, definition.EffectId, monster.Card, zone)];
         MonsterBinding binding = new(playerId, zone, monster.Card, monster.PlacementId);
         List<DuelEvent> paid = [.. head];
@@ -361,12 +363,13 @@ public sealed partial class DuelEngine
         return ContinueCommit(next, head, playerId, monster.Card, zone, definition, monster.PlacementId, chain);
     }
 
-    private bool UsedThisTurn(CardInstance card, EffectDefinition effect) =>
-        State.Bookkeeping.ActivatedUses.Any(u => u.InstanceId == card.InstanceId && u.TurnNumber == State.TurnNumber && u.Key == effect.OncePerTurnKey);
+    /// <summary>A plain once-per-turn limit belongs to this copy where it is now; a card that left the field and returned is a new card.</summary>
+    private bool UsedThisTurn(CardInstance card, EffectDefinition effect, long? placement = null) =>
+        State.Bookkeeping.ActivatedUses.Any(u => u.InstanceId == card.InstanceId && u.TurnNumber == State.TurnNumber && u.Key == effect.OncePerTurnKey && u.PlacementId == placement);
 
-    private DuelState RecordUse(DuelState state, CardInstance card, EffectDefinition effect) => state.WithBookkeeping(state.Bookkeeping with
+    private DuelState RecordUse(DuelState state, CardInstance card, EffectDefinition effect, long? placement = null) => state.WithBookkeeping(state.Bookkeeping with
     {
-        ActivatedUses = Array.AsReadOnly(state.Bookkeeping.ActivatedUses.Where(u => u.TurnNumber == State.TurnNumber).Append(new(card.InstanceId, State.TurnNumber, effect.OncePerTurnKey)).ToArray())
+        ActivatedUses = Array.AsReadOnly(state.Bookkeeping.ActivatedUses.Where(u => u.TurnNumber == State.TurnNumber).Append(new(card.InstanceId, State.TurnNumber, effect.OncePerTurnKey, placement)).ToArray())
     });
 
     private DuelActionResult ExecuteUnequip(PlayerId playerId, int zone)

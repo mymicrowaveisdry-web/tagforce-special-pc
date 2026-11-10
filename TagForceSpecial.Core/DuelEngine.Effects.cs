@@ -71,6 +71,7 @@ public sealed partial class DuelEngine
     private DuelError DefinitionRequirementsError(EffectDefinition definition, PlayerId playerId, CardInstance card, ChainLink? preceding)
     {
         var player = State.GetPlayer(playerId);
+        if (definition.NameLimit is { } limit && NameLimitReached(State, playerId, limit)) return DuelError.EffectAlreadyUsed;
         if (ActivationLocked(State, playerId, card, definition)) return DuelError.LockedByEffect;
         if (definition.Cost is TributeSelfCost && RuleLocked(State, LockedAction.BeTributed, playerId, card, MonsterOf(State, card))) return DuelError.LockedByEffect;
         foreach (var condition in definition.Conditions)
@@ -409,6 +410,7 @@ public sealed partial class DuelEngine
             SummonAttemptId: chain is null && definition.Steps.Any(s => s is NegateSummonStep) ? State.PendingSummon?.AttemptId : null);
         var pending = new PendingChain(checked(State.Revision + 1), (chain?.Links ?? []).Append(link), Other(receipt.Player));
         var next = state.WithCommittedActivation(receipt).WithChain(pending);
+        if (definition.NameLimit is { } named) next = RecordNamedUse(next, receipt.Player, named);
         // A link added during battle reopens the battle window for the other player, as battle responses do.
         if (next.Battle is { } battle)
             next = next.WithBattle(battle with { Window = battle.Window with { ConsecutivePasses = 0, Responder = Other(receipt.Player) } });

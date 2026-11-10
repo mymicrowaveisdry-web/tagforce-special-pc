@@ -124,6 +124,16 @@ public sealed class CardTable(string prefix)
         new(id, name, CardKind.Monster, EffectMonsterKind, IconNormal, rules ?? MonsterRules, effects.Select((o, i) => new EffectDefinition(Effect(id, $"effect-{i + 1}"), id,
             quick ? EffectKind.MonsterQuick : EffectKind.MonsterIgnition, o.Steps, o.Conditions, o.Cost, fieldTargets: o.Targets, oncePerTurn: true, oncePerTurnKey: sharedLimit ? Effect(id, "shared") : null)).ToArray());
 
+    /// <summary>
+    /// Adds a limit every copy shares: "activate 1 X per turn" counts activations, "use this effect of X once per turn"
+    /// counts uses; <paramref name="perDuel"/> makes it once per Duel.
+    /// </summary>
+    public AuthoredCard ByName(AuthoredCard card, LimitCounts counts = LimitCounts.Activations, bool perDuel = false)
+    {
+        var limit = new NameLimit(Effect(card.Id, "name-limit"), counts, perDuel);
+        return card with { Definitions = Array.AsReadOnly(card.Definitions.Select(d => d.WithNameLimit(limit)).ToArray()) };
+    }
+
     private RuleLockProfile Locked(uint id, RuleLock rule) => new(Effect(id, "lock"), id, rule);
 
     /// <summary>A Continuous card whose only effect is a "cannot" rule while it stays face-up.</summary>
@@ -231,7 +241,8 @@ public sealed class CardTable(string prefix)
         bool targets = effect.FieldTargets.Count != 0;
         string detail = effect.Kind == EffectKind.FieldSpell || effect.LastingModifiers.Count != 0 ? $" Lasting: {Describe(effect.LastingModifiers)}." : "";
         return new(card.Id, card.Name, card.Kind, effect,
-            string.Join(" Or: ", card.Definitions.Select(d => $"{d.Kind}: {Describe(d.Steps)}.")) + detail + (card.Locks.Count == 0 ? "" : $" Rules: {Describe(card.Locks.Select(l => l.Lock))}."),
+            string.Join(" Or: ", card.Definitions.Select(d => $"{d.Kind}: {Describe(d.Steps)}.")) + detail + (card.Locks.Count == 0 ? "" : $" Rules: {Describe(card.Locks.Select(l => l.Lock))}.")
+                + (card.Definitions.Select(d => d.NameLimit).FirstOrDefault(l => l is not null) is { } named ? $" Limit: {named.Counts} by name, once per {(named.PerDuel ? "Duel" : "turn")}." : ""),
             card.Triggers.Count != 0 ? string.Join("; ", card.Triggers.Select(t => $"{t.Requirement} {t.Timing} on {t.EventKind} from {t.SourceLocation}, cause {t.Cause}")) + "."
                 : effect.Conditions.Count == 0 ? $"Default timing for {effect.Kind}." : $"Default timing for {effect.Kind}, with {Describe(effect.Conditions)}.",
             effect.Cost is null ? "none" : $"{Describe(effect.Cost)} (never refunded).",

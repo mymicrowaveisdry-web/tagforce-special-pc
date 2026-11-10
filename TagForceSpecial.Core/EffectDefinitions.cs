@@ -282,6 +282,17 @@ public sealed class EffectDefinition
     public bool OncePerTurn { get; }
     /// <summary>Effects with the same key share one use per turn; by default each effect has its own.</summary>
     public string OncePerTurnKey { get; }
+    /// <summary>A limit shared by every copy the player controls, checked before activation.</summary>
+    public NameLimit? NameLimit { get; private set; }
+
+    /// <summary>A copy of this definition with a by-name limit.</summary>
+    public EffectDefinition WithNameLimit(NameLimit limit)
+    {
+        ArgumentNullException.ThrowIfNull(limit);
+        var copy = (EffectDefinition)MemberwiseClone();
+        copy.NameLimit = limit;
+        return copy;
+    }
     /// <summary>Where this effect is used from.</summary>
     public EffectOrigin Origin { get; }
     public bool IsFaceUpEffect => Kind is EffectKind.SpellTrapIgnition or EffectKind.SpellTrapQuick;

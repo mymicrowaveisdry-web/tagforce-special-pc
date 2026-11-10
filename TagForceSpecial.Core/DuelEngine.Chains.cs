@@ -220,6 +220,10 @@ public sealed partial class DuelEngine
         var target = links[number - 1];
         links[number - 1] = target with { Negation = negation };
         events.Add(new ChainLinkNegated(number, link.Number, negation));
+        // A negated activation never happened, so a limit that counts activations is not spent.
+        if (negation == ChainNegation.Activation && target.Trigger is null && effectsById.TryGetValue(target.Activation.EffectId, out var negated) &&
+            negated.NameLimit is { Counts: LimitCounts.Activations } limit)
+            next = ForgetNamedUse(next, target.Activation.Player, limit);
         // A card used from the hand or Graveyard is not on the field to be destroyed.
         if (target.Operation == ChainOperation.ZoneEffect) return next;
         if (destroy && target.Operation == ChainOperation.MonsterEffect)

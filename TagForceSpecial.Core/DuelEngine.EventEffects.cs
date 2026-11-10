@@ -229,7 +229,7 @@ public sealed partial class DuelEngine
         }
         return next.WithEventEffects(current.WithTriggers(pending, current.PendingCommitment).WithDeferred(deferred, last)
             .WithModifiers(timed, applied, statistics).WithNegations(negations, negated)
-            .WithUses(current.UsedTriggers.Where(u => u.Turn == next.TurnNumber)));
+            .WithUses(current.UsedTriggers.Where(u => u.Turn == next.TurnNumber || u.Turn == 0)));
     }
 
     private DuelState ResolveTrigger(DuelState next, TriggerActivation trigger, List<DuelEvent> events)

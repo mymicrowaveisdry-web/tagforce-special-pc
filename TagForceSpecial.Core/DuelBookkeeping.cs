@@ -18,9 +18,11 @@ internal sealed record DuelBookkeeping(int NextInstanceId = 1, DuelRandomState? 
     /// <summary>"Cannot" rules applied until the end of a turn.</summary>
     public IReadOnlyList<TimedRuleLock> TimedLocks { get; init; } = Array.AsReadOnly(Array.Empty<TimedRuleLock>());
     public IReadOnlyList<RuleLockUse> LockUses { get; init; } = Array.AsReadOnly(Array.Empty<RuleLockUse>());
+    /// <summary>By-name uses this turn, and once-per-Duel uses for the whole Duel.</summary>
+    public IReadOnlyList<NamedUse> NamedUses { get; init; } = Array.AsReadOnly(Array.Empty<NamedUse>());
 }
 
-internal sealed record ActivatedEffectUse(int InstanceId, int TurnNumber, string Key);
+internal sealed record ActivatedEffectUse(int InstanceId, int TurnNumber, string Key, long? PlacementId = null);
 
 /// <summary>
 /// A turn player's phase-change request, or a just-completed Summon, paused so the other player can activate a set

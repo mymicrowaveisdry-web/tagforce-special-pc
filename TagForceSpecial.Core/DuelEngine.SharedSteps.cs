@@ -96,11 +96,11 @@ public sealed partial class DuelEngine
         var field = State.GetPlayer(playerId).SpellTrapAt(zone);
         if (field is not { IsFaceUp: true, EffectActive: true } || !EffectAt(field.Card.GameCardId, effectIndex, out var definition) || !definition.IsFaceUpEffect || definition.Origin != EffectOrigin.Field)
             return Reject(DuelError.UnsupportedSpellEffect);
-        if (definition.OncePerTurn && UsedThisTurn(field.Card, definition)) return Reject(DuelError.EffectAlreadyUsed);
+        if (definition.OncePerTurn && UsedThisTurn(field.Card, definition, field.PlacementId)) return Reject(DuelError.EffectAlreadyUsed);
         var context = window ? ActivationContext.SpellTrapWindow : chain is null ? ActivationContext.SpellTrapField : ActivationContext.SpellTrapChain;
         if (DefinitionActivationError(definition, context, playerId, field.Card, field, chain?.Links[^1]) is not DuelError.None and var error) return Reject(error);
         var start = from ?? State;
-        var next = definition.OncePerTurn ? RecordUse(start, field.Card, definition) : start;
+        var next = definition.OncePerTurn ? RecordUse(start, field.Card, definition, field.PlacementId) : start;
         var (paid, head) = PayLifePointCost(next, playerId, definition, [new FieldEffectActivated(playerId, definition.EffectId, field.Card, zone)]);
         return ContinueCommit(paid, head, playerId, field.Card, zone, definition, field.PlacementId, chain);
     }
@@ -122,7 +122,7 @@ public sealed partial class DuelEngine
         if (QuickMonsterReady(playerId)) return true;
         if (!HasZoneOrFaceUpQuicks) return false;
         var player = State.GetPlayer(playerId);
-        bool Ready(EffectDefinition d, CardInstance card) => d.Kind is EffectKind.MonsterQuick or EffectKind.SpellTrapQuick && !(d.OncePerTurn && UsedThisTurn(card, d));
+        bool Ready(EffectDefinition d, CardInstance card, long? placement = null) => d.Kind is EffectKind.MonsterQuick or EffectKind.SpellTrapQuick && !(d.OncePerTurn && UsedThisTurn(card, d, placement));
         foreach (var card in player.Hand.Concat(player.Graveyard))
             if (effectsByCard.TryGetValue(card.GameCardId, out var effects))
             {
@@ -130,7 +130,7 @@ public sealed partial class DuelEngine
                 if (effects.Any(d => d.Origin == origin && Ready(d, card) && DefinitionActivationError(d, ActivationContext.ZoneWindow, playerId, card, null) == DuelError.None)) return true;
             }
         return ActiveCards(State).Where(e => e.Player == playerId).Any(e => effectsByCard.TryGetValue(e.Field.Card.GameCardId, out var effects) &&
-            effects.Any(d => d.IsFaceUpEffect && Ready(d, e.Field.Card) && DefinitionActivationError(d, ActivationContext.SpellTrapWindow, playerId, e.Field.Card, e.Field) == DuelError.None));
+            effects.Any(d => d.IsFaceUpEffect && Ready(d, e.Field.Card, e.Field.PlacementId) && DefinitionActivationError(d, ActivationContext.SpellTrapWindow, playerId, e.Field.Card, e.Field) == DuelError.None));
     }
 
     private static bool SpellTrapSourcePresent(DuelState state, MonsterBinding source) =>
