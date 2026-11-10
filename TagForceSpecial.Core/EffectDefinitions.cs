@@ -324,7 +324,8 @@ public sealed class EffectDefinition
     }).Where(c => c != EffectCount.None);
     internal static bool IsFieldTargetStep(EffectStep s) => s is DestroyTargetsStep or ReturnTargetsToHandStep or ChangeTargetsToDefenseStep or
         BanishFieldTargetsStep or NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep or DestroyAndBanishTargetsStep or ModifyCombatantStatsStep or
-        EquipTargetStep or UnionEquipStep or PlaceCounterStep or ModifyTargetsUntilEndStep or FlipTargetsFaceDownStep or FlipTargetsFaceUpStep;
+        EquipTargetStep or UnionEquipStep or PlaceCounterStep or ModifyTargetsUntilEndStep or FlipTargetsFaceDownStep or FlipTargetsFaceUpStep or
+        AttachSourceStep or AttachTargetsToSelfStep;
     /// <summary>Cost choices answered before the target choices, each binding a field target answer.</summary>
     internal int CostTargetSteps => Cost switch { TributeCost tribute => tribute.Count, BanishFromGraveyardCost banish => banish.Count, _ => 0 };
     internal static bool IsAutomatic(EffectTarget t) => t is AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget or TriggerTargetedMonster or TriggerSourceMonster;
@@ -388,6 +389,7 @@ public sealed class EffectDefinition
                     FlipTargetsFaceUpStep s => s.Position is not (BattlePosition.FaceUpAttack or BattlePosition.FaceUpDefense),
                     ReturnSourceToDeckTopStep => kind != EffectKind.MonsterTrigger,
                     BanishFieldTargetsStep or NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep or DestroyAndBanishTargetsStep => false,
+                    AttachSourceStep or AttachTargetsToSelfStep => false,
                     ModifyCombatantStatsStep s => s.Attack == 0 && s.Defense == 0,
                     BanishAllStep s => !Enum.IsDefined(s.Side) || !Enum.IsDefined(s.Filter),
                     DestroyAllStep s => !Enum.IsDefined(s.Kind) || !Enum.IsDefined(s.Side) || !Enum.IsDefined(s.Filter),
@@ -446,7 +448,11 @@ public sealed class EffectDefinition
             attaches && fields is not [FieldTarget { Kind: FieldCardKind.Monster, Count: 1, Filter: FieldCardFilter.FaceUp }] ||
             snapshot.Any(s => s is SpecialSummonTargetStep { Link: RevivalLink.Haunted }) && kind != EffectKind.ContinuousTrap ||
             unionEquip && (kind != EffectKind.MonsterIgnition || !oncePerTurn || fields is not [FieldTarget { Kind: FieldCardKind.Monster, Count: 1, Side: TargetSide.Own, Filter: FieldCardFilter.FaceUp, NoUnionEquipped: true }]) ||
-            snapshot.Any(s => s is PlaceCounterStep) && fields is not ([TriggerSourceMonster] or [FieldTarget { Count: 1 }]))
+            snapshot.Any(s => s is PlaceCounterStep) && fields is not ([TriggerSourceMonster] or [FieldTarget { Count: 1 }]) ||
+            (snapshot.Any(s => s is AttachSourceStep or SpecialSummonTargetStep { Link: RevivalLink.Material }) &&
+                kind is not (EffectKind.NormalSpell or EffectKind.QuickPlaySpell or EffectKind.NormalTrap)) ||
+            snapshot.Any(s => s is AttachSourceStep) && fields is not [FieldTarget { Kind: FieldCardKind.Monster, Count: 1 }] ||
+            snapshot.Any(s => s is AttachTargetsToSelfStep) && (!monsterKind || fields.Any(f => f is not FieldTarget { Kind: FieldCardKind.Monster })))
             throw new ArgumentException("Equip, revival, Union and counter steps need their card kinds and bound targets.", nameof(steps));
         if (kind == EffectKind.MonsterTrigger && (required.Length != 0 || cost is not null || target is not null || fields is not ([] or [TriggerTargetedMonster] or [TriggerSourceMonster] or [ZoneTarget { MinCount: 1, MaxCount: 1 }]) || locksOtherSummonsThisTurn) ||
             kind != EffectKind.MonsterTrigger && fields.Any(f => f is TriggerTargetedMonster or TriggerSourceMonster))

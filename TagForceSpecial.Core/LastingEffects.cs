@@ -9,7 +9,9 @@ public enum RevivalLink
     /// <summary>The monster is destroyed when the card leaves the field; the card is destroyed when the monster is destroyed.</summary>
     Haunted,
     /// <summary>The card equips the monster; the monster is destroyed when the card is destroyed.</summary>
-    Equip
+    Equip,
+    /// <summary>The card is attached to the revived monster as Xyz Material.</summary>
+    Material
 }
 
 /// <summary>A public count that multiplies a lasting stat change, from the lasting card's controller's side.</summary>

@@ -159,6 +159,14 @@ public sealed record ZoneTarget : EffectTarget
 public sealed record AnyCardFilter : CardFilter;
 /// <summary>Matches a card the inner filter rejects.</summary>
 public sealed record NotFilter(CardFilter Filter) : CardFilter;
+/// <summary>Matches Xyz Monsters.</summary>
+public sealed record XyzMonsterFilter : CardFilter;
+
+/// <summary>Attaches the resolving Spell or Trap to its bound Xyz Monster as Xyz Material, if both are still there.</summary>
+public sealed record AttachSourceStep : EffectStep;
+
+/// <summary>Attaches every bound target monster to the activating monster as Xyz Material; Tokens cannot be attached.</summary>
+public sealed record AttachTargetsToSelfStep : EffectStep;
 
 /// <summary>Adds every qualifying Graveyard or banished target to its owner's hand.</summary>
 public sealed record AddTargetsToHandStep : EffectStep;

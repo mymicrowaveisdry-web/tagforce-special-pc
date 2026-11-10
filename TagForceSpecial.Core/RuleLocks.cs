@@ -135,7 +135,10 @@ public sealed partial class DuelEngine
     }
 
     private bool MoveAllowed(DuelState state, DecisionSequence sequence, int index, FieldCardTarget target) =>
-        SequenceDefinition(sequence) is not { } definition || ChoiceMove(definition, index, target.Card) is var move && (move == LockedAction.None || !MoveLocked(state, move, target));
+        SequenceDefinition(sequence) is not { } definition ||
+        // A Token cannot become Xyz Material, so an attaching effect cannot choose one.
+        !(index >= definition.CostTargetSteps && definition.Steps.Any(s => s is AttachTargetsToSelfStep) && IsTokenId(target.Card.GameCardId)) &&
+        ChoiceMove(definition, index, target.Card) is var move && (move == LockedAction.None || !MoveLocked(state, move, target));
 
     private EffectDefinition? SequenceDefinition(DecisionSequence sequence)
     {

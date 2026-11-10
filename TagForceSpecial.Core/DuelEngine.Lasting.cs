@@ -20,7 +20,7 @@ public sealed partial class DuelEngine
 
     private bool? fieldLinks;
     private bool HasFieldLinks => fieldLinks ??= rules.Values.Any(r => r.IsToon) || allEffects.Any(d => d.Kind == EffectKind.EquipSpell ||
-        d.Steps.Any(s => s is UnionEquipStep || s is SpecialSummonTargetStep { Link: not RevivalLink.None }));
+        d.Steps.Any(s => s is UnionEquipStep || s is SpecialSummonTargetStep { Link: RevivalLink.Haunted or RevivalLink.Equip }));
 
     internal bool IsToonCard(uint cardId) => rules.TryGetValue(cardId, out var rule) && rule.IsToon;
 

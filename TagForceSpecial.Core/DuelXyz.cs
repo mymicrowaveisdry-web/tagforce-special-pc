@@ -15,6 +15,9 @@ public sealed record XyzMaterialAttached(CardInstance Host, MonsterBinding Mater
 /// <summary>Sent from attachment storage, never from the field or by destruction.</summary>
 public sealed record XyzMaterialSentToGraveyard(CardInstance Host, CardInstance Material, bool IsCost) : DuelEvent;
 
+/// <summary>A card became Xyz Material of a monster by a card effect.</summary>
+public sealed record CardAttachedAsMaterial(PlayerId Controller, CardInstance Host, CardInstance Card, string EffectId) : DuelEvent;
+
 public sealed record ChooseTriggerXyzMaterials : DuelCommand
 {
     public long DecisionId { get; }

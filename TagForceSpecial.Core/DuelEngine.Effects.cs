@@ -537,6 +537,12 @@ public sealed partial class DuelEngine
                     definition.EffectId, events);
                 choice = null;
             }
+            else if (step is AttachSourceStep)
+            {
+                // The bound monster only has to still be there; it may have been turned face-down.
+                if (link.Activation.FieldTargets is [{ } host] && host.IsStillPresent(state)) state = AttachSourceAsMaterial(state, link, host, events);
+                else events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
+            }
             else if (EffectDefinition.IsFieldTargetStep(step) || EffectDefinition.IsZoneTargetStep(step))
             {
                 var valid = QualifyingTargets(state, link, definition).ToArray();
@@ -554,7 +560,12 @@ public sealed partial class DuelEngine
                             Enumerable.Range(0, 5).Where(z => state.GetPlayer(controller).MonsterZones[z] is null), revive.Position));
                     state = PlaceSpecialSummon(RemoveFromZone(state, valid[0]), controller, valid[0].Card, place.MonsterZone, place.Position,
                         DecisionCardSource.Graveyard, events, sourceAlreadyRemoved: true);
-                    if (revive.Link != RevivalLink.None) state = AttachRevival(state, link, place.MonsterZone, revive.Link);
+                    if (revive.Link == RevivalLink.Material)
+                    {
+                        var revived = state.GetPlayer(controller).MonsterZones[place.MonsterZone]!;
+                        state = AttachSourceAsMaterial(state, link, new(controller, FieldLocation.MonsterZone, place.MonsterZone, revived.Card, revived.PlacementId), events);
+                    }
+                    else if (revive.Link != RevivalLink.None) state = AttachRevival(state, link, place.MonsterZone, revive.Link);
                     choice = null;
                     continue;
                 }
@@ -599,6 +610,7 @@ public sealed partial class DuelEngine
                         ModifyTargetsUntilEndStep stats => ModifyUntilEnd(state, target, stats, definition.EffectId, events),
                         FlipTargetsFaceDownStep => FlipFaceDown(state, target, events),
                         FlipTargetsFaceUpStep flip => FlipFaceUp(state, target, flip, events),
+                        AttachTargetsToSelfStep => AttachMonsterAsMaterial(state, link, target, definition.EffectId, events),
                         BanishFieldTargetsStep => BanishFieldCard(state, target, definition.EffectId, events),
                         DestroyAndBanishTargetsStep => DestroyAndBanishFieldCard(state, target, definition.EffectId, events),
                         ModifyCombatantStatsStep stats => ModifyCombatant(state, link, target, stats, definition.EffectId, events),
@@ -772,6 +784,7 @@ public sealed partial class DuelEngine
             level <= limit.MaxLevel && level >= limit.MinLevel && (limit.TypeCode is not { } typeCode || catalog[card.GameCardId].Codes?.Type == typeCode),
         AnyOfFilter any => any.Filters.Any(f => MatchesFilter(card, f, inGraveyard)),
         NotFilter not => !MatchesFilter(card, not.Filter, inGraveyard),
+        XyzMonsterFilter => rule.Category == CardCategory.Monster && IsXyzCard(card),
         AllOfFilter all => all.Filters.All(f => MatchesFilter(card, f, inGraveyard)),
         MonsterTraitFilter trait => rule.Category == CardCategory.Monster && !trait.ExcludedCardIds.Contains(card.GameCardId) &&
             (trait.AttributeCode is not { } code || catalog[card.GameCardId].Codes?.Attribute == code) &&
