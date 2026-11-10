@@ -16,7 +16,7 @@ public sealed record PendingSummon(long AttemptId, long DecisionId, PlayerId Pla
 }
 
 public sealed record PassSummonResponse(PlayerId Player, long DecisionId) : DuelCommand(Player);
-public sealed record ActivateSummonNegation(PlayerId Player, long DecisionId, int SpellTrapZone) : DuelCommand(Player);
+public sealed record ActivateSummonNegation(PlayerId Player, long DecisionId, int SpellTrapZone, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] int EffectIndex = 0) : DuelCommand(Player);
 public sealed record SummonAttempted(PendingSummon Attempt) : DuelEvent;
 public sealed record SummonResponseRequested(PendingSummon Attempt) : DuelEvent;
 public sealed record SummonResponsePassed(PlayerId Player) : DuelEvent;

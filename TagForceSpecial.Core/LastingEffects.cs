@@ -151,6 +151,16 @@ public sealed record BanishFromGraveyardCost : EffectCost
 public sealed record ActivateMonsterEffect(PlayerId Player, int MonsterZone, IReadOnlyList<int>? DetachInstanceIds = null, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] int EffectIndex = 0) : DuelCommand(Player);
 /// <summary>A face-up Spell or Trap's activated effect in its controller's open Main Phase.</summary>
 public sealed record ActivateCardEffect(PlayerId Player, int SpellTrapZone, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] int EffectIndex = 0) : DuelCommand(Player);
+/// <summary>A card's activated effect used from the hand or Graveyard in an open Main Phase state.</summary>
+public sealed record ActivateZoneEffect(PlayerId Player, int CardInstanceId, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] int EffectIndex = 0) : DuelCommand(Player);
+/// <summary>A hand or Graveyard quick effect as the next chain link or in an open window.</summary>
+public sealed record ActivateZoneEffectResponse(PlayerId Player, long DecisionId, int CardInstanceId, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] int EffectIndex = 0) : DuelCommand(Player);
+/// <summary>A hand or Graveyard quick effect in an open battle window.</summary>
+public sealed record ActivateZoneEffectBattleResponse(PlayerId Player, long DecisionId, int CardInstanceId, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] int EffectIndex = 0) : DuelCommand(Player);
+/// <summary>A face-up Spell or Trap's quick effect as the next chain link or in an open window.</summary>
+public sealed record ActivateFieldEffectResponse(PlayerId Player, long DecisionId, int SpellTrapZone, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] int EffectIndex = 0) : DuelCommand(Player);
+/// <summary>A face-up Spell or Trap's quick effect in an open battle window.</summary>
+public sealed record ActivateFieldEffectBattleResponse(PlayerId Player, long DecisionId, int SpellTrapZone, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] int EffectIndex = 0) : DuelCommand(Player);
 /// <summary>A face-up monster's quick effect as the next chain link.</summary>
 public sealed record ActivateMonsterChainResponse(PlayerId Player, long DecisionId, int MonsterZone, IReadOnlyList<int>? DetachInstanceIds = null, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] int EffectIndex = 0) : DuelCommand(Player);
 /// <summary>A face-up monster's quick effect starting a chain in an open battle window.</summary>

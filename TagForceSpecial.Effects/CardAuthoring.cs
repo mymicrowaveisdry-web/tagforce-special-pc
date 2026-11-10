@@ -88,12 +88,32 @@ public sealed class CardTable(string prefix)
     }
 
     /// <summary>A Continuous card with no effect of its own beyond its activated effects, used while it stays face-up.</summary>
-    public AuthoredCard ContinuousWithEffects(uint id, string name, bool trap, params EffectOption[] effects)
+    public AuthoredCard ContinuousWithEffects(uint id, string name, bool trap, params EffectOption[] effects) => ContinuousWithEffects(id, name, trap, quick: false, effects);
+
+    public AuthoredCard ContinuousWithEffects(uint id, string name, bool trap, bool quick, params EffectOption[] effects)
     {
         var lasting = new EffectDefinition(Effect(id, "continuous"), id, trap ? EffectKind.ContinuousTrap : EffectKind.ContinuousSpell, [], isMarker: true);
-        var activated = effects.Select((o, i) => new EffectDefinition(Effect(id, $"effect-{i + 1}"), id, EffectKind.SpellTrapIgnition, o.Steps, o.Conditions, o.Cost, fieldTargets: o.Targets, oncePerTurn: true));
+        var activated = effects.Select((o, i) => new EffectDefinition(Effect(id, $"effect-{i + 1}"), id, quick ? EffectKind.SpellTrapQuick : EffectKind.SpellTrapIgnition, o.Steps, o.Conditions, o.Cost, fieldTargets: o.Targets, oncePerTurn: true));
         return new(id, name, trap ? CardKind.Trap : CardKind.Spell, trap ? TrapKind : SpellKind, IconContinuous, trap ? TrapRules : SpellRules, [lasting, .. activated]);
     }
+
+    /// <summary>A Continuous card that triggers while face-up, on events relative to its controller.</summary>
+    public AuthoredCard ContinuousTrigger(uint id, string name, bool trap, MonsterEventKind when, EffectRelation relation, EffectStep[] steps, TriggerRequirement requirement = TriggerRequirement.Mandatory,
+        TriggerTiming timing = TriggerTiming.If, TriggerEventCause cause = TriggerEventCause.Any, TriggerTurnLimit limit = TriggerTurnLimit.None, string exceptions = "none")
+    {
+        var lasting = new EffectDefinition(Effect(id, "continuous"), id, trap ? EffectKind.ContinuousTrap : EffectKind.ContinuousSpell, [], isMarker: true);
+        var trigger = new EffectDefinition(Effect(id, "trigger"), id, EffectKind.MonsterTrigger, steps);
+        return new(id, name, trap ? CardKind.Trap : CardKind.Spell, trap ? TrapKind : SpellKind, IconContinuous, trap ? TrapRules : SpellRules, [lasting, trigger], exceptions)
+        {
+            Triggers = [new TriggerEffectProfile(trigger, when, relation, requirement, TriggerSourceLocation.FaceUpSpellTrap, timing, cause, limit)]
+        };
+    }
+
+    /// <summary>A monster's activated effect used from the hand or Graveyard.</summary>
+    public AuthoredCard FromZone(uint id, string name, EffectOrigin origin, EffectOption effect, bool quick = false, bool oncePerTurn = false, DuelCardRules? rules = null, string exceptions = "none") =>
+        new(id, name, CardKind.Monster, EffectMonsterKind, IconNormal, rules ?? MonsterRules,
+            [new EffectDefinition(Effect(id, origin == EffectOrigin.Hand ? "hand" : "graveyard"), id, quick ? EffectKind.MonsterQuick : EffectKind.MonsterIgnition, effect.Steps, effect.Conditions, effect.Cost,
+                fieldTargets: effect.Targets, oncePerTurn: oncePerTurn, origin: origin)], exceptions);
 
     /// <summary>A monster with several activated effects. With <paramref name="sharedLimit"/>, they share one use per turn.</summary>
     public AuthoredCard ActivatedEffects(uint id, string name, bool quick, bool sharedLimit, DuelCardRules? rules, params EffectOption[] effects) =>

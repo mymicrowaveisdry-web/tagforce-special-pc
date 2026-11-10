@@ -26,6 +26,8 @@ public sealed partial class DuelEngine
             ActivateChainResponse c => c.DecisionId,
             ActivateHandChainResponse c => c.DecisionId,
             ActivateMonsterChainResponse c => c.DecisionId,
+            ActivateZoneEffectResponse c => c.DecisionId,
+            ActivateFieldEffectResponse c => c.DecisionId,
             ResolveNextChainLink c => c.DecisionId,
             _ => -1
         };
@@ -41,6 +43,8 @@ public sealed partial class DuelEngine
         if (command.Player != chain.Responder) return Reject(DuelError.NotChainResponder);
         if (command is ActivateHandChainResponse hand) return BeginHandDefinitionResponse(chain, hand);
         if (command is ActivateMonsterChainResponse monsterResponse) return BeginMonsterEffect(monsterResponse.Player, monsterResponse.MonsterZone, chain, detach: monsterResponse.DetachInstanceIds, effectIndex: monsterResponse.EffectIndex);
+        if (command is ActivateZoneEffectResponse zoneResponse) return BeginZoneEffect(zoneResponse.Player, zoneResponse.CardInstanceId, zoneResponse.EffectIndex, chain);
+        if (command is ActivateFieldEffectResponse fieldResponse) return BeginFieldEffect(fieldResponse.Player, fieldResponse.SpellTrapZone, fieldResponse.EffectIndex, chain);
         if (command is ActivateChainResponse response)
         {
             if (response.SpellTrapZone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
@@ -104,6 +108,7 @@ public sealed partial class DuelEngine
             case ChainOperation.Definition:
             case ChainOperation.MonsterEffect:
             case ChainOperation.FieldEffect:
+            case ChainOperation.ZoneEffect:
             case ChainOperation.TriggerEffect when link.Trigger is not null:
             {
                 (next, var pause) = ResolveDefinitionSteps(next, links, link, chain.DefinitionChoice?.StepIndex ?? 0,
@@ -162,7 +167,7 @@ public sealed partial class DuelEngine
         foreach (var entry in links.Reverse())
         {
             // Monster effects, including a Union's unequip, are not Spell activations.
-            if (entry.Trigger is not null || entry.Operation is ChainOperation.MonsterEffect or ChainOperation.UnionUnequip or ChainOperation.FieldEffect) continue;
+            if (entry.Trigger is not null || entry.Operation is ChainOperation.MonsterEffect or ChainOperation.UnionUnequip or ChainOperation.FieldEffect or ChainOperation.ZoneEffect) continue;
             var receipt = entry.Activation;
             var player = next.GetPlayer(receipt.Player);
             if (entry.IsPendulumScale)
@@ -215,13 +220,15 @@ public sealed partial class DuelEngine
         var target = links[number - 1];
         links[number - 1] = target with { Negation = negation };
         events.Add(new ChainLinkNegated(number, link.Number, negation));
+        // A card used from the hand or Graveyard is not on the field to be destroyed.
+        if (target.Operation == ChainOperation.ZoneEffect) return next;
         if (destroy && target.Operation == ChainOperation.MonsterEffect)
         {
             var receipt = target.Activation;
             FieldCardTarget monster = new(receipt.Player, FieldLocation.MonsterZone, receipt.SpellTrapZone, receipt.Spell, target.SourcePlacementId);
             return monster.IsStillPresent(next) ? DestroyFieldCard(next, monster, events) : next;
         }
-        if (destroy && target.Trigger is null)
+        if (destroy && (target.Trigger is null || target.Trigger.Profile.SourceLocation == TriggerSourceLocation.FaceUpSpellTrap))
         {
             var receipt = target.Activation;
             var player = next.GetPlayer(receipt.Player);
@@ -233,7 +240,7 @@ public sealed partial class DuelEngine
                     events, activationNegated: target.IsPendulumScale && negation == ChainNegation.Activation);
             }
         }
-        if (destroy && target.Trigger is { } triggered && triggered.Source.IsStillPresent(next))
+        if (destroy && target.Trigger is { Profile.SourceLocation: not TriggerSourceLocation.FaceUpSpellTrap } triggered && triggered.Source.IsStillPresent(next))
         {
             var binding = triggered.Source;
             next = DestroyFieldCard(next, new(binding.Player, FieldLocation.MonsterZone, binding.Zone, binding.Card, binding.PlacementId), events);

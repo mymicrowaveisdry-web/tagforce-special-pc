@@ -290,12 +290,12 @@ public sealed partial class DuelEngine
     }
 
     private bool? quickMonsters;
-    private bool HasQuickMonsters => quickMonsters ??= allEffects.Any(d => d.Kind == EffectKind.MonsterQuick);
+    private bool HasQuickMonsters => quickMonsters ??= allEffects.Any(d => d.Kind is EffectKind.MonsterQuick or EffectKind.SpellTrapQuick);
 
     /// <summary>True when the player has a face-up monster whose quick effect could be activated in an open window now.</summary>
-    private bool QuickMonsterReady(PlayerId playerId) => HasQuickMonsters && State.GetPlayer(playerId).MonsterZones.Any(m =>
+    private bool QuickMonsterReady(PlayerId playerId) => State.GetPlayer(playerId).MonsterZones.Any(m =>
         m is { Position: not BattlePosition.FaceDownDefense, BattleDestroyed: false } && effectsByCard.TryGetValue(m.Card.GameCardId, out var effects) &&
-        effects.Any(definition => definition.Kind == EffectKind.MonsterQuick && !(definition.OncePerTurn && UsedThisTurn(m.Card, definition)) &&
+        effects.Any(definition => definition.Kind == EffectKind.MonsterQuick && definition.Origin == EffectOrigin.Field && !(definition.OncePerTurn && UsedThisTurn(m.Card, definition)) &&
             DefinitionActivationError(definition, ActivationContext.MonsterWindow, playerId, m.Card, null) == DuelError.None));
 
     /// <summary>Starts a monster effect in an open state, as a chain response, or in an open or battle window.</summary>
@@ -307,7 +307,7 @@ public sealed partial class DuelEngine
         var monster = State.GetPlayer(playerId).MonsterZones[zone];
         if (monster is null) return Reject(DuelError.MonsterZoneEmpty);
         if (monster.Position == BattlePosition.FaceDownDefense || monster.BattleDestroyed ||
-            !EffectAt(monster.Card.GameCardId, effectIndex, out var definition) || !definition.IsMonsterEffect)
+            !EffectAt(monster.Card.GameCardId, effectIndex, out var definition) || !definition.IsMonsterEffect || definition.Origin != EffectOrigin.Field)
             return Reject(DuelError.UnsupportedMonsterEffect);
         if (definition.OncePerTurn && UsedThisTurn(monster.Card, definition)) return Reject(DuelError.EffectAlreadyUsed);
         var context = window ? ActivationContext.MonsterWindow : chain is null ? ActivationContext.MonsterField : ActivationContext.MonsterChainResponse;

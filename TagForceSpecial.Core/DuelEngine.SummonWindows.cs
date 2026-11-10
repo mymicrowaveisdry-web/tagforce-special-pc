@@ -83,7 +83,7 @@ public sealed partial class DuelEngine
         if (command.SpellTrapZone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
         var player = State.GetPlayer(command.Player);
         var source = player.SpellTrapFields[command.SpellTrapZone];
-        if (source is null || !definitions.TryGetValue(source.Card.GameCardId, out var definition))
+        if (source is null || !EffectAt(source.Card.GameCardId, command.EffectIndex, out var definition))
             return Reject(DuelError.UnsupportedSummonResponse);
         return BeginSummonDefinition(player.Id, command.SpellTrapZone, source, definition);
     }

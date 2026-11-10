@@ -9,7 +9,9 @@ public enum EffectKind
     /// <summary>A face-up monster's Spell Speed 2 effect, also usable as a chain response.</summary>
     MonsterQuick,
     /// <summary>A face-up Continuous, Field or Equip card's Spell Speed 1 effect, activated in its controller's open Main Phase.</summary>
-    SpellTrapIgnition
+    SpellTrapIgnition,
+    /// <summary>A face-up Continuous, Field or Equip card's Spell Speed 2 effect, also usable as a response.</summary>
+    SpellTrapQuick
 }
 
 /// <summary>One ordered resolution operation from a closed, Core-defined set.</summary>
@@ -280,6 +282,9 @@ public sealed class EffectDefinition
     public bool OncePerTurn { get; }
     /// <summary>Effects with the same key share one use per turn; by default each effect has its own.</summary>
     public string OncePerTurnKey { get; }
+    /// <summary>Where this effect is used from.</summary>
+    public EffectOrigin Origin { get; }
+    public bool IsFaceUpEffect => Kind is EffectKind.SpellTrapIgnition or EffectKind.SpellTrapQuick;
     /// <summary>ATK this monster gains for each counter on it.</summary>
     public int AttackPerCounter { get; }
     /// <summary>The phase of its controller's turn in which the upkeep is owed.</summary>
@@ -299,7 +304,7 @@ public sealed class EffectDefinition
         _ => ChainSpellSpeed.Two
     };
 
-    internal bool SummonsMonsters => Steps.Any(s => s is SummonTokensStep or SpecialSummonStep);
+    internal bool SummonsMonsters => Steps.Any(s => s is SummonTokensStep or SpecialSummonStep or SpecialSummonSelfStep);
     internal IEnumerable<EffectCount> Counts => Steps.Select(s => s switch
     {
         GainLifePointsStep g => g.PerCount,
@@ -323,7 +328,7 @@ public sealed class EffectDefinition
         bool locksOtherSummonsThisTurn = false, IEnumerable<EffectTarget>? fieldTargets = null,
         IEnumerable<LastingStatModifier>? lastingModifiers = null, LastingNegation negation = LastingNegation.None, int upkeepLifePoints = 0,
         bool oncePerTurn = false, int attackPerCounter = 0, bool isMarker = false, DuelPhase upkeepPhase = DuelPhase.Standby,
-        DestructionCause unionReplaces = DestructionCause.Battle, int spellCounterMax = 0, bool locksOwnAttack = false, string? oncePerTurnKey = null)
+        DestructionCause unionReplaces = DestructionCause.Battle, int spellCounterMax = 0, bool locksOwnAttack = false, string? oncePerTurnKey = null, EffectOrigin origin = EffectOrigin.Field)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(effectId);
         ArgumentNullException.ThrowIfNull(steps);
@@ -339,7 +344,7 @@ public sealed class EffectDefinition
             throw new ArgumentException("Only lasting cards and Union equips take up to 8 distinct lasting modifiers.", nameof(lastingModifiers));
         if (!Enum.IsDefined(negation) || upkeepLifePoints < 0 || attackPerCounter < 0 ||
             (negation != LastingNegation.None || upkeepLifePoints != 0) && !lastingKind ||
-            oncePerTurn && !monsterKind && kind != EffectKind.SpellTrapIgnition || oncePerTurnKey is not null && (!oncePerTurn || oncePerTurnKey.Length == 0) ||
+            oncePerTurn && !monsterKind && kind is not (EffectKind.SpellTrapIgnition or EffectKind.SpellTrapQuick) || oncePerTurnKey is not null && (!oncePerTurn || oncePerTurnKey.Length == 0) ||
             (attackPerCounter != 0 || locksOwnAttack) && !monsterKind)
             throw new ArgumentException("Negation and upkeep belong to lasting cards; once-per-turn and counter stats to activated monster effects.", nameof(negation));
         if (upkeepPhase is not (DuelPhase.Standby or DuelPhase.End) || unionReplaces is not (DestructionCause.Battle or DestructionCause.Any) ||
@@ -366,6 +371,7 @@ public sealed class EffectDefinition
                     AddTargetsToHandStep or BanishTargetsStep or ReturnTargetsToGraveyardStep or ShuffleTargetsIntoDeckStep => false,
                     SpecialSummonTargetStep s => s.Position is not (null or BattlePosition.FaceUpAttack or BattlePosition.FaceUpDefense) || !Enum.IsDefined(s.Link),
                     EquipTargetStep or UnionEquipStep or PlaceCounterStep or FlipTargetsFaceDownStep or GrantNormalSummonStep or StopUnlessNoOwnMonstersStep => false,
+                    SpecialSummonSelfStep s => s.Position is not (null or BattlePosition.FaceUpAttack or BattlePosition.FaceUpDefense),
                     ModifyTargetsUntilEndStep s => s.Attack == 0 && s.Defense == 0,
                     FlipTargetsFaceUpStep s => s.Position is not (BattlePosition.FaceUpAttack or BattlePosition.FaceUpDefense),
                     ReturnSourceToDeckTopStep => kind != EffectKind.MonsterTrigger,
@@ -387,9 +393,14 @@ public sealed class EffectDefinition
         if (required.OfType<BattleTimingCondition>().Any(c => c.Windows == BattleTiming.None || (c.Windows & ~BattleTiming.All) != 0 ||
                 c.Windows.HasFlag(BattleTiming.Calculation) && !c.DuringCalculation))
             throw new ArgumentException("A battle timing condition needs supported timings; during calculation needs an explicit exception.", nameof(conditions));
-        if (cost is not (null or DiscardCost or PayLifePointsCost or TributeCost or PayHalfLifePointsCost or TributeSelfCost or RemoveCounterCost or BanishFromGraveyardCost or DetachCost) ||
+        if (cost is not (null or DiscardCost or PayLifePointsCost or TributeCost or PayHalfLifePointsCost or TributeSelfCost or RemoveCounterCost or BanishFromGraveyardCost or DetachCost or SendSelfCost) ||
             cost is TributeSelfCost or RemoveCounterCost or DetachCost && !monsterKind ||
             cost is DiscardCost { Count: < 1 or > 5 } or TributeCost { Count: < 1 or > 5 }) throw new ArgumentOutOfRangeException(nameof(cost));
+        if (!Enum.IsDefined(origin) || origin != EffectOrigin.Field && !monsterKind && kind is not (EffectKind.SpellTrapIgnition or EffectKind.SpellTrapQuick) ||
+            cost is SendSelfCost self && (!Enum.IsDefined(self.Destination) || origin == EffectOrigin.Field || origin == EffectOrigin.Hand && self.Destination == SelfDestination.Banish ||
+                origin == EffectOrigin.Graveyard && self.Destination != SelfDestination.Banish) ||
+            snapshot.Any(s => s is SpecialSummonSelfStep) && origin == EffectOrigin.Field)
+            throw new ArgumentException("Hand and Graveyard effects belong to activated effects, with a self-cost that matches where the card is.", nameof(origin));
         if (required.OfType<MonsterWouldBeSummonedCondition>().Any(c => c.Kinds is <= 0 || (c.Kinds & ~(SummonKinds.Normal | SummonKinds.Special)) != 0) ||
             snapshot.Any(s => s is NegateSummonStep) != required.Any(c => c is MonsterWouldBeSummonedCondition) || snapshot.Any(s => s is NegateSummonStep) && kind != EffectKind.CounterTrap)
             throw new ArgumentException("Summon negation needs a Counter Trap with a Normal/Special would-be-Summoned condition.", nameof(steps));
@@ -442,6 +453,7 @@ public sealed class EffectDefinition
         UpkeepLifePoints = upkeepLifePoints;
         OncePerTurn = oncePerTurn;
         OncePerTurnKey = oncePerTurnKey ?? effectId;
+        Origin = origin;
         AttackPerCounter = attackPerCounter;
         UpkeepPhase = upkeepPhase;
         UnionReplaces = unionReplaces;
@@ -452,7 +464,7 @@ public sealed class EffectDefinition
 
 public sealed record ActivateSetSpell(PlayerId Player, int SpellTrapZone, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] int EffectIndex = 0) : DuelCommand(Player);
 /// <summary>The turn player activates a Quick-Play Spell from the hand as the next chain link.</summary>
-public sealed record ActivateHandChainResponse(PlayerId Player, long DecisionId, int CardInstanceId, int SpellTrapZone)
+public sealed record ActivateHandChainResponse(PlayerId Player, long DecisionId, int CardInstanceId, int SpellTrapZone, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] int EffectIndex = 0)
     : DuelCommand(Player);
 public sealed record EffectDamageDealt(PlayerId Player, int Damage, int LifePointsBefore,
     int LifePointsAfter, string EffectId) : DuelEvent;

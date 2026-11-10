@@ -88,6 +88,22 @@ public sealed record FlipTargetsFaceUpStep(BattlePosition Position = BattlePosit
 /// <summary>The turn player can conduct one more Normal Summon or Set this turn.</summary>
 public sealed record GrantNormalSummonStep : EffectStep;
 
+/// <summary>Where a card's activated effect is used from.</summary>
+public enum EffectOrigin { Field, Hand, Graveyard }
+
+public enum SelfDestination { Graveyard, Discard, Banish }
+
+/// <summary>The activating card moves as the cost: from the hand to the Graveyard, or banished from the Graveyard (never refunded).</summary>
+public sealed record SendSelfCost(SelfDestination Destination) : EffectCost;
+
+/// <summary>Special Summons the activating card from the hand or Graveyard, if it is still there.</summary>
+public sealed record SpecialSummonSelfStep(BattlePosition? Position = null) : EffectStep;
+
+public enum TurnOwner { Own, Opponent, Either }
+
+/// <summary>Met only on the given player's turn and, when set, only during a Main Phase.</summary>
+public sealed record TurnTimingCondition(TurnOwner Owner, bool MainPhaseOnly = false) : EffectCondition;
+
 /// <summary>An effect flipped this monster face-up; it was not Flip Summoned.</summary>
 public sealed record MonsterFlippedByEffect(MonsterBinding Monster) : DuelEvent;
 

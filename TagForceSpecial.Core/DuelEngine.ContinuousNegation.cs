@@ -38,7 +38,8 @@ public sealed partial class DuelEngine
         return negated.OrderBy(n => n.Player).ThenBy(n => n.Zone).ToArray();
     }
 
-    private static bool IsSourceEffectNegated(DuelState state, TriggerActivation trigger) =>
+    private bool IsSourceEffectNegated(DuelState state, TriggerActivation trigger) =>
+        trigger.Profile.SourceLocation == TriggerSourceLocation.FaceUpSpellTrap ? rules[trigger.Source.Card.GameCardId].Category == CardCategory.Spell && IsSpellsNegated(state) :
         trigger.Profile.SourceLocation == TriggerSourceLocation.FaceUpMonster && trigger.Source.IsStillPresent(state) &&
         state.EventEffects.NegatedMonsters.Contains(trigger.Source);
 }

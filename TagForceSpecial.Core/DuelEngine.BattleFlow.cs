@@ -48,6 +48,21 @@ public sealed partial class DuelEngine
                 return Reject(DuelError.UnsupportedBattleResponse);
             return BeginBattleDefinition(command.Player, activate.SpellTrapZone, source, definition);
         }
+        if (command is ActivateZoneEffectBattleResponse or ActivateFieldEffectBattleResponse)
+        {
+            var (decision, responder) = command switch
+            {
+                ActivateZoneEffectBattleResponse z => (z.DecisionId, z.Player),
+                ActivateFieldEffectBattleResponse f => (f.DecisionId, f.Player),
+                _ => throw new InvalidOperationException()
+            };
+            if (decision != battle.Window.DecisionId) return Reject(DuelError.StaleBattleDecision);
+            if (battle.Window.Closed) return Reject(DuelError.BattleWindowClosed);
+            if (responder != battle.Window.Responder) return Reject(DuelError.NotBattleResponder);
+            return command is ActivateZoneEffectBattleResponse zone
+                ? BeginZoneEffect(zone.Player, zone.CardInstanceId, zone.EffectIndex, null, window: true)
+                : BeginFieldEffect(responder, ((ActivateFieldEffectBattleResponse)command).SpellTrapZone, ((ActivateFieldEffectBattleResponse)command).EffectIndex, window: true);
+        }
         if (command is ActivateHandBattleResponse hand)
         {
             if (hand.DecisionId != battle.Window.DecisionId) return Reject(DuelError.StaleBattleDecision);

@@ -87,7 +87,7 @@ public sealed partial class DuelEngine
         continuousNegations = (experimentalContinuousNegations ?? []).ToArray();
         // Spells and Traps may only have effects that activate once they are in the Graveyard.
         if (triggerEffects.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) ||
-                rule.Category != CardCategory.Monster && !(p.SourceLocation == TriggerSourceLocation.GraveyardSelf && rule.Category is CardCategory.Spell or CardCategory.Trap) ||
+                rule.Category != CardCategory.Monster && !(p.SourceLocation is TriggerSourceLocation.GraveyardSelf or TriggerSourceLocation.FaceUpSpellTrap && rule.Category is CardCategory.Spell or CardCategory.Trap) ||
                 p.DiscardCardIds.Any(id => !knownIds.Contains(id)) ||
                 p.Target is { } target && target.AllowedCardIds.Any(id => !knownIds.Contains(id) ||
                     !this.rules.TryGetValue(id, out var targetRule) || targetRule.Category != CardCategory.Monster)))
@@ -156,7 +156,7 @@ public sealed partial class DuelEngine
         if (definitionList.Any(d => d is null || d.Cost is DiscardCost { Filter: CardIdFilter discardFilter } && discardFilter.CardIds.Any(id => !knownIds.Contains(id)) ||
                 d.Steps.OfType<SummonTokensStep>().Any(s => s.TokenCardIds.Any(id => !IsTokenId(id))) ||
                 d.Kind == EffectKind.MonsterTrigger || shuffleSeed is null && NeedsShuffle(d) ||
-                !this.rules.TryGetValue(d.CardId, out var rule) || (d.IsMonsterEffect ? rule.Category != CardCategory.Monster : d.Kind == EffectKind.SpellTrapIgnition ? rule.Category is not (CardCategory.Spell or CardCategory.Trap) : !rule.AllowsSpellTrapSet ||
+                !this.rules.TryGetValue(d.CardId, out var rule) || (d.IsMonsterEffect ? rule.Category != CardCategory.Monster : d.IsFaceUpEffect ? rule.Category is not (CardCategory.Spell or CardCategory.Trap) : !rule.AllowsSpellTrapSet ||
                 rule.Category != (d.Kind is EffectKind.NormalSpell or EffectKind.QuickPlaySpell or EffectKind.ContinuousSpell or EffectKind.FieldSpell or EffectKind.EquipSpell ? CardCategory.Spell : CardCategory.Trap)) ||
 
                 summonEffects.ContainsKey(d.CardId) || usedEffectIds.Contains(d.EffectId) ||
@@ -167,7 +167,7 @@ public sealed partial class DuelEngine
         if (shuffleSeed is null && triggerEffects.Any(p => p.Definition is { } d && NeedsShuffle(d)))
             throw new ArgumentException("Triggers that search or Summon from the Deck need a seed.", nameof(shuffleSeed));
         // Attack-declaration and Damage Step responses only have a window in the staged flow.
-        this.experimentalBattleFlow = this.experimentalBattleFlow || definitionList.Any(d => d.Kind == EffectKind.MonsterQuick || d.Conditions.Any(c => c is OpponentAttackDeclaredCondition or BattleTimingCondition));
+        this.experimentalBattleFlow = this.experimentalBattleFlow || definitionList.Any(d => d.Kind is EffectKind.MonsterQuick or EffectKind.SpellTrapQuick || d.Conditions.Any(c => c is OpponentAttackDeclaredCondition or BattleTimingCondition));
         definitions = definitionList.GroupBy(d => d.CardId).ToFrozenDictionary(g => g.Key, g => g.First());
         effectsByCard = definitionList.GroupBy(d => d.CardId).ToFrozenDictionary(g => g.Key, g => g.ToArray());
         effectsById = definitionList.ToFrozenDictionary(d => d.EffectId, StringComparer.Ordinal);
@@ -249,14 +249,14 @@ public sealed partial class DuelEngine
         if (State.PendingChain is not null) return ExecuteChain(command);
         if (State.PendingSummon is not null) return ExecuteSummonWindow(command);
         if (command is PassSummonResponse or ActivateSummonNegation) return Reject(DuelError.NoPendingSummon);
-        if (command is PassChainResponse or ActivateChainResponse or ActivateHandChainResponse or ActivateMonsterChainResponse or ResolveNextChainLink or
+        if (command is PassChainResponse or ActivateChainResponse or ActivateHandChainResponse or ActivateMonsterChainResponse or ActivateZoneEffectResponse or ActivateFieldEffectResponse or ResolveNextChainLink or
             ChooseEffectSummon or ChooseDefinitionSummon or FinishDefinitionSummon or ChooseDefinitionCard) return Reject(DuelError.NoPendingChain);
         // A definition answering its cost/target decisions before its first link exists (hand, set or open-window
         // activation); the decision may belong to the non-turn player.
         if (State.PendingDecision is not null && State.PendingSpellActivation is { } activating &&
             definitions.ContainsKey(activating.Spell.GameCardId))
             return command is DecisionCommand decision ? AnswerDecision(decision) : Reject(DuelError.DecisionPending);
-        if (command is AdvanceBattle or PassBattleResponse or ChooseAttackReplay or ActivateBattleResponse or ActivateHandBattleResponse or ActivateMonsterBattleResponse)
+        if (command is AdvanceBattle or PassBattleResponse or ChooseAttackReplay or ActivateBattleResponse or ActivateHandBattleResponse or ActivateMonsterBattleResponse or ActivateZoneEffectBattleResponse or ActivateFieldEffectBattleResponse)
         {
             if (!experimentalBattleFlow) return Reject(DuelError.BattleFlowNotEnabled);
             if (State.Battle is null) return Reject(DuelError.NoBattleInProgress);
@@ -273,6 +273,7 @@ public sealed partial class DuelEngine
             ActivateSpell activate => Activate(activate.CardInstanceId, activate.SpellTrapZone, activate.EffectIndex),
             ActivateSetSpell activate => ActivateSetDefinition(activate.SpellTrapZone, activate.EffectIndex),
             ActivateCardEffect effect => BeginFieldEffect(effect.Player, effect.SpellTrapZone, effect.EffectIndex),
+            ActivateZoneEffect zoneEffect => BeginZoneEffect(zoneEffect.Player, zoneEffect.CardInstanceId, zoneEffect.EffectIndex, null),
             ActivatePendulumScale scale => ActivateScale(scale),
             PendulumSummon pendulum => ExecutePendulumSummon(pendulum),
             ResolveDrawStep => Draw(),

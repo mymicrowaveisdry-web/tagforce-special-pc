@@ -69,9 +69,10 @@ public sealed partial class DuelEngine
     /// <summary>Several effects are allowed on monsters, as "choose 1" options of one kind, or as activated effects after a lasting card's own.</summary>
     private static bool EffectGroupsValid(EffectDefinition[] effects) => effects.GroupBy(d => d.CardId).All(group =>
     {
-        var kinds = group.Select(d => d.Kind).ToArray();
-        if (kinds.Contains(EffectKind.SpellTrapIgnition))
-            return kinds[0] is EffectKind.ContinuousSpell or EffectKind.ContinuousTrap or EffectKind.FieldSpell or EffectKind.EquipSpell && kinds.Skip(1).All(k => k == EffectKind.SpellTrapIgnition);
+        var kinds = group.Where(d => d.Origin == EffectOrigin.Field).Select(d => d.Kind).ToArray();
+        if (kinds.Length == 0) return group.All(d => d.IsMonsterEffect);
+        if (kinds.Any(k => k is EffectKind.SpellTrapIgnition or EffectKind.SpellTrapQuick))
+            return kinds[0] is EffectKind.ContinuousSpell or EffectKind.ContinuousTrap or EffectKind.FieldSpell or EffectKind.EquipSpell && kinds.Skip(1).All(k => k is EffectKind.SpellTrapIgnition or EffectKind.SpellTrapQuick);
         return kinds.Length == 1 || kinds.All(k => k is EffectKind.MonsterIgnition or EffectKind.MonsterQuick) ||
             kinds.All(k => k == kinds[0] && k is EffectKind.NormalSpell or EffectKind.QuickPlaySpell or EffectKind.NormalTrap);
     });
@@ -88,18 +89,91 @@ public sealed partial class DuelEngine
     private EffectDefinition LinkDefinition(ChainLink link) => link.Trigger?.Profile.Definition ?? effectsById[link.Activation.EffectId];
 
     /// <summary>Starts a face-up Spell or Trap's activated effect. The card stays in place and the effect resolves even if the card then leaves.</summary>
-    private DuelActionResult BeginFieldEffect(PlayerId playerId, int zone, int effectIndex)
+    private DuelActionResult BeginFieldEffect(PlayerId playerId, int zone, int effectIndex, PendingChain? chain = null, DuelState? from = null, bool window = false)
     {
-        if (State.Phase is not (DuelPhase.Main1 or DuelPhase.Main2)) return Reject(DuelError.WrongPhase);
+        if (chain is null && !window && State.Phase is not (DuelPhase.Main1 or DuelPhase.Main2)) return Reject(DuelError.WrongPhase);
         if (zone is < 0 or > DuelPlayerState.FieldZoneIndex) return Reject(DuelError.InvalidSpellTrapZone);
         var field = State.GetPlayer(playerId).SpellTrapAt(zone);
-        if (field is not { IsFaceUp: true, EffectActive: true } || !EffectAt(field.Card.GameCardId, effectIndex, out var definition) || definition.Kind != EffectKind.SpellTrapIgnition)
+        if (field is not { IsFaceUp: true, EffectActive: true } || !EffectAt(field.Card.GameCardId, effectIndex, out var definition) || !definition.IsFaceUpEffect || definition.Origin != EffectOrigin.Field)
             return Reject(DuelError.UnsupportedSpellEffect);
         if (definition.OncePerTurn && UsedThisTurn(field.Card, definition)) return Reject(DuelError.EffectAlreadyUsed);
-        if (DefinitionActivationError(definition, ActivationContext.SpellTrapField, playerId, field.Card, field) is not DuelError.None and var error) return Reject(error);
-        var next = definition.OncePerTurn ? RecordUse(State, field.Card, definition) : State;
+        var context = window ? ActivationContext.SpellTrapWindow : chain is null ? ActivationContext.SpellTrapField : ActivationContext.SpellTrapChain;
+        if (DefinitionActivationError(definition, context, playerId, field.Card, field, chain?.Links[^1]) is not DuelError.None and var error) return Reject(error);
+        var start = from ?? State;
+        var next = definition.OncePerTurn ? RecordUse(start, field.Card, definition) : start;
         var (paid, head) = PayLifePointCost(next, playerId, definition, [new FieldEffectActivated(playerId, definition.EffectId, field.Card, zone)]);
-        return ContinueCommit(paid, head, playerId, field.Card, zone, definition, field.PlacementId, null);
+        return ContinueCommit(paid, head, playerId, field.Card, zone, definition, field.PlacementId, chain);
+    }
+
+    /// <summary>The effects of this card used from the hand or Graveyard.</summary>
+    internal IEnumerable<int> ZoneEffectIndexes(uint cardId) => effectsByCard.TryGetValue(cardId, out var effects)
+        ? Enumerable.Range(0, effects.Length).Where(i => effects[i].Origin != EffectOrigin.Field) : [];
+
+    /// <summary>The Quick Effects of this card used while it is face-up.</summary>
+    internal IEnumerable<int> FaceUpEffectIndexes(uint cardId) => effectsByCard.TryGetValue(cardId, out var effects)
+        ? Enumerable.Range(0, effects.Length).Where(i => effects[i].IsFaceUpEffect && effects[i].Origin == EffectOrigin.Field) : [];
+
+    private bool? zoneQuicks;
+    private bool HasZoneOrFaceUpQuicks => zoneQuicks ??= allEffects.Any(d => d.Kind is EffectKind.MonsterQuick or EffectKind.SpellTrapQuick && (d.Origin != EffectOrigin.Field || d.IsFaceUpEffect));
+
+    /// <summary>True when the player could use a quick effect from any location in an open window now.</summary>
+    private bool QuickEffectReady(PlayerId playerId)
+    {
+        if (QuickMonsterReady(playerId)) return true;
+        if (!HasZoneOrFaceUpQuicks) return false;
+        var player = State.GetPlayer(playerId);
+        bool Ready(EffectDefinition d, CardInstance card) => d.Kind is EffectKind.MonsterQuick or EffectKind.SpellTrapQuick && !(d.OncePerTurn && UsedThisTurn(card, d));
+        foreach (var card in player.Hand.Concat(player.Graveyard))
+            if (effectsByCard.TryGetValue(card.GameCardId, out var effects))
+            {
+                var origin = player.Hand.Contains(card) ? EffectOrigin.Hand : EffectOrigin.Graveyard;
+                if (effects.Any(d => d.Origin == origin && Ready(d, card) && DefinitionActivationError(d, ActivationContext.ZoneWindow, playerId, card, null) == DuelError.None)) return true;
+            }
+        return ActiveCards(State).Where(e => e.Player == playerId).Any(e => effectsByCard.TryGetValue(e.Field.Card.GameCardId, out var effects) &&
+            effects.Any(d => d.IsFaceUpEffect && Ready(d, e.Field.Card) && DefinitionActivationError(d, ActivationContext.SpellTrapWindow, playerId, e.Field.Card, e.Field) == DuelError.None));
+    }
+
+    private static bool SpellTrapSourcePresent(DuelState state, MonsterBinding source) =>
+        state.GetPlayer(source.Player).SpellTrapAt(source.Zone) is { IsFaceUp: true, EffectActive: true } field && field.Card == source.Card && field.PlacementId == source.PlacementId;
+
+    private bool SelfSummonPossible(PlayerId playerId, CardInstance card, EffectDefinition definition, SpecialSummonSelfStep step)
+    {
+        var from = definition.Origin == EffectOrigin.Hand ? DecisionCardSource.Hand : DecisionCardSource.Graveyard;
+        return Enumerable.Range(0, 5).Any(zone => CheckSpecialSummon(State, playerId, card, zone, step.Position ?? BattlePosition.FaceUpAttack, from) == DuelError.None);
+    }
+
+    /// <summary>Starts an effect used from the hand or Graveyard. A self-cost moves the card first, so it never targets itself.</summary>
+    private DuelActionResult BeginZoneEffect(PlayerId playerId, int instanceId, int effectIndex, PendingChain? chain, DuelState? from = null, bool window = false)
+    {
+        if (chain is null && !window && State.Phase is not (DuelPhase.Main1 or DuelPhase.Main2)) return Reject(DuelError.WrongPhase);
+        var player = State.GetPlayer(playerId);
+        var inHand = player.Hand.SingleOrDefault(c => c.InstanceId == instanceId);
+        var card = inHand ?? player.Graveyard.SingleOrDefault(c => c.InstanceId == instanceId);
+        if (card is null) return Reject(DuelError.CardNotInHand);
+        if (!EffectAt(card.GameCardId, effectIndex, out var definition) || definition.Origin != (inHand is not null ? EffectOrigin.Hand : EffectOrigin.Graveyard))
+            return Reject(DuelError.UnsupportedMonsterEffect);
+        if (definition.OncePerTurn && UsedThisTurn(card, definition)) return Reject(DuelError.EffectAlreadyUsed);
+        var context = window ? ActivationContext.ZoneWindow : chain is null ? ActivationContext.ZoneField : ActivationContext.ZoneChain;
+        if (DefinitionActivationError(definition, context, playerId, card, null, chain?.Links[^1]) is not DuelError.None and var error) return Reject(error);
+        var next = from ?? State;
+        if (definition.OncePerTurn) next = RecordUse(next, card, definition);
+        List<DuelEvent> paid = [new MonsterEffectActivated(playerId, definition.EffectId, card, -1)];
+        if (definition.Cost is SendSelfCost self)
+        {
+            var owner = next.GetPlayer(playerId);
+            if (self.Destination == SelfDestination.Banish)
+            {
+                next = next.With(player: owner.With(graveyard: owner.Graveyard.Where(c => c != card), banished: owner.Banished.Append(card)));
+                paid.Add(new CardBanishedFromGraveyard(playerId, card, definition.EffectId));
+            }
+            else
+            {
+                next = next.With(player: owner.With(hand: owner.Hand.Where(c => c != card), graveyard: owner.Graveyard.Append(card)));
+                paid.Add(new ActivationCostPaid(playerId, definition.EffectId, card));
+            }
+        }
+        var (charged, head) = PayLifePointCost(next, playerId, definition, [.. paid]);
+        return ContinueCommit(charged, head, playerId, card, -1, definition, 0, chain);
     }
 
     private bool DiscardQualifies(CardInstance card, CardFilter? filter) => filter switch

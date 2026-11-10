@@ -11,7 +11,9 @@ public enum ChainOperation
     /// <summary>Special Summons a Union monster from its equip.</summary>
     UnionUnequip,
     /// <summary>An activated effect of a face-up Spell or Trap; the card stays where it is.</summary>
-    FieldEffect
+    FieldEffect,
+    /// <summary>An activated effect used from the hand or Graveyard.</summary>
+    ZoneEffect
 }
 public enum ChainSpellSpeed { One = 1, Two = 2, Three = 3 }
 public enum ChainNegation { None, Effect, Activation }

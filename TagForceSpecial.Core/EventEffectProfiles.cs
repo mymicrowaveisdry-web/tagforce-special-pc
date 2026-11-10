@@ -9,7 +9,7 @@ public enum MonsterEventKind { NormalSummoned, SpecialSummoned, FlipSummoned, De
 public enum TriggerEventCause { Any, FromField, ByBattle }
 public enum EffectRelation { Self, Controller, Opponent, Any }
 public enum TriggerRequirement { Mandatory, Optional }
-public enum TriggerSourceLocation { FaceUpMonster, DestroyedSelf, GraveyardSelf }
+public enum TriggerSourceLocation { FaceUpMonster, DestroyedSelf, GraveyardSelf, FaceUpSpellTrap }
 public enum TriggerTiming { If, When }
 public enum TriggerTurnLimit { None, PerPlacement, SharedPerPlayer }
 public enum TriggerOperation

@@ -21,7 +21,8 @@ public sealed partial class DuelEngine
 
     private bool CanActivateTrigger(DuelState state, TriggerActivation trigger)
     {
-        bool location = trigger.Profile.SourceLocation != TriggerSourceLocation.FaceUpMonster
+        bool location = trigger.Profile.SourceLocation == TriggerSourceLocation.FaceUpSpellTrap ? SpellTrapSourcePresent(state, trigger.Source) :
+            trigger.Profile.SourceLocation != TriggerSourceLocation.FaceUpMonster
             ? state.GetPlayer(trigger.Player).Graveyard.Contains(trigger.Source.Card) ||
                 trigger.Profile.SourceLocation == TriggerSourceLocation.DestroyedSelf && state.GetPlayer(trigger.Player).FaceUpExtraDeck.Contains(trigger.Source.Card)
             : trigger.Source.IsStillPresent(state) && state.GetPlayer(trigger.Player).MonsterZones[trigger.Source.Zone]!.Position != BattlePosition.FaceDownDefense;
@@ -141,8 +142,17 @@ public sealed partial class DuelEngine
                     ? destructionSources : FieldMonsters(after);
                 foreach (var profile in triggerEffects.Where(p => p.EventKind == occurrence.Kind && CauseMatches(p, occurrence)).OrderBy(p => p.EffectId, StringComparer.Ordinal))
                 {
-                    if (occurrence.FromSpellTrapZone && profile.SourceLocation == TriggerSourceLocation.FaceUpMonster) continue;
+                    if (occurrence.FromSpellTrapZone && profile.SourceLocation is TriggerSourceLocation.FaceUpMonster or TriggerSourceLocation.FaceUpSpellTrap) continue;
                     if (profile.RequiredProcedureId is { } procedure && occurrence.ProcedureId != procedure) continue;
+                    if (profile.SourceLocation == TriggerSourceLocation.FaceUpSpellTrap)
+                    {
+                        foreach (var (owner, zone, field) in ActiveCards(after).Where(e => e.Field.Card.GameCardId == profile.CardId))
+                        {
+                            MonsterBinding source = new(owner, zone, field.Card, field.PlacementId);
+                            if (Relates(profile.Relation, source, occurrence.Subject)) yield return new(id++, profile, source, occurrence);
+                        }
+                        continue;
+                    }
                     if (profile.SourceLocation != TriggerSourceLocation.FaceUpMonster)
                     {
                         // A definition effect in the Graveyard belongs to the card's owner, who may not have controlled it.

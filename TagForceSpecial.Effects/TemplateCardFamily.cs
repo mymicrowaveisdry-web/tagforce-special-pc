@@ -28,6 +28,9 @@ public static class TemplateCardFamily
     private static AuthoredCard OnlyWithNoMonsters(uint id, string name, uint type) => T.ContinuousWithEffects(id, name, trap: false,
         new EffectOption([new StopUnlessNoOwnMonstersStep(), new SpecialSummonStep(SpecialSummonSources.Hand, OfType(type))], Conditions: [new ControlsNoMonstersCondition()]));
 
+    private static AuthoredCard DiscardToSearch(uint id, string name, uint target) =>
+        T.FromZone(id, name, EffectOrigin.Hand, new EffectOption([new AddFromDeckToHandStep(new CardIdFilter([target]))], new SendSelfCost(SelfDestination.Discard)));
+
     private static EffectStep[] SearchFor(IReadOnlyList<uint> ids) => [new AddFromDeckToHandStep(new CardIdFilter(ids))];
 
     private static AuthoredCard Recover(uint id, string name, CardFilter filter, int count = 1, CardZone zone = CardZone.Graveyard, EffectCost? cost = null) =>
@@ -91,6 +94,12 @@ public static class TemplateCardFamily
         T.Normal(5688, "Magical Stone Excavation", [new AddTargetsToHandStep()], new DiscardCost(Count: 2),
             [new ZoneTarget(CardZone.Graveyard, TargetSide.Own, new CardCategoryFilter(CardCategory.Spell))]),
         T.Trap(6709, "Icarus Attack", [new DestroyTargetsStep()], new TributeCost(OfType(WingedBeast)), [new FieldTarget(FieldCardKind.Any, count: 2)]),
+        DiscardToSearch(7108, "Destroyersaurus", 6823),
+        DiscardToSearch(7572, "Hecatrice", 7573),
+        T.FromZone(7359, "Mezuki", EffectOrigin.Graveyard, new EffectOption([new SpecialSummonTargetStep()], new SendSelfCost(SelfDestination.Banish),
+            [new ZoneTarget(CardZone.Graveyard, TargetSide.Own, OfType(Zombie), mustBeSummonable: true)])),
+        T.FromZone(10735, "Malicevorous Fork", EffectOrigin.Hand, new EffectOption([new SpecialSummonSelfStep()], new DiscardCost(OfType(Fiend)))),
+        T.ContinuousTrigger(11147, "Supply Squad", trap: false, MonsterEventKind.Destroyed, EffectRelation.Controller, [new DrawCardsStep(1)], limit: TriggerTurnLimit.PerPlacement),
         T.Modal(5607, "Poison of the Old Man", EffectKind.QuickPlaySpell, "The option is chosen at activation.", new EffectOption([new GainLifePointsStep(1200)]), new EffectOption([new DealDamageStep(800)])),
         OnlyWithNoMonsters(5435, "Call of the Mummy", Zombie),
         OnlyWithNoMonsters(7573, "Valhalla, Hall of the Fallen", Fairy),
