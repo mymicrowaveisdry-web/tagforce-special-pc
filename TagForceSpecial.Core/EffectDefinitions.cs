@@ -317,6 +317,19 @@ public sealed class EffectDefinition
         return copy;
     }
 
+    /// <summary>The declaration is made as the link starts resolving, not as it is activated (text without a ";").</summary>
+    public bool DeclaresAtResolution { get; private set; }
+
+    /// <summary>A copy of this Continuous card that declares <paramref name="kind"/> as it resolves; its triggers read the value.</summary>
+    public EffectDefinition WithDeclarationAtResolution(DeclarationKind kind)
+    {
+        if (Kind is not (EffectKind.ContinuousSpell or EffectKind.ContinuousTrap))
+            throw new ArgumentException("Only a Continuous Spell or Trap declares as it resolves.", nameof(kind));
+        var copy = WithDeclaration(kind);
+        copy.DeclaresAtResolution = true;
+        return copy;
+    }
+
     /// <summary>A copy of this definition with a by-name limit.</summary>
     public EffectDefinition WithNameLimit(NameLimit limit)
     {
@@ -358,7 +371,8 @@ public sealed class EffectDefinition
         BanishFieldTargetsStep or NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep or DestroyAndBanishTargetsStep or ModifyCombatantStatsStep or
         EquipTargetStep or UnionEquipStep or PlaceCounterStep or ModifyTargetsUntilEndStep or FlipTargetsFaceDownStep or FlipTargetsFaceUpStep or
         AttachSourceStep or AttachTargetsToSelfStep or DetachAllStep or RankUpStep or AttachFromStep { ToTarget: true } or
-        TakeControlStep or GiveControlStep or SwitchControlStep or LockTargetsUntilEndStep or ChangeTargetsTraitStep or SetTargetScaleStep;
+        TakeControlStep or GiveControlStep or SwitchControlStep or LockTargetsUntilEndStep or ChangeTargetsTraitStep or SetTargetScaleStep or
+        DestroyTargetAtStep or GiveTargetControlStep;
     /// <summary>Cost choices answered before the target choices, each binding a field target answer.</summary>
     internal int CostTargetSteps => Cost switch { TributeCost tribute => tribute.Count, BanishFromGraveyardCost banish => banish.Count, _ => 0 };
     internal static bool IsAutomatic(EffectTarget t) => t is AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget or TriggerTargetedMonster or TriggerSourceMonster;
@@ -407,6 +421,7 @@ public sealed class EffectDefinition
                     DamageBothPlayersStep s => s.ToOpponent <= 0 || s.ToSelf <= 0,
                     TakeDamageStep s => s.Amount <= 0,
                     BanishSourceWhenItLeavesStep => false,
+                    BanishEventMonsterStep or BanishSourceCardStep => kind != EffectKind.MonsterTrigger,
                     RedirectRespondedDamageStep => false,
                     DiscardRandomStep s => s.Player is not (TargetSide.Own or TargetSide.Opponent),
                     // Validated by their constructors; the engine checks Token rules and the seed.
@@ -448,6 +463,9 @@ public sealed class EffectDefinition
                     TakeControlStep s => !Enum.IsDefined(s.Duration),
                     GiveControlStep s => !Enum.IsDefined(s.Duration),
                     SwitchControlStep or SwapChosenMonstersStep => false,
+                    DestroyTargetAtStep s => s.Target is < 0 or > 5,
+                    GiveTargetControlStep s => s.Target is < 0 or > 5,
+                    TakeChosenControlStep s => s.Filter is null || !Enum.IsDefined(s.Duration) || s.Duration == ControlDuration.WhileEquipped,
                     StopUnlessActivatedThisTurnStep => false,
                     SkipPhaseStep s => s.Phase is not (DuelPhase.Draw or DuelPhase.Standby or DuelPhase.Battle or DuelPhase.Main2) ||
                         s.Count is < 1 or > 3 || !Enum.IsDefined(s.Player),
@@ -551,6 +569,12 @@ public sealed class EffectDefinition
             snapshot.Any(s => s is AttachFromStep { ToTarget: false }) && (!monsterKind || fields.Length != 0) ||
             snapshot.Any(s => s is AttachTargetsToSelfStep) && (!monsterKind || fields.Any(f => f is not FieldTarget { Kind: FieldCardKind.Monster })))
             throw new ArgumentException("Equip, revival, Union and counter steps need their card kinds and bound targets.", nameof(steps));
+        if (snapshot.OfType<DestroyTargetAtStep>().Any(s => s.Target >= fields.Length) ||
+            snapshot.OfType<GiveTargetControlStep>().Any(s => s.Target >= fields.Length || fields[s.Target] is not FieldTarget { Kind: FieldCardKind.Monster, Side: TargetSide.Own, Count: 1 }) ||
+            snapshot.Any(s => s is DestroyTargetAtStep or GiveTargetControlStep) && fields.Any(f => f is FieldTarget { Count: not 1 }))
+            throw new ArgumentException("A step on one target needs a single target at that place; giving control needs your own monster.", nameof(steps));
+        if (fields.Any(f => f is FieldTarget { CardFilter: SharedTraitFilter } || f is ZoneTarget { Filter: SharedTraitFilter } z && (fields.Length != 1 || z.MinCount != z.MaxCount || z.MinCount < 2)))
+            throw new ArgumentException("A shared-trait filter belongs to a single Graveyard or banished target slot of a fixed count.", nameof(fieldTargets));
         // Taking a monster the opponent just Summoned binds it automatically.
         bool takesSummoned = snapshot.Any(s => s is TakeControlStep) && fields is [SummonedMonsterTarget] && required.OfType<MonsterSummonedCondition>().All(c => c.ByOpponent);
         if (snapshot.Any(s => s is TakeControlStep or GiveControlStep) && !takesSummoned && fields.Any(f => f is not FieldTarget { Kind: FieldCardKind.Monster }) ||
@@ -560,7 +584,9 @@ public sealed class EffectDefinition
                 FieldTarget { Kind: FieldCardKind.Monster, Count: 1, Side: TargetSide.Own }] or [FieldTarget { Kind: FieldCardKind.Monster, Count: 1, Side: TargetSide.Own },
                 FieldTarget { Kind: FieldCardKind.Monster, Count: 1, Side: TargetSide.Opponent }]) ||
             snapshot.Any(s => s is TakeControlStep { Duration: ControlDuration.WhileEquipped } or GiveControlStep { Duration: ControlDuration.WhileEquipped }) &&
-                kind != EffectKind.EquipSpell)
+                kind != EffectKind.EquipSpell ||
+            snapshot.Any(s => s is TakeControlStep { Duration: ControlDuration.WhileSourceFaceUp } or GiveControlStep { Duration: ControlDuration.WhileSourceFaceUp }
+                or TakeChosenControlStep { Duration: ControlDuration.WhileSourceFaceUp }) && !monsterKind && kind != EffectKind.MonsterTrigger)
             throw new ArgumentException("Control steps need monster targets on the side they take from or give, one per side to switch.", nameof(steps));
         if (kind == EffectKind.MonsterTrigger && (required.Length != 0 || cost is not null || target is not null || fields is not ([] or [TriggerTargetedMonster] or [TriggerSourceMonster] or [ZoneTarget { MinCount: 1, MaxCount: 1 }] or [FieldTarget { Count: 1, ForTribute: false }]) || locksOtherSummonsThisTurn) ||
             kind != EffectKind.MonsterTrigger && fields.Any(f => f is TriggerTargetedMonster or TriggerSourceMonster))

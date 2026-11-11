@@ -13,7 +13,10 @@ public sealed partial class DuelEngine
         return state.WithEventEffects(effects.WithModifiers(effects.TimedModifiers.Append(modifier), effects.AppliedModifiers, effects.Statistics));
     }
 
-    /// <summary>Turns a face-up monster face-down; Tokens and Xyz Monsters cannot be. Counters and a Gemini's effects are lost.</summary>
+    /// <summary>
+    /// Turns a face-up monster face-down; Tokens and Xyz Monsters cannot be. Counters and a Gemini's effects are lost, and it becomes a new
+    /// card for its once-per-turn and once-while-face-up limits.
+    /// </summary>
     private DuelState FlipFaceDown(DuelState state, FieldCardTarget target, List<DuelEvent> events)
     {
         var player = state.GetPlayer(target.Player);
@@ -22,7 +25,7 @@ public sealed partial class DuelEngine
         var zones = player.MonsterZones.ToArray();
         zones[target.Zone] = monster with { Position = BattlePosition.FaceDownDefense, Counters = 0, GeminiActive = false };
         events.Add(new MonsterPositionChanged(player.Id, target.Zone, monster.Position, BattlePosition.FaceDownDefense));
-        return state.With(player: player.With(monsters: zones));
+        return ForgetUses(state.With(player: player.With(monsters: zones)), monster.Card);
     }
 
     /// <summary>Flips a face-down monster face-up by an effect, which counts as flipped for Flip effects but is not a Flip Summon.</summary>

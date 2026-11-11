@@ -185,7 +185,8 @@ public sealed partial class DuelEngine
                 {
                     if (occurrence.FromSpellTrapZone && profile.SourceLocation is TriggerSourceLocation.FaceUpMonster or TriggerSourceLocation.FaceUpSpellTrap or TriggerSourceLocation.PendulumZone) continue;
                     if (profile.RequiredProcedureId is { } procedure && occurrence.ProcedureId != procedure) continue;
-                    if (profile.DirectAttackOnly && !occurrence.DirectAttack || profile.SubjectFilter is { } subjects && !MatchesFilter(occurrence.Subject.Card, subjects)) continue;
+                    if (profile.DirectAttackOnly && !occurrence.DirectAttack ||
+                        profile.SourceLocation != TriggerSourceLocation.FaceUpSpellTrap && !SubjectMatches(profile, occurrence.Subject.Card, null)) continue;
                     if (profile.SourceLocation == TriggerSourceLocation.Hand)
                     {
                         foreach (var holder in after.Players)
@@ -202,7 +203,7 @@ public sealed partial class DuelEngine
                         foreach (var (owner, zone, field) in faceUp.Where(e => e.Field.Card.GameCardId == profile.CardId))
                         {
                             MonsterBinding source = new(owner, zone, field.Card, field.PlacementId);
-                            if (Relates(profile.Relation, source, occurrence.Subject) &&
+                            if (Relates(profile.Relation, source, occurrence.Subject) && SubjectMatches(profile, occurrence.Subject.Card, field) &&
                                 (occurrence.Kind is not (MonsterEventKind.StandbyPhase or MonsterEventKind.EndPhase) || occurrence.Subject.Card == field.Card))
                                 yield return new(id++, profile, source, occurrence);
                         }
@@ -245,7 +246,8 @@ public sealed partial class DuelEngine
 
     private DuelState PrepareEventEffects(DuelState before, DuelState next, List<DuelEvent> events)
     {
-        if (triggerEffects.Length == 0 && continuousEffects.Length == 0 && continuousNegations.Length == 0 && !HasTimedCombatModifiers && !HasLastingModifiers && !HasMonsterNegators) return next;
+        if (triggerEffects.Length == 0 && continuousEffects.Length == 0 && continuousNegations.Length == 0 && !HasTimedCombatModifiers && !HasLastingModifiers && !HasMonsterNegators &&
+            !HasEffectLocks) return next;
         var current = next.EventEffects;
         var timed = current.TimedModifiers.Where(m => m.Target.IsStillPresent(next) &&
             next.GetPlayer(m.Target.Player).MonsterZones[m.Target.Zone]!.Position != BattlePosition.FaceDownDefense &&

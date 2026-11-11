@@ -31,6 +31,7 @@ public sealed partial class DuelEngine
         FieldCardTarget[]? fieldTargets = (step.FieldTargetSpec switch
             {
                 FieldTarget spec => FieldMatches(state, player.Id, spec.Kind, spec.Side, spec.Filter, excluded).Where(t => TargetPasses(state, spec, t) && SelectionAllowed(state, spec, t, player.Id, sequence) && MoveAllowed(state, sequence, index, t)),
+                ZoneTarget { Filter: SharedTraitFilter shared } zone => SharedTraitMatches(state, player.Id, zone, shared, answers).Where(t => MoveAllowed(state, sequence, index, t)),
                 ZoneTarget zone => ZoneMatches(state, player.Id, zone).Where(t => MoveAllowed(state, sequence, index, t)),
                 _ => null
             })?.Where(t => !answers.Any(a => a.FieldTarget is { } chosen && chosen.Card == t.Card)).ToArray();
@@ -40,6 +41,13 @@ public sealed partial class DuelEngine
             step.Kind == DecisionKind.FieldTarget && fieldTargets!.Length == 0)
             return null;
         return new(checked(State.Revision + 1), sequence, player.Id, index, cards, zones, answers, targets, fieldTargets);
+    }
+
+    private IEnumerable<FieldCardTarget> SharedTraitMatches(DuelState state, PlayerId player, ZoneTarget zone, SharedTraitFilter shared, IEnumerable<DecisionAnswer> answers)
+    {
+        var matches = ZoneMatches(state, player, zone).ToArray();
+        var picked = answers.Select(a => a.FieldTarget?.Card).OfType<CardInstance>().Where(c => matches.Any(m => m.Card == c)).ToArray();
+        return matches.Where(t => !picked.Contains(t.Card) && SharedTraitPick(shared, t, matches, picked, zone.MinCount));
     }
 
     private DuelActionResult BeginDecisions(string sequenceId)

@@ -443,7 +443,7 @@ public sealed partial class DuelEngine
             SummonAttemptId: chain is null && definition.Steps.Any(s => s is NegateSummonStep) ? State.PendingSummon?.AttemptId : null);
         var pending = new PendingChain(checked(State.Revision + 1), (chain?.Links ?? []).Append(link), Other(receipt.Player));
         // A declaring effect declares as it is activated, before either player can respond.
-        if (definition.Declares is { } declares) pending = AskDeclaration(pending, link, definition, receipt.Player, DeclarationOptions(declares));
+        if (definition.Declares is { } declares && !definition.DeclaresAtResolution) pending = AskDeclaration(pending, link, definition, receipt.Player, DeclarationChoices(definition, receipt, declares));
         var next = state.WithCommittedActivation(receipt).WithChain(pending);
         if (definition.NameLimit is { } named) next = RecordNamedUse(next, receipt.Player, named);
         // A link added during battle reopens the battle window for the other player, as battle responses do.
@@ -650,6 +650,13 @@ public sealed partial class DuelEngine
                 choice = null;
                 continue;
             }
+            if (step is TakeChosenControlStep takeChosen)
+            {
+                (state, var pick) = TakeChosenControl(state, link, definition, i, takeChosen, choice, events);
+                if (pick is not null) return (state, pick);
+                choice = null;
+                continue;
+            }
             if (step is SwapChosenMonstersStep)
             {
                 (state, var swap, bool none) = SwapChosen(state, link, definition, i, choice, events);
@@ -695,6 +702,22 @@ public sealed partial class DuelEngine
                 // The bound monster only has to still be there; it may have been turned face-down.
                 if (BoundTarget(link, attachSource.Target) is { } host && host.IsStillPresent(state)) state = AttachSourceAsMaterial(state, link, host, events);
                 else events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
+            }
+            else if (step is DestroyTargetAtStep destroyAt)
+            {
+                if (BoundTarget(link, destroyAt.Target) is not { } doomed || !QualifyingTargets(state, link, definition).Contains(doomed))
+                {
+                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
+                    break;
+                }
+                state = DestroyFieldCard(state, doomed, events);
+                // "Then": the next part happens only if this one did.
+                if (doomed.IsStillPresent(state)) break;
+            }
+            else if (step is GiveTargetControlStep giveAt)
+            {
+                if (BoundTarget(link, giveAt.Target) is { } given && given.Player == controller && QualifyingTargets(state, link, definition).Contains(given))
+                    state = ChangeControl(state, link, given, Other(controller), ControlDuration.Permanent, definition.EffectId, events);
             }
             else if (step is DetachAllStep detachAll)
             {
@@ -910,6 +933,8 @@ public sealed partial class DuelEngine
                     TakeDamageStep take => DealEffectDamage(state, controller, take.Amount, definition.EffectId, events),
                     DiscardRandomStep discard => DiscardRandom(state, controller, discard, events),
                     BanishSourceWhenItLeavesStep => BanishSourceWhenItLeaves(state, link),
+                    BanishEventMonsterStep => BanishEventMonster(state, link, definition.EffectId, events),
+                    BanishSourceCardStep => BanishSourceCard(state, link, definition.EffectId, events),
                     RedirectRespondedDamageStep => RedirectRespondedDamage(state, controller, link),
                     SummonTokensStep tokens => SummonTokens(state, link, tokens, events),
                     ShuffleDeckStep => ShuffleDeck(state, controller, definition.EffectId, events),
@@ -1047,6 +1072,8 @@ public sealed partial class DuelEngine
         AnyMonsterFilter => rule.Category == CardCategory.Monster,
         AnyCardFilter => true,
         DeclaredFilter => resolvingDeclaration is not { } declared || DeclaredMatches(card, declared.Kind, declared.Value),
+        // Whether the targets share the trait is checked as they are picked.
+        SharedTraitFilter shared => rule.Category == CardCategory.Monster && (shared.Trait == IdentityTrait.Attribute ? AttributeCode(card) : TypeCode(card)) is not null,
         CardCategoryFilter category => rule.Category == category.Category,
         MonsterTypeFilter types => rule.Category == CardCategory.Monster && TypeCode(card) is { } type && types.TypeCodes.Contains(type),
         NormalMonsterFilter normal => normal.CardIds.Contains(card.GameCardId) || inGraveyard && rule.IsGemini,

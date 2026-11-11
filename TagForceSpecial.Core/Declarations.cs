@@ -19,6 +19,18 @@ public enum DeclarationKind
     FaceUpMonsterType
 }
 
+/// <summary>
+/// Monsters that share <paramref name="Trait"/> with the other targets chosen for the same target slot, for "declare 1 Attribute and target
+/// monsters with that Attribute": the declaration can then only be the targets' shared value.
+/// </summary>
+public sealed record SharedTraitFilter(IdentityTrait Trait) : CardFilter;
+
+/// <summary>Banishes the monster a trigger's event was about, if it is still in place.</summary>
+public sealed record BanishEventMonsterStep : EffectStep;
+
+/// <summary>Banishes the face-up Spell or Trap whose trigger resolves, if it is still in place.</summary>
+public sealed record BanishSourceCardStep : EffectStep;
+
 /// <summary>Matches cards fitting the effect's declaration. Before anything is declared, any card could match.</summary>
 public sealed record DeclaredFilter : CardFilter;
 
@@ -95,6 +107,51 @@ public sealed partial class DuelEngine
             _ => false
         };
 
+    /// <summary>Whether a trigger's event monster matches its subject filter, reading the declaration of the face-up card it comes from.</summary>
+    private bool SubjectMatches(TriggerEffectProfile profile, CardInstance subject, FieldSpellTrap? source)
+    {
+        if (profile.SubjectFilter is not { } filter) return true;
+        if (source is null || !effectsByCard.TryGetValue(source.Card.GameCardId, out var effects) || effects.FirstOrDefault(d => d.Declares is not null)?.Declares is not { } kind)
+            return MatchesFilter(subject, filter);
+        // With nothing declared, nothing matches the declared filter.
+        if (source.Declared is not { } value) return false;
+        var saved = resolvingDeclaration;
+        resolvingDeclaration = (kind, value);
+        try { return MatchesFilter(subject, filter); }
+        finally { resolvingDeclaration = saved; }
+    }
+
+    private DuelState BanishEventMonster(DuelState state, ChainLink link, string effectId, List<DuelEvent> events) =>
+        link.Trigger?.Occurrence.Subject is { } subject && subject.IsStillPresent(state)
+            ? BanishFieldCard(state, new(subject.Player, FieldLocation.MonsterZone, subject.Zone, subject.Card, subject.PlacementId), effectId, events) : state;
+
+    private DuelState BanishSourceCard(DuelState state, ChainLink link, string effectId, List<DuelEvent> events) =>
+        link.Trigger?.Source is { } source && SpellTrapSourcePresent(state, source)
+            ? BanishFieldCard(state, new(source.Player, FieldLocation.SpellTrapZone, source.Zone, source.Card, source.PlacementId), effectId, events) : state;
+
+    private uint? TraitCode(CardInstance card, IdentityTrait trait) => trait == IdentityTrait.Attribute ? AttributeCode(card) : TypeCode(card);
+
+    /// <summary>The values this activation can declare: with targets that share a trait, only that trait's value.</summary>
+    private IReadOnlyList<int> DeclarationChoices(EffectDefinition definition, CommittedActivation receipt, DeclarationKind kind)
+    {
+        if (definition.FieldTargets is not [ZoneTarget { Filter: SharedTraitFilter shared }] || receipt.FieldTargets is not [var first, ..] ||
+            kind != (shared.Trait == IdentityTrait.Attribute ? DeclarationKind.Attribute : DeclarationKind.MonsterType))
+            return DeclarationOptions(kind);
+        return TraitCode(first.Card, shared.Trait) is uint code ? [(int)code] : DeclarationOptions(kind);
+    }
+
+    /// <summary>
+    /// Whether a card can be picked for a shared-trait target slot: it shares the trait with the cards picked so far, and enough other cards
+    /// share it to fill the rest of the slot.
+    /// </summary>
+    private bool SharedTraitPick(SharedTraitFilter shared, FieldCardTarget candidate, IReadOnlyList<FieldCardTarget> matches, IReadOnlyList<CardInstance> picked, int required)
+    {
+        var code = TraitCode(candidate.Card, shared.Trait);
+        if (code is null || picked.Any(p => TraitCode(p, shared.Trait) != code)) return false;
+        int partners = matches.Count(m => m.Card != candidate.Card && !picked.Contains(m.Card) && TraitCode(m.Card, shared.Trait) == code);
+        return partners >= required - picked.Count - 1;
+    }
+
     /// <summary>Pauses a just-added link for its declaration; responses open once it is made.</summary>
     private static PendingChain AskDeclaration(PendingChain chain, ChainLink link, EffectDefinition definition, PlayerId player, IReadOnlyList<int> options) =>
         new(chain.DecisionId, chain.Links, chain.Responder,
@@ -104,8 +161,13 @@ public sealed partial class DuelEngine
     {
         if (command.DecisionId != pending.DecisionId) return Reject(DuelError.StaleDecision);
         if (command.Player != pending.Player) return Reject(DuelError.NotActivePlayer);
-        if (!DeclarationValid(pending.Kind, command.Value)) return Reject(DuelError.InvalidDecisionChoice);
+        if (!DeclarationValid(pending.Kind, command.Value) || pending.Options.Count != 0 && !pending.Options.Contains(command.Value))
+            return Reject(DuelError.InvalidDecisionChoice);
         var links = chain.Links.Select(l => l.Number == pending.LinkNumber ? l with { Declared = command.Value } : l).ToArray();
+        // A declaration made as the link resolves returns to resolution; one made on activation opens responses.
+        if (chain.NextLink != 0)
+            return Accept(State.WithChain(new PendingChain(checked(State.Revision + 1), links, chain.Responder, chain.ConsecutivePasses, chain.NextLink)),
+                new DeclarationMade(command.Player, pending.Kind, command.Value, pending.EffectId));
         var next = new PendingChain(checked(State.Revision + 1), links, chain.Responder);
         return Accept(State.WithChain(next), new DeclarationMade(command.Player, pending.Kind, command.Value, pending.EffectId),
             new ChainResponseRequested(next.Responder, next.DecisionId));

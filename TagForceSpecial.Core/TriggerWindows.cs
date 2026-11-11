@@ -56,6 +56,18 @@ public sealed partial class DuelEngine
         state.PendingChain is not null || !state.Bookkeeping.TimedDamageRules.Any(t => t.LinkNumber is not null) ? state
             : state.WithBookkeeping(state.Bookkeeping with { TimedDamageRules = Array.AsReadOnly(state.Bookkeeping.TimedDamageRules.Where(t => t.LinkNumber is null).ToArray()) });
 
+    /// <summary>Drops the per-card limits a card has used, so it counts as a new card; limits by name are kept.</summary>
+    private static DuelState ForgetUses(DuelState state, CardInstance card)
+    {
+        var books = state.Bookkeeping;
+        state = state.WithBookkeeping(books with
+        {
+            ActivatedUses = Array.AsReadOnly(books.ActivatedUses.Where(u => u.InstanceId != card.InstanceId).ToArray()),
+            LockUses = Array.AsReadOnly(books.LockUses.Where(u => u.InstanceId != card.InstanceId).ToArray())
+        });
+        return state.WithEventEffects(state.EventEffects.WithUses(state.EventEffects.UsedTriggers.Where(u => u.InstanceId != card.InstanceId)));
+    }
+
     private static DuelState BanishSourceWhenItLeaves(DuelState state, ChainLink link)
     {
         var placed = FieldMonsters(state).Where(e => e.Binding.Card == link.Activation.Spell).Select(e => (long?)e.Binding.PlacementId).FirstOrDefault();

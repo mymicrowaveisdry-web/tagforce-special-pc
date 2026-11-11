@@ -618,7 +618,10 @@ public sealed partial class DuelEngine
         state = PrepareBattleState(State, state, emitted);
         state = PrepareXyzMaterials(State, state, emitted);
         state = ApplyFieldLinks(State, state, emitted);
+        int beforeReturns = emitted.Count;
         state = ApplyControlReturns(state, emitted);
+        // A monster sent to the Graveyard because its control ended with no free zone leaves its Equip cards behind.
+        if (emitted.Skip(beforeReturns).Any(e => e is MonsterSentToGraveyardByRule)) state = ApplyFieldLinks(State, state, emitted);
         state = DropLinkDamageRules(state);
         state = ApplyGraveyardRedirects(state, emitted);
         state = PrepareSummonHistory(State, state, emitted);

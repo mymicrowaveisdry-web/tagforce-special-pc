@@ -7,14 +7,28 @@ public enum ControlDuration
     /// <summary>Until the End Phase of the turn it was taken.</summary>
     UntilEndPhase,
     /// <summary>While the resolving Equip Spell stays equipped to it.</summary>
-    WhileEquipped
+    WhileEquipped,
+    /// <summary>While the monster whose effect took it stays face-up on the field.</summary>
+    WhileSourceFaceUp
 }
+
+/// <summary>
+/// The activating player chooses 1 face-up monster the opponent controls that matches <paramref name="Filter"/> (not targeted) and takes
+/// control of it.
+/// </summary>
+public sealed record TakeChosenControlStep(CardFilter Filter, ControlDuration Duration = ControlDuration.Permanent) : EffectStep;
 
 /// <summary>The activating player takes control of the bound opponent's monsters.</summary>
 public sealed record TakeControlStep(ControlDuration Duration = ControlDuration.Permanent) : EffectStep;
 
 /// <summary>The activating player gives control of the bound monsters they control to the opponent.</summary>
 public sealed record GiveControlStep(ControlDuration Duration = ControlDuration.Permanent) : EffectStep;
+
+/// <summary>The activating player gives control of the bound monster at <paramref name="Target"/>, one they control, to the opponent.</summary>
+public sealed record GiveTargetControlStep(int Target) : EffectStep;
+
+/// <summary>Destroys the bound target at <paramref name="Target"/>; if it is not destroyed, the rest of the effect does not happen.</summary>
+public sealed record DestroyTargetAtStep(int Target) : EffectStep;
 
 /// <summary>The two bound monsters, one on each side, switch control.</summary>
 public sealed record SwitchControlStep : EffectStep;
@@ -91,8 +105,9 @@ public sealed partial class DuelEngine
         if (target.Player == receiver || ControlLocked(state, monster) || FreeZone(state, receiver) is not int zone) return state;
         state = MoveMonsters(state, [(monster, receiver, zone)], effectId, events);
         if (duration == ControlDuration.Permanent) return state;
+        // The Equip Spell, or the monster whose effect took control, is kept with the grant.
         var grant = new ControlGrant(target.Card, target.PlacementId, target.Player, receiver, state.TurnNumber, duration,
-            duration == ControlDuration.WhileEquipped ? link.Activation.Spell : null, link.SourcePlacementId);
+            duration is ControlDuration.WhileEquipped or ControlDuration.WhileSourceFaceUp ? link.Activation.Spell : null, link.SourcePlacementId);
         return state.WithBookkeeping(state.Bookkeeping with { ControlGrants = Array.AsReadOnly([.. state.Bookkeeping.ControlGrants, grant]) });
     }
 
@@ -105,6 +120,23 @@ public sealed partial class DuelEngine
 
     private IEnumerable<FieldCardTarget> Swappable(DuelState state, PlayerId player) =>
         FieldMatches(state, player, FieldCardKind.Monster, TargetSide.Own, FieldCardFilter.Any, null).Where(t => !ControlLocked(state, Bound(t)));
+
+    private IEnumerable<FieldCardTarget> ChoosableToTake(DuelState state, PlayerId controller, TakeChosenControlStep step) =>
+        FieldMatches(state, controller, FieldCardKind.Monster, TargetSide.Opponent, FieldCardFilter.FaceUp, null)
+            .Where(t => MatchesFilter(t.Card, step.Filter) && !ControlLocked(state, Bound(t)));
+
+    /// <summary>Asks the activating player for a matching monster, then takes control of it; nothing happens when none matches.</summary>
+    private (DuelState State, PendingDefinitionChoice? Pause) TakeChosenControl(DuelState state, ChainLink link, EffectDefinition definition, int stepIndex,
+        TakeChosenControlStep step, DuelCommand? choice, List<DuelEvent> events)
+    {
+        var controller = link.Activation.Player;
+        var options = ChoosableToTake(state, controller, step).ToArray();
+        if (options.Length == 0) return (state, null);
+        if (choice is not ChooseDefinitionCard pick)
+            return (state, new PendingDefinitionCardChoice(checked(State.Revision + 1), controller, definition.EffectId, link.Number, stepIndex, options.Select(t => t.Card)));
+        var taken = options.FirstOrDefault(t => t.Card.InstanceId == pick.CardInstanceId) ?? options[0];
+        return (ChangeControl(state, link, taken, controller, step.Duration, definition.EffectId, events), null);
+    }
 
     /// <summary>Asks the activating player, then the opponent, for the monster each gives; then switches them.</summary>
     private (DuelState State, PendingDefinitionChoice? Pause, bool Stop) SwapChosen(DuelState state, ChainLink link, EffectDefinition definition, int stepIndex,
@@ -154,6 +186,8 @@ public sealed partial class DuelEngine
             {
                 ControlDuration.UntilEndPhase => next.TurnNumber > grant.TurnNumber || next.Phase == DuelPhase.End,
                 ControlDuration.WhileEquipped => !EquipStillAttached(next, grant, binding),
+                ControlDuration.WhileSourceFaceUp => !FieldMonsters(next).Any(e => e.Monster.Card == grant.Equip && e.Monster.PlacementId == grant.EquipPlacementId &&
+                    e.Monster.Position != BattlePosition.FaceDownDefense),
                 _ => false
             };
             if (!ended) { kept.Add(grant); continue; }

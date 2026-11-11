@@ -65,4 +65,37 @@ public sealed class CardPoolTests
         var catalog = ReviewedCardMetadata.ApplyReviewed(CardCatalogImporter.Read(stream, 3459, 11657));
         foreach (var family in CardFamilies.All) family.ValidateCatalog(catalog);
     }
+
+    /// <summary>
+    /// Summon restrictions in the decoded text have matching rules: "Cannot be Normal Summoned" needs no Normal Summon and a Special Summon
+    /// policy (none from effects for "Must be" or "by other ways", a proper Summon first for "Must first be"), and a leading "Cannot be
+    /// Special Summoned" needs that rule.
+    /// </summary>
+    [Fact]
+    [Trait("Category", "LocalReference")]
+    public void EverySupportedMonsterFollowsItsSummonRestrictionText()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../.."));
+        using var stream = File.OpenRead(Path.Combine(root,
+            "data/extracted/e99cff5774856e16329b94c9ff48f9eb0c6bc61ff1127882d0785ca4221bd707/files/PSP_GAME/USRDIR/duelsys/cardinfo_jpn.ehp"));
+        var text = CardCatalogImporter.Read(stream, 3459, 11657).Cards.ToDictionary(c => c.GameCardId, c => c.Description.ReplaceLineEndings(" "));
+        var policies = CardFamilies.All.SelectMany(f => f.SpecialSummonCards).GroupBy(p => p.CardId).ToDictionary(g => g.Key, g => g.Last());
+        List<string> wrong = [];
+        int restricted = 0;
+        foreach (var (id, rule) in CardPool.Rules.Where(r => r.Value.Category == CardCategory.Monster && !r.Value.AllowsExtraDeck && text.ContainsKey(r.Key)))
+        {
+            string description = text[id];
+            if (description.Contains("Cannot be Normal Summoned", StringComparison.Ordinal))
+            {
+                restricted++;
+                bool first = description.Contains("ust first be Special Summoned", StringComparison.Ordinal);
+                if (rule.AllowsNormalSummon || !policies.TryGetValue(id, out var policy) ||
+                    (first ? policy.RequiredProperProcedureId is null : policy.EffectSources != SpecialSummonSources.None))
+                    wrong.Add($"{id} Nomi");
+            }
+            if (description.StartsWith("Cannot be Special Summoned", StringComparison.Ordinal) && !rule.CannotBeSpecialSummoned) wrong.Add($"{id} no Special Summon");
+        }
+        Assert.Empty(wrong);
+        Assert.True(restricted >= 6, $"Only {restricted} restricted monsters were checked.");
+    }
 }

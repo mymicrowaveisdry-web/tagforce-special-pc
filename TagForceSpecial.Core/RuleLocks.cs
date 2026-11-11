@@ -35,7 +35,9 @@ public enum LockedAction
     /// <summary>Being Tributed for a Tribute Summon (costs and other Tributes are not affected).</summary>
     BeTributedForSummon = 8388608,
     BeSynchroMaterial = 16777216,
-    BeXyzMaterial = 33554432
+    BeXyzMaterial = 33554432,
+    /// <summary>"Its effects cannot be used": a face-up monster it covers has its effects negated while the lock lasts.</summary>
+    ApplyEffects = 67108864
 }
 
 /// <summary>Who or what a lock applies to.</summary>
@@ -160,7 +162,9 @@ public sealed partial class DuelEngine
     private LockedAction ChoiceMove(EffectDefinition definition, int index, CardInstance card)
     {
         if (index < definition.CostTargetSteps) return definition.Cost is BanishFromGraveyardCost ? LockedAction.BeBanished : LockedAction.None;
-        if (definition.Steps.Any(s => s is TakeControlStep or GiveControlStep or SwitchControlStep)) return LockedAction.SwitchControl;
+        if (definition.Steps.OfType<DestroyTargetAtStep>().Any(s => s.Target == index - definition.CostTargetSteps)) return LockedAction.None;
+        if (definition.Steps.Any(s => s is TakeControlStep or GiveControlStep or SwitchControlStep || s is GiveTargetControlStep give && give.Target == index - definition.CostTargetSteps))
+            return LockedAction.SwitchControl;
         if (definition.Steps.Any(s => s is BanishFieldTargetsStep or DestroyAndBanishTargetsStep or BanishTargetsStep)) return LockedAction.BeBanished;
         if (definition.Steps.Any(s => s is ShuffleTargetsIntoDeckStep)) return LockedAction.BeReturnedToDeck;
         if (definition.Steps.Any(s => s is ReturnTargetsToHandStep))

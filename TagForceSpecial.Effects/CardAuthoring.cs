@@ -32,6 +32,8 @@ public sealed record AuthoredCard(uint Id, string Name, CardKind Kind, uint Gett
     public IReadOnlyList<DestructionReplacementProfile> Replacements { get; init; } = [];
     public IReadOnlyList<GraveyardRedirectProfile> Redirects { get; init; } = [];
     public IReadOnlyList<DamageRuleProfile> DamageRules { get; init; } = [];
+    /// <summary>How effects may Special Summon the card, for monsters that cannot be Normal Summoned.</summary>
+    public IReadOnlyList<SpecialSummonCardProfile> SpecialSummons { get; init; } = [];
     /// <summary>Everything the card's reviewed metadata refers to.</summary>
     public IEnumerable<string> References => Definitions.Select(d => d.EffectId).Concat(Locks.Select(l => l.EffectId)).Concat(BattleAbilities.Select(p => p.EffectId)).Concat(Replacements.Select(r => r.EffectId))
         .Concat(Redirects.Select(r => r.EffectId)).Concat(DamageRules.Select(r => r.EffectId));
@@ -122,6 +124,23 @@ public sealed class CardTable(string prefix)
         return new(id, name, trap ? CardKind.Trap : CardKind.Spell, trap ? TrapKind : SpellKind, IconContinuous, trap ? TrapRules : SpellRules, [lasting, trigger], exceptions)
         {
             Triggers = [new TriggerEffectProfile(trigger, when, relation, requirement, TriggerSourceLocation.FaceUpSpellTrap, timing, cause, limit)]
+        };
+    }
+
+    /// <summary>
+    /// A Continuous card that declares as it resolves and then triggers on each listed event about a monster matching the declaration
+    /// ("If your opponent Summons that monster"), relative to its controller.
+    /// </summary>
+    public AuthoredCard DeclaredWatch(uint id, string name, bool trap, DeclarationKind declares, MonsterEventKind[] when, EffectRelation relation, EffectStep[] steps,
+        string exceptions = "none")
+    {
+        var lasting = new EffectDefinition(Effect(id, "continuous"), id, trap ? EffectKind.ContinuousTrap : EffectKind.ContinuousSpell, [], isMarker: true)
+            .WithDeclarationAtResolution(declares);
+        var triggers = when.Select((e, i) => new EffectDefinition(Effect(id, $"trigger-{i + 1}"), id, EffectKind.MonsterTrigger, steps)).ToArray();
+        return new(id, name, trap ? CardKind.Trap : CardKind.Spell, trap ? TrapKind : SpellKind, IconContinuous, trap ? TrapRules : SpellRules, [lasting, .. triggers], exceptions)
+        {
+            Triggers = triggers.Zip(when, (d, e) => new TriggerEffectProfile(d, e, relation, TriggerRequirement.Mandatory, TriggerSourceLocation.FaceUpSpellTrap)
+                { SubjectFilter = new DeclaredFilter() }).ToArray()
         };
     }
 
@@ -328,6 +347,26 @@ public sealed class CardTable(string prefix)
     }
 
     /// <summary>
+    /// "Cannot be Normal Summoned/Set. Must be Special Summoned by ...": no Normal Summon or Set, and no effect can Special Summon it.
+    /// <paramref name="procedureId"/> names its own Summon procedure, if one exists.
+    /// </summary>
+    public static AuthoredCard Nomi(AuthoredCard card, string? procedureId = null) => card with
+    {
+        Rules = card.Rules with { AllowsNormalSummon = false },
+        SpecialSummons = [new SpecialSummonCardProfile(card.Id, SpecialSummonSources.None, procedureId)]
+    };
+
+    /// <summary>
+    /// "Cannot be Normal Summoned/Set. Must first be Special Summoned by ...": no Normal Summon or Set, and effects can Special Summon it
+    /// from the Graveyard or banishment only after its procedure Summoned it properly.
+    /// </summary>
+    public static AuthoredCard SemiNomi(AuthoredCard card, string procedureId) => card with
+    {
+        Rules = card.Rules with { AllowsNormalSummon = false },
+        SpecialSummons = [new SpecialSummonCardProfile(card.Id, SpecialSummonSources.Graveyard | SpecialSummonSources.Banished, procedureId)]
+    };
+
+    /// <summary>
     /// Makes a monster a Spirit: it cannot be Special Summoned and returns to the hand in the End Phase of a turn it was Normal Summoned
     /// or flipped face-up.
     /// </summary>
@@ -402,6 +441,7 @@ public sealed class CardTable(string prefix)
             GraveyardRedirects = Array.AsReadOnly(cards.SelectMany(c => c.Redirects).ToArray()),
             DamageRules = Array.AsReadOnly(cards.SelectMany(c => c.DamageRules).ToArray()),
             PendulumCards = Array.AsReadOnly(cards.SelectMany(c => c.Scales).ToArray()),
+            SpecialSummonCards = Array.AsReadOnly(cards.SelectMany(c => c.SpecialSummons).ToArray()),
             TributeProcedures = Array.AsReadOnly(cards.SelectMany(c => c.TributeProcedures).ToArray())
         };
     }

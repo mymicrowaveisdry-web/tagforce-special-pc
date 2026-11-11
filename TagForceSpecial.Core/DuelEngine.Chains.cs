@@ -78,6 +78,13 @@ public sealed partial class DuelEngine
     {
         var link = chain.Links[chain.NextLink - 1];
         var activation = link.Activation;
+        // A card that declares as it resolves asks first; resolution then goes on with the next step command.
+        if (link is { Declared: null, EffectNegated: false, Trigger: null } && effectsById.GetValueOrDefault(activation.EffectId) is { DeclaresAtResolution: true, Declares: { } kind } declaring)
+        {
+            var ask = new PendingDeclaration(checked(State.Revision + 1), activation.Player, declaring.EffectId, link.Number, kind, DeclarationOptions(kind));
+            return Accept(State.WithChain(new PendingChain(ask.DecisionId, chain.Links, chain.Responder, chain.ConsecutivePasses, chain.NextLink, definitionChoice: ask)),
+                new DeclarationRequested(ask));
+        }
         var next = State;
         var links = chain.Links.ToArray();
         List<DuelEvent> events = [];

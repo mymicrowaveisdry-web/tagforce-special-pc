@@ -16,7 +16,7 @@ public static class TemplateCardFamily
     /// <summary>"Cards with that name, and their effects, cannot be used": Summoned, Set, activated, used to attack or used as Synchro/Xyz Material.</summary>
     private const LockedAction PsiBlocked = LockedAction.NormalSummon | LockedAction.SetMonster | LockedAction.SpecialSummon | LockedAction.FusionSummon |
         LockedAction.ActivateSpell | LockedAction.ActivateTrap | LockedAction.ActivateMonsterEffect | LockedAction.SetSpellTrap | LockedAction.Attack |
-        LockedAction.BeSynchroMaterial | LockedAction.BeXyzMaterial;
+        LockedAction.BeSynchroMaterial | LockedAction.BeXyzMaterial | LockedAction.ApplyEffects;
     /// <summary>"Savior" Synchro Monsters (Savior Star Dragon, Savior Demon Dragon).</summary>
     private static readonly uint[] SaviorSynchros = [8475, 8651];
     private static readonly FieldTarget FaceUpMonster = new(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUp);
@@ -24,6 +24,15 @@ public static class TemplateCardFamily
     private static MonsterTypeFilter OfType(uint type) => new([type]);
     private static MonsterAttributeFilter OfAttribute(uint attribute) => new(attribute);
     private static LastingStatModifier AttributeBoost(uint attribute) => new(TargetSide.Either, 500, -400, OfAttribute(attribute));
+
+    /// <summary>"FLIP: take control of 1 [Attribute] monster your opponent controls while this card is face-up", chosen at resolution or targeted.</summary>
+    private static AuthoredCard Charmer(uint id, string name, uint attribute, bool targets = false) => targets
+        ? T.Trigger(id, name, MonsterEventKind.FlippedFaceUp, [new TakeControlStep(ControlDuration.WhileSourceFaceUp)], getterKind: 24,
+            targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Opponent, FieldCardFilter.FaceUp, cardFilter: OfAttribute(attribute))], exceptions: CharmerControl)
+        : T.Trigger(id, name, MonsterEventKind.FlippedFaceUp, [new TakeChosenControlStep(OfAttribute(attribute), ControlDuration.WhileSourceFaceUp)], getterKind: 24,
+            exceptions: CharmerControl);
+
+    private const string CharmerControl = "Control returns when this card stops being face-up on the field; flipping the taken monster face-down later does not end it in this era.";
 
     private static AuthoredCard TypeWipe(uint id, string name, uint type) =>
         T.Normal(id, name, [new DestroyAllStep(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUp, OfType(type))]);
@@ -227,6 +236,21 @@ public static class TemplateCardFamily
         T.Trigger(4490, "Ameba", MonsterEventKind.ControlChanged, [new TakeDamageStep(2000)], limit: TriggerTurnLimit.WhileFaceUp, exceptions: GainedControl),
         T.Trigger(4553, "Griggle", MonsterEventKind.ControlChanged, [new GainLifePointsStep(3000, EffectPlayers.Opponent)], limit: TriggerTurnLimit.WhileFaceUp, exceptions: GainedControl),
         T.Trigger(7725, "Kunoichi", MonsterEventKind.ControlChanged, [new DiscardRandomStep()], exceptions: GainedControl),
+        Charmer(6335, "Aussa the Earth Charmer", Earth),
+        Charmer(6338, "Wynn the Wind Charmer", Wind),
+        Charmer(7664, "Dharc the Dark Charmer", Dark),
+        Charmer(8800, "Lyna the Light Charmer", Light),
+        Charmer(6336, "Eria the Water Charmer", Water, targets: true),
+        Charmer(6337, "Hiita the Fire Charmer", Fire, targets: true),
+        T.Normal(5168, "Mystic Box", [new DestroyTargetAtStep(0), new GiveTargetControlStep(1)],
+            targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Opponent), new FieldTarget(FieldCardKind.Monster, TargetSide.Own)],
+            exceptions: "If the first target is not destroyed, control is not given (\"then\"; no card ruling found)."),
+        CardTable.Declaring(T.Trap(8853, "Crevice Into the Different Dimension", [new BanishTargetsStep()],
+            targets: [new ZoneTarget(CardZone.Graveyard, TargetSide.Either, new SharedTraitFilter(IdentityTrait.Attribute), 2, 2)],
+            exceptions: "The targets are chosen first and must share an Attribute; the declaration is then that Attribute."), DeclarationKind.Attribute),
+        T.DeclaredWatch(7015, "Cloak and Dagger", trap: true, DeclarationKind.MonsterCardName,
+            [MonsterEventKind.NormalSummoned, MonsterEventKind.SpecialSummoned, MonsterEventKind.FlippedFaceUp], EffectRelation.Opponent,
+            [new BanishEventMonsterStep(), new BanishSourceCardStep()], "The name is declared as the card resolves (OCG ruling)."),
         T.HandTrigger(8617, "Battle Fader", MonsterEventKind.AttackDeclared, EffectRelation.Opponent,
             [new SpecialSummonSelfStep(), new BanishSourceWhenItLeavesStep(), new EndBattlePhaseStep()], directAttack: true),
         T.HandTrigger(10898, "Gorgonic Gargoyle", MonsterEventKind.NormalSummoned, EffectRelation.Controller, [new SpecialSummonSelfStep()], OfType(Rock)),
