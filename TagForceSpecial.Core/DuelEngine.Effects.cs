@@ -102,6 +102,7 @@ public sealed partial class DuelEngine
                     attack.Attacker.Player != playerId && attack.Attacker.IsStillPresent(State),
                 MonsterSummonedCondition summoned => SummonedMatches(State, playerId, summoned).Any(),
                 OpponentHandAtLeastCondition hand => State.GetPlayer(Other(playerId)).Hand.Count >= hand.Count,
+                PhaseCondition phase => State.Phase == phase.Phase,
                 LifePointsBehindCondition behind => (long)State.GetPlayer(Other(playerId)).LifePoints - player.LifePoints >= behind.Amount,
                 NoSpecialSummonThisTurnCondition => !State.SummonHistory.Any(h => h.Player == playerId && h.TurnNumber == State.TurnNumber &&
                     h.Status != SummonStatus.Negated && h.Method is SummonMethod.SpecialEffect or SummonMethod.SpecialProcedure or SummonMethod.Token or SummonMethod.Pendulum),
@@ -577,6 +578,12 @@ public sealed partial class DuelEngine
                 choice = null;
                 continue;
             }
+            if (step is StopUnlessOwnTurnStep)
+            {
+                if (state.ActivePlayer == controller) continue;
+                events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
+                break;
+            }
             if (step is StopUnlessSpecialSummonedStep)
             {
                 if (link.Trigger?.Source is { } summonedSource && WasSpecialSummoned(state, summonedSource)) continue;
@@ -775,6 +782,12 @@ public sealed partial class DuelEngine
                         state = ChangeControl(state, link, target, receiver, duration, definition.EffectId, events);
                     continue;
                 }
+                if (step is LockTargetsUntilEndStep lockTargets)
+                {
+                    foreach (var target in valid.Where(t => t.Location == FieldLocation.MonsterZone))
+                        state = AddBoundLock(state, controller, lockTargets.Actions, target, definition.EffectId, events);
+                    continue;
+                }
                 if (step is SwitchControlStep)
                 {
                     // Both monsters must still be there, or neither switches.
@@ -880,6 +893,8 @@ public sealed partial class DuelEngine
                     DiceDuelStep dice => DiceDuel(state, controller, dice, definition.EffectId, events),
                     ExcavateStep excavate => Excavate(state, controller, excavate.Count, definition.EffectId, events),
                     ReturnAttackerToHandStep => ReturnAttacker(state, link, definition.EffectId, events),
+                    // "Draw ... and skip": if the draw was stopped, nothing is skipped either (Reckless Greed ruling).
+                    SkipPhaseStep when definition.Steps.Any(s => s is DrawCardsStep) && RuleLocked(state, LockedAction.Draw, controller, null) => state,
                     SkipPhaseStep skip => AddPhaseSkips(state, controller, skip),
                     EndBattlePhaseStep => EndBattlePhase(state, events),
                     SendSourceToGraveyardStep => SendSourceToGraveyard(state, link, events),

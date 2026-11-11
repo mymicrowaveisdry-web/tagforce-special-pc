@@ -344,7 +344,7 @@ public sealed class EffectDefinition
         BanishFieldTargetsStep or NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep or DestroyAndBanishTargetsStep or ModifyCombatantStatsStep or
         EquipTargetStep or UnionEquipStep or PlaceCounterStep or ModifyTargetsUntilEndStep or FlipTargetsFaceDownStep or FlipTargetsFaceUpStep or
         AttachSourceStep or AttachTargetsToSelfStep or DetachAllStep or RankUpStep or AttachFromStep { ToTarget: true } or
-        TakeControlStep or GiveControlStep or SwitchControlStep;
+        TakeControlStep or GiveControlStep or SwitchControlStep or LockTargetsUntilEndStep;
     /// <summary>Cost choices answered before the target choices, each binding a field target answer.</summary>
     internal int CostTargetSteps => Cost switch { TributeCost tribute => tribute.Count, BanishFromGraveyardCost banish => banish.Count, _ => 0 };
     internal static bool IsAutomatic(EffectTarget t) => t is AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget or TriggerTargetedMonster or TriggerSourceMonster;
@@ -434,6 +434,8 @@ public sealed class EffectDefinition
                     SkipPhaseStep s => s.Phase is not (DuelPhase.Draw or DuelPhase.Standby or DuelPhase.Battle or DuelPhase.Main2) ||
                         s.Count is < 1 or > 3 || !Enum.IsDefined(s.Player),
                     EndBattlePhaseStep => false,
+                    LockTargetsUntilEndStep s => s.Actions == LockedAction.None,
+                    StopUnlessOwnTurnStep => false,
                     StopUnlessSpecialSummonedStep or SendSourceToGraveyardStep => kind != EffectKind.MonsterTrigger,
                     StopUnlessMilledStep s => s.Filter is null,
                     ApplyDamageRuleStep s => s.Rule is null || !Enum.IsDefined(s.Rule.Kind) || (s.Rule.Applies & DamageKinds.Any) == 0 || !Enum.IsDefined(s.Scope),

@@ -67,19 +67,21 @@ public sealed class CardTable(string prefix)
 
     private string Effect(uint id, string role) => $"{prefix}-{id}-{role}-v1";
 
-    private AuthoredCard Activated(uint id, string name, EffectKind kind, EffectStep[] steps, EffectCost? cost, EffectTarget[]? targets, EffectCondition[]? conditions, string exceptions)
+    private AuthoredCard Activated(uint id, string name, EffectKind kind, EffectStep[] steps, EffectCost? cost, EffectTarget[]? targets, EffectCondition[]? conditions, string exceptions,
+        bool locksOtherSummons = false)
     {
         bool trap = kind is EffectKind.NormalTrap or EffectKind.CounterTrap;
         uint icon = kind switch { EffectKind.QuickPlaySpell => IconQuickPlay, EffectKind.CounterTrap => IconCounter, _ => IconNormal };
-        var definition = new EffectDefinition(Effect(id, "effect"), id, kind, steps, conditions, cost, fieldTargets: targets);
+        var definition = new EffectDefinition(Effect(id, "effect"), id, kind, steps, conditions, cost, fieldTargets: targets, locksOtherSummonsThisTurn: locksOtherSummons);
         return new(id, name, trap ? CardKind.Trap : CardKind.Spell, trap ? TrapKind : SpellKind, icon, trap ? TrapRules : SpellRules, [definition], exceptions);
     }
 
     public AuthoredCard Normal(uint id, string name, EffectStep[] steps, EffectCost? cost = null, EffectTarget[]? targets = null, EffectCondition[]? conditions = null, string exceptions = "none") =>
         Activated(id, name, EffectKind.NormalSpell, steps, cost, targets, conditions, exceptions);
 
-    public AuthoredCard QuickPlay(uint id, string name, EffectStep[] steps, EffectCost? cost = null, EffectTarget[]? targets = null, EffectCondition[]? conditions = null, string exceptions = "none") =>
-        Activated(id, name, EffectKind.QuickPlaySpell, steps, cost, targets, conditions, exceptions);
+    public AuthoredCard QuickPlay(uint id, string name, EffectStep[] steps, EffectCost? cost = null, EffectTarget[]? targets = null, EffectCondition[]? conditions = null, string exceptions = "none",
+        bool locksOtherSummons = false) =>
+        Activated(id, name, EffectKind.QuickPlaySpell, steps, cost, targets, conditions, exceptions, locksOtherSummons);
 
     public AuthoredCard Trap(uint id, string name, EffectStep[] steps, EffectCost? cost = null, EffectTarget[]? targets = null, EffectCondition[]? conditions = null, string exceptions = "none") =>
         Activated(id, name, EffectKind.NormalTrap, steps, cost, targets, conditions, exceptions);
@@ -153,9 +155,13 @@ public sealed class CardTable(string prefix)
     private RuleLockProfile Locked(uint id, RuleLock rule) => new(Effect(id, "lock"), id, rule);
 
     /// <summary>A Continuous card whose only effect is a "cannot" rule while it stays face-up.</summary>
-    public AuthoredCard ContinuousLock(uint id, string name, bool trap, RuleLock rule, string exceptions = "none") =>
+    public AuthoredCard ContinuousLock(uint id, string name, bool trap, RuleLock rule, string exceptions = "none", EffectCondition[]? conditions = null) =>
         new(id, name, trap ? CardKind.Trap : CardKind.Spell, trap ? TrapKind : SpellKind, IconContinuous, trap ? TrapRules : SpellRules,
-            [new EffectDefinition(Effect(id, "continuous"), id, trap ? EffectKind.ContinuousTrap : EffectKind.ContinuousSpell, [], isMarker: true)], exceptions) { Locks = [Locked(id, rule)] };
+            [new EffectDefinition(Effect(id, "continuous"), id, trap ? EffectKind.ContinuousTrap : EffectKind.ContinuousSpell, [], conditions, isMarker: true)], exceptions) { Locks = [Locked(id, rule)] };
+
+    /// <summary>Adds a "cannot" rule to a card; <paramref name="onCardId"/> names another card it applies to, such as the Tokens it makes.</summary>
+    public AuthoredCard WithLock(AuthoredCard card, RuleLock rule, uint? onCardId = null) =>
+        card with { Locks = [.. card.Locks, Locked(onCardId ?? card.Id, rule) with { EffectId = Effect(card.Id, $"lock-{card.Locks.Count + 1}") }] };
 
     /// <summary>A Continuous card with a "cannot" rule that also triggers in each Standby Phase of the player on <paramref name="standbyOf"/>.</summary>
     public AuthoredCard ContinuousLock(uint id, string name, bool trap, RuleLock rule, EffectRelation standbyOf, EffectStep[] standby, string exceptions = "none")
@@ -271,8 +277,8 @@ public sealed class CardTable(string prefix)
     public AuthoredCard DamageRuleMonster(uint id, string name, DamageRule rule, TargetSide side, uint getterKind = EffectMonsterKind, string exceptions = "none") =>
         new(id, name, CardKind.Monster, getterKind, IconNormal, TributeMonsterRules, [], exceptions) { DamageRules = [new(Effect(id, "damage-rule"), id, rule, side)] };
 
-    public AuthoredCard MonsterLock(uint id, string name, RuleLock rule, uint getterKind = EffectMonsterKind, string exceptions = "none") =>
-        new(id, name, CardKind.Monster, getterKind, IconNormal, TributeMonsterRules, [], exceptions) { Locks = [Locked(id, rule)] };
+    public AuthoredCard MonsterLock(uint id, string name, RuleLock rule, uint getterKind = EffectMonsterKind, string exceptions = "none", DuelCardRules? rules = null) =>
+        new(id, name, CardKind.Monster, getterKind, IconNormal, rules ?? TributeMonsterRules, [], exceptions) { Locks = [Locked(id, rule)] };
 
     /// <summary>A monster whose continuous effect grants battle permissions or requirements.</summary>
     public AuthoredCard BattleMonster(uint id, string name, BattleAbilities abilities, uint getterKind = EffectMonsterKind) =>

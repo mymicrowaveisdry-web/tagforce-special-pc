@@ -31,7 +31,11 @@ public enum LockedAction
     /// <summary>Entering the Battle Phase: the locked side skips it.</summary>
     EnterBattlePhase = 2097152,
     /// <summary>Entering Main Phase 2: the locked side skips it.</summary>
-    EnterMainPhase2 = 4194304
+    EnterMainPhase2 = 4194304,
+    /// <summary>Being Tributed for a Tribute Summon (costs and other Tributes are not affected).</summary>
+    BeTributedForSummon = 8388608,
+    BeSynchroMaterial = 16777216,
+    BeXyzMaterial = 33554432
 }
 
 /// <summary>Who or what a lock applies to.</summary>
@@ -44,7 +48,8 @@ public enum LockScope { Side, Self, Equipped }
 public sealed record RuleLock(LockedAction Actions, TargetSide Side = TargetSide.Either, CardFilter? Cards = null, LockScope Scope = LockScope.Side,
     FieldCardFilter Position = FieldCardFilter.Any, bool SummonedThisTurnOnly = false, DuelPhase? Phase = null, EffectKind? Kind = null,
     SpecialSummonSources From = SpecialSummonSources.None, int UsesPerTurn = 0, bool ByOpponentOnly = false, CardCategory? ByCategory = null,
-    DuelPhase? ExceptPhase = null, BattleOpponent? Versus = null, bool OnFieldOnly = false);
+    DuelPhase? ExceptPhase = null, BattleOpponent? Versus = null, bool OnFieldOnly = false,
+    bool WhileHandEmpty = false, CardFilter? WhileControlsOther = null, CardFilter? ExceptSummoning = null);
 
 /// <summary>The monster a battle is with, by card filter and current ATK; used for battle destruction.</summary>
 public sealed record BattleOpponent(CardFilter? Cards = null, int MinAttack = 0, int MaxAttack = int.MaxValue);
@@ -59,7 +64,12 @@ public sealed record RuleLockProfile(string EffectId, uint CardId, RuleLock Lock
 /// <summary>Applies a lock that lasts until the end of this turn, relative to the activating player.</summary>
 public sealed record ApplyRuleLockStep(RuleLock Lock) : EffectStep;
 
-internal sealed record TimedRuleLock(PlayerId Controller, int TurnNumber, RuleLock Lock);
+internal sealed record TimedRuleLock(PlayerId Controller, int TurnNumber, RuleLock Lock)
+{
+    /// <summary>The one monster a self-scoped timed lock is bound to.</summary>
+    public CardInstance? BoundCard { get; init; }
+    public long BoundPlacementId { get; init; }
+}
 internal sealed record RuleLockUse(int InstanceId, string EffectId, int TurnNumber);
 
 public sealed record RuleLockApplied(PlayerId Controller, string EffectId) : DuelEvent;
@@ -74,7 +84,7 @@ public sealed partial class DuelEngine
     private IEnumerable<ActiveLock> ActiveLocks(DuelState state)
     {
         foreach (var timed in state.Bookkeeping.TimedLocks.Where(t => t.TurnNumber == state.TurnNumber))
-            yield return new(timed.Controller, timed.Lock, null, null, "", 0);
+            yield return new(timed.Controller, timed.Lock, timed.BoundCard is { } bound ? new(bound, timed.BoundPlacementId) : null, null, "", 0);
         if (ruleLockProfiles.Count == 0) yield break;
         foreach (var (binding, monster) in FieldMonsters(state))
             if (monster.Position != BattlePosition.FaceDownDefense && !state.EventEffects.NegatedMonsters.Contains(binding) &&
@@ -93,7 +103,8 @@ public sealed partial class DuelEngine
     }
 
     private bool LockApplies(DuelState state, ActiveLock active, LockedAction action, PlayerId subject, CardInstance? card, FieldMonster? monster,
-        DecisionCardSource? from, EffectKind? kind, PlayerId? targeter, CardCategory? byCategory, MonsterBinding? versus = null, bool onField = true)
+        DecisionCardSource? from, EffectKind? kind, PlayerId? targeter, CardCategory? byCategory, MonsterBinding? versus = null, bool onField = true,
+        CardInstance? summoning = null)
     {
         var rule = active.Lock;
         if (!rule.Actions.HasFlag(action)) return false;
@@ -106,6 +117,8 @@ public sealed partial class DuelEngine
         if (rule.Phase is { } phase && phase != state.Phase) return false;
         if (rule.ExceptPhase is { } except && except == state.Phase) return false;
         if (rule.OnFieldOnly && !onField) return false;
+        if (rule.ExceptSummoning is { } exempt && summoning is not null && MatchesFilter(summoning, exempt)) return false;
+        if (!LockConditionHolds(state, rule, active.Controller, active.Self?.Card, active.Self?.PlacementId ?? 0)) return false;
         if (rule.Versus is { } opponent && (versus is not { } other || !VersusMatches(state, opponent, other))) return false;
         if (rule.Kind is { } required && required != kind) return false;
         if (rule.From != SpecialSummonSources.None && (from is not { } source || !rule.From.HasFlag(SourceFlag(source)))) return false;
@@ -130,8 +143,9 @@ public sealed partial class DuelEngine
 
     /// <summary>True when an active "cannot" rule forbids this action.</summary>
     private bool RuleLocked(DuelState state, LockedAction action, PlayerId subject, CardInstance? card, FieldMonster? monster = null,
-        DecisionCardSource? from = null, EffectKind? kind = null, PlayerId? targeter = null, CardCategory? byCategory = null, bool onField = true) =>
-        ActiveLocks(state).Any(active => LockApplies(state, active, action, subject, card, monster, from, kind, targeter, byCategory, onField: onField));
+        DecisionCardSource? from = null, EffectKind? kind = null, PlayerId? targeter = null, CardCategory? byCategory = null, bool onField = true,
+        CardInstance? summoning = null) =>
+        ActiveLocks(state).Any(active => LockApplies(state, active, action, subject, card, monster, from, kind, targeter, byCategory, onField: onField, summoning: summoning));
 
     /// <summary>True when a lock stops this card from being moved: banished, or returned to the hand or Deck.</summary>
     private bool MoveLocked(DuelState state, LockedAction action, FieldCardTarget target) =>

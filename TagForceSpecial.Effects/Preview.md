@@ -40,7 +40,7 @@ contain local card text. `card-support` records original text, IDs/provenance,
 conditions, operations, costs, choices, limits, tests and evidence separately for
 the preview and full pool (the full pool also includes the 665-card Normal Monster
 family, the five chain cards, the 13 LP cards, the 10
-Deck-operation cards, the 15 removal cards, the 8 Graveyard cards, the 9 battle Traps, the 5 summon Traps, the 3 summon negators the 13 monster triggers, the 12 Flip, Spirit and Gemini monsters, the 26 lasting and activated cards, the 24 Summon procedure cards and the 151 template cards and the 2 Egyptian God cards,
+Deck-operation cards, the 15 removal cards, the 8 Graveyard cards, the 9 battle Traps, the 5 summon Traps, the 3 summon negators the 13 monster triggers, the 12 Flip, Spirit and Gemini monsters, the 26 lasting and activated cards, the 24 Summon procedure cards and the 157 template cards, the 2 Egyptian God cards and the 2 Token cards,
 and excludes 95 Tokens).
 Unreviewed cards remain unsupported. Unclassified effects require later family inventory.
 

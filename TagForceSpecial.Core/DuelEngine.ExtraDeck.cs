@@ -30,6 +30,10 @@ public sealed partial class DuelEngine
                 State.SummonHistory.Any(h => h.Card == material.Card && h.Method == SummonMethod.Token))
                 return Reject(DuelError.SummonMaterialNotAllowed);
         }
+        // "Cannot be used as Synchro/Xyz Material (except for ...)" is checked against the monster being Summoned.
+        var materialLock = profile.Synchro is not null ? LockedAction.BeSynchroMaterial : profile.Xyz is not null ? LockedAction.BeXyzMaterial : LockedAction.None;
+        if (materialLock != LockedAction.None && selected.Any(m => RuleLocked(State, materialLock, m.Player, m.Card, player.MonsterZones[m.Zone], summoning: target)))
+            return Reject(DuelError.SummonMaterialNotAllowed);
         if (profile.Synchro is { } synchro)
         {
             var targetLevel = catalog[target.GameCardId].Statistics.Level;

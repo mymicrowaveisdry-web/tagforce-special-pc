@@ -46,6 +46,7 @@ public sealed partial class DuelEngine
         if (trigger.Profile.Definition?.Steps is [StopUnlessHandHoldsStep holds, ..] && !HandHolds(state, trigger.Player, holds)) return false;
         if (trigger.Profile.Definition?.Steps is [OpponentCallsRandomHandCardStep, ..] && state.GetPlayer(trigger.Player).Hand.Count == 0) return false;
         if (trigger.Profile.Definition?.Steps is [StopUnlessSpecialSummonedStep, ..] && !WasSpecialSummoned(state, trigger.Source)) return false;
+        if (trigger.Profile.Definition?.Steps is [StopUnlessOwnTurnStep, ..] && state.ActivePlayer != trigger.Player) return false;
         if (trigger.Profile.Definition?.Steps is [StopUnlessActivatedThisTurnStep, ..] &&
             !ScaleActivatedThisTurn(state, trigger.Player, trigger.Source.Zone, trigger.Source.Card, trigger.Source.PlacementId)) return false;
         if (trigger.Profile.TributeCost && trigger.TributedCost is null &&

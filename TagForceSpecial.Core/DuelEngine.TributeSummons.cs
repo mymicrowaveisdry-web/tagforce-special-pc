@@ -35,6 +35,7 @@ public sealed partial class DuelEngine
             return Reject(DuelError.InvalidTributeSelection);
         foreach (var tribute in selected)
             if (player.MonsterZones[tribute.Zone]!.BattleDestroyed || RuleLocked(State, LockedAction.BeTributed, player.Id, tribute.Card, player.MonsterZones[tribute.Zone]) ||
+                RuleLocked(State, LockedAction.BeTributedForSummon, player.Id, tribute.Card, player.MonsterZones[tribute.Zone], summoning: card) ||
                 !rules.TryGetValue(tribute.Card.GameCardId, out var donorRule) || !donorRule.AllowsTributeForSummon ||
                 procedure is not null && (procedure.AllowedTributeCardIds.Count != 0 && !procedure.AllowedTributeCardIds.Contains(tribute.Card.GameCardId) ||
                     procedure.RequireFaceUpTributes && player.MonsterZones[tribute.Zone]!.Position == BattlePosition.FaceDownDefense))

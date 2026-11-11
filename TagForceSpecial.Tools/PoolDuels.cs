@@ -167,8 +167,10 @@ public static class PoolDuels
         }
     }
 
+    /// <summary>Cards held by a pending Summon; a Gemini Summon's monster stays in its zone, so it is not counted again.</summary>
     private static IEnumerable<int> PendingCards(PendingSummon summon) =>
-        summon.PendulumGroup.SelectMany(PendingCards).Concat(summon.XyzMaterials.Select(c => c.InstanceId)).Append(summon.Card.InstanceId);
+        summon.PendulumGroup.SelectMany(PendingCards).Concat(summon.XyzMaterials.Select(c => c.InstanceId))
+            .Concat(summon.IsGeminiSummon ? [] : [summon.Card.InstanceId]);
 
     private static string? Violation(DuelState state, HashSet<int> initial, CardCatalog catalog)
     {

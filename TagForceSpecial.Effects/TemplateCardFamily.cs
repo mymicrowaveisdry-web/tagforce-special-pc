@@ -12,6 +12,8 @@ public static class TemplateCardFamily
 
     private const string EndsWithEndPhase = "The change ends when the End Phase begins.";
     private static readonly CardTable T = new("template");
+    /// <summary>"Savior" Synchro Monsters (Savior Star Dragon, Savior Demon Dragon).</summary>
+    private static readonly uint[] SaviorSynchros = [8475, 8651];
     private static readonly FieldTarget FaceUpMonster = new(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUp);
 
     private static MonsterTypeFilter OfType(uint type) => new([type]);
@@ -196,6 +198,15 @@ public static class TemplateCardFamily
         T.Trap(5793, "Frozen Soul", [new SkipPhaseStep(DuelPhase.Battle, TargetSide.Opponent)], conditions: [new LifePointsBehindCondition(2000)]),
         T.Counter(4804, "Negate Attack", [new NegateAttackStep(), new EndBattlePhaseStep()], TrapTiming.OpponentAttacks, targets: TrapTiming.Attacker),
         T.WhenBattleDestroyed(4875, "The Unhappy Maiden", [new EndBattlePhaseStep()]),
+        T.WithLock(T.Trigger(5974, "Solar Flare Dragon", MonsterEventKind.EndPhase, [new StopUnlessOwnTurnStep(), new DealDamageStep(500)], timing: TriggerTiming.If),
+            new RuleLock(LockedAction.BeAttacked, Scope: LockScope.Self, WhileControlsOther: OfType(Pyro))),
+        T.MonsterLock(8274, "Infernity Guardian", new RuleLock(LockedAction.BeDestroyedByBattle | LockedAction.BeDestroyedByEffect, Scope: LockScope.Self, WhileHandEmpty: true)),
+        T.MonsterLock(6473, "Reborn Zombie", new RuleLock(LockedAction.BeDestroyedByBattle, Scope: LockScope.Self, Position: FieldCardFilter.AttackPosition, WhileHandEmpty: true)),
+        T.MonsterLock(8436, "Savior Dragon", new RuleLock(LockedAction.BeSynchroMaterial, Scope: LockScope.Self, ExceptSummoning: new CardIdFilter(SaviorSynchros)),
+            getterKind: 16, rules: new(CardCategory.Monster, AllowsNormalSummon: true, AllowsBasicBattle: true, AllowsTributeForSummon: true, AllowsSummonMaterial: true, IsTuner: true)),
+        T.Normal(4817, "Mind Control", [new LockTargetsUntilEndStep(LockedAction.Attack | LockedAction.BeTributed), new TakeControlStep(ControlDuration.UntilEndPhase)],
+            targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Opponent)], conditions: [new FreeMonsterZonesCondition(1)]),
+        T.ContinuousLock(9353, "Terminal World", trap: false, new RuleLock(LockedAction.EnterMainPhase2), conditions: [new PhaseCondition(DuelPhase.Main1)]),
         T.ContinuousLock(5134, "Gravity Bind", trap: true, new RuleLock(LockedAction.Attack, Cards: new MonsterLevelFilter(12, minLevel: 4))),
         T.ContinuousLock(5281, "Vengeful Bog Spirit", trap: false, new RuleLock(LockedAction.Attack, SummonedThisTurnOnly: true)),
         T.ContinuousLock(6522, "Non-Fusion Area", trap: true, new RuleLock(LockedAction.FusionSummon)),

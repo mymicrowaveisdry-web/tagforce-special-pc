@@ -93,7 +93,8 @@ public static class CardFamilies
             PendulumCards = SummonProcedureFamily.PendulumCards
         },
         TemplateCardFamily.Family,
-        EgyptianGodFamily.Family
+        EgyptianGodFamily.Family,
+        TokenCardFamily.Family
     });
 }
 
