@@ -343,7 +343,8 @@ public sealed class EffectDefinition
     internal static bool IsFieldTargetStep(EffectStep s) => s is DestroyTargetsStep or ReturnTargetsToHandStep or ChangeTargetsToDefenseStep or
         BanishFieldTargetsStep or NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep or DestroyAndBanishTargetsStep or ModifyCombatantStatsStep or
         EquipTargetStep or UnionEquipStep or PlaceCounterStep or ModifyTargetsUntilEndStep or FlipTargetsFaceDownStep or FlipTargetsFaceUpStep or
-        AttachSourceStep or AttachTargetsToSelfStep or DetachAllStep or RankUpStep or AttachFromStep { ToTarget: true };
+        AttachSourceStep or AttachTargetsToSelfStep or DetachAllStep or RankUpStep or AttachFromStep { ToTarget: true } or
+        TakeControlStep or GiveControlStep or SwitchControlStep;
     /// <summary>Cost choices answered before the target choices, each binding a field target answer.</summary>
     internal int CostTargetSteps => Cost switch { TributeCost tribute => tribute.Count, BanishFromGraveyardCost banish => banish.Count, _ => 0 };
     internal static bool IsAutomatic(EffectTarget t) => t is AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget or TriggerTargetedMonster or TriggerSourceMonster;
@@ -426,6 +427,9 @@ public sealed class EffectDefinition
                     OpponentSendsFromDeckStep s => s.Filter is null,
                     OpponentAddsFromDeckStep s => s.Filter is null,
                     OpponentDiscardsMatchingStep s => s.Filter is null,
+                    TakeControlStep s => !Enum.IsDefined(s.Duration),
+                    GiveControlStep s => !Enum.IsDefined(s.Duration),
+                    SwitchControlStep or SwapChosenMonstersStep => false,
                     StopUnlessMilledStep s => s.Filter is null,
                     ApplyDamageRuleStep s => s.Rule is null || !Enum.IsDefined(s.Rule.Kind) || (s.Rule.Applies & DamageKinds.Any) == 0 || !Enum.IsDefined(s.Scope),
                     ModifyCombatantStatsStep s => s.Attack == 0 && s.Defense == 0,
@@ -511,6 +515,15 @@ public sealed class EffectDefinition
             snapshot.Any(s => s is AttachFromStep { ToTarget: false }) && (!monsterKind || fields.Length != 0) ||
             snapshot.Any(s => s is AttachTargetsToSelfStep) && (!monsterKind || fields.Any(f => f is not FieldTarget { Kind: FieldCardKind.Monster })))
             throw new ArgumentException("Equip, revival, Union and counter steps need their card kinds and bound targets.", nameof(steps));
+        if (snapshot.Any(s => s is TakeControlStep or GiveControlStep) && fields.Any(f => f is not FieldTarget { Kind: FieldCardKind.Monster }) ||
+            snapshot.Any(s => s is TakeControlStep) && fields.Any(f => f is FieldTarget { Side: not TargetSide.Opponent }) ||
+            snapshot.Any(s => s is GiveControlStep) && fields.Any(f => f is FieldTarget { Side: not TargetSide.Own }) ||
+            snapshot.Any(s => s is SwitchControlStep) && fields is not ([FieldTarget { Kind: FieldCardKind.Monster, Count: 1, Side: TargetSide.Opponent },
+                FieldTarget { Kind: FieldCardKind.Monster, Count: 1, Side: TargetSide.Own }] or [FieldTarget { Kind: FieldCardKind.Monster, Count: 1, Side: TargetSide.Own },
+                FieldTarget { Kind: FieldCardKind.Monster, Count: 1, Side: TargetSide.Opponent }]) ||
+            snapshot.Any(s => s is TakeControlStep { Duration: ControlDuration.WhileEquipped } or GiveControlStep { Duration: ControlDuration.WhileEquipped }) &&
+                kind != EffectKind.EquipSpell)
+            throw new ArgumentException("Control steps need monster targets on the side they take from or give, one per side to switch.", nameof(steps));
         if (kind == EffectKind.MonsterTrigger && (required.Length != 0 || cost is not null || target is not null || fields is not ([] or [TriggerTargetedMonster] or [TriggerSourceMonster] or [ZoneTarget { MinCount: 1, MaxCount: 1 }] or [FieldTarget { Count: 1, ForTribute: false }]) || locksOtherSummonsThisTurn) ||
             kind != EffectKind.MonsterTrigger && fields.Any(f => f is TriggerTargetedMonster or TriggerSourceMonster))
             throw new ArgumentException("A monster trigger takes its timing and costs from its trigger profile.", nameof(kind));

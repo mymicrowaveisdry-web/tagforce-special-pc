@@ -586,6 +586,7 @@ public sealed partial class DuelEngine
         state = PrepareBattleState(State, state, emitted);
         state = PrepareXyzMaterials(State, state, emitted);
         state = ApplyFieldLinks(State, state, emitted);
+        state = ApplyControlReturns(state, emitted);
         state = ApplyGraveyardRedirects(state, emitted);
         state = PrepareSummonHistory(State, state, emitted);
         state = PrepareEventEffects(State, state, emitted);

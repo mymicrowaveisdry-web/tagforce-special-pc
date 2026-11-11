@@ -233,7 +233,7 @@ public sealed partial class DuelEngine
         var known = LinkedCards(before).ToArray();
         for (int guard = 0; guard < 64; guard++)
         {
-            var target = NextLinkedDestruction(known.Concat(LinkedCards(next)).DistinctBy(e => (e.Field.Card.InstanceId, e.Field.PlacementId)), next, events);
+            var target = NextLinkedDestruction(LinkedCards(next).Concat(known).DistinctBy(e => (e.Field.Card.InstanceId, e.Field.PlacementId)), next, events);
             if (target is null) break;
             next = DestroyFieldCard(next, target, events, replaceable: false);
         }

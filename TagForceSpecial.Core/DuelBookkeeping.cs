@@ -26,6 +26,8 @@ internal sealed record DuelBookkeeping(int NextInstanceId = 1, DuelRandomState? 
     public IReadOnlyList<TimedDamageRule> TimedDamageRules { get; init; } = Array.AsReadOnly(Array.Empty<TimedDamageRule>());
     /// <summary>The latest die roll and coin toss, read by later steps of the same effect.</summary>
     public RandomResult? LastRandom { get; init; }
+    /// <summary>Control of monsters taken for a while; each returns when its time is up.</summary>
+    public IReadOnlyList<ControlGrant> ControlGrants { get; init; } = Array.AsReadOnly(Array.Empty<ControlGrant>());
 }
 
 internal sealed record ActivatedEffectUse(int InstanceId, int TurnNumber, string Key, long? PlacementId = null);

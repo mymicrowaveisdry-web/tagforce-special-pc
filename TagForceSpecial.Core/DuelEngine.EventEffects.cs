@@ -70,6 +70,7 @@ public sealed partial class DuelEngine
             XyzMaterialSentToGraveyard e => new(e.Material.Owner, -1, e.Material, 0),
             SummonNegated e => new(e.Attempt.Card.Owner, -1, e.Attempt.Card, 0),
             CardDiscarded e => new(e.Player, -1, e.Card, 0),
+            MonsterSentToGraveyardByRule e => new(e.Player, e.Zone, e.Card, e.PlacementId),
             ActivationCostPaid e => new(e.Player, -1, e.Card, 0),
             TriggerCostPaid { DiscardedCard: { } card } e => new(e.Trigger.Player, -1, card, 0),
             // A negated activation or a Pendulum scale is not a Spell/Trap sent from the field.

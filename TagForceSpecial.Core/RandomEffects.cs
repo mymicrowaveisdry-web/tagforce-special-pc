@@ -102,6 +102,8 @@ internal sealed record RandomResult(int Die, int Heads)
     public CardInstance? Milled { get; init; }
     public int MilledLevel { get; init; }
     public IReadOnlyList<CardInstance> Excavated { get; init; } = [];
+    /// <summary>The monster the activating player chose to give in a swap, while the opponent chooses theirs.</summary>
+    public CardInstance? SwapFirst { get; init; }
 }
 
 public sealed partial class DuelEngine

@@ -148,6 +148,7 @@ public sealed partial class DuelEngine
                     .Any(p => State.GetPlayer(p).Deck.Count + (p == playerId ? incoming : 0) < draw.Count),
                 MillTopOfDeckStep mill => player.Deck.Count < mill.Count,
                 ExcavateStep excavate => player.Deck.Count < excavate.Count,
+                SwapChosenMonstersStep => !Swappable(State, playerId).Any() || !Swappable(State, Other(playerId)).Any(),
                 AddFromDeckToHandStep search => !DeckMatches(State, playerId, search.Filter).Any(),
                 SendFromDeckToGraveyardStep send => !DeckMatches(State, playerId, send.Filter).Any(),
                 DestroyAllStep all => !FieldMatches(State, playerId, all.Kind, all.Side, all.Filter, card.InstanceId).Any(t => all.Cards is null || MatchesFilter(t.Card, all.Cards)),
@@ -608,6 +609,14 @@ public sealed partial class DuelEngine
                 choice = null;
                 continue;
             }
+            if (step is SwapChosenMonstersStep)
+            {
+                (state, var swap, bool none) = SwapChosen(state, link, definition, i, choice, events);
+                if (swap is not null) return (state, swap);
+                choice = null;
+                if (none) break;
+                continue;
+            }
             if (step is OpponentCallsRandomHandCardStep)
             {
                 (state, var call, bool stop) = CallRandomHandCard(state, link, definition, i, choice, events);
@@ -736,6 +745,22 @@ public sealed partial class DuelEngine
                 if (step is EquipTargetStep)
                 {
                     state = AttachEquip(state, link, valid[0]);
+                    continue;
+                }
+                if (step is TakeControlStep or GiveControlStep)
+                {
+                    var receiver = step is TakeControlStep ? controller : Other(controller);
+                    var duration = step is TakeControlStep take ? take.Duration : ((GiveControlStep)step).Duration;
+                    foreach (var target in valid.Where(t => t.Location == FieldLocation.MonsterZone).ToArray())
+                        state = ChangeControl(state, link, target, receiver, duration, definition.EffectId, events);
+                    continue;
+                }
+                if (step is SwitchControlStep)
+                {
+                    // Both monsters must still be there, or neither switches.
+                    if (valid.Length == 2 && valid[0].Player != valid[1].Player)
+                        state = SwitchControl(state, Bound(valid[0]), Bound(valid[1]), definition.EffectId, events);
+                    else events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
                     continue;
                 }
                 if (step is UnionEquipStep)

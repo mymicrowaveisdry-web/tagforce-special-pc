@@ -161,6 +161,22 @@ public sealed class CardTable(string prefix)
             Triggers = [new TriggerEffectProfile(trigger, MonsterEventKind.StandbyPhase, standbyOf, TriggerRequirement.Mandatory, TriggerSourceLocation.FaceUpSpellTrap)] };
     }
 
+    /// <summary>
+    /// An Equip Spell for a face-up monster the opponent controls that takes control of it while equipped; with <paramref name="standby"/>,
+    /// it also triggers in each Standby Phase of the player on <paramref name="standbyOf"/>.
+    /// </summary>
+    public AuthoredCard EquipControl(uint id, string name, EffectRelation standbyOf = EffectRelation.Opponent, EffectStep[]? standby = null)
+    {
+        var equip = new EffectDefinition(Effect(id, "equip"), id, EffectKind.EquipSpell, [new EquipTargetStep(), new TakeControlStep(ControlDuration.WhileEquipped)],
+            [new FreeMonsterZonesCondition(1)], fieldTargets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Opponent, FieldCardFilter.FaceUp)]);
+        var card = new AuthoredCard(id, name, CardKind.Spell, SpellKind, IconEquip, SpellRules, [equip],
+            "Destroyed when the equipped monster leaves the field or is flipped face-down; control returns when it stops being equipped.");
+        if (standby is null) return card;
+        var trigger = new EffectDefinition(Effect(id, "standby"), id, EffectKind.MonsterTrigger, standby);
+        return card with { Definitions = Array.AsReadOnly([equip, trigger]),
+            Triggers = [new TriggerEffectProfile(trigger, MonsterEventKind.StandbyPhase, standbyOf, TriggerRequirement.Mandatory, TriggerSourceLocation.FaceUpSpellTrap)] };
+    }
+
     /// <summary>An Equip Spell whose effect is a "cannot" rule on the equipped monster.</summary>
     public AuthoredCard EquipLock(uint id, string name, LockedAction actions, CardFilter? only = null)
     {

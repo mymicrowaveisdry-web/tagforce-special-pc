@@ -25,7 +25,9 @@ public enum LockedAction
     BeReturnedToDeck = 131072,
     Draw = 262144,
     /// <summary>Keeping the hand hidden: the locked side plays with its hand revealed.</summary>
-    HideHand = 524288
+    HideHand = 524288,
+    /// <summary>Control of the card switching to the other player.</summary>
+    SwitchControl = 1048576
 }
 
 /// <summary>Who or what a lock applies to.</summary>
@@ -129,6 +131,7 @@ public sealed partial class DuelEngine
     private LockedAction ChoiceMove(EffectDefinition definition, int index, CardInstance card)
     {
         if (index < definition.CostTargetSteps) return definition.Cost is BanishFromGraveyardCost ? LockedAction.BeBanished : LockedAction.None;
+        if (definition.Steps.Any(s => s is TakeControlStep or GiveControlStep or SwitchControlStep)) return LockedAction.SwitchControl;
         if (definition.Steps.Any(s => s is BanishFieldTargetsStep or DestroyAndBanishTargetsStep or BanishTargetsStep)) return LockedAction.BeBanished;
         if (definition.Steps.Any(s => s is ShuffleTargetsIntoDeckStep)) return LockedAction.BeReturnedToDeck;
         if (definition.Steps.Any(s => s is ReturnTargetsToHandStep))
