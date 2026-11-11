@@ -89,6 +89,7 @@ public sealed partial class DuelEngine
                 return Reject(DuelError.UnsupportedPendulumCard);
             uint level = catalog[card.GameCardId].Statistics.Level;
             if (level == 0 || level <= low || level >= high) return Reject(DuelError.UnsupportedMonsterLevel);
+            if (RuleLocked(State, LockedAction.PendulumSummon, player.Id, card)) return Reject(DuelError.LockedByEffect);
             var error = CheckSpecialSummon(State, player.Id, card, choice.MonsterZone, choice.Position, choice.Source, "pendulum");
             if (error != DuelError.None) return Reject(error);
             group.Add(new(checked(State.Revision + 1), checked(State.Revision + 1), player.Id, card, choice.MonsterZone,

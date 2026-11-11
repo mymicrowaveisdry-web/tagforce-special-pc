@@ -27,6 +27,12 @@ public sealed record FieldMonster(CardInstance Card, BattlePosition Position, in
     /// <summary>A Gemini monster that has been Normal Summoned again and has its effects.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public bool GeminiActive { get; internal init; }
+    /// <summary>How many monsters were Tributed to Normal Summon or Set it; null when it was not Normal Summoned or Set.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int? SummonTributes { get; internal init; }
+    /// <summary>A Level an effect gave it; null for its own Level.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public uint? Level { get; internal init; }
     /// <summary>Counters on this monster; a card effect places and removes them.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public int Counters { get; internal init; }

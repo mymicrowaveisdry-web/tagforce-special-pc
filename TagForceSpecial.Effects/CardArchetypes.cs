@@ -13,5 +13,9 @@ public static class CardArchetypes
     public static IReadOnlyList<uint> NumberC { get; } = Array.AsReadOnly(new uint[] { 9914, 10261, 10533, 10569, 10651, 10659, 10684, 10777, 10779, 10932, 10935, 10936, 11013, 11014, 11015, 11016, 11017, 11070, 11072, 11073, 11075, 11077, 11185, 11187 });
     /// <summary>"Qli" cards: every catalog card whose name contains "Qli" (Qliphort, Apoqliphort, Saqlifice, Laser Qlip, Qlimate Change, Qlipper Launch, Re-qliate).</summary>
     public static IReadOnlyList<uint> Qli { get; } = Array.AsReadOnly(new uint[] { 11353, 11354, 11355, 11356, 11357, 11358, 11393, 11394, 11405, 11406, 11540, 11541, 11542, 11543, 11593 });
+    /// <summary>"D/D" cards: every catalog card whose name starts with "D/D" ("D/D/D" included).</summary>
+    public static IReadOnlyList<uint> DD { get; } = Array.AsReadOnly(new uint[] { 11328, 11329, 11330, 11439, 11440, 11441, 11442, 11443, 11444, 11445, 11450, 11451, 11457, 11458, 11460, 11616 });
+    /// <summary>"Covenant" cards: every catalog card whose name contains "Covenant".</summary>
+    public static IReadOnlyList<uint> Covenant { get; } = Array.AsReadOnly(new uint[] { 11446, 11447, 11448 });
     public static IReadOnlyList<uint> CXyz { get; } = Array.AsReadOnly(new uint[] { 10528, 10710, 10711, 10713, 10715, 10717, 10719, 11133 });
 }

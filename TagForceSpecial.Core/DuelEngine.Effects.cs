@@ -679,6 +679,41 @@ public sealed partial class DuelEngine
                 events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
                 break;
             }
+            if (step is AddFromFaceUpExtraDeckStep extra)
+            {
+                var options = state.GetPlayer(controller).FaceUpExtraDeck.Where(c => MatchesFilter(c, extra.Filter)).ToArray();
+                if (options.Length == 0)
+                {
+                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
+                    continue;
+                }
+                if (choice is not ChooseDefinitionCard taken)
+                    return (state, new PendingDefinitionCardChoice(checked(State.Revision + 1), controller, definition.EffectId, link.Number, i, options));
+                var card = options.FirstOrDefault(c => c.InstanceId == taken.CardInstanceId) ?? options[0];
+                var holder = state.GetPlayer(controller);
+                state = state.With(player: holder.With(faceUpExtraDeck: holder.FaceUpExtraDeck.Where(c => c != card), hand: holder.Hand.Append(card)));
+                events.Add(new CardAddedFromExtraDeck(controller, card, definition.EffectId));
+                choice = null;
+                continue;
+            }
+            if (step is AddFromDeckOrGraveyardStep either)
+            {
+                var owned = state.GetPlayer(controller);
+                var options = DeckMatches(state, controller, either.Filter).Concat(owned.Graveyard.Where(c => MatchesFilter(c, either.Filter, inGraveyard: true))).ToArray();
+                if (options.Length == 0)
+                {
+                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
+                    continue;
+                }
+                if (choice is not ChooseDefinitionCard taken)
+                    return (state, new PendingDefinitionCardChoice(checked(State.Revision + 1), controller, definition.EffectId, link.Number, i, options));
+                var card = options.FirstOrDefault(c => c.InstanceId == taken.CardInstanceId) ?? options[0];
+                state = owned.Graveyard.Contains(card)
+                    ? MoveZoneCardToHand(state, new(controller, FieldLocation.Graveyard, -1, card, 0), definition.EffectId, events)
+                    : MoveChosenDeckCard(state, controller, card.InstanceId, toHand: true, definition.EffectId, events);
+                choice = null;
+                continue;
+            }
             if (step is AddFromDeckToHandStep or SendFromDeckToGraveyardStep)
             {
                 if (choice is not ChooseDefinitionCard picked)
@@ -875,6 +910,8 @@ public sealed partial class DuelEngine
                         ReturnTargetsToHandStep => ReturnFieldCardToHand(state, target, definition.EffectId, events),
                         ChangeTargetsToDefenseStep => ChangeToDefense(state, target, events),
                         ModifyTargetsUntilEndStep stats => ModifyUntilEnd(state, target, stats, definition.EffectId, events),
+                        ModifyTargetsStep lasting => target.Location == FieldLocation.MonsterZone
+                            ? ModifyLasting(state, new(target.Player, target.Zone, target.Card, target.PlacementId), lasting.Attack, lasting.Defense, definition.EffectId, events) : state,
                         FlipTargetsFaceDownStep => FlipFaceDown(state, target, events),
                         FlipTargetsFaceUpStep flip => FlipFaceUp(state, target, flip, events),
                         AttachTargetsToSelfStep => AttachMonsterAsMaterial(state, link, target, definition.EffectId, events),
@@ -933,6 +970,11 @@ public sealed partial class DuelEngine
                     TakeDamageStep take => DealEffectDamage(state, controller, take.Amount, definition.EffectId, events),
                     DiscardRandomStep discard => DiscardRandom(state, controller, discard, events),
                     BanishSourceWhenItLeavesStep => BanishSourceWhenItLeaves(state, link),
+                    WeakenEventMonsterStep weaken => WeakenEventMonster(state, link, weaken, definition.EffectId, events),
+                    PayDownToGainStep pay => PayDownToGain(state, controller, link, pay, definition.EffectId, events),
+                    SetDeclaredLevelStep level => SetDeclaredLevel(state, controller, link, level),
+                    ReduceSourceScaleStep reduce => ReduceSourceScale(state, link, reduce, definition.EffectId, events),
+                    DestroyAboveSourceScaleStep above => DestroyAboveSourceScale(state, controller, link, above, events),
                     BanishEventMonsterStep => BanishEventMonster(state, link, definition.EffectId, events),
                     BanishSourceCardStep => BanishSourceCard(state, link, definition.EffectId, events),
                     RedirectRespondedDamageStep => RedirectRespondedDamage(state, controller, link),
@@ -972,13 +1014,13 @@ public sealed partial class DuelEngine
                         .Aggregate(state, (s, p) => s.Outcome is null ? DrawCards(s, p, draw.Count, events) : s),
                     MillTopOfDeckStep mill => MillAndRecord(state, controller, mill.Count, definition.EffectId, events),
                     DestroyAllStep all => FieldMatches(state, controller, all.Kind, all.Side, all.Filter, all.IncludeSelf ? null : link.Activation.Spell.InstanceId)
-                        .Where(t => all.Cards is null || MatchesFilter(t.Card, all.Cards)).ToArray().Aggregate(state, (s, t) => DestroyFieldCard(s, t, events)),
+                        .Where(t => (all.Cards is null || MatchesFilter(t.Card, all.Cards)) && Affects(state, link, t)).ToArray().Aggregate(state, (s, t) => DestroyFieldCard(s, t, events)),
                     ReturnAllToHandStep all => FieldMatches(state, controller, all.Kind, all.Side, FieldCardFilter.Any, link.Activation.Spell.InstanceId)
-                        .ToArray().Aggregate(state, (s, t) => ReturnFieldCardToHand(s, t, definition.EffectId, events)),
+                        .Where(t => Affects(state, link, t)).ToArray().Aggregate(state, (s, t) => ReturnFieldCardToHand(s, t, definition.EffectId, events)),
                     BanishAllStep all => FieldMatches(state, controller, FieldCardKind.Monster, all.Side, all.Filter, null)
-                        .ToArray().Aggregate(state, (s, t) => BanishFieldCard(s, t, definition.EffectId, events)),
+                        .Where(t => Affects(state, link, t)).ToArray().Aggregate(state, (s, t) => BanishFieldCard(s, t, definition.EffectId, events)),
                     ChangeAllToDefenseStep all => FieldMatches(state, controller, FieldCardKind.Monster, all.Side, FieldCardFilter.AttackPosition, null)
-                        .ToArray().Aggregate(state, (s, t) => ChangeToDefense(s, t, events)),
+                        .Where(t => Affects(state, link, t)).ToArray().Aggregate(state, (s, t) => ChangeToDefense(s, t, events)),
                     _ => throw new InvalidOperationException("Unsupported effect step.")
                 };
             if (state.Outcome is not null) break;
@@ -1042,7 +1084,7 @@ public sealed partial class DuelEngine
                     link.Trigger!.Profile.Target!.RequireFaceUpAtResolution ? FieldCardFilter.FaceUp : FieldCardFilter.Any, null),
                 _ => []
             };
-            if (target.IsStillPresent(state) && matches.Any(m => m.Card == target.Card)) yield return target;
+            if (target.IsStillPresent(state) && matches.Any(m => m.Card == target.Card) && Affects(state, link, target)) yield return target;
         }
     }
 
@@ -1072,13 +1114,14 @@ public sealed partial class DuelEngine
         AnyMonsterFilter => rule.Category == CardCategory.Monster,
         AnyCardFilter => true,
         DeclaredFilter => resolvingDeclaration is not { } declared || DeclaredMatches(card, declared.Kind, declared.Value),
+        FaceUpAttackFilter => FieldMonsters(IdentityState).Any(e => e.Monster.Card == card && e.Monster.Position == BattlePosition.FaceUpAttack),
         // Whether the targets share the trait is checked as they are picked.
         SharedTraitFilter shared => rule.Category == CardCategory.Monster && (shared.Trait == IdentityTrait.Attribute ? AttributeCode(card) : TypeCode(card)) is not null,
         CardCategoryFilter category => rule.Category == category.Category,
         MonsterTypeFilter types => rule.Category == CardCategory.Monster && TypeCode(card) is { } type && types.TypeCodes.Contains(type),
         NormalMonsterFilter normal => normal.CardIds.Contains(card.GameCardId) || inGraveyard && rule.IsGemini,
         MonsterAttributeFilter attribute => rule.Category == CardCategory.Monster && AttributeCode(card) == attribute.AttributeCode,
-        MonsterLevelFilter limit => rule.Category == CardCategory.Monster && !IsXyzCard(card) && catalog[card.GameCardId].Statistics.Level is > 0 and var level &&
+        MonsterLevelFilter limit => rule.Category == CardCategory.Monster && !IsXyzCard(card) && CurrentLevel(card) is > 0 and var level &&
             level <= limit.MaxLevel && level >= limit.MinLevel && (limit.TypeCode is not { } typeCode || TypeCode(card) == typeCode),
         AnyOfFilter any => any.Filters.Any(f => MatchesFilter(card, f, inGraveyard)),
         NotFilter not => !MatchesFilter(card, not.Filter, inGraveyard),

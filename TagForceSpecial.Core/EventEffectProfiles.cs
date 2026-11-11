@@ -14,7 +14,9 @@ public enum MonsterEventKind { NormalSummoned, SpecialSummoned, FlipSummoned, De
     /// <summary>An End Phase began; like <see cref="StandbyPhase"/>, only face-up Spells, Traps and scales use it.</summary>
     EndPhase,
     /// <summary>Control of this face-up monster changed; the subject is the monster in its new place.</summary>
-    ControlChanged }
+    ControlChanged,
+    /// <summary>This monster was Tributed, for a Summon or as a cost; only its Graveyard trigger uses it.</summary>
+    Tributed }
 /// <summary>Narrows a Destroyed or SentToGraveyard event by where it came from or what caused it.</summary>
 public enum TriggerEventCause { Any, FromField, ByBattle }
 public enum EffectRelation { Self, Controller, Opponent, Any }
@@ -164,8 +166,8 @@ public sealed class TriggerEffectProfile
             !Enum.IsDefined(sourceLocation) || !Enum.IsDefined(timing) || !Enum.IsDefined(turnLimit) || !Enum.IsDefined(cause))
             throw new ArgumentException("Unknown trigger metadata.");
         if (sourceLocation == TriggerSourceLocation.DestroyedSelf && (eventKind != MonsterEventKind.Destroyed || relation != EffectRelation.Self) ||
-            sourceLocation == TriggerSourceLocation.GraveyardSelf && (eventKind is not (MonsterEventKind.SentToGraveyard or MonsterEventKind.TributedForSummon) || relation != EffectRelation.Self) ||
-            eventKind == MonsterEventKind.TributedForSummon && sourceLocation != TriggerSourceLocation.GraveyardSelf)
+            sourceLocation == TriggerSourceLocation.GraveyardSelf && (eventKind is not (MonsterEventKind.SentToGraveyard or MonsterEventKind.TributedForSummon or MonsterEventKind.Tributed) || relation != EffectRelation.Self) ||
+            eventKind is MonsterEventKind.TributedForSummon or MonsterEventKind.Tributed && sourceLocation != TriggerSourceLocation.GraveyardSelf)
             throw new ArgumentException("Graveyard sources require the matching self event.");
         if (eventKind is MonsterEventKind.EndPhaseAfterSummonOrFlip or MonsterEventKind.DestroyedOpponentByBattle or MonsterEventKind.InflictedBattleDamage or MonsterEventKind.ControlChanged && (sourceLocation != TriggerSourceLocation.FaceUpMonster || relation != EffectRelation.Self) ||
             requiresGeminiActive && sourceLocation != TriggerSourceLocation.FaceUpMonster)

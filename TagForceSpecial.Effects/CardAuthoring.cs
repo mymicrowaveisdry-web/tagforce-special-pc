@@ -32,6 +32,8 @@ public sealed record AuthoredCard(uint Id, string Name, CardKind Kind, uint Gett
     public IReadOnlyList<DestructionReplacementProfile> Replacements { get; init; } = [];
     public IReadOnlyList<GraveyardRedirectProfile> Redirects { get; init; } = [];
     public IReadOnlyList<DamageRuleProfile> DamageRules { get; init; } = [];
+    /// <summary>The monster's own rules for its ATK, DEF and Level.</summary>
+    public MonsterStatProfile? Stats { get; init; }
     /// <summary>How effects may Special Summon the card, for monsters that cannot be Normal Summoned.</summary>
     public IReadOnlyList<SpecialSummonCardProfile> SpecialSummons { get; init; } = [];
     /// <summary>Everything the card's reviewed metadata refers to.</summary>
@@ -212,13 +214,13 @@ public sealed class CardTable(string prefix)
     /// stat changes, each applying while the card is an active scale.
     /// </summary>
     public AuthoredCard NormalPendulum(uint id, string name, uint scale, EffectOption[]? effects = null, RuleLock? scaleLock = null,
-        LastingStatModifier[]? modifiers = null, string exceptions = "none")
+        LastingStatModifier[]? modifiers = null, string exceptions = "none", uint getterKind = NormalPendulumKind)
     {
         List<EffectDefinition> definitions = [.. (effects ?? []).Select((o, i) => new EffectDefinition(Effect(id, $"pendulum-{i + 1}"), id, EffectKind.SpellTrapIgnition,
             o.Steps, o.Conditions, o.Cost, fieldTargets: o.Targets, oncePerTurn: true, origin: EffectOrigin.PendulumZone))];
         if (modifiers is { Length: > 0 })
             definitions.Add(new EffectDefinition(Effect(id, "pendulum-lasting"), id, EffectKind.ContinuousSpell, [], lastingModifiers: modifiers, origin: EffectOrigin.PendulumZone));
-        return new(id, name, CardKind.Monster, NormalPendulumKind, IconNormal, PendulumMonsterRules, definitions, exceptions)
+        return new(id, name, CardKind.Monster, getterKind, IconNormal, PendulumMonsterRules, definitions, exceptions)
         {
             Scales = [new PendulumCardProfile(id, scale, scale)],
             Locks = scaleLock is null ? [] : [Locked(id, scaleLock) with { PendulumZone = true }]
@@ -229,18 +231,58 @@ public sealed class CardTable(string prefix)
     /// An Egyptian God: 3 Tributes to Normal Summon and no Set, a Normal Summon that cannot be negated or answered, and "During the End
     /// Phase, if this card was Special Summoned: Send it to the Graveyard". Its own effects come as an activated effect and a lock on itself.
     /// </summary>
-    public AuthoredCard EgyptianGod(uint id, string name, uint getterKind, EffectOption? effect = null, RuleLock? selfLock = null, string exceptions = "none")
+    public AuthoredCard EgyptianGod(uint id, string name, uint getterKind, EffectOption? effect = null, RuleLock? selfLock = null, string exceptions = "none",
+        bool sendIfSpecialSummoned = true, bool cannotBeSpecialSummoned = false)
     {
         var endPhase = new EffectDefinition(Effect(id, "end-phase"), id, EffectKind.MonsterTrigger, [new StopUnlessSpecialSummonedStep(), new SendSourceToGraveyardStep()]);
         List<EffectDefinition> definitions = [];
         if (effect is not null)
             definitions.Add(new EffectDefinition(Effect(id, "effect"), id, EffectKind.MonsterIgnition, effect.Steps, effect.Conditions, effect.Cost, fieldTargets: effect.Targets));
-        definitions.Add(endPhase);
-        return new(id, name, CardKind.Monster, getterKind, IconNormal, TributeMonsterRules with { RequiresRegisteredTributeProcedure = true }, definitions, exceptions)
+        if (sendIfSpecialSummoned) definitions.Add(endPhase);
+        return new(id, name, CardKind.Monster, getterKind, IconNormal, TributeMonsterRules with { RequiresRegisteredTributeProcedure = true, CannotBeSpecialSummoned = cannotBeSpecialSummoned },
+            definitions, exceptions)
         {
-            Triggers = [new TriggerEffectProfile(endPhase, MonsterEventKind.EndPhase, EffectRelation.Self, TriggerRequirement.Mandatory)],
+            Triggers = sendIfSpecialSummoned ? [new TriggerEffectProfile(endPhase, MonsterEventKind.EndPhase, EffectRelation.Self, TriggerRequirement.Mandatory)] : [],
             TributeProcedures = [new TributeProcedureProfile(Effect(id, "three-tributes"), id, 3, allowsSet: false) { CannotBeNegated = true, NoResponses = true }],
             Locks = selfLock is null ? [] : [Locked(id, selfLock)]
+        };
+    }
+
+    /// <summary>Adds a trigger on <paramref name="when"/> for each event, relative to this face-up monster; <paramref name="subject"/> narrows the event's monster.</summary>
+    public AuthoredCard WithTrigger(AuthoredCard card, string role, MonsterEventKind[] when, EffectRelation relation, EffectStep[] steps,
+        TriggerRequirement requirement = TriggerRequirement.Mandatory, CardFilter? subject = null, EffectTarget[]? targets = null,
+        TriggerTiming timing = TriggerTiming.When, string? sharedLimit = null)
+    {
+        // A shared limit is "you can only use this effect of [this card] once per turn" over every trigger given the same name.
+        var limit = sharedLimit is null ? TriggerTurnLimit.None : TriggerTurnLimit.SharedPerPlayer;
+        string? limitKey = sharedLimit is null ? null : Effect(card.Id, sharedLimit);
+        var added = when.Select((e, i) => new EffectDefinition(Effect(card.Id, when.Length == 1 ? role : $"{role}-{i + 1}"), card.Id, EffectKind.MonsterTrigger, steps, fieldTargets: targets)).ToArray();
+        return card with
+        {
+            Definitions = Array.AsReadOnly([.. card.Definitions, .. added]),
+            Triggers = [.. card.Triggers, .. added.Zip(when, (d, e) => new TriggerEffectProfile(d, e, relation, requirement, timing: timing, turnLimit: limit, limitKey: limitKey)
+                { SubjectFilter = subject })]
+        };
+    }
+
+    /// <summary>
+    /// A Qliphort monster: it can be Normal Summoned without Tributing, which (like a Special Summon) makes it Level 4 with 1800 original ATK; once
+    /// Normal Summoned or Set it is unaffected by activated effects of monsters with a lower original Level or Rank.
+    /// </summary>
+    public AuthoredCard Qliphort(AuthoredCard card) => card with
+    {
+        TributeProcedures = [.. card.TributeProcedures, new TributeProcedureProfile(Effect(card.Id, "no-tributes"), card.Id, 0, allowsSet: false)],
+        Stats = new MonsterStatProfile(Effect(card.Id, "stats"), card.Id) { ReducedLevel = 4, ReducedAttack = 1800, UnaffectedByLowerMonsters = true }
+    };
+
+    /// <summary>Adds an optional "If this card is Tributed" effect that targets a card on the field.</summary>
+    public AuthoredCard WhenTributed(AuthoredCard card, EffectStep[] steps, FieldTarget target)
+    {
+        var definition = new EffectDefinition(Effect(card.Id, "tributed"), card.Id, EffectKind.MonsterTrigger, steps, fieldTargets: [target]);
+        return card with
+        {
+            Definitions = Array.AsReadOnly([.. card.Definitions, definition]),
+            Triggers = [.. card.Triggers, new TriggerEffectProfile(definition, MonsterEventKind.Tributed, EffectRelation.Self, TriggerRequirement.Optional, TriggerSourceLocation.GraveyardSelf)]
         };
     }
 
@@ -284,6 +326,22 @@ public sealed class CardTable(string prefix)
         new("", 0, subject, cost, cause, optional, oncePerTurn, cards, side, all, onlyIfSole);
 
     private DestructionReplacementProfile Replacing(uint id, DestructionReplacementProfile replacement) => replacement with { EffectId = Effect(id, "replacement"), CardId = id };
+
+    /// <summary>Adds a destruction replacement to a card.</summary>
+    public AuthoredCard WithReplacement(AuthoredCard card, DestructionReplacementProfile replacement) =>
+        card with { Replacements = [.. card.Replacements, Replacing(card.Id, replacement)] };
+
+    /// <summary>Adds an optional "If this card is sent from the field to the Graveyard" effect of a Spell or Trap.</summary>
+    public AuthoredCard WhenSentFromField(AuthoredCard card, EffectStep[] steps)
+    {
+        var definition = new EffectDefinition(Effect(card.Id, "sent"), card.Id, EffectKind.MonsterTrigger, steps);
+        return card with
+        {
+            Definitions = Array.AsReadOnly([.. card.Definitions, definition]),
+            Triggers = [.. card.Triggers, new TriggerEffectProfile(definition, MonsterEventKind.SentToGraveyard, EffectRelation.Self, TriggerRequirement.Optional,
+                TriggerSourceLocation.GraveyardSelf, cause: TriggerEventCause.FromField)]
+        };
+    }
 
     /// <summary>A Continuous or Field Spell or Trap whose only effect replaces destruction while it stays face-up.</summary>
     public AuthoredCard ReplacementCard(uint id, string name, bool trap, bool field, DestructionReplacementProfile replacement, string exceptions = "none") =>
@@ -442,6 +500,7 @@ public sealed class CardTable(string prefix)
             DamageRules = Array.AsReadOnly(cards.SelectMany(c => c.DamageRules).ToArray()),
             PendulumCards = Array.AsReadOnly(cards.SelectMany(c => c.Scales).ToArray()),
             SpecialSummonCards = Array.AsReadOnly(cards.SelectMany(c => c.SpecialSummons).ToArray()),
+            MonsterStats = Array.AsReadOnly(cards.Select(c => c.Stats).OfType<MonsterStatProfile>().ToArray()),
             TributeProcedures = Array.AsReadOnly(cards.SelectMany(c => c.TributeProcedures).ToArray())
         };
     }

@@ -2,7 +2,12 @@ namespace TagForceSpecial.Core;
 
 /// <summary>Where a card that left the field went. <see cref="Removed"/>: a Token ceased to exist (no zone).</summary>
 public enum FieldCardDestination { Graveyard, FaceUpExtraDeck, Removed, Hand, ExtraDeck, Banished, Deck }
-public sealed record PendulumCardProfile(uint CardId, uint LeftScale, uint RightScale);
+public sealed record PendulumCardProfile(uint CardId, uint LeftScale, uint RightScale)
+{
+    /// <summary>When set, the scale is <see cref="ScaleWithoutPartner"/> unless the other Pendulum Zone holds a matching card.</summary>
+    public CardFilter? PartnerFilter { get; init; }
+    public uint ScaleWithoutPartner { get; init; }
+}
 public sealed record ActivatePendulumScale(PlayerId Player, int CardInstanceId, int PendulumZone) : DuelCommand(Player);
 public sealed record PendulumSummonSelection(int CardInstanceId, DecisionCardSource Source, int MonsterZone,
     BattlePosition Position = BattlePosition.FaceUpAttack);

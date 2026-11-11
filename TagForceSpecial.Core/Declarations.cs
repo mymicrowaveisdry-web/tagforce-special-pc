@@ -16,7 +16,9 @@ public enum DeclarationKind
     /// <summary>A Pendulum Scale from 1 to 10.</summary>
     PendulumScale,
     /// <summary>A monster Type that a face-up monster on the field currently has (Tribe-Infecting Virus ruling).</summary>
-    FaceUpMonsterType
+    FaceUpMonsterType,
+    /// <summary>A Level from 1 to 12; an effect that sets Levels can narrow the range.</summary>
+    Level
 }
 
 /// <summary>
@@ -84,6 +86,7 @@ public sealed partial class DuelEngine
             .Where(c => rules.TryGetValue(c.GameCardId, out var rule) && rule.Category == CardCategory.Monster && !IsTokenId(c.GameCardId) && c.Codes is not null)
             .Select(c => (int)c.Codes!.Attribute).Distinct().Order().ToArray(),
         DeclarationKind.PendulumScale => [.. Enumerable.Range(1, 10)],
+        DeclarationKind.Level => [.. Enumerable.Range(1, 12)],
         DeclarationKind.FaceUpMonsterType => [.. FieldMonsters(State).Where(e => e.Monster.Position != BattlePosition.FaceDownDefense)
             .Select(e => TypeCode(e.Monster.Card)).OfType<uint>().Select(t => (int)t).Distinct().Order()],
         _ => []
@@ -104,6 +107,7 @@ public sealed partial class DuelEngine
             DeclarationKind.MonsterType or DeclarationKind.FaceUpMonsterType => rule.Category == CardCategory.Monster && TypeCode(card) == (uint)value,
             DeclarationKind.Attribute => rule.Category == CardCategory.Monster && AttributeCode(card) == (uint)value,
             DeclarationKind.CardType => rule.Category == (CardCategory)value,
+            DeclarationKind.Level => rule.Category == CardCategory.Monster && CurrentLevel(card) == (uint)value,
             _ => false
         };
 
@@ -134,6 +138,8 @@ public sealed partial class DuelEngine
     /// <summary>The values this activation can declare: with targets that share a trait, only that trait's value.</summary>
     private IReadOnlyList<int> DeclarationChoices(EffectDefinition definition, CommittedActivation receipt, DeclarationKind kind)
     {
+        if (kind == DeclarationKind.Level && definition.Steps.OfType<SetDeclaredLevelStep>().FirstOrDefault() is { } levels)
+            return [.. Enumerable.Range(levels.MinLevel, levels.MaxLevel - levels.MinLevel + 1)];
         if (definition.FieldTargets is not [ZoneTarget { Filter: SharedTraitFilter shared }] || receipt.FieldTargets is not [var first, ..] ||
             kind != (shared.Trait == IdentityTrait.Attribute ? DeclarationKind.Attribute : DeclarationKind.MonsterType))
             return DeclarationOptions(kind);

@@ -25,6 +25,7 @@ public sealed record CardFamily(string FamilyId, string BatchId, IReadOnlyList<D
     public IReadOnlyList<DestructionReplacementProfile> DestructionReplacements { get; init; } = [];
     public IReadOnlyList<GraveyardRedirectProfile> GraveyardRedirects { get; init; } = [];
     public IReadOnlyList<DamageRuleProfile> DamageRules { get; init; } = [];
+    public IReadOnlyList<MonsterStatProfile> MonsterStats { get; init; } = [];
 }
 
 /// <summary>Every effect family. Adding a family here adds it to the overlay, the manifest and the full card pool.</summary>
@@ -94,7 +95,8 @@ public static class CardFamilies
         },
         TemplateCardFamily.Family,
         EgyptianGodFamily.Family,
-        TokenCardFamily.Family
+        TokenCardFamily.Family,
+        ApoqliphortFamily.Family
     });
 }
 
@@ -136,6 +138,7 @@ public static class CardPool
             effectDefinitions: definitions, shuffleSeed: shuffleSeed, ruleLocks: families.SelectMany(f => f.RuleLocks),
             battleAbilities: families.SelectMany(f => f.BattleAbilities),
             destructionReplacements: families.SelectMany(f => f.DestructionReplacements),
-            graveyardRedirects: families.SelectMany(f => f.GraveyardRedirects), damageRules: families.SelectMany(f => f.DamageRules));
+            graveyardRedirects: families.SelectMany(f => f.GraveyardRedirects), damageRules: families.SelectMany(f => f.DamageRules),
+            monsterStats: families.SelectMany(f => f.MonsterStats));
     }
 }

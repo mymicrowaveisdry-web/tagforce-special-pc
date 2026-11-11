@@ -372,7 +372,7 @@ public sealed class EffectDefinition
         EquipTargetStep or UnionEquipStep or PlaceCounterStep or ModifyTargetsUntilEndStep or FlipTargetsFaceDownStep or FlipTargetsFaceUpStep or
         AttachSourceStep or AttachTargetsToSelfStep or DetachAllStep or RankUpStep or AttachFromStep { ToTarget: true } or
         TakeControlStep or GiveControlStep or SwitchControlStep or LockTargetsUntilEndStep or ChangeTargetsTraitStep or SetTargetScaleStep or
-        DestroyTargetAtStep or GiveTargetControlStep;
+        DestroyTargetAtStep or GiveTargetControlStep or ModifyTargetsStep;
     /// <summary>Cost choices answered before the target choices, each binding a field target answer.</summary>
     internal int CostTargetSteps => Cost switch { TributeCost tribute => tribute.Count, BanishFromGraveyardCost banish => banish.Count, _ => 0 };
     internal static bool IsAutomatic(EffectTarget t) => t is AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget or TriggerTargetedMonster or TriggerSourceMonster;
@@ -421,6 +421,14 @@ public sealed class EffectDefinition
                     DamageBothPlayersStep s => s.ToOpponent <= 0 || s.ToSelf <= 0,
                     TakeDamageStep s => s.Amount <= 0,
                     BanishSourceWhenItLeavesStep => false,
+                    ModifyTargetsStep s => s.Attack == 0 && s.Defense == 0,
+                    WeakenEventMonsterStep s => s.Attack <= 0 || kind != EffectKind.MonsterTrigger,
+                    PayDownToGainStep s => s.Remaining < 1 || kind != EffectKind.MonsterTrigger,
+                    SetDeclaredLevelStep s => s.Filter is null || s.MinLevel < 1 || s.MaxLevel > 12 || s.MinLevel > s.MaxLevel,
+                    AddFromDeckOrGraveyardStep s => s.Filter is null,
+                    AddFromFaceUpExtraDeckStep s => s.Filter is null,
+                    ReduceSourceScaleStep s => s.By < 1 || s.Minimum < 0 || kind != EffectKind.MonsterTrigger,
+                    DestroyAboveSourceScaleStep s => s.Except is null || kind != EffectKind.MonsterTrigger,
                     BanishEventMonsterStep or BanishSourceCardStep => kind != EffectKind.MonsterTrigger,
                     RedirectRespondedDamageStep => false,
                     DiscardRandomStep s => s.Player is not (TargetSide.Own or TargetSide.Opponent),

@@ -87,7 +87,7 @@ public sealed partial class DuelEngine
             if (failed.Contains(key)) return false;
             var material = pool[index];
             selection.Add(material);
-            if (Search(index + 1, total + catalog[material.Card.GameCardId].Statistics.Level, hasField || material.Field is not null)) return true;
+            if (Search(index + 1, total + CurrentLevel(material.Card), hasField || material.Field is not null)) return true;
             selection.RemoveAt(selection.Count - 1);
             if (Search(index + 1, total, hasField)) return true;
             failed.Add(key); return false;
@@ -98,7 +98,7 @@ public sealed partial class DuelEngine
     /// <summary>The Tribute Levels meet the recipe, and for an "or more" recipe no Tribute is unnecessary.</summary>
     private bool RitualPayment(IReadOnlyList<EffectSummonMaterial> tributes, RitualSummonRecipe recipe)
     {
-        long Level(EffectSummonMaterial m) => catalog[m.Card.GameCardId].Statistics.Level;
+        long Level(EffectSummonMaterial m) => CurrentLevel(m.Card);
         long total = tributes.Sum(Level);
         return recipe.OrMore ? total >= recipe.RequiredLevel && tributes.All(m => total - Level(m) < recipe.RequiredLevel) : total == recipe.RequiredLevel;
     }

@@ -64,7 +64,7 @@ public sealed partial class DuelEngine
         IEnumerable<PendulumCardProfile>? experimentalPendulumCards = null,
         IEnumerable<EffectDefinition>? effectDefinitions = null, ulong? shuffleSeed = null, IEnumerable<RuleLockProfile>? ruleLocks = null, IEnumerable<BattleAbilityProfile>? battleAbilities = null,
         IEnumerable<DestructionReplacementProfile>? destructionReplacements = null, IEnumerable<GraveyardRedirectProfile>? graveyardRedirects = null,
-        IEnumerable<DamageRuleProfile>? damageRules = null)
+        IEnumerable<DamageRuleProfile>? damageRules = null, IEnumerable<MonsterStatProfile>? monsterStats = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(rules);
@@ -137,7 +137,8 @@ public sealed partial class DuelEngine
         materialProcedures = materialProfiles.ToFrozenDictionary(p => p.ProcedureId, StringComparer.Ordinal);
         if (summonLevelModifiers.Any(p => p is null || !IsMonster(p.SourceCardId) || p.TargetCardIds.Any(id => !IsMonster(id))) ||
             procedures.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) || !rule.AllowsTributeSummon ||
-                p.AllowedTributeCardIds.Any(id => !this.rules.TryGetValue(id, out var donor) || !donor.AllowsTributeForSummon)) ||
+                // A listed card without rules can never be on the field; one with rules must be able to be Tributed.
+                p.AllowedTributeCardIds.Any(id => this.rules.TryGetValue(id, out var donor) && !donor.AllowsTributeForSummon)) ||
             windows.Any(p => p is null || !this.rules.TryGetValue(p.CardId, out var rule) ||
                 !rule.AllowsNormalSummon && !specialSummonCards.ContainsKey(p.CardId)) ||
             procedures.Select(p => p.ProcedureId).Distinct(StringComparer.Ordinal).Count() != procedures.Length ||
@@ -222,6 +223,11 @@ public sealed partial class DuelEngine
             throw new ArgumentException("Graveyard redirects and damage rules need distinct IDs, known source cards and defined values.", nameof(graveyardRedirects));
         redirectProfiles = redirectList.GroupBy(p => p.CardId).ToFrozenDictionary(g => g.Key, g => g.ToArray());
         damageRuleProfiles = damageList.GroupBy(p => p.CardId).ToFrozenDictionary(g => g.Key, g => g.ToArray());
+        var statList = (monsterStats ?? []).ToArray();
+        if (statList.Any(p => p is null || string.IsNullOrWhiteSpace(p.EffectId) || !this.rules.TryGetValue(p.CardId, out var statRule) || statRule.Category != CardCategory.Monster ||
+                p.PerHandCard < 0 || p.ReducedLevel is 0 or > 12 || p.ReducedAttack < 0) || statList.Select(p => p.CardId).Distinct().Count() != statList.Length)
+            throw new ArgumentException("Monster stat rules need one known monster each and valid values.", nameof(monsterStats));
+        statProfiles = statList.ToFrozenDictionary(p => p.CardId);
         definitionDecisions = definitionList.Where(d => d.Cost is DiscardCost or TributeCost or BanishFromGraveyardCost || d.Target is not null || d.FieldTargets.Any(t => !EffectDefinition.IsAutomatic(t)))
             .ToFrozenDictionary(d => d.EffectId, d => new DecisionSequence(DefinitionSequenceId(d),
                 [.. d.Cost is DiscardCost discard ? Enumerable.Repeat(discard.Filter switch

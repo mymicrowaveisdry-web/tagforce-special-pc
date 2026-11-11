@@ -37,7 +37,9 @@ public enum LockedAction
     BeSynchroMaterial = 16777216,
     BeXyzMaterial = 33554432,
     /// <summary>"Its effects cannot be used": a face-up monster it covers has its effects negated while the lock lasts.</summary>
-    ApplyEffects = 67108864
+    ApplyEffects = 67108864,
+    /// <summary>Pendulum Summoning a monster the lock covers.</summary>
+    PendulumSummon = 134217728
 }
 
 /// <summary>Who or what a lock applies to.</summary>

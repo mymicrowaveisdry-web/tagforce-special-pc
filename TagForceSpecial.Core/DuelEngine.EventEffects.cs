@@ -28,7 +28,8 @@ public sealed partial class DuelEngine
             trigger.Profile.SourceLocation == TriggerSourceLocation.PendulumZone ? ScaleSourcePresent(state, trigger.Source) :
             trigger.Profile.SourceLocation != TriggerSourceLocation.FaceUpMonster
             ? state.GetPlayer(trigger.Player).Graveyard.Contains(trigger.Source.Card) ||
-                trigger.Profile.SourceLocation == TriggerSourceLocation.DestroyedSelf && state.GetPlayer(trigger.Player).FaceUpExtraDeck.Contains(trigger.Source.Card)
+                trigger.Profile.SourceLocation == TriggerSourceLocation.DestroyedSelf && state.GetPlayer(trigger.Player).FaceUpExtraDeck.Contains(trigger.Source.Card) ||
+                trigger.Profile.EventKind == MonsterEventKind.Tributed && state.GetPlayer(trigger.Player).FaceUpExtraDeck.Contains(trigger.Source.Card)
             : trigger.Source.IsStillPresent(state) && state.GetPlayer(trigger.Player).MonsterZones[trigger.Source.Zone]!.Position != BattlePosition.FaceDownDefense;
         if (!location || IsTriggerUsed(state, trigger)) return false;
         if (state.Battle?.Step == BattleStep.Damage && !(trigger.Profile.DamageStepAllowed ??
@@ -102,6 +103,9 @@ public sealed partial class DuelEngine
         };
         // Neither the face-up Extra Deck nor a removed Token is "sent to the Graveyard"; destruction still counts.
         bool notToGraveyard = emitted.FieldDestination is FieldCardDestination.FaceUpExtraDeck or FieldCardDestination.Removed or FieldCardDestination.Banished or FieldCardDestination.Deck;
+        // A Tributed Pendulum Monster goes to the face-up Extra Deck; its "If this card is Tributed" effect still activates there.
+        if (emitted is MonsterTributed && emitted.FieldDestination is not (FieldCardDestination.Removed or FieldCardDestination.Banished or FieldCardDestination.Deck))
+            yield return new(MonsterEventKind.Tributed, subject, point, cost);
         if (kind == MonsterEventKind.SentToGraveyard && notToGraveyard) yield break;
         bool byBattle = emitted is MonsterDestroyed { ByBattle: true };
         yield return new(kind, subject, point, cost, byBattle) { FromSpellTrapZone = spellTrapLeaving, ProcedureId = (emitted as MonsterSpecialSummoned)?.ProcedureId };
@@ -160,6 +164,10 @@ public sealed partial class DuelEngine
         definition.Steps.All(step => step switch
         {
             SpecialSummonStep summon => SpecialSummonOptions(state, trigger.Player, summon, trigger.Source.Card).Any(),
+            PayDownToGainStep pay => state.GetPlayer(trigger.Player).LifePoints > pay.Remaining,
+            AddFromFaceUpExtraDeckStep extra => state.GetPlayer(trigger.Player).FaceUpExtraDeck.Any(c => MatchesFilter(c, extra.Filter)),
+            AddFromDeckOrGraveyardStep either => DeckMatches(state, trigger.Player, either.Filter).Any() ||
+                state.GetPlayer(trigger.Player).Graveyard.Any(c => MatchesFilter(c, either.Filter, inGraveyard: true)),
             SpecialSummonSelfStep self => trigger.Profile.SourceLocation != TriggerSourceLocation.Hand || Enumerable.Range(0, 5).Any(zone =>
                 CheckSpecialSummon(state, trigger.Player, trigger.Source.Card, zone, self.Position ?? BattlePosition.FaceUpAttack, DecisionCardSource.Hand) == DuelError.None),
             AddFromDeckToHandStep search => DeckMatches(state, trigger.Player, search.Filter).Any(),
@@ -169,9 +177,17 @@ public sealed partial class DuelEngine
 
     private IEnumerable<TriggerActivation> CollectTriggers(DuelState before, DuelState after, IReadOnlyList<DuelEvent> events, int firstId)
     {
+        // "When Normal Summoned, (other) cards and effects cannot be activated": only that monster's own effects trigger at that time.
+        var unanswerable = events.OfType<MonsterNormalSummoned>().Where(e => unanswerableSummons.Contains(e.Monster.Card.GameCardId)).Select(e => e.Monster.Card).ToHashSet();
         int id = firstId;
-        // "When Normal Summoned, cards and effects cannot be activated": nothing triggers at that time.
-        if (events.Any(e => e is MonsterNormalSummoned summoned && unanswerableSummons.Contains(summoned.Monster.Card.GameCardId))) yield break;
+        foreach (var trigger in CollectAllTriggers(before, after, events))
+            if (unanswerable.Count == 0 || unanswerable.Contains(trigger.Source.Card))
+                yield return trigger with { Id = id++ };
+    }
+
+    private IEnumerable<TriggerActivation> CollectAllTriggers(DuelState before, DuelState after, IReadOnlyList<DuelEvent> events)
+    {
+        int id = 0;
         var destructionSources = FieldMonsters(before).Select(entry =>
             events.OfType<MonsterRevealed>().Any(e => e.Card == entry.Monster.Card)
                 ? (entry.Binding, entry.Monster with { Position = BattlePosition.FaceUpDefense }) : entry).ToArray();
@@ -247,11 +263,11 @@ public sealed partial class DuelEngine
     private DuelState PrepareEventEffects(DuelState before, DuelState next, List<DuelEvent> events)
     {
         if (triggerEffects.Length == 0 && continuousEffects.Length == 0 && continuousNegations.Length == 0 && !HasTimedCombatModifiers && !HasLastingModifiers && !HasMonsterNegators &&
-            !HasEffectLocks) return next;
+            !HasEffectLocks && statProfiles.Count == 0) return next;
         var current = next.EventEffects;
         var timed = current.TimedModifiers.Where(m => m.Target.IsStillPresent(next) &&
             next.GetPlayer(m.Target.Player).MonsterZones[m.Target.Zone]!.Position != BattlePosition.FaceDownDefense &&
-            m.ExpiresOnTurn == next.TurnNumber && next.Phase != DuelPhase.End &&
+            (m.ExpiresOnTurn is null || m.ExpiresOnTurn == next.TurnNumber && next.Phase != DuelPhase.End) &&
             (m.ExpiresAfterAttackId is null || m.ExpiresAfterAttackId == next.Battle?.Attack?.Id)).ToArray();
         var negations = current.TimedNegations.Where(n => n.ExpiresOnTurn == next.TurnNumber && next.Phase != DuelPhase.End &&
             n.Target.IsStillPresent(next) && next.GetPlayer(n.Target.Player).MonsterZones[n.Target.Zone]!.Position != BattlePosition.FaceDownDefense).ToArray();
@@ -264,7 +280,7 @@ public sealed partial class DuelEngine
                     ? ModifierRemovalReason.EndPhaseReached : old.ExpiresAfterAttackId is not null && old.ExpiresAfterAttackId != next.Battle?.Attack?.Id
                         ? ModifierRemovalReason.DamageStepEnded : ModifierRemovalReason.ConditionNoLongerMet));
         foreach (var added in applied.Except(before.EventEffects.AppliedModifiers)) events.Add(new StatModifierApplied(added));
-        var statistics = FieldMonsters(next).Select(entry => CalculateStatistics(entry.Binding, applied)).ToArray();
+        var statistics = FieldMonsters(next).Select(entry => CalculateStatistics(next, entry.Binding, applied)).ToArray();
         var last = LastTimingPoint(before, events);
         var deferred = current.DeferredTriggers.ToList();
         if (next.Outcome is null) deferred.AddRange(CollectTriggers(before, next, events.ToArray(), deferred.Count + 1));
@@ -363,9 +379,9 @@ public sealed partial class DuelEngine
     }
 
 
-    private EffectiveMonsterStatistics CalculateStatistics(MonsterBinding monster, IEnumerable<StatModifier> modifiers)
+    private EffectiveMonsterStatistics CalculateStatistics(DuelState state, MonsterBinding monster, IEnumerable<StatModifier> modifiers)
     {
-        var printed = catalog[monster.Card.GameCardId].Statistics;
+        var printed = BaseStatistics(state, monster);
         var applied = modifiers.Where(m => m.Target == monster).ToArray();
         int? Value(int? value, Func<StatModifier, int> delta) => value is null ? null
             : (int)Math.Clamp((long)value.Value + applied.Sum(m => (long)delta(m)), 0, int.MaxValue);
@@ -385,6 +401,6 @@ public sealed partial class DuelEngine
         var monster = state.GetPlayer(player).MonsterZones[zone];
         if (monster is null) return null;
         var modifiers = CalculateModifiers(state, state.EventEffects.TimedModifiers);
-        return CalculateStatistics(new(player, zone, monster.Card, monster.PlacementId), modifiers);
+        return CalculateStatistics(state, new(player, zone, monster.Card, monster.PlacementId), modifiers);
     }
 }

@@ -39,13 +39,13 @@ public sealed partial class DuelEngine
             var targetLevel = catalog[target.GameCardId].Statistics.Level;
             bool IsTuner(uint id) => synchro.ByTunerRule ? rules[id].IsTuner : synchro.TunerCardIds.Contains(id);
             if (IsXyzCard(target) || selected.Any(m => IsXyzCard(m.Card)) || targetLevel == 0 || selected.Count(m => IsTuner(m.Card.GameCardId)) != 1 ||
-                selected.Any(m => catalog[m.Card.GameCardId].Statistics.Level == 0) ||
-                selected.Sum(m => (long)catalog[m.Card.GameCardId].Statistics.Level) != targetLevel)
+                selected.Any(m => CurrentLevel(m.Card) == 0) ||
+                selected.Sum(m => (long)CurrentLevel(m.Card)) != targetLevel)
                 return Reject(DuelError.InvalidSummonMaterials);
         }
         if (profile.Xyz is { } xyz && (profile.OverlayFrom is { } overlay
                 ? selected.Any(m => !IsXyzCard(m.Card) || !MatchesFilter(m.Card, overlay))
-                : selected.Any(m => IsXyzCard(m.Card) || catalog[m.Card.GameCardId].Statistics.Level != xyz.Rank)))
+                : selected.Any(m => IsXyzCard(m.Card) || CurrentLevel(m.Card) != xyz.Rank)))
             return Reject(DuelError.InvalidSummonMaterials);
         if (player.MonsterZones[command.MonsterZone] is not null && !selected.Any(m => m.Zone == command.MonsterZone))
             return Reject(DuelError.MonsterZoneOccupied);

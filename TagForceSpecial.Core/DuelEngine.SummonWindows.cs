@@ -22,6 +22,7 @@ public sealed partial class DuelEngine
     {
         var player = next.GetPlayer(playerId);
         var monster = NewSummonedMonster(next, card, faceDown ? BattlePosition.FaceDownDefense : BattlePosition.FaceUpAttack);
+        monster = monster with { SummonTributes = tributes.Count };
         var monsters = player.MonsterZones.ToArray();
         monsters[zone] = monster;
         events.Add(faceDown ? new MonsterSet(playerId, monster, zone) { TimingGroup = 1 }

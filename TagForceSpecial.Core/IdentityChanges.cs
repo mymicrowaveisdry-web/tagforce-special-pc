@@ -90,16 +90,27 @@ public sealed partial class DuelEngine
         events.Add(new ScaleChanged(target.Card, (uint)value, effectId));
         return state.WithBookkeeping(state.Bookkeeping with
         {
-            ScaleChanges = Array.AsReadOnly(state.Bookkeeping.ScaleChanges.Where(c => c.Turn == state.TurnNumber)
+            ScaleChanges = Array.AsReadOnly(state.Bookkeeping.ScaleChanges.Where(c => c.Turn == state.TurnNumber || c.Turn == 0)
                 .Append(new ScaleChange(target.Card, target.PlacementId, (uint)value, state.TurnNumber)).ToArray())
         });
     }
 
-    /// <summary>A scale's current Pendulum Scale on one side: a change made this turn, otherwise the printed value.</summary>
-    private uint CurrentScale(DuelState state, FieldSpellTrap scale, bool left) =>
-        state.Bookkeeping.ScaleChanges.LastOrDefault(c => c.Card == scale.Card && c.PlacementId == scale.PlacementId && c.Turn == state.TurnNumber) is { } changed
-            ? changed.Scale
-            : left ? pendulumCards[scale.Card.GameCardId].LeftScale : pendulumCards[scale.Card.GameCardId].RightScale;
+    /// <summary>
+    /// A scale's current Pendulum Scale on one side: the latest change made this turn or lasting while it stays (turn 0), otherwise the printed
+    /// value, or its value without a partner in the other Pendulum Zone.
+    /// </summary>
+    private uint CurrentScale(DuelState state, FieldSpellTrap scale, bool left)
+    {
+        if (state.Bookkeeping.ScaleChanges.LastOrDefault(c => c.Card == scale.Card && c.PlacementId == scale.PlacementId && (c.Turn == state.TurnNumber || c.Turn == 0)) is { } changed)
+            return changed.Scale;
+        var profile = pendulumCards[scale.Card.GameCardId];
+        if (profile.PartnerFilter is { } partner && state.Players.FirstOrDefault(p => p.PendulumZones.Contains(scale)) is { } owner)
+        {
+            var other = owner.PendulumZones.FirstOrDefault(z => z is not null && z != scale);
+            if (other is null || !MatchesFilter(other.Card, partner)) return profile.ScaleWithoutPartner;
+        }
+        return left ? profile.LeftScale : profile.RightScale;
+    }
 
     /// <summary>A declared filter turned into a concrete one, for effects that keep it after the declaration is gone (lasting locks).</summary>
     private CardFilter ConcreteDeclared(CardFilter filter) => filter is DeclaredFilter && resolvingDeclaration is { } declared

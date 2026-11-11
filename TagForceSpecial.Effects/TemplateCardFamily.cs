@@ -20,6 +20,8 @@ public static class TemplateCardFamily
     /// <summary>"Savior" Synchro Monsters (Savior Star Dragon, Savior Demon Dragon).</summary>
     private static readonly uint[] SaviorSynchros = [8475, 8651];
     private static readonly FieldTarget FaceUpMonster = new(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUp);
+    /// <summary>"You cannot Special Summon monsters, except 'Qli' monsters."</summary>
+    private static readonly RuleLock QliOnly = new(LockedAction.SpecialSummon, TargetSide.Own, new NotFilter(new AllOfFilter([new AnyMonsterFilter(), new CardIdFilter(CardArchetypes.Qli)])));
 
     private static MonsterTypeFilter OfType(uint type) => new([type]);
     private static MonsterAttributeFilter OfAttribute(uint attribute) => new(attribute);
@@ -33,6 +35,27 @@ public static class TemplateCardFamily
             exceptions: CharmerControl);
 
     private const string CharmerControl = "Control returns when this card stops being face-up on the field; flipping the taken monster face-down later does not end it in this era.";
+
+    /// <summary>
+    /// D/D Magical Astronomer Kepler: when Summoned, 1 of 2 effects once per turn (return another "D/D" card or search a "Covenant" card); as a scale,
+    /// only "D/D" monsters can be Pendulum Summoned, and each of its controller's Standby Phases lowers its scale by 2 and destroys their higher-Level monsters.
+    /// </summary>
+    private static AuthoredCard Kepler()
+    {
+        var dd = new CardIdFilter(CardArchetypes.DD);
+        var card = T.PendulumTrigger(T.NormalPendulum(11442, "D/D Magical Astronomer Kepler", 10,
+                scaleLock: new RuleLock(LockedAction.PendulumSummon, TargetSide.Own, new NotFilter(dd)), getterKind: 26),
+            MonsterEventKind.StandbyPhase, EffectRelation.Controller, [new ReduceSourceScaleStep(2), new DestroyAboveSourceScaleStep(dd)]);
+        MonsterEventKind[] summoned = [MonsterEventKind.NormalSummoned, MonsterEventKind.SpecialSummoned];
+        card = T.WithTrigger(card, "return", summoned, EffectRelation.Self, [new ReturnTargetsToHandStep()], TriggerRequirement.Optional,
+            targets: [new FieldTarget(FieldCardKind.Any, TargetSide.Own, cardFilter: new AllOfFilter([dd, new NotFilter(new CardIdFilter([11442]))]))],
+            timing: TriggerTiming.If, sharedLimit: "summoned");
+        return T.WithTrigger(card, "search", summoned, EffectRelation.Self, [new AddFromDeckToHandStep(new CardIdFilter(CardArchetypes.Covenant))], TriggerRequirement.Optional,
+            timing: TriggerTiming.If, sharedLimit: "summoned") with
+        {
+            Exceptions = "The two Summon effects are separate triggers sharing one use per turn; \"other\" excludes every copy of this card."
+        };
+    }
 
     private static AuthoredCard TypeWipe(uint id, string name, uint type) =>
         T.Normal(id, name, [new DestroyAllStep(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUp, OfType(type))]);
@@ -201,6 +224,24 @@ public static class TemplateCardFamily
         T.NormalPendulum(11353, "Qliphort Scout", 9,
             [new([new AddFromDeckToHandStep(new AllOfFilter([new CardIdFilter(CardArchetypes.Qli), new NotFilter(new CardIdFilter([11353]))]))], new PayLifePointsCost(800))],
             new RuleLock(LockedAction.SpecialSummon, TargetSide.Own, new NotFilter(new AllOfFilter([new AnyMonsterFilter(), new CardIdFilter(CardArchetypes.Qli)])))),
+        T.WhenTributed(T.Qliphort(T.NormalPendulum(11354, "Qliphort Carrier", 1, scaleLock: QliOnly,
+            modifiers: [new LastingStatModifier(TargetSide.Own, 300, 0, new CardIdFilter(CardArchetypes.Qli))], getterKind: 26)),
+            [new ReturnTargetsToHandStep()], new FieldTarget(FieldCardKind.Monster)),
+        T.WhenTributed(T.Qliphort(T.NormalPendulum(11355, "Qliphort Helix", 9, scaleLock: QliOnly,
+            modifiers: [new LastingStatModifier(TargetSide.Opponent, -300, 0)], getterKind: 26)),
+            [new DestroyTargetsStep()], new FieldTarget(FieldCardKind.SpellTrap)),
+        T.WhenSentFromField(T.WithReplacement(T.WithLock(CardTable.Declaring(T.ContinuousWithEffects(11299, "Marshalling Field", trap: true,
+                    new EffectOption([new SetDeclaredLevelStep(new AllOfFilter([OfType(Machine), new MonsterLevelFilter(12, minLevel: 5)]), 5, 9)])), DeclarationKind.Level),
+                new RuleLock(LockedAction.SpecialSummon, TargetSide.Own, new NotFilter(OfType(Machine)))),
+            CardTable.Instead(ReplacementSubject.Monsters, new(ReplacementAction.SendSourceToGraveyard), cards: new AllOfFilter([OfType(Machine), new XyzMonsterFilter()]), all: true)),
+            [new AddFromDeckOrGraveyardStep(new CardIdFilter([11022]))]),
+        T.WithTrigger(T.NormalPendulum(11330, "D/D Proud Chevalier", 6,
+                [new([new ModifyTargetsStep(-500)], new PayLifePointsCost(500), [new FieldTarget(FieldCardKind.Monster, TargetSide.Opponent, FieldCardFilter.FaceUp)])], getterKind: 26) with
+            {
+                Scales = [new PendulumCardProfile(11330, 6, 6) { PartnerFilter = new CardIdFilter(CardArchetypes.DD), ScaleWithoutPartner = 5 }]
+            },
+            "summoned", [MonsterEventKind.NormalSummoned], EffectRelation.Self, [new AddFromFaceUpExtraDeckStep(OfAttribute(Dark))], TriggerRequirement.Optional),
+        Kepler(),
         T.PendulumTrigger(T.NormalPendulum(11211, "Foucault's Cannon", 2), MonsterEventKind.EndPhase, EffectRelation.Any,
             [new StopUnlessActivatedThisTurnStep(), new DestroyTargetsStep()], TriggerRequirement.Optional,
             [new FieldTarget(FieldCardKind.SpellTrap, TargetSide.Either, FieldCardFilter.FaceUp)]),
