@@ -63,7 +63,9 @@ public sealed partial class DuelEngine
         int needed = definition.FieldTargets.OfType<ZoneTarget>().Where(z => z.Zone == CardZone.Graveyard).Sum(z => z.MinCount);
         if (needed == 0 || needed > discard.Count) return null;
         var player = State.GetPlayer(playerId);
-        return State.With(player: player.With(graveyard: player.Graveyard.Concat(player.Hand.Where(c => c != source && DiscardQualifies(c, discard.Filter)))));
+        // A card that would be banished instead cannot be discarded, so it cannot become a target this way.
+        return State.With(player: player.With(graveyard: player.Graveyard.Concat(player.Hand.Where(c => c != source && DiscardQualifies(c, discard.Filter) &&
+            RedirectFor(State, c, false) is null))));
     }
 
     /// <summary>Several effects are allowed on monsters, as "choose 1" options of one kind, or as activated effects after a lasting card's own.</summary>

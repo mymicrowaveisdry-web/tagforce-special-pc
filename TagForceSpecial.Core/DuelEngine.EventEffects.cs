@@ -89,7 +89,7 @@ public sealed partial class DuelEngine
             _ => MonsterEventKind.SentToGraveyard
         };
         // Neither the face-up Extra Deck nor a removed Token is "sent to the Graveyard"; destruction still counts.
-        bool notToGraveyard = emitted.FieldDestination is FieldCardDestination.FaceUpExtraDeck or FieldCardDestination.Removed;
+        bool notToGraveyard = emitted.FieldDestination is FieldCardDestination.FaceUpExtraDeck or FieldCardDestination.Removed or FieldCardDestination.Banished or FieldCardDestination.Deck;
         if (kind == MonsterEventKind.SentToGraveyard && notToGraveyard) yield break;
         bool byBattle = emitted is MonsterDestroyed { ByBattle: true };
         yield return new(kind, subject, point, cost, byBattle) { FromSpellTrapZone = spellTrapLeaving, ProcedureId = (emitted as MonsterSpecialSummoned)?.ProcedureId };
@@ -261,10 +261,7 @@ public sealed partial class DuelEngine
         var profile = trigger.Profile;
         if (action.Operation == TriggerOperation.GainLifePoints)
         {
-            var player = next.GetPlayer(trigger.Player);
-            int after = (int)Math.Min(int.MaxValue, (long)player.LifePoints + action.LifePointGain);
-            events.Add(new LifePointsGained(player.Id, after - player.LifePoints, player.LifePoints, after, profile.EffectId));
-            return next.With(player: player.With(lifePoints: after));
+            return GainLifePoints(next, trigger.Player, action.LifePointGain, profile.EffectId, events);
         }
         var subject = action.Operation == TriggerOperation.ModifyEventMonsterUntilEndPhase ? trigger.Occurrence.Subject : trigger.Target!;
         if (!subject.IsStillPresent(next) ||

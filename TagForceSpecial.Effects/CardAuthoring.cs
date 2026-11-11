@@ -27,8 +27,11 @@ public sealed record AuthoredCard(uint Id, string Name, CardKind Kind, uint Gett
     public IReadOnlyList<RuleLockProfile> Locks { get; init; } = [];
     public IReadOnlyList<BattleAbilityProfile> BattleAbilities { get; init; } = [];
     public IReadOnlyList<DestructionReplacementProfile> Replacements { get; init; } = [];
+    public IReadOnlyList<GraveyardRedirectProfile> Redirects { get; init; } = [];
+    public IReadOnlyList<DamageRuleProfile> DamageRules { get; init; } = [];
     /// <summary>Everything the card's reviewed metadata refers to.</summary>
-    public IEnumerable<string> References => Definitions.Select(d => d.EffectId).Concat(Locks.Select(l => l.EffectId)).Concat(BattleAbilities.Select(p => p.EffectId)).Concat(Replacements.Select(r => r.EffectId));
+    public IEnumerable<string> References => Definitions.Select(d => d.EffectId).Concat(Locks.Select(l => l.EffectId)).Concat(BattleAbilities.Select(p => p.EffectId)).Concat(Replacements.Select(r => r.EffectId))
+        .Concat(Redirects.Select(r => r.EffectId)).Concat(DamageRules.Select(r => r.EffectId));
 }
 
 /// <summary>One option of a card whose effects are chosen at activation.</summary>
@@ -169,6 +172,20 @@ public sealed class CardTable(string prefix)
     public AuthoredCard MonsterReplacement(uint id, string name, DestructionReplacementProfile replacement, uint getterKind = EffectMonsterKind, string exceptions = "none") =>
         new(id, name, CardKind.Monster, getterKind, IconNormal, TributeMonsterRules, [], exceptions) { Replacements = [Replacing(id, replacement)] };
 
+    /// <summary>A Continuous Spell or Trap whose only effect sends cards elsewhere instead of the Graveyard while it stays face-up.</summary>
+    public AuthoredCard RedirectCard(uint id, string name, bool trap, GraveyardRedirect rule, string exceptions = "none") =>
+        new(id, name, trap ? CardKind.Trap : CardKind.Spell, trap ? TrapKind : SpellKind, IconContinuous, trap ? TrapRules : SpellRules,
+            [new EffectDefinition(Effect(id, "continuous"), id, trap ? EffectKind.ContinuousTrap : EffectKind.ContinuousSpell, [], isMarker: true)], exceptions)
+            { Redirects = [new(Effect(id, "redirect"), id, rule)] };
+
+    /// <summary>A monster whose only effect sends cards elsewhere instead of the Graveyard while it is face-up.</summary>
+    public AuthoredCard RedirectMonster(uint id, string name, GraveyardRedirect rule, uint getterKind = EffectMonsterKind, string exceptions = "none") =>
+        new(id, name, CardKind.Monster, getterKind, IconNormal, TributeMonsterRules, [], exceptions) { Redirects = [new(Effect(id, "redirect"), id, rule)] };
+
+    /// <summary>A monster whose only effect changes damage or LP gain while it is face-up; <paramref name="side"/> is whose, relative to its controller.</summary>
+    public AuthoredCard DamageRuleMonster(uint id, string name, DamageRule rule, TargetSide side, uint getterKind = EffectMonsterKind, string exceptions = "none") =>
+        new(id, name, CardKind.Monster, getterKind, IconNormal, TributeMonsterRules, [], exceptions) { DamageRules = [new(Effect(id, "damage-rule"), id, rule, side)] };
+
     public AuthoredCard MonsterLock(uint id, string name, RuleLock rule, uint getterKind = EffectMonsterKind, string exceptions = "none") =>
         new(id, name, CardKind.Monster, getterKind, IconNormal, TributeMonsterRules, [], exceptions) { Locks = [Locked(id, rule)] };
 
@@ -243,7 +260,9 @@ public sealed class CardTable(string prefix)
             Triggers = Array.AsReadOnly(cards.SelectMany(c => c.Triggers).ToArray()),
             RuleLocks = Array.AsReadOnly(cards.SelectMany(c => c.Locks).ToArray()),
             BattleAbilities = Array.AsReadOnly(cards.SelectMany(c => c.BattleAbilities).ToArray()),
-            DestructionReplacements = Array.AsReadOnly(cards.SelectMany(c => c.Replacements).ToArray())
+            DestructionReplacements = Array.AsReadOnly(cards.SelectMany(c => c.Replacements).ToArray()),
+            GraveyardRedirects = Array.AsReadOnly(cards.SelectMany(c => c.Redirects).ToArray()),
+            DamageRules = Array.AsReadOnly(cards.SelectMany(c => c.DamageRules).ToArray())
         };
     }
 
@@ -269,6 +288,8 @@ public sealed class CardTable(string prefix)
         return new(card.Id, card.Name, card.Kind, effect,
             string.Join(" Or: ", card.Definitions.Select(d => $"{d.Kind}: {Describe(d.Steps)}.")) + detail + (card.Locks.Count == 0 ? "" : $" Rules: {Describe(card.Locks.Select(l => l.Lock))}.")
                 + (card.Replacements.Count == 0 ? "" : $" Replacement: {Describe(card.Replacements.Select(r => r with { EffectId = "", CardId = 0 }))}.")
+                + (card.Redirects.Count == 0 ? "" : $" Redirect: {Describe(card.Redirects.Select(r => r.Rule))}.")
+                + (card.DamageRules.Count == 0 ? "" : $" Damage: {Describe(card.DamageRules.Select(r => r with { EffectId = "", CardId = 0 }))}.")
                 + (card.BattleAbilities.Count == 0 ? "" : $" Battle: {Describe(card.BattleAbilities.Select(p => p.Abilities))}.")
                 + (card.Definitions.Select(d => d.NameLimit).FirstOrDefault(l => l is not null) is { } named ? $" Limit: {named.Counts} by name, once per {(named.PerDuel ? "Duel" : "turn")}." : ""),
             card.Definitions.Count == 0 && card.BattleAbilities.Count != 0 ? "Continuous while the source is face-up and not negated."

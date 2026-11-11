@@ -392,6 +392,8 @@ public sealed class EffectDefinition
                     AttachSourceStep or AttachTargetsToSelfStep or DetachAllStep or TakeOpponentMaterialStep => false,
                     AttachFromStep s => s.Filter is null || !s.Hand && !s.Graveyard,
                     RankUpStep s => s.Into is null || s.RankChange is 0 or < -12 or > 12,
+                    ApplyGraveyardRedirectStep s => s.Rule is null || !Enum.IsDefined(s.Rule.To) || !Enum.IsDefined(s.Rule.Owner),
+                    ApplyDamageRuleStep s => s.Rule is null || !Enum.IsDefined(s.Rule.Kind) || (s.Rule.Applies & DamageKinds.Any) == 0 || !Enum.IsDefined(s.Scope),
                     ModifyCombatantStatsStep s => s.Attack == 0 && s.Defense == 0,
                     BanishAllStep s => !Enum.IsDefined(s.Side) || !Enum.IsDefined(s.Filter),
                     DestroyAllStep s => !Enum.IsDefined(s.Kind) || !Enum.IsDefined(s.Side) || !Enum.IsDefined(s.Filter),

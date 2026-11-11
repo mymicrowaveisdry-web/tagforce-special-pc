@@ -72,6 +72,7 @@ public sealed partial class DuelEngine
     {
         var player = State.GetPlayer(playerId);
         if (definition.NameLimit is { } limit && NameLimitReached(State, playerId, limit)) return DuelError.EffectAlreadyUsed;
+        if (GraveyardCostBlocked(State, playerId, card, definition)) return DuelError.LockedByEffect;
         if (definition.Steps.OfType<AttachFromStep>().ToArray() is { Length: > 0 } attaches &&
             AttachCandidates(State, playerId, attaches[0], card).Count() < attaches.Length) return DuelError.DecisionUnavailable;
         if (ActivationLocked(State, playerId, card, definition)) return DuelError.LockedByEffect;
@@ -355,6 +356,8 @@ public sealed partial class DuelEngine
                 return Reject(DuelError.InvalidEffectState);
             next = MoveZoneCard(next, banished, toBanished: true, definition.EffectId, events);
         }
+        // A paid cost goes where it really goes before the next choice is offered.
+        next = ApplyGraveyardRedirects(next, events);
         if (pending.StepIndex + 1 < sequence.Steps.Count)
         {
             var decision = CreateDecision(sequence, pending.StepIndex + 1, answers, from: next);
@@ -508,7 +511,7 @@ public sealed partial class DuelEngine
             var step = definition.Steps[i];
             replacementContext = null;
             // Optional replacements are answered before the step destroys anything; nothing can happen in between.
-            if (DestructionBatch(state, link, definition, step, controller) is { Count: > 0 } batch)
+            if (DestructionBatch(state, links, link, definition, step, controller) is { Count: > 0 } batch)
             {
                 if (choice is ReplacementAnswers answers)
                 {
@@ -750,6 +753,8 @@ public sealed partial class DuelEngine
                     ShuffleDeckStep => ShuffleDeck(state, controller, definition.EffectId, events),
                     GrantNormalSummonStep => GrantNormalSummon(state, definition.EffectId, events),
                     ApplyRuleLockStep apply => ApplyTimedLock(state, controller, apply.Lock, definition.EffectId, events),
+                    ApplyGraveyardRedirectStep redirect => AddTimedRedirect(state, controller, redirect.Rule),
+                    ApplyDamageRuleStep damageRule => AddTimedDamageRule(state, controller, damageRule),
                     ReturnSourceToDeckTopStep => ReturnSourceToDeckTop(state, link, definition.EffectId, events),
                     DestroyTargetStep => DestroyTarget(state, link, events),
                     DestroyOpponentFaceUpMonstersStep => DestroyOpponentFaceUpMonsters(state, Other(controller), events),
@@ -1349,22 +1354,33 @@ public sealed partial class DuelEngine
         return state;
     }
 
-    /// <summary>Both players take damage at once (opponent's event first); both at 0 LP is a draw.</summary>
-    private static DuelState DamageBothPlayers(DuelState state, PlayerId controller, DamageBothPlayersStep step, string effectId,
+    /// <summary>Both players take damage at once (opponent's first), after damage rules; both at 0 LP is a draw.</summary>
+    private DuelState DamageBothPlayers(DuelState state, PlayerId controller, DamageBothPlayersStep step, string effectId,
         List<DuelEvent> events)
     {
-        var opponent = state.GetPlayer(Other(controller));
-        var self = state.GetPlayer(controller);
-        int opponentAfter = Math.Max(0, opponent.LifePoints - step.ToOpponent);
-        int selfAfter = Math.Max(0, self.LifePoints - step.ToSelf);
-        events.Add(new EffectDamageDealt(opponent.Id, opponent.LifePoints - opponentAfter, opponent.LifePoints, opponentAfter, effectId));
-        events.Add(new EffectDamageDealt(self.Id, self.LifePoints - selfAfter, self.LifePoints, selfAfter, effectId));
-        var next = state.With(player: opponent.With(lifePoints: opponentAfter)).With(player: self.With(lifePoints: selfAfter));
-        DuelOutcome? outcome = (opponentAfter, selfAfter) switch
+        var life = new Dictionary<PlayerId, int> { [PlayerId.One] = state.GetPlayer(PlayerId.One).LifePoints, [PlayerId.Two] = state.GetPlayer(PlayerId.Two).LifePoints };
+        foreach (var (target, amount) in new[] { (Other(controller), step.ToOpponent), (controller, step.ToSelf) })
         {
-            (0, 0) => new(null, null, DuelEndReason.BothLifePointsDepleted),
-            (0, _) => new(controller, opponent.Id, DuelEndReason.LifePointsDepleted),
-            (_, 0) => new(opponent.Id, controller, DuelEndReason.LifePointsDepleted),
+            var recipient = DamageRecipient(state, target, DamageKinds.Effect);
+            int before = life[recipient];
+            if (HasDamageRule(state, recipient, DamageRuleKind.BecomesGain, DamageKinds.Effect))
+            {
+                life[recipient] = (int)Math.Min(int.MaxValue, (long)before + amount);
+                events.Add(new LifePointsGained(recipient, life[recipient] - before, before, life[recipient], effectId));
+            }
+            else
+            {
+                life[recipient] = Math.Max(0, before - amount);
+                events.Add(new EffectDamageDealt(recipient, before - life[recipient], before, life[recipient], effectId));
+            }
+        }
+        var next = state.With(player: state.GetPlayer(PlayerId.One).With(lifePoints: life[PlayerId.One]))
+            .With(player: state.GetPlayer(PlayerId.Two).With(lifePoints: life[PlayerId.Two]));
+        DuelOutcome? outcome = (life[Other(controller)] == 0, life[controller] == 0) switch
+        {
+            (true, true) => new(null, null, DuelEndReason.BothLifePointsDepleted),
+            (true, false) => new(controller, Other(controller), DuelEndReason.LifePointsDepleted),
+            (false, true) => new(Other(controller), controller, DuelEndReason.LifePointsDepleted),
             _ => null
         };
         if (outcome is null) return next;
@@ -1372,8 +1388,11 @@ public sealed partial class DuelEngine
         return next.With(outcome: outcome);
     }
 
-    private DuelState GainLifePoints(DuelState state, PlayerId recipient, int amount, string effectId, List<DuelEvent> events)
+    private DuelState GainLifePoints(DuelState state, PlayerId recipient, int amount, string effectId, List<DuelEvent> events, bool converted = false)
     {
+        // An effect's LP gain can become damage; a gain that replaced damage does not turn back.
+        if (!converted && HasDamageRule(state, recipient, DamageRuleKind.GainBecomesDamage, DamageKinds.Effect))
+            return DealEffectDamage(state, recipient, amount, effectId, events, converted: true);
         var player = state.GetPlayer(recipient);
         // Same bounded integer policy as existing trigger LP recovery.
         int after = (int)Math.Min(int.MaxValue, (long)player.LifePoints + amount);
@@ -1381,8 +1400,11 @@ public sealed partial class DuelEngine
         return state.With(player: player.With(lifePoints: after));
     }
 
-    private DuelState DealEffectDamage(DuelState state, PlayerId recipient, int amount, string effectId, List<DuelEvent> events)
+    private DuelState DealEffectDamage(DuelState state, PlayerId recipient, int amount, string effectId, List<DuelEvent> events, bool converted = false)
     {
+        recipient = DamageRecipient(state, recipient, DamageKinds.Effect);
+        if (!converted && HasDamageRule(state, recipient, DamageRuleKind.BecomesGain, DamageKinds.Effect))
+            return GainLifePoints(state, recipient, amount, effectId, events, converted: true);
         var player = state.GetPlayer(recipient);
         int remaining = Math.Max(0, player.LifePoints - amount);
         events.Add(new EffectDamageDealt(recipient, player.LifePoints - remaining, player.LifePoints, remaining, effectId));

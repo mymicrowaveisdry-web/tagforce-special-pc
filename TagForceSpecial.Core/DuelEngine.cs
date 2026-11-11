@@ -33,6 +33,8 @@ public sealed partial class DuelEngine
     private readonly FrozenDictionary<uint, RuleLockProfile[]> ruleLockProfiles;
     private readonly FrozenDictionary<uint, BattleAbilityProfile[]> battleAbilityProfiles;
     private readonly FrozenDictionary<uint, DestructionReplacementProfile[]> replacementProfiles;
+    private readonly FrozenDictionary<uint, GraveyardRedirectProfile[]> redirectProfiles;
+    private readonly FrozenDictionary<uint, DamageRuleProfile[]> damageRuleProfiles;
     /// <summary>Activation-time cost/target decisions of definitions that have any, keyed by source card ID.</summary>
     private readonly FrozenDictionary<string, DecisionSequence> definitionDecisions;
     public DuelState State { get; private set; }
@@ -58,7 +60,8 @@ public sealed partial class DuelEngine
         IEnumerable<SummonEffectProfile>? experimentalSummonEffects = null,
         IEnumerable<PendulumCardProfile>? experimentalPendulumCards = null,
         IEnumerable<EffectDefinition>? effectDefinitions = null, ulong? shuffleSeed = null, IEnumerable<RuleLockProfile>? ruleLocks = null, IEnumerable<BattleAbilityProfile>? battleAbilities = null,
-        IEnumerable<DestructionReplacementProfile>? destructionReplacements = null)
+        IEnumerable<DestructionReplacementProfile>? destructionReplacements = null, IEnumerable<GraveyardRedirectProfile>? graveyardRedirects = null,
+        IEnumerable<DamageRuleProfile>? damageRules = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(rules);
@@ -201,6 +204,16 @@ public sealed partial class DuelEngine
             replacementList.Select(p => p.EffectId).Distinct(StringComparer.Ordinal).Count() != replacementList.Length)
             throw new ArgumentException("Destruction replacements need distinct IDs, known sources and costs that suit the source.", nameof(destructionReplacements));
         replacementProfiles = replacementList.GroupBy(p => p.CardId).ToFrozenDictionary(g => g.Key, g => g.ToArray());
+        var redirectList = (graveyardRedirects ?? []).ToArray();
+        var damageList = (damageRules ?? []).ToArray();
+        if (redirectList.Any(p => p is null || string.IsNullOrWhiteSpace(p.EffectId) || p.Rule is null || !Enum.IsDefined(p.Rule.To) || !Enum.IsDefined(p.Rule.Owner) ||
+                !this.rules.ContainsKey(p.CardId)) ||
+            damageList.Any(p => p is null || string.IsNullOrWhiteSpace(p.EffectId) || p.Rule is null || !Enum.IsDefined(p.Rule.Kind) ||
+                (p.Rule.Applies & DamageKinds.Any) == 0 || !Enum.IsDefined(p.Side) || !this.rules.ContainsKey(p.CardId)) ||
+            redirectList.Select(p => p.EffectId).Concat(damageList.Select(p => p.EffectId)).Distinct(StringComparer.Ordinal).Count() != redirectList.Length + damageList.Length)
+            throw new ArgumentException("Graveyard redirects and damage rules need distinct IDs, known source cards and defined values.", nameof(graveyardRedirects));
+        redirectProfiles = redirectList.GroupBy(p => p.CardId).ToFrozenDictionary(g => g.Key, g => g.ToArray());
+        damageRuleProfiles = damageList.GroupBy(p => p.CardId).ToFrozenDictionary(g => g.Key, g => g.ToArray());
         definitionDecisions = definitionList.Where(d => d.Cost is DiscardCost or TributeCost or BanishFromGraveyardCost || d.Target is not null || d.FieldTargets.Any(t => !EffectDefinition.IsAutomatic(t)))
             .ToFrozenDictionary(d => d.EffectId, d => new DecisionSequence(DefinitionSequenceId(d),
                 [.. d.Cost is DiscardCost discard ? Enumerable.Repeat(discard.Filter switch
@@ -512,17 +525,9 @@ public sealed partial class DuelEngine
             defender is null ? null : new(defenderPlayer.Id, targetZone!.Value, defender.Card, defender.PlacementId));
         if (damage > 0)
         {
-            var damaged = next.GetPlayer(damagedPlayer);
-            int remaining = Math.Max(0, damaged.LifePoints - damage);
-            next = next.With(player: damaged.With(lifePoints: remaining));
-            events.Add(new BattleDamageDealt(damagedPlayer, damage, damaged.LifePoints, remaining));
             // LP defeat occurs during damage calculation, before sending battle-destroyed cards to the graveyard.
-            if (remaining == 0)
-            {
-                var outcome = new DuelOutcome(Other(damagedPlayer), damagedPlayer, DuelEndReason.LifePointsDepleted);
-                events.Add(new DuelEnded(outcome));
-                return Accept(next.With(outcome: outcome), events.ToArray());
-            }
+            next = ApplyBattleDamage(next, damagedPlayer, damage, events);
+            if (next.Outcome is not null) return Accept(next, events.ToArray());
         }
         MonsterBinding attackerBinding = new(attackerPlayer.Id, attackerZone, attacker.Card, attacker.PlacementId);
         MonsterBinding? defenderBinding = defender is null ? null : new(defenderPlayer.Id, targetZone!.Value, defender.Card, defender.PlacementId);
@@ -573,6 +578,7 @@ public sealed partial class DuelEngine
         state = PrepareBattleState(State, state, emitted);
         state = PrepareXyzMaterials(State, state, emitted);
         state = ApplyFieldLinks(State, state, emitted);
+        state = ApplyGraveyardRedirects(state, emitted);
         state = PrepareSummonHistory(State, state, emitted);
         state = PrepareEventEffects(State, state, emitted);
         State = state.With(revision: checked(State.Revision + 1));

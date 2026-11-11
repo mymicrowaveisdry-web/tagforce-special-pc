@@ -21,6 +21,9 @@ internal sealed record DuelBookkeeping(int NextInstanceId = 1, DuelRandomState? 
     /// <summary>By-name uses this turn, and once-per-Duel uses for the whole Duel.</summary>
     public IReadOnlyList<BattleAttackUse> BattleAttacks { get; init; } = Array.AsReadOnly(Array.Empty<BattleAttackUse>());
     public IReadOnlyList<NamedUse> NamedUses { get; init; } = Array.AsReadOnly(Array.Empty<NamedUse>());
+    /// <summary>Graveyard redirects and damage rules applied until the end of a turn.</summary>
+    public IReadOnlyList<TimedGraveyardRedirect> TimedRedirects { get; init; } = Array.AsReadOnly(Array.Empty<TimedGraveyardRedirect>());
+    public IReadOnlyList<TimedDamageRule> TimedDamageRules { get; init; } = Array.AsReadOnly(Array.Empty<TimedDamageRule>());
 }
 
 internal sealed record ActivatedEffectUse(int InstanceId, int TurnNumber, string Key, long? PlacementId = null);

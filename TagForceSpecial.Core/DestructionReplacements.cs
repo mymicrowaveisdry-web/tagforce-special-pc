@@ -223,8 +223,11 @@ public sealed partial class DuelEngine
     }
 
     /// <summary>The field cards a destroying definition step is about to destroy; null for other steps.</summary>
-    private IReadOnlyList<FieldCardTarget>? DestructionBatch(DuelState state, ChainLink link, EffectDefinition definition, EffectStep step, PlayerId controller) => step switch
+    private IReadOnlyList<FieldCardTarget>? DestructionBatch(DuelState state, ChainLink[] links, ChainLink link, EffectDefinition definition, EffectStep step,
+        PlayerId controller) => step switch
     {
+        NegateActivationStep { DestroySource: true } or NegateEffectStep { DestroySource: true } when link.TargetLinkNumber is int number &&
+            NegatedSource(state, links[number - 1]) is { } negated => [negated],
         DestroyTargetsStep or DestroyAndBanishTargetsStep => QualifyingTargets(state, link, definition)
             .Where(t => t.Location is FieldLocation.MonsterZone or FieldLocation.SpellTrapZone).ToArray(),
         DestroyAllStep all => FieldMatches(state, controller, all.Kind, all.Side, all.Filter, link.Activation.Spell.InstanceId)
@@ -233,6 +236,21 @@ public sealed partial class DuelEngine
             .Select(e => new FieldCardTarget(e.Binding.Player, FieldLocation.MonsterZone, e.Binding.Zone, e.Monster.Card, e.Monster.PlacementId)).ToArray(),
         _ => null
     };
+
+    /// <summary>The field card a negation that also destroys would destroy, if it is still in place.</summary>
+    private static FieldCardTarget? NegatedSource(DuelState state, ChainLink target)
+    {
+        var receipt = target.Activation;
+        FieldCardTarget? source = target.Operation switch
+        {
+            ChainOperation.MonsterEffect => new(receipt.Player, FieldLocation.MonsterZone, receipt.SpellTrapZone, receipt.Spell, target.SourcePlacementId),
+            ChainOperation.ZoneEffect => null,
+            _ when target.Trigger is null && receipt.SpellTrapZone is >= 0 and < 5 =>
+                new(receipt.Player, FieldLocation.SpellTrapZone, receipt.SpellTrapZone, receipt.Spell, target.SourcePlacementId),
+            _ => null
+        };
+        return source is not null && source.IsStillPresent(state) ? source : null;
+    }
 
     private bool ValidReplacementAnswer(PendingReplacement pending, ChooseDestructionReplacement answer, out ReplacementDecision decision)
     {

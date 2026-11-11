@@ -266,16 +266,8 @@ public sealed partial class DuelEngine
             events.Add(new BattleDamageCalculated(attack.Id, calculation));
             if (calculation.Damage > 0)
             {
-                var player = next.GetPlayer(calculation.DamagedPlayer);
-                int after = Math.Max(0, player.LifePoints - calculation.Damage);
-                next = next.With(player: player.With(lifePoints: after));
-                events.Add(new BattleDamageDealt(player.Id, calculation.Damage, player.LifePoints, after));
-                if (after == 0)
-                {
-                    var outcome = new DuelOutcome(Other(player.Id), player.Id, DuelEndReason.LifePointsDepleted);
-                    events.Add(new DuelEnded(outcome));
-                    return Accept(next.With(outcome: outcome).WithBattle(battle with { Attack = attack with { Calculation = calculation } }), events.ToArray());
-                }
+                next = ApplyBattleDamage(next, calculation.DamagedPlayer, calculation.Damage, events);
+                if (next.Outcome is not null) return Accept(next.WithBattle(battle with { Attack = attack with { Calculation = calculation } }), events.ToArray());
             }
             void Mark(MonsterBinding binding)
             {
