@@ -13,13 +13,13 @@ public sealed record PlayerView(PlayerId Id, int LifePoints, int DeckCount, int 
 /// <summary>The shared visibility boundary for human and opponent presentation.</summary>
 public static class PlayerProjection
 {
-    public static PlayerView Create(DuelState state, PlayerId player, PlayerId viewer, CardCatalog catalog)
+    public static PlayerView Create(DuelState state, PlayerId player, PlayerId viewer, CardCatalog catalog, bool handRevealed = false)
     {
         if (!Enum.IsDefined(viewer)) throw new ArgumentOutOfRangeException(nameof(viewer));
         var p = state.GetPlayer(player);
         bool own = player == viewer;
         return new(player, p.LifePoints, p.Deck.Count, p.ExtraDeck.Count,
-            Read(p.Hand.Select(c => Card(c, own, null, catalog))),
+            Read(p.Hand.Select(c => Card(c, own || handRevealed, null, catalog))),
             Read(p.MonsterZones.Select(m => m is null ? null : Card(m.Card,
                 own || m.Position != BattlePosition.FaceDownDefense, m.Position, catalog))),
             Read(p.SpellTrapFields.Select(f => f is null ? null : Card(f.Card, own || f.IsFaceUp, null, catalog))),

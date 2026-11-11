@@ -24,6 +24,8 @@ internal sealed record DuelBookkeeping(int NextInstanceId = 1, DuelRandomState? 
     /// <summary>Graveyard redirects and damage rules applied until the end of a turn.</summary>
     public IReadOnlyList<TimedGraveyardRedirect> TimedRedirects { get; init; } = Array.AsReadOnly(Array.Empty<TimedGraveyardRedirect>());
     public IReadOnlyList<TimedDamageRule> TimedDamageRules { get; init; } = Array.AsReadOnly(Array.Empty<TimedDamageRule>());
+    /// <summary>The latest die roll and coin toss, read by later steps of the same effect.</summary>
+    public RandomResult? LastRandom { get; init; }
 }
 
 internal sealed record ActivatedEffectUse(int InstanceId, int TurnNumber, string Key, long? PlacementId = null);

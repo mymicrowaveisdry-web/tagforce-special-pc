@@ -38,7 +38,13 @@ public enum EffectCount
     /// <summary>Cards in the opponent's hand plus every card they control (monster, Spell/Trap and Pendulum zones).</summary>
     OpponentHandAndField,
     OpponentGraveyard,
-    OpponentBanished
+    OpponentBanished,
+    /// <summary>The effect's latest die roll; it cannot be known at activation.</summary>
+    DieRoll,
+    /// <summary>Heads in the effect's latest coin toss; it cannot be known at activation.</summary>
+    Heads,
+    /// <summary>The Level of the monster the effect last sent from the top of the Deck; it cannot be known at activation.</summary>
+    MilledLevel
 }
 
 /// <summary>
@@ -393,6 +399,19 @@ public sealed class EffectDefinition
                     AttachFromStep s => s.Filter is null || !s.Hand && !s.Graveyard,
                     RankUpStep s => s.Into is null || s.RankChange is 0 or < -12 or > 12,
                     ApplyGraveyardRedirectStep s => s.Rule is null || !Enum.IsDefined(s.Rule.To) || !Enum.IsDefined(s.Rule.Owner),
+                    RollDieStep or LookAtOpponentHandStep => false,
+                    TossCoinsStep s => s.Count is < 1 or > 5,
+                    StopUnlessRollStep s => s.Values.Count == 0 || s.Values.Any(v => v is < 1 or > 6),
+                    StopUnlessHeadsStep s => s.Minimum < 1,
+                    ModifyAllUntilEndStep s => s.Attack == 0 && s.Defense == 0 || !Enum.IsDefined(s.Side) || !Enum.IsDefined(s.PerCount),
+                    ChooseFromOpponentHandStep s => !Enum.IsDefined(s.To),
+                    EachPlayerTossesCoinStep s => s.HeadsGain < 0 || s.TailsDamage < 0 || s.HeadsGain == 0 && s.TailsDamage == 0,
+                    DiceDuelStep s => s.PerPip < 1 || s.OnSix < 1,
+                    OpponentCallsRandomHandCardStep or ReturnAttackerToHandStep => false,
+                    StopUnlessHandHoldsStep s => s.Filter is null || !Enum.IsDefined(s.Side),
+                    ExcavateStep s => s.Count is < 1 or > 10,
+                    TakeExcavatedStep => false,
+                    StopUnlessMilledStep s => s.Filter is null,
                     ApplyDamageRuleStep s => s.Rule is null || !Enum.IsDefined(s.Rule.Kind) || (s.Rule.Applies & DamageKinds.Any) == 0 || !Enum.IsDefined(s.Scope),
                     ModifyCombatantStatsStep s => s.Attack == 0 && s.Defense == 0,
                     BanishAllStep s => !Enum.IsDefined(s.Side) || !Enum.IsDefined(s.Filter),
@@ -403,6 +422,19 @@ public sealed class EffectDefinition
                     _ => true
                 })
                 throw new ArgumentException("Steps must be supported Core operations with positive amounts.", nameof(steps));
+        // A step that reads a die roll or coin toss must follow one in the same effect, or it would read an earlier effect's result.
+        int roll = Array.FindIndex(snapshot, s => s is RollDieStep), toss = Array.FindIndex(snapshot, s => s is TossCoinsStep),
+            mill = Array.FindIndex(snapshot, s => s is MillTopOfDeckStep), dig = Array.FindIndex(snapshot, s => s is ExcavateStep);
+        static EffectCount CountOf(EffectStep s) => s switch
+        {
+            GainLifePointsStep g => g.PerCount, DealDamageStep d => d.PerCount, ModifyAllUntilEndStep m => m.PerCount, _ => EffectCount.None
+        };
+        for (int i = 0; i < snapshot.Length; i++)
+            if ((snapshot[i] is StopUnlessRollStep || CountOf(snapshot[i]) == EffectCount.DieRoll) && (roll < 0 || roll > i) ||
+                (snapshot[i] is StopUnlessHeadsStep || CountOf(snapshot[i]) == EffectCount.Heads) && (toss < 0 || toss > i) ||
+                (snapshot[i] is StopUnlessMilledStep || CountOf(snapshot[i]) == EffectCount.MilledLevel) && (mill < 0 || mill > i) ||
+                snapshot[i] is TakeExcavatedStep && (dig < 0 || dig > i))
+                throw new ArgumentException("A die or coin result is read only after the effect rolls or tosses.", nameof(steps));
         var required = (conditions ?? []).Take(9).ToArray();
         if (required.Length > 8 || required.Any(c => c is null) || required.Distinct().Count() != required.Length)
             throw new ArgumentException("Supply up to 8 distinct conditions.", nameof(conditions));
@@ -411,12 +443,12 @@ public sealed class EffectDefinition
         if (required.OfType<BattleTimingCondition>().Any(c => c.Windows == BattleTiming.None || (c.Windows & ~BattleTiming.All) != 0 ||
                 c.Windows.HasFlag(BattleTiming.Calculation) && !c.DuringCalculation))
             throw new ArgumentException("A battle timing condition needs supported timings; during calculation needs an explicit exception.", nameof(conditions));
-        if (cost is not (null or DiscardCost or PayLifePointsCost or TributeCost or PayHalfLifePointsCost or TributeSelfCost or RemoveCounterCost or BanishFromGraveyardCost or DetachCost or SendSelfCost) ||
+        if (cost is not (null or DiscardCost or PayLifePointsCost or TributeCost or PayHalfLifePointsCost or TributeSelfCost or RemoveCounterCost or BanishFromGraveyardCost or DetachCost or SendSelfCost or RevealSelfCost) ||
             cost is TributeSelfCost or RemoveCounterCost or DetachCost && !monsterKind ||
             cost is DiscardCost { Count: < 1 or > 5 } or TributeCost { Count: < 1 or > 5 }) throw new ArgumentOutOfRangeException(nameof(cost));
         if (!Enum.IsDefined(origin) || origin != EffectOrigin.Field && !monsterKind && kind is not (EffectKind.SpellTrapIgnition or EffectKind.SpellTrapQuick) ||
             cost is SendSelfCost self && (!Enum.IsDefined(self.Destination) || origin == EffectOrigin.Field || origin == EffectOrigin.Hand && self.Destination == SelfDestination.Banish ||
-                origin == EffectOrigin.Graveyard && self.Destination != SelfDestination.Banish) ||
+                origin == EffectOrigin.Graveyard && self.Destination != SelfDestination.Banish) || cost is RevealSelfCost && origin != EffectOrigin.Hand ||
             snapshot.Any(s => s is SpecialSummonSelfStep) && origin == EffectOrigin.Field)
             throw new ArgumentException("Hand and Graveyard effects belong to activated effects, with a self-cost that matches where the card is.", nameof(origin));
         if (required.OfType<MonsterWouldBeSummonedCondition>().Any(c => c.Kinds is <= 0 || (c.Kinds & ~(SummonKinds.Normal | SummonKinds.Special)) != 0) ||
@@ -464,7 +496,7 @@ public sealed class EffectDefinition
             snapshot.Any(s => s is AttachFromStep { ToTarget: false }) && (!monsterKind || fields.Length != 0) ||
             snapshot.Any(s => s is AttachTargetsToSelfStep) && (!monsterKind || fields.Any(f => f is not FieldTarget { Kind: FieldCardKind.Monster })))
             throw new ArgumentException("Equip, revival, Union and counter steps need their card kinds and bound targets.", nameof(steps));
-        if (kind == EffectKind.MonsterTrigger && (required.Length != 0 || cost is not null || target is not null || fields is not ([] or [TriggerTargetedMonster] or [TriggerSourceMonster] or [ZoneTarget { MinCount: 1, MaxCount: 1 }]) || locksOtherSummonsThisTurn) ||
+        if (kind == EffectKind.MonsterTrigger && (required.Length != 0 || cost is not null || target is not null || fields is not ([] or [TriggerTargetedMonster] or [TriggerSourceMonster] or [ZoneTarget { MinCount: 1, MaxCount: 1 }] or [FieldTarget { Count: 1, ForTribute: false }]) || locksOtherSummonsThisTurn) ||
             kind != EffectKind.MonsterTrigger && fields.Any(f => f is TriggerTargetedMonster or TriggerSourceMonster))
             throw new ArgumentException("A monster trigger takes its timing and costs from its trigger profile.", nameof(kind));
         EffectId = effectId;

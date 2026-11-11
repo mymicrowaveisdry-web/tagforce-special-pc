@@ -95,6 +95,9 @@ public sealed partial class DuelEngine
                 OpponentAttackDeclaredCondition => State.Battle is { Window.Timing: BattleTiming.AttackDeclaration, Attack: { Cancellation: null } attack } &&
                     attack.Attacker.Player != playerId && attack.Attacker.IsStillPresent(State),
                 MonsterSummonedCondition summoned => SummonedMatches(State, playerId, summoned).Any(),
+                OpponentHandAtLeastCondition hand => State.GetPlayer(Other(playerId)).Hand.Count >= hand.Count,
+                NoSpecialSummonThisTurnCondition => !State.SummonHistory.Any(h => h.Player == playerId && h.TurnNumber == State.TurnNumber &&
+                    h.Status != SummonStatus.Negated && h.Method is SummonMethod.SpecialEffect or SummonMethod.SpecialProcedure or SummonMethod.Token or SummonMethod.Pendulum),
                 BattleTimingCondition timing => State.Battle is { } current && timing.Windows.HasFlag(current.Window.Timing),
                 MonsterWouldBeSummonedCondition would => preceding is null
                     ? State.PendingChain is null && State.PendingSummon is { Negated: false } attempt && (!would.ByOpponent || attempt.Player != playerId) &&
@@ -110,7 +113,8 @@ public sealed partial class DuelEngine
         if (definition.FieldTargets is [AttackingMonsterTarget or DefendingMonsterTarget] && LiveCombatant(State, definition) is null)
             return DuelError.ActivationConditionNotMet;
         // A counted amount needs something to count when activated (it is read again at resolution).
-        if (definition.Counts.Any(count => CountFor(State, playerId, count) == 0)) return DuelError.ActivationConditionNotMet;
+        if (definition.Counts.Any(count => count is not (EffectCount.DieRoll or EffectCount.Heads or EffectCount.MilledLevel) && CountFor(State, playerId, count) == 0))
+            return DuelError.ActivationConditionNotMet;
         if (definition.SummonsMonsters && IsSummonLocked(State, playerId)) return DuelError.SummonLocked;
         if (definition.Cost is PayLifePointsCost pay && player.LifePoints <= pay.Amount) return DuelError.InsufficientLifePoints;
         if (definition.Cost is TributeCost && !player.MonsterZones.Any(m => m is not null)) return DuelError.DecisionUnavailable;
@@ -143,6 +147,7 @@ public sealed partial class DuelEngine
                 DrawCardsStep draw => DrawingPlayers(playerId, draw.Players)
                     .Any(p => State.GetPlayer(p).Deck.Count + (p == playerId ? incoming : 0) < draw.Count),
                 MillTopOfDeckStep mill => player.Deck.Count < mill.Count,
+                ExcavateStep excavate => player.Deck.Count < excavate.Count,
                 AddFromDeckToHandStep search => !DeckMatches(State, playerId, search.Filter).Any(),
                 SendFromDeckToGraveyardStep send => !DeckMatches(State, playerId, send.Filter).Any(),
                 DestroyAllStep all => !FieldMatches(State, playerId, all.Kind, all.Side, all.Filter, card.InstanceId).Any(t => all.Cards is null || MatchesFilter(t.Card, all.Cards)),
@@ -538,6 +543,57 @@ public sealed partial class DuelEngine
                 choice = null;
                 continue;
             }
+            if (step is StopUnlessRollStep or StopUnlessHeadsStep)
+            {
+                var last = state.Bookkeeping.LastRandom;
+                if (step is StopUnlessRollStep roll ? last is not null && roll.Values.Contains(last.Die) : last is not null && last.Heads >= ((StopUnlessHeadsStep)step).Minimum)
+                    continue;
+                events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
+                break;
+            }
+            if (step is ChooseFromOpponentHandStep fromHand)
+            {
+                var options = state.GetPlayer(Other(controller)).Hand.Where(c => fromHand.Filter is null || MatchesFilter(c, fromHand.Filter)).ToArray();
+                if (options.Length == 0) continue;
+                if (choice is not ChooseDefinitionCard taken)
+                    return (state, new PendingDefinitionCardChoice(checked(State.Revision + 1), controller, definition.EffectId, link.Number, i, options));
+                state = MoveFromOpponentHand(state, controller, options.FirstOrDefault(c => c.InstanceId == taken.CardInstanceId) ?? options[0], fromHand.To,
+                    definition.EffectId, events);
+                choice = null;
+                continue;
+            }
+            if (step is StopUnlessHandHoldsStep holds)
+            {
+                if (HandHolds(state, controller, holds)) continue;
+                events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
+                break;
+            }
+            if (step is StopUnlessMilledStep milled)
+            {
+                if (state.Bookkeeping.LastRandom?.Milled is { } top && MatchesFilter(top, milled.Filter)) continue;
+                if (milled.DestroySourceOtherwise) state = DestroyInHand(state, controller, link.Activation.Spell, definition.EffectId, events);
+                events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
+                break;
+            }
+            if (step is TakeExcavatedStep excavated)
+            {
+                var deck = state.GetPlayer(controller).Deck;
+                var options = (state.Bookkeeping.LastRandom?.Excavated ?? []).Where(c => deck.Contains(c) && (excavated.Filter is null || MatchesFilter(c, excavated.Filter))).ToArray();
+                if (options.Length == 0) continue;
+                if (choice is not ChooseDefinitionCard taken)
+                    return (state, new PendingDefinitionCardChoice(checked(State.Revision + 1), controller, definition.EffectId, link.Number, i, options));
+                state = TakeFromDeck(state, controller, options.FirstOrDefault(c => c.InstanceId == taken.CardInstanceId) ?? options[0], definition.EffectId, events);
+                choice = null;
+                continue;
+            }
+            if (step is OpponentCallsRandomHandCardStep)
+            {
+                (state, var call, bool stop) = CallRandomHandCard(state, link, definition, i, choice, events);
+                if (call is not null) return (state, call);
+                choice = null;
+                if (stop) break;
+                continue;
+            }
             if (step is StopUnlessNoOwnMonstersStep)
             {
                 if (state.GetPlayer(controller).MonsterZones.All(m => m is null)) continue;
@@ -753,7 +809,15 @@ public sealed partial class DuelEngine
                     ShuffleDeckStep => ShuffleDeck(state, controller, definition.EffectId, events),
                     GrantNormalSummonStep => GrantNormalSummon(state, definition.EffectId, events),
                     ApplyRuleLockStep apply => ApplyTimedLock(state, controller, apply.Lock, definition.EffectId, events),
+                    EachPlayerTossesCoinStep coins => EachPlayerTosses(state, controller, coins, definition.EffectId, events),
+                    DiceDuelStep dice => DiceDuel(state, controller, dice, definition.EffectId, events),
+                    ExcavateStep excavate => Excavate(state, controller, excavate.Count, definition.EffectId, events),
+                    ReturnAttackerToHandStep => ReturnAttacker(state, link, definition.EffectId, events),
                     ApplyGraveyardRedirectStep redirect => AddTimedRedirect(state, controller, redirect.Rule),
+                    RollDieStep => RollDie(state, controller, definition.EffectId, events),
+                    TossCoinsStep coins => TossCoins(state, controller, coins.Count, definition.EffectId, events),
+                    ModifyAllUntilEndStep all => ModifyAllUntilEnd(state, controller, all, definition.EffectId, events),
+                    LookAtOpponentHandStep look => LookAtOpponentHand(state, controller, look.IncludeSetCards, definition.EffectId, events),
                     ApplyDamageRuleStep damageRule => AddTimedDamageRule(state, controller, damageRule),
                     ReturnSourceToDeckTopStep => ReturnSourceToDeckTop(state, link, definition.EffectId, events),
                     DestroyTargetStep => DestroyTarget(state, link, events),
@@ -765,7 +829,7 @@ public sealed partial class DuelEngine
                         ? NegateLink(state, links, link, ChainNegation.Activation, true, events) : ResolveSummonNegation(state, link, events),
                     DrawCardsStep draw => DrawingPlayers(controller, draw.Players)
                         .Aggregate(state, (s, p) => s.Outcome is null ? DrawCards(s, p, draw.Count, events) : s),
-                    MillTopOfDeckStep mill => MillTop(state, controller, mill.Count, definition.EffectId, events),
+                    MillTopOfDeckStep mill => MillAndRecord(state, controller, mill.Count, definition.EffectId, events),
                     DestroyAllStep all => FieldMatches(state, controller, all.Kind, all.Side, all.Filter, link.Activation.Spell.InstanceId)
                         .Where(t => all.Cards is null || MatchesFilter(t.Card, all.Cards)).ToArray().Aggregate(state, (s, t) => DestroyFieldCard(s, t, events)),
                     ReturnAllToHandStep all => FieldMatches(state, controller, all.Kind, all.Side, FieldCardFilter.Any, link.Activation.Spell.InstanceId)
@@ -1337,6 +1401,9 @@ public sealed partial class DuelEngine
                 opponent.SpellTrapFields.Count(f => f is not null) + opponent.PendulumZones.Count(f => f is not null) + (opponent.FieldSpell is null ? 0 : 1),
             EffectCount.OpponentGraveyard => opponent.Graveyard.Count,
             EffectCount.OpponentBanished => opponent.Banished.Count,
+            EffectCount.DieRoll => state.Bookkeeping.LastRandom?.Die ?? 0,
+            EffectCount.Heads => state.Bookkeeping.LastRandom?.Heads ?? 0,
+            EffectCount.MilledLevel => state.Bookkeeping.LastRandom?.MilledLevel ?? 0,
             _ => throw new ArgumentOutOfRangeException(nameof(count))
         };
     }

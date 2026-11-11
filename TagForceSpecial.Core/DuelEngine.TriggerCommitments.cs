@@ -26,6 +26,12 @@ public sealed partial class DuelEngine
             .Select(e => e.Binding);
     }
 
+    /// <summary>Field cards a trigger's own target can choose, excluding cards that cannot be targeted.</summary>
+    private IEnumerable<FieldCardTarget> TriggerFieldTargets(DuelState state, TriggerActivation trigger, FieldTarget spec) =>
+        FieldMatches(state, trigger.Player, spec.Kind, spec.Side, spec.Filter, null).Where(t => TargetPasses(state, spec, t) &&
+            !RuleLocked(state, LockedAction.BeTargeted, t.Player, t.Card, t.Location == FieldLocation.MonsterZone ? state.GetPlayer(t.Player).MonsterZones[t.Zone] : null,
+                targeter: trigger.Player, byCategory: rules[trigger.Source.Card.GameCardId].Category));
+
     private DuelActionResult OrderTriggers(ChooseTriggerOrder command)
     {
         var batch = State.EventEffects.PendingTriggers!;
@@ -75,6 +81,9 @@ public sealed partial class DuelEngine
             if (trigger is { TargetCard: null, Profile.Definition.FieldTargets: [ZoneTarget zone] })
                 return RequestTriggerCommitment(next, remaining, committed, queue,
                     new(checked(State.Revision + 1), trigger, TriggerCommitmentKind.ZoneTarget, zones: ZoneMatches(next, trigger.Player, zone)), events);
+            if (trigger is { TargetCard: null, Profile.Definition.FieldTargets: [FieldTarget field] })
+                return RequestTriggerCommitment(next, remaining, committed, queue,
+                    new(checked(State.Revision + 1), trigger, TriggerCommitmentKind.ZoneTarget, zones: TriggerFieldTargets(next, trigger, field)), events);
             if (trigger.Profile.DetachMaterialCount != 0 && trigger.DetachedCost.Count == 0)
                 return RequestTriggerCommitment(next, remaining, committed, queue,
                     new(checked(State.Revision + 1), trigger, TriggerCommitmentKind.DetachCost,
@@ -112,7 +121,7 @@ public sealed partial class DuelEngine
         {
             [TriggerTargetedMonster] when trigger.Target is { } target => [new(target.Player, FieldLocation.MonsterZone, target.Zone, target.Card, target.PlacementId)],
             [TriggerSourceMonster] => [new(trigger.Source.Player, FieldLocation.MonsterZone, trigger.Source.Zone, trigger.Source.Card, trigger.Source.PlacementId)],
-            [ZoneTarget] when trigger.TargetCard is { } card => [card],
+            [ZoneTarget or FieldTarget] when trigger.TargetCard is { } card => [card],
             _ => null
         };
         return new(number, new(trigger.Player, trigger.Profile.EffectId, trigger.Source.Card, trigger.Source.Zone, trigger.DiscardedCost, null, bound),

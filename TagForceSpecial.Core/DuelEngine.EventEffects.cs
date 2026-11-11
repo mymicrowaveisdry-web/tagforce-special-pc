@@ -39,6 +39,10 @@ public sealed partial class DuelEngine
             state.GetPlayer(trigger.Player).MonsterZones[trigger.Source.Zone]!.XyzMaterials.Count < trigger.Profile.DetachMaterialCount) return false;
         if (trigger.Profile is { Requirement: TriggerRequirement.Optional, Definition: { } definition } && !DefinitionTriggerAvailable(state, trigger, definition)) return false;
         if (trigger is { TargetCard: null, Profile.Definition.FieldTargets: [ZoneTarget zone] } && !ZoneMatches(state, trigger.Player, zone).Any()) return false;
+        if (trigger is { TargetCard: null, Profile.Definition.FieldTargets: [FieldTarget field] } && !TriggerFieldTargets(state, trigger, field).Any()) return false;
+        // A leading hand check is also the trigger's activation condition.
+        if (trigger.Profile.Definition?.Steps is [StopUnlessHandHoldsStep holds, ..] && !HandHolds(state, trigger.Player, holds)) return false;
+        if (trigger.Profile.Definition?.Steps is [OpponentCallsRandomHandCardStep, ..] && state.GetPlayer(trigger.Player).Hand.Count == 0) return false;
         if (trigger.Profile.TributeCost && trigger.TributedCost is null &&
             !FieldMonsters(state).Any(e => e.Binding.Player == trigger.Player && !e.Monster.BattleDestroyed && !RuleLocked(state, LockedAction.BeTributed, e.Binding.Player, e.Monster.Card, e.Monster))) return false;
         if (trigger.DiscardedCost is not null || trigger.PaidLifePoints > 0 || trigger.DetachedCost.Count > 0) return true;
@@ -102,6 +106,17 @@ public sealed partial class DuelEngine
         if (kind == MonsterEventKind.FlipSummoned) yield return new(MonsterEventKind.FlippedFaceUp, subject, point);
     }
 
+    /// <summary>An attack declaration, with the attacker as subject; and on entering the Standby Phase, one per face-up Spell or Trap.</summary>
+    private IEnumerable<MonsterEventOccurrence> AttackAndStandbyOccurrences(DuelState before, DuelState after, DuelEvent emitted)
+    {
+        var point = new EffectTimingPoint(checked(State.Revision + 1), emitted.TimingGroup ?? 0);
+        if (emitted is AttackDeclared declared && before.GetPlayer(declared.Player).MonsterZones[declared.AttackerZone] is { } attacker)
+            yield return new(MonsterEventKind.AttackDeclared, new(declared.Player, declared.AttackerZone, attacker.Card, attacker.PlacementId), point);
+        if (emitted is PhaseChanged { To: DuelPhase.Standby })
+            foreach (var (_, _, field) in ActiveCards(after))
+                yield return new(MonsterEventKind.StandbyPhase, new(after.ActivePlayer, -1, field.Card, field.PlacementId), point);
+    }
+
     /// <summary>On entering the End Phase, one occurrence per face-up monster Summoned or flipped face-up this turn.</summary>
     private IEnumerable<MonsterEventOccurrence> EndPhaseOccurrences(DuelState after, DuelEvent emitted)
     {
@@ -136,7 +151,7 @@ public sealed partial class DuelEngine
             events.OfType<MonsterRevealed>().Any(e => e.Card == entry.Monster.Card)
                 ? (entry.Binding, entry.Monster with { Position = BattlePosition.FaceUpDefense }) : entry).ToArray();
         foreach (var emitted in events)
-            foreach (var occurrence in Occurrences(before, emitted).Concat(EndPhaseOccurrences(after, emitted)))
+            foreach (var occurrence in Occurrences(before, emitted).Concat(EndPhaseOccurrences(after, emitted)).Concat(AttackAndStandbyOccurrences(before, after, emitted)))
             {
                 var sources = emitted is MonsterDestroyed or MonsterTributed or SummonMaterialSentToGraveyard or
                     FusionMaterialSentToGraveyard or RitualMaterialTributed or XyzMaterialSentToGraveyard { IsCost: false }
@@ -150,7 +165,9 @@ public sealed partial class DuelEngine
                         foreach (var (owner, zone, field) in ActiveCards(after).Where(e => e.Field.Card.GameCardId == profile.CardId))
                         {
                             MonsterBinding source = new(owner, zone, field.Card, field.PlacementId);
-                            if (Relates(profile.Relation, source, occurrence.Subject)) yield return new(id++, profile, source, occurrence);
+                            if (Relates(profile.Relation, source, occurrence.Subject) &&
+                                (occurrence.Kind != MonsterEventKind.StandbyPhase || occurrence.Subject.Card == field.Card))
+                                yield return new(id++, profile, source, occurrence);
                         }
                         continue;
                     }

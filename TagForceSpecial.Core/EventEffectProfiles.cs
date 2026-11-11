@@ -4,7 +4,11 @@ public enum MonsterEventKind { NormalSummoned, SpecialSummoned, FlipSummoned, De
     /// <summary>The End Phase of a turn this face-up monster was Summoned or flipped face-up.</summary>
     EndPhaseAfterSummonOrFlip,
     /// <summary>This monster destroyed an opponent's monster by battle and sent it to the Graveyard.</summary>
-    DestroyedOpponentByBattle }
+    DestroyedOpponentByBattle,
+    /// <summary>A monster declared an attack; the attacker is the subject.</summary>
+    AttackDeclared,
+    /// <summary>A Standby Phase began; the turn player is the subject's player. Only face-up Spells and Traps use it.</summary>
+    StandbyPhase }
 /// <summary>Narrows a Destroyed or SentToGraveyard event by where it came from or what caused it.</summary>
 public enum TriggerEventCause { Any, FromField, ByBattle }
 public enum EffectRelation { Self, Controller, Opponent, Any }
@@ -152,6 +156,8 @@ public sealed class TriggerEffectProfile
         if (eventKind is MonsterEventKind.EndPhaseAfterSummonOrFlip or MonsterEventKind.DestroyedOpponentByBattle && (sourceLocation != TriggerSourceLocation.FaceUpMonster || relation != EffectRelation.Self) ||
             requiresGeminiActive && sourceLocation != TriggerSourceLocation.FaceUpMonster)
             throw new ArgumentException("This trigger needs its face-up source.");
+        if (eventKind == MonsterEventKind.StandbyPhase && (sourceLocation != TriggerSourceLocation.FaceUpSpellTrap || relation == EffectRelation.Self))
+            throw new ArgumentException("A Standby Phase trigger belongs to a face-up Spell or Trap.");
         if (cause != TriggerEventCause.Any && eventKind is not (MonsterEventKind.Destroyed or MonsterEventKind.SentToGraveyard))
             throw new ArgumentException("Only destruction and Graveyard events have a cause.");
         if (definition is not null && definition.Kind != EffectKind.MonsterTrigger)

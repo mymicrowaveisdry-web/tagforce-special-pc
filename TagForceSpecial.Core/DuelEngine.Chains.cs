@@ -16,9 +16,11 @@ public sealed partial class DuelEngine
             };
         if (chain.DefinitionCardChoice is not null)
             return command is ChooseDefinitionCard card ? AnswerDefinitionCardChoice(chain, card) : Reject(DuelError.DecisionPending);
+        if (chain.DefinitionChoice is PendingTypeCall typeCall)
+            return command is CallCardType call ? AnswerTypeCall(chain, typeCall, call) : Reject(DuelError.DecisionPending);
         if (chain.ReplacementChoice is { } replacement)
             return command is ChooseDestructionReplacement answer ? AnswerChainReplacement(chain, replacement, answer) : Reject(DuelError.DecisionPending);
-        if (command is ChooseEffectSummon or ChooseDefinitionSummon or FinishDefinitionSummon or ChooseDefinitionCard or ChooseDestructionReplacement) return Reject(DuelError.NoPendingDecision);
+        if (command is ChooseEffectSummon or ChooseDefinitionSummon or FinishDefinitionSummon or ChooseDefinitionCard or ChooseDestructionReplacement or CallCardType) return Reject(DuelError.NoPendingDecision);
         if (State.PendingDecision is not null)
             return command is DecisionCommand answer ? AnswerDecision(answer) : Reject(DuelError.DecisionPending);
         if (command is DecisionCommand) return Reject(DuelError.NoPendingDecision);
@@ -123,6 +125,7 @@ public sealed partial class DuelEngine
                         {
                             PendingDefinitionSummon summon => new DefinitionSummonRequested(summon),
                             PendingDefinitionCardChoice card => new DefinitionCardChoiceRequested(card),
+                            PendingTypeCall call => new TypeCallRequested(call),
                             PendingReplacementChoice replacement => new DestructionReplacementRequested(replacement.Replacement),
                             _ => throw new InvalidOperationException("Unknown definition choice.")
                         }]);

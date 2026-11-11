@@ -45,8 +45,8 @@ public sealed class DuelActionSource
             }
         }
         AuthorizedDecision? decision = state.EventEffects.PendingCommitment is { } commitment && commitment.Player == player
-            // Target options can be face-down, so only the chooser's cost cards are listed.
-            ? new(commitment.DecisionId, "TriggerCommitment", PlayerProjection.Read(commitment.CardOptions.Concat(commitment.ZoneOptions.Select(o => o.Card)).Select(c => PlayerProjection.Card(c, true, null, catalog))))
+            // Target options can be face-down, so only cost cards and public or face-up targets are listed.
+            ? new(commitment.DecisionId, "TriggerCommitment", PlayerProjection.Read(commitment.CardOptions.Concat(commitment.ZoneOptions.Where(o => Shown(state, o, player)).Select(o => o.Card)).Select(c => PlayerProjection.Card(c, true, null, catalog))))
             : state.EventEffects.PendingCommitment is null && state.EventEffects.PendingTriggers is { } triggers && triggers.Player == player
             ? new(triggers.DecisionId, "TriggerOrder", PlayerProjection.Read(triggers.Options.Select(t => PlayerProjection.Card(t.Source.Card, true, null, catalog))))
             : state.PendingDecision is { } d && d.Player == player
@@ -62,6 +62,8 @@ public sealed class DuelActionSource
             : state.PendingChain?.DefinitionCardChoice is { } pick && pick.Player == player
                 ? new(pick.DecisionId, "DefinitionCard", PlayerProjection.Read(pick.Options
                     .Select(c => PlayerProjection.Card(c, true, null, catalog))))
+            : state.PendingChain?.DefinitionChoice is PendingTypeCall call && call.Player == player
+                ? new(call.DecisionId, "TypeCall", PlayerProjection.Read(Array.Empty<CardView>()))
             : state.OpenWindow is { } window && actor == player ? new(window.DecisionId, "OpenWindow", PlayerProjection.Read(Array.Empty<CardView>()))
             : state.PendingChain is null && state.PendingSummon is { } attempt && actor == player
                 ? new(attempt.DecisionId, "SummonWindow", PlayerProjection.Read(Array.Empty<CardView>()))
@@ -70,7 +72,7 @@ public sealed class DuelActionSource
                 battle.Attack?.ReplayRequired == true && battle.Window.Closed ? "AttackReplay" : "Battle", PlayerProjection.Read(Array.Empty<CardView>())) : null;
         var view = new DuelObservation(state.Revision, player, actor, state.ActivePlayer, state.TurnNumber, state.Phase,
             PlayerProjection.Create(state, player, player, catalog),
-            PlayerProjection.Create(state, Other(player), player, catalog), decision, status, unsupported,
+            PlayerProjection.Create(state, Other(player), player, catalog, engine.HandRevealed(Other(player))), decision, status, unsupported,
             PlayerProjection.Read(commands.Select(c => c.Action)), state.Outcome);
         cache[player] = (view, commands);
         return view;
@@ -104,6 +106,17 @@ public sealed class DuelActionSource
         int? target = null, BattlePosition? position = null, DuelPhase? phase = null, PlayerId? targetPlayer = null)
         => new(command, new(0, $"{kind}|{card}|{zone}|{target}|{position}|{phase}|{targetPlayer}", kind, label, card, zone, target, position, phase));
 
+    /// <summary>Graveyard and banished cards are public; a field card is shown to its controller or while face-up.</summary>
+    private static bool Shown(DuelState state, FieldCardTarget option, PlayerId viewer) => option.Location switch
+    {
+        FieldLocation.Graveyard or FieldLocation.Banished => true,
+        _ when option.Player == viewer => true,
+        FieldLocation.MonsterZone => state.GetPlayer(option.Player).MonsterZones[option.Zone] is { Position: not BattlePosition.FaceDownDefense },
+        FieldLocation.PendulumZone => true,
+        _ => option.Zone == DuelPlayerState.FieldZoneIndex ? state.GetPlayer(option.Player).FieldSpell is { IsFaceUp: true }
+            : state.GetPlayer(option.Player).SpellTrapFields[option.Zone] is { IsFaceUp: true }
+    };
+
     private IEnumerable<Bound> CommitmentActions(PendingTriggerCommitment commitment, PlayerId player)
     {
         if (commitment.Kind == TriggerCommitmentKind.DiscardCost)
@@ -111,8 +124,12 @@ public sealed class DuelActionSource
                 yield return B(new ChooseTriggerCostCard(player, commitment.DecisionId, card.InstanceId), ActionKind.ChooseCard,
                     $"Discard {catalog[card.GameCardId].Name}", card.InstanceId);
         foreach (var option in commitment.ZoneOptions)
-            yield return B(new ChooseTriggerZoneTarget(player, commitment.DecisionId, option.Player, option.Card.InstanceId), ActionKind.ChooseCard,
-                $"Target {catalog[option.Card.GameCardId].Name}", option.Card.InstanceId);
+            yield return option.Location is FieldLocation.Graveyard or FieldLocation.Banished
+                ? B(new ChooseTriggerZoneTarget(player, commitment.DecisionId, option.Player, option.Card.InstanceId), ActionKind.ChooseCard,
+                    $"Target {catalog[option.Card.GameCardId].Name}", option.Card.InstanceId)
+                // Field targets are bound by zone so a face-down card is not revealed.
+                : B(new ChooseTriggerZoneTarget(player, commitment.DecisionId, option.Player, option.Card.InstanceId), ActionKind.ChooseTarget,
+                    $"Target P{(int)option.Player + 1} {option.Location} {option.Zone + 1}", null, (int)option.Location, option.Zone, targetPlayer: option.Player);
         // Bound by zone only: a target can be face-down.
         foreach (var target in commitment.TargetOptions)
             yield return B(new ChooseTriggerMonsterTarget(player, commitment.DecisionId, target.Player, target.Zone, target.Card.InstanceId), ActionKind.ChooseTarget,
@@ -257,6 +274,12 @@ public sealed class DuelActionSource
                             ActionKind.ChooseCard, $"Summon {catalog[option.Card.GameCardId].Name} ({option.Source}) [{zone + 1}] {position}",
                             option.Card.InstanceId, zone, position: position);
             if (summon.CanFinish) yield return B(new FinishDefinitionSummon(player, summon.DecisionId), ActionKind.FinishChoice, "Done");
+            yield break;
+        }
+        if (state.PendingChain?.DefinitionChoice is PendingTypeCall call)
+        {
+            foreach (var category in call.Options)
+                yield return B(new CallCardType(player, call.DecisionId, category), ActionKind.ChooseCard, $"Call {category}", target: (int)category);
             yield break;
         }
         if (state.PendingChain?.DefinitionCardChoice is { } pick)

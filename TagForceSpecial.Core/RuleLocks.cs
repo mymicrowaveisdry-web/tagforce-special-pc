@@ -23,7 +23,9 @@ public enum LockedAction
     BeBanished = 32768,
     BeReturnedToHand = 65536,
     BeReturnedToDeck = 131072,
-    Draw = 262144
+    Draw = 262144,
+    /// <summary>Keeping the hand hidden: the locked side plays with its hand revealed.</summary>
+    HideHand = 524288
 }
 
 /// <summary>Who or what a lock applies to.</summary>

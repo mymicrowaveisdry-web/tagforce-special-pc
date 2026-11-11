@@ -146,6 +146,15 @@ public sealed class CardTable(string prefix)
         new(id, name, trap ? CardKind.Trap : CardKind.Spell, trap ? TrapKind : SpellKind, IconContinuous, trap ? TrapRules : SpellRules,
             [new EffectDefinition(Effect(id, "continuous"), id, trap ? EffectKind.ContinuousTrap : EffectKind.ContinuousSpell, [], isMarker: true)], exceptions) { Locks = [Locked(id, rule)] };
 
+    /// <summary>A Continuous card with a "cannot" rule that also triggers in each Standby Phase of the player on <paramref name="standbyOf"/>.</summary>
+    public AuthoredCard ContinuousLock(uint id, string name, bool trap, RuleLock rule, EffectRelation standbyOf, EffectStep[] standby, string exceptions = "none")
+    {
+        var trigger = new EffectDefinition(Effect(id, "standby"), id, EffectKind.MonsterTrigger, standby);
+        var card = ContinuousLock(id, name, trap, rule, exceptions);
+        return card with { Definitions = Array.AsReadOnly([.. card.Definitions, trigger]),
+            Triggers = [new TriggerEffectProfile(trigger, MonsterEventKind.StandbyPhase, standbyOf, TriggerRequirement.Mandatory, TriggerSourceLocation.FaceUpSpellTrap)] };
+    }
+
     /// <summary>An Equip Spell whose effect is a "cannot" rule on the equipped monster.</summary>
     public AuthoredCard EquipLock(uint id, string name, LockedAction actions, CardFilter? only = null)
     {
@@ -207,10 +216,11 @@ public sealed class CardTable(string prefix)
     }
 
     /// <summary>"When this card is Summoned": separate triggers for Normal, Flip and Special Summons.</summary>
-    public AuthoredCard WhenSummoned(uint id, string name, EffectStep[] steps, TriggerRequirement requirement = TriggerRequirement.Mandatory, string exceptions = "none")
+    public AuthoredCard WhenSummoned(uint id, string name, EffectStep[] steps, TriggerRequirement requirement = TriggerRequirement.Mandatory, string exceptions = "none",
+        EffectTarget[]? targets = null)
     {
         (MonsterEventKind Event, string Role)[] events = [(MonsterEventKind.NormalSummoned, "normal"), (MonsterEventKind.FlipSummoned, "flip"), (MonsterEventKind.SpecialSummoned, "special")];
-        var definitions = events.Select(e => new EffectDefinition(Effect(id, e.Role), id, EffectKind.MonsterTrigger, steps)).ToArray();
+        var definitions = events.Select(e => new EffectDefinition(Effect(id, e.Role), id, EffectKind.MonsterTrigger, steps, fieldTargets: targets)).ToArray();
         return new(id, name, CardKind.Monster, EffectMonsterKind, IconNormal, MonsterRules, definitions, exceptions)
         {
             Triggers = definitions.Zip(events, (d, e) => new TriggerEffectProfile(d, e.Event, EffectRelation.Self, requirement, timing: TriggerTiming.When)).ToArray()

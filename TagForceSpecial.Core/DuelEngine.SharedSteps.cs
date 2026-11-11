@@ -174,6 +174,7 @@ public sealed partial class DuelEngine
                 paid.Add(new ActivationCostPaid(playerId, definition.EffectId, card));
             }
         }
+        if (definition.Cost is RevealSelfCost) paid.Add(new CardsRevealed(playerId, Array.AsReadOnly(new[] { card }), definition.EffectId));
         var (charged, head) = PayLifePointCost(next, playerId, definition, [.. paid]);
         return ContinueCommit(charged, head, playerId, card, -1, definition, 0, chain);
     }

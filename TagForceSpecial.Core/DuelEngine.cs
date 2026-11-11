@@ -110,7 +110,7 @@ public sealed partial class DuelEngine
         if (eventIds.Distinct(StringComparer.Ordinal).Count() != eventIds.Length)
             throw new ArgumentException("Event effect IDs must be distinct and unreserved.");
         // Battle flips activate after damage calculation, which only the staged flow has.
-        this.experimentalBattleFlow = experimentalBattleFlow || triggerEffects.Any(p => p is { EventKind: MonsterEventKind.FlippedFaceUp, Definition: not null });
+        this.experimentalBattleFlow = experimentalBattleFlow || triggerEffects.Any(p => p is { EventKind: MonsterEventKind.FlippedFaceUp or MonsterEventKind.AttackDeclared, Definition: not null });
         summonLevelModifiers = (experimentalSummonLevelModifiers ?? []).ToArray();
         var procedures = (experimentalTributeProcedures ?? []).ToArray();
         var windows = (experimentalSummonWindows ?? []).ToArray();
@@ -292,7 +292,7 @@ public sealed partial class DuelEngine
         if (State.PendingSummon is not null) return ExecuteSummonWindow(command);
         if (command is PassSummonResponse or ActivateSummonNegation) return Reject(DuelError.NoPendingSummon);
         if (command is PassChainResponse or ActivateChainResponse or ActivateHandChainResponse or ActivateMonsterChainResponse or ActivateZoneEffectResponse or ActivateFieldEffectResponse or ResolveNextChainLink or
-            ChooseEffectSummon or ChooseDefinitionSummon or FinishDefinitionSummon or ChooseDefinitionCard) return Reject(DuelError.NoPendingChain);
+            ChooseEffectSummon or ChooseDefinitionSummon or FinishDefinitionSummon or ChooseDefinitionCard or CallCardType) return Reject(DuelError.NoPendingChain);
         // A definition answering its cost/target decisions before its first link exists (hand, set or open-window
         // activation); the decision may belong to the non-turn player.
         if (State.PendingDecision is not null && State.PendingSpellActivation is { } activating &&
