@@ -20,6 +20,9 @@ public sealed partial class DuelEngine
     private DuelActionResult ExecuteBattleFlow(DuelCommand command)
     {
         var battle = State.Battle!;
+        if (battle.Replacement is { } replacement)
+            return command is ChooseDestructionReplacement answer ? AnswerBattleReplacement(battle, replacement, answer) : Reject(DuelError.DecisionPending);
+        if (command is ChooseDestructionReplacement) return Reject(DuelError.NoPendingDecision);
         if (command is PassBattleResponse pass)
         {
             if (pass.DecisionId != battle.Window.DecisionId) return Reject(DuelError.StaleBattleDecision);
@@ -225,9 +228,15 @@ public sealed partial class DuelEngine
         return Accept(next.WithBattle(old with { Step = step, DamageStep = damage, Window = window }), events.ToArray());
     }
 
-    private DuelActionResult CalculateStagedDamage()
+    private DuelActionResult CalculateStagedDamage(IReadOnlyList<ReplacementDecision>? answers = null)
     {
-        var battle = State.Battle!; var attack = battle.Attack!; var next = State;
+        try { return CalculateStagedDamageCore(answers); }
+        finally { replacementContext = null; }
+    }
+
+    private DuelActionResult CalculateStagedDamageCore(IReadOnlyList<ReplacementDecision>? answers)
+    {
+        var battle = State.Battle! with { Replacement = null }; var attack = battle.Attack!; var next = State;
         List<DuelEvent> events = [];
         BattleDamageCalculation? calculation = null;
         if (attack.Cancellation is null && attack.Attacker.IsStillPresent(next) &&
@@ -242,6 +251,18 @@ public sealed partial class DuelEngine
                 return Reject(DuelError.UnsupportedBattleStatistics);
             calculation = CalculateBasicBattle(value, defending, defender?.Position, attack.Attacker.Player, Other(attack.Attacker.Player),
                 GetBattleAbilities(next, attack.Attacker.Player, attacker).Piercing);
+            FieldCardTarget[] batch = [.. new[] { calculation.DestroyAttacker ? attack.Attacker : null, calculation.DestroyDefender ? attack.Defender : null }
+                .OfType<MonsterBinding>().Select(b => new FieldCardTarget(b.Player, FieldLocation.MonsterZone, b.Zone, b.Card, b.PlacementId))];
+            if (batch.Length != 0)
+            {
+                // Optional replacements are answered before calculation; nothing can happen between it and the destruction.
+                if (answers is null && OptionalOffers(next, batch, DestructionCause.Battle) is { Count: > 0 } offers)
+                {
+                    var pending = new PendingReplacement(checked(State.Revision + 1), offers, []);
+                    return Accept(State.WithBattle(battle with { Replacement = pending }), new DestructionReplacementRequested(pending));
+                }
+                replacementContext = new(batch, answers ?? []);
+            }
             events.Add(new BattleDamageCalculated(attack.Id, calculation));
             if (calculation.Damage > 0)
             {

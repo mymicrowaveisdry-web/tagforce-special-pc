@@ -26,8 +26,9 @@ public sealed record AuthoredCard(uint Id, string Name, CardKind Kind, uint Gett
     public IReadOnlyList<TriggerEffectProfile> Triggers { get; init; } = [];
     public IReadOnlyList<RuleLockProfile> Locks { get; init; } = [];
     public IReadOnlyList<BattleAbilityProfile> BattleAbilities { get; init; } = [];
+    public IReadOnlyList<DestructionReplacementProfile> Replacements { get; init; } = [];
     /// <summary>Everything the card's reviewed metadata refers to.</summary>
-    public IEnumerable<string> References => Definitions.Select(d => d.EffectId).Concat(Locks.Select(l => l.EffectId)).Concat(BattleAbilities.Select(p => p.EffectId));
+    public IEnumerable<string> References => Definitions.Select(d => d.EffectId).Concat(Locks.Select(l => l.EffectId)).Concat(BattleAbilities.Select(p => p.EffectId)).Concat(Replacements.Select(r => r.EffectId));
 }
 
 /// <summary>One option of a card whose effects are chosen at activation.</summary>
@@ -151,6 +152,23 @@ public sealed class CardTable(string prefix)
     }
 
     /// <summary>A monster whose only effect is a "cannot" rule while it is face-up.</summary>
+    /// <summary>A destruction replacement for <see cref="ReplacementCard"/> or <see cref="MonsterReplacement"/>; the builder fills in its ID and card.</summary>
+    public static DestructionReplacementProfile Instead(ReplacementSubject subject, ReplacementCost cost, DestructionCause cause = DestructionCause.Any,
+        bool optional = true, bool oncePerTurn = false, CardFilter? cards = null, TargetSide side = TargetSide.Own, bool all = false, bool onlyIfSole = false) =>
+        new("", 0, subject, cost, cause, optional, oncePerTurn, cards, side, all, onlyIfSole);
+
+    private DestructionReplacementProfile Replacing(uint id, DestructionReplacementProfile replacement) => replacement with { EffectId = Effect(id, "replacement"), CardId = id };
+
+    /// <summary>A Continuous or Field Spell or Trap whose only effect replaces destruction while it stays face-up.</summary>
+    public AuthoredCard ReplacementCard(uint id, string name, bool trap, bool field, DestructionReplacementProfile replacement, string exceptions = "none") =>
+        new(id, name, trap ? CardKind.Trap : CardKind.Spell, trap ? TrapKind : SpellKind, field ? IconField : IconContinuous, trap ? TrapRules : SpellRules,
+            [new EffectDefinition(Effect(id, field ? "field" : "continuous"), id, field ? EffectKind.FieldSpell : trap ? EffectKind.ContinuousTrap : EffectKind.ContinuousSpell, [],
+                isMarker: true)], exceptions) { Replacements = [Replacing(id, replacement)] };
+
+    /// <summary>A monster whose only effect replaces destruction while it is face-up.</summary>
+    public AuthoredCard MonsterReplacement(uint id, string name, DestructionReplacementProfile replacement, uint getterKind = EffectMonsterKind, string exceptions = "none") =>
+        new(id, name, CardKind.Monster, getterKind, IconNormal, TributeMonsterRules, [], exceptions) { Replacements = [Replacing(id, replacement)] };
+
     public AuthoredCard MonsterLock(uint id, string name, RuleLock rule, uint getterKind = EffectMonsterKind, string exceptions = "none") =>
         new(id, name, CardKind.Monster, getterKind, IconNormal, TributeMonsterRules, [], exceptions) { Locks = [Locked(id, rule)] };
 
@@ -224,7 +242,8 @@ public sealed class CardTable(string prefix)
             Definitions = Array.AsReadOnly(definitions),
             Triggers = Array.AsReadOnly(cards.SelectMany(c => c.Triggers).ToArray()),
             RuleLocks = Array.AsReadOnly(cards.SelectMany(c => c.Locks).ToArray()),
-            BattleAbilities = Array.AsReadOnly(cards.SelectMany(c => c.BattleAbilities).ToArray())
+            BattleAbilities = Array.AsReadOnly(cards.SelectMany(c => c.BattleAbilities).ToArray()),
+            DestructionReplacements = Array.AsReadOnly(cards.SelectMany(c => c.Replacements).ToArray())
         };
     }
 
@@ -249,6 +268,7 @@ public sealed class CardTable(string prefix)
         string detail = effect.Kind == EffectKind.FieldSpell || effect.LastingModifiers.Count != 0 ? $" Lasting: {Describe(effect.LastingModifiers)}." : "";
         return new(card.Id, card.Name, card.Kind, effect,
             string.Join(" Or: ", card.Definitions.Select(d => $"{d.Kind}: {Describe(d.Steps)}.")) + detail + (card.Locks.Count == 0 ? "" : $" Rules: {Describe(card.Locks.Select(l => l.Lock))}.")
+                + (card.Replacements.Count == 0 ? "" : $" Replacement: {Describe(card.Replacements.Select(r => r with { EffectId = "", CardId = 0 }))}.")
                 + (card.BattleAbilities.Count == 0 ? "" : $" Battle: {Describe(card.BattleAbilities.Select(p => p.Abilities))}.")
                 + (card.Definitions.Select(d => d.NameLimit).FirstOrDefault(l => l is not null) is { } named ? $" Limit: {named.Counts} by name, once per {(named.PerDuel ? "Duel" : "turn")}." : ""),
             card.Definitions.Count == 0 && card.BattleAbilities.Count != 0 ? "Continuous while the source is face-up and not negated."

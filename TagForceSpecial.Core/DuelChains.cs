@@ -45,6 +45,8 @@ public sealed class PendingChain
     public PendingDefinitionSummon? DefinitionSummon => definitionChoice as PendingDefinitionSummon;
     /// <summary>A definition step paused for its resolution-time Deck card choice.</summary>
     public PendingDefinitionCardChoice? DefinitionCardChoice => definitionChoice as PendingDefinitionCardChoice;
+    /// <summary>A resolving effect paused while optional destruction replacements are answered.</summary>
+    public PendingReplacementChoice? ReplacementChoice => definitionChoice as PendingReplacementChoice;
     internal PendingDefinitionChoice? DefinitionChoice => definitionChoice;
     internal PendingChain(long decisionId, IEnumerable<ChainLink> links, PlayerId responder,
         int consecutivePasses = 0, int nextLink = 0, PendingEffectSummon? summonDecision = null,

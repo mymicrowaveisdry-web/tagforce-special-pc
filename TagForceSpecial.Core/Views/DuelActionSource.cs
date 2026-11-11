@@ -53,6 +53,9 @@ public sealed class DuelActionSource
             ? new(d.DecisionId, d.Kind.ToString(), PlayerProjection.Read(d.CardOptions.OrderBy(c => c.GameCardId).ThenBy(c => c.InstanceId)
                 .Select(c => PlayerProjection.Card(c, true, null, catalog))))
             // Deck options are private: only the choosing player is shown them.
+            : (state.PendingChain?.ReplacementChoice?.Replacement ?? state.Battle?.Replacement) is { } replacement && replacement.Current.Player == player
+                ? new(replacement.DecisionId, "Replacement", PlayerProjection.Read(replacement.Current.CardOptions
+                    .Select(c => PlayerProjection.Card(c, true, null, catalog))))
             : state.PendingChain?.DefinitionSummon is { } summon && summon.Player == player
                 ? new(summon.DecisionId, "DefinitionSummon", PlayerProjection.Read(summon.Options
                     .Select(o => PlayerProjection.Card(o.Card, true, null, catalog))))
@@ -91,6 +94,7 @@ public sealed class DuelActionSource
         ?? state.EventEffects.PendingTriggers?.Player
         ?? state.PendingDecision?.Player
         ?? state.PendingChain?.DefinitionChoice?.Player
+        ?? state.Battle?.Replacement?.Current.Player
         ?? state.OpenWindow?.Responder
         ?? (state.PendingChain is null ? state.PendingSummon?.Responder : null)
         ?? (state.PendingChain is { } chain ? chain.NextLink > 0 ? state.ActivePlayer : chain.Responder
@@ -229,6 +233,19 @@ public sealed class DuelActionSource
                         yield return B(new ChooseEffectSummon(player, effectSummon.DecisionId, target.InstanceId, ids, zone, position), ActionKind.ChooseCard,
                             $"Summon {catalog[target.GameCardId].Name} using {string.Join(", ", materials.Select(m => catalog[m.Card.GameCardId].Name))}", target.InstanceId, zone, ordinal++, position);
                 }
+            yield break;
+        }
+        if ((state.PendingChain?.ReplacementChoice?.Replacement ?? state.Battle?.Replacement) is { } replacement)
+        {
+            var offer = replacement.Current;
+            if (offer.Player != player) yield break;
+            string source = catalog[offer.Source.GameCardId].Name;
+            yield return B(new ChooseDestructionReplacement(player, replacement.DecisionId, false), ActionKind.FinishChoice, $"Do not use {source}");
+            if (offer.CardOptions.Count == 0)
+                yield return B(new ChooseDestructionReplacement(player, replacement.DecisionId, true), ActionKind.ChooseCard, $"Use {source}", offer.Source.InstanceId);
+            foreach (var card in offer.CardOptions)
+                yield return B(new ChooseDestructionReplacement(player, replacement.DecisionId, true, card.InstanceId), ActionKind.ChooseCard,
+                    $"Use {source}: {catalog[card.GameCardId].Name}", card.InstanceId);
             yield break;
         }
         if (state.PendingChain?.DefinitionSummon is { } summon)

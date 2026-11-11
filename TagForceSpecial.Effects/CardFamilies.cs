@@ -21,6 +21,7 @@ public sealed record CardFamily(string FamilyId, string BatchId, IReadOnlyList<D
     public IReadOnlyList<PendulumCardProfile> PendulumCards { get; init; } = [];
     public IReadOnlyList<RuleLockProfile> RuleLocks { get; init; } = [];
     public IReadOnlyList<BattleAbilityProfile> BattleAbilities { get; init; } = [];
+    public IReadOnlyList<DestructionReplacementProfile> DestructionReplacements { get; init; } = [];
 }
 
 /// <summary>Every effect family. Adding a family here adds it to the overlay, the manifest and the full card pool.</summary>
@@ -127,6 +128,7 @@ public static class CardPool
             experimentalSummonEffects: families.SelectMany(f => f.SummonEffects),
             experimentalPendulumCards: families.SelectMany(f => f.PendulumCards),
             effectDefinitions: definitions, shuffleSeed: shuffleSeed, ruleLocks: families.SelectMany(f => f.RuleLocks),
-            battleAbilities: families.SelectMany(f => f.BattleAbilities));
+            battleAbilities: families.SelectMany(f => f.BattleAbilities),
+            destructionReplacements: families.SelectMany(f => f.DestructionReplacements));
     }
 }

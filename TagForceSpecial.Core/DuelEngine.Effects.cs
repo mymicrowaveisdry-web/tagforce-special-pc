@@ -494,11 +494,31 @@ public sealed partial class DuelEngine
     private (DuelState State, PendingDefinitionChoice? Pause) ResolveDefinitionSteps(DuelState state, ChainLink[] links,
         ChainLink link, int start, DuelCommand? choice, List<DuelEvent> events)
     {
+        try { return ResolveDefinitionStepsCore(state, links, link, start, choice, events); }
+        finally { replacementContext = null; }
+    }
+
+    private (DuelState State, PendingDefinitionChoice? Pause) ResolveDefinitionStepsCore(DuelState state, ChainLink[] links,
+        ChainLink link, int start, DuelCommand? choice, List<DuelEvent> events)
+    {
         var definition = LinkDefinition(link);
         var controller = link.Activation.Player;
         for (int i = start; i < definition.Steps.Count; i++)
         {
             var step = definition.Steps[i];
+            replacementContext = null;
+            // Optional replacements are answered before the step destroys anything; nothing can happen in between.
+            if (DestructionBatch(state, link, definition, step, controller) is { Count: > 0 } batch)
+            {
+                if (choice is ReplacementAnswers answers)
+                {
+                    replacementContext = new(batch, answers.Decisions);
+                    choice = null;
+                }
+                else if (OptionalOffers(state, batch, DestructionCause.Effect) is { Count: > 0 } offers)
+                    return (state, new PendingReplacementChoice(new(checked(State.Revision + 1), offers, []), definition.EffectId, link.Number, i));
+                else replacementContext = new(batch, []);
+            }
             if (step is SpecialSummonSelfStep self)
             {
                 var card = link.Activation.Spell;

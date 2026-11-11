@@ -16,7 +16,9 @@ public sealed partial class DuelEngine
             };
         if (chain.DefinitionCardChoice is not null)
             return command is ChooseDefinitionCard card ? AnswerDefinitionCardChoice(chain, card) : Reject(DuelError.DecisionPending);
-        if (command is ChooseEffectSummon or ChooseDefinitionSummon or FinishDefinitionSummon or ChooseDefinitionCard) return Reject(DuelError.NoPendingDecision);
+        if (chain.ReplacementChoice is { } replacement)
+            return command is ChooseDestructionReplacement answer ? AnswerChainReplacement(chain, replacement, answer) : Reject(DuelError.DecisionPending);
+        if (command is ChooseEffectSummon or ChooseDefinitionSummon or FinishDefinitionSummon or ChooseDefinitionCard or ChooseDestructionReplacement) return Reject(DuelError.NoPendingDecision);
         if (State.PendingDecision is not null)
             return command is DecisionCommand answer ? AnswerDecision(answer) : Reject(DuelError.DecisionPending);
         if (command is DecisionCommand) return Reject(DuelError.NoPendingDecision);
@@ -121,6 +123,7 @@ public sealed partial class DuelEngine
                         {
                             PendingDefinitionSummon summon => new DefinitionSummonRequested(summon),
                             PendingDefinitionCardChoice card => new DefinitionCardChoiceRequested(card),
+                            PendingReplacementChoice replacement => new DestructionReplacementRequested(replacement.Replacement),
                             _ => throw new InvalidOperationException("Unknown definition choice.")
                         }]);
                 if (IsLastingLink(link) && LastingSourceInPlace(next, link)) next = ActivateLastingEffect(next, link);

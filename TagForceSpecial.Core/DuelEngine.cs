@@ -32,6 +32,7 @@ public sealed partial class DuelEngine
     private readonly EffectDefinition[] allEffects;
     private readonly FrozenDictionary<uint, RuleLockProfile[]> ruleLockProfiles;
     private readonly FrozenDictionary<uint, BattleAbilityProfile[]> battleAbilityProfiles;
+    private readonly FrozenDictionary<uint, DestructionReplacementProfile[]> replacementProfiles;
     /// <summary>Activation-time cost/target decisions of definitions that have any, keyed by source card ID.</summary>
     private readonly FrozenDictionary<string, DecisionSequence> definitionDecisions;
     public DuelState State { get; private set; }
@@ -56,7 +57,8 @@ public sealed partial class DuelEngine
         IEnumerable<ExtraDeckMaterialProcedureProfile>? experimentalMaterialProcedures = null,
         IEnumerable<SummonEffectProfile>? experimentalSummonEffects = null,
         IEnumerable<PendulumCardProfile>? experimentalPendulumCards = null,
-        IEnumerable<EffectDefinition>? effectDefinitions = null, ulong? shuffleSeed = null, IEnumerable<RuleLockProfile>? ruleLocks = null, IEnumerable<BattleAbilityProfile>? battleAbilities = null)
+        IEnumerable<EffectDefinition>? effectDefinitions = null, ulong? shuffleSeed = null, IEnumerable<RuleLockProfile>? ruleLocks = null, IEnumerable<BattleAbilityProfile>? battleAbilities = null,
+        IEnumerable<DestructionReplacementProfile>? destructionReplacements = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(rules);
@@ -189,6 +191,16 @@ public sealed partial class DuelEngine
             battleProfiles.Select(p => p.EffectId).Distinct(StringComparer.Ordinal).Count() != battleProfiles.Length)
             throw new ArgumentException("Battle abilities require distinct IDs, known sources and valid scopes and attack counts.", nameof(battleAbilities));
         battleAbilityProfiles = battleProfiles.GroupBy(p => p.CardId).ToFrozenDictionary(g => g.Key, g => g.ToArray());
+        var replacementList = (destructionReplacements ?? []).ToArray();
+        if (replacementList.Any(p => p is null || string.IsNullOrWhiteSpace(p.EffectId) || p.Cost is null || !Enum.IsDefined(p.Subject) ||
+                !Enum.IsDefined(p.Cost.Action) || p.Cause is not (DestructionCause.Battle or DestructionCause.Effect or DestructionCause.Any) ||
+                p.Cost.LifePoints < 0 || !Enum.IsDefined(p.Side) || !this.rules.TryGetValue(p.CardId, out var replacementRule) ||
+                p.Subject == ReplacementSubject.Equipped && replacementRule.Category != CardCategory.Spell ||
+                p.Cost.Action == ReplacementAction.DetachMaterial && replacementRule.Category != CardCategory.Monster ||
+                p.Cost.Action == ReplacementAction.SendSourceToGraveyard && replacementRule.Category == CardCategory.Monster) ||
+            replacementList.Select(p => p.EffectId).Distinct(StringComparer.Ordinal).Count() != replacementList.Length)
+            throw new ArgumentException("Destruction replacements need distinct IDs, known sources and costs that suit the source.", nameof(destructionReplacements));
+        replacementProfiles = replacementList.GroupBy(p => p.CardId).ToFrozenDictionary(g => g.Key, g => g.ToArray());
         definitionDecisions = definitionList.Where(d => d.Cost is DiscardCost or TributeCost or BanishFromGraveyardCost || d.Target is not null || d.FieldTargets.Any(t => !EffectDefinition.IsAutomatic(t)))
             .ToFrozenDictionary(d => d.EffectId, d => new DecisionSequence(DefinitionSequenceId(d),
                 [.. d.Cost is DiscardCost discard ? Enumerable.Repeat(discard.Filter switch

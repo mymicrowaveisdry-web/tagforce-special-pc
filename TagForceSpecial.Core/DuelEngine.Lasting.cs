@@ -211,6 +211,7 @@ public sealed partial class DuelEngine
         if (target.Location == FieldLocation.MonsterZone)
             return ReplaceDestruction(state, new(target.Player, target.Zone, target.Card, target.PlacementId), DestructionCause.Effect, events);
         if (target.Location == FieldLocation.SpellTrapZone && PreventDestruction(state, LockedAction.BeDestroyedByEffect, target.Player, target.Card, null, events) is { } safe) return safe;
+        if (target.Location == FieldLocation.SpellTrapZone && ProfileReplacement(state, target, DestructionCause.Effect, events) is { } swappedField) return swappedField;
         var player = state.GetPlayer(target.Player);
         if (target.Location != FieldLocation.SpellTrapZone || player.SpellTrapAt(target.Zone) is not { ProtectionCounters: > 0 } field) return null;
         events.Add(new SpellTrapDestructionReplaced(player.Id, target.Zone, field.Card));
@@ -283,6 +284,7 @@ public sealed partial class DuelEngine
             events.Add(new DestructionReplaced(monster, monster.Card));
             return state.With(player: player.With(monsters: monsters));
         }
+        if (ProfileReplacement(state, new(monster.Player, FieldLocation.MonsterZone, monster.Zone, monster.Card, monster.PlacementId), cause, events) is { } swapped) return swapped;
         if (IsSpellsNegated(state)) return null;
         for (int zone = 0; zone < 5; zone++)
             if (player.SpellTrapFields[zone] is { IsUnion: true, EffectActive: true } union && union.EquippedTo == monster &&

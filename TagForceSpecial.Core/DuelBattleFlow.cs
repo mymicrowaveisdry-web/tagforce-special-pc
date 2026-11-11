@@ -36,7 +36,7 @@ public sealed record PendingBattleAttack
     }
 }
 public sealed record BattleState(BattleStep Step, DamageStep? DamageStep, BattleResponseWindow Window,
-    PendingBattleAttack? Attack = null);
+    PendingBattleAttack? Attack = null, PendingReplacement? Replacement = null);
 
 public sealed record AdvanceBattle(PlayerId Player, long DecisionId) : DuelCommand(Player);
 public sealed record PassBattleResponse(PlayerId Player, long DecisionId) : DuelCommand(Player);
