@@ -138,6 +138,8 @@ public sealed partial class DuelEngine
         SequenceDefinition(sequence) is not { } definition ||
         // A Token cannot become Xyz Material, so an attaching effect cannot choose one.
         !(index >= definition.CostTargetSteps && definition.Steps.Any(s => s is AttachTargetsToSelfStep) && IsTokenId(target.Card.GameCardId)) &&
+        // A Rank-Up cannot target a monster that has no legal Extra Deck monster to become.
+        !(index >= definition.CostTargetSteps && definition.Steps.OfType<RankUpStep>().FirstOrDefault() is { } rankUp && !RankUpOptions(state, target, rankUp).Any()) &&
         ChoiceMove(definition, index, target.Card) is var move && (move == LockedAction.None || !MoveLocked(state, move, target));
 
     private EffectDefinition? SequenceDefinition(DecisionSequence sequence)

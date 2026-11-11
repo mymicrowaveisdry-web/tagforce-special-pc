@@ -15,10 +15,15 @@ public sealed class ExtraDeckMaterialProcedureProfile
     public XyzMaterialRequirements? Xyz { get; }
     /// <summary>Any monster allowed as a Summon material qualifies; rank or Tuner and Level rules still apply.</summary>
     public bool AnyMaterial { get; }
+    /// <summary>"You can also Xyz Summon this card by using" one face-up Xyz Monster matching this filter; its materials carry over.</summary>
+    public CardFilter? OverlayFrom { get; }
+    /// <summary>The Proper Summon procedure the Summon records; an overlay procedure records the card's main Xyz procedure.</summary>
+    public string ProperProcedureId { get; }
 
     public ExtraDeckMaterialProcedureProfile(string procedureId, IEnumerable<uint> targetCardIds,
         IEnumerable<uint> materialCardIds, int materialCount, MaterialDestination destination = MaterialDestination.Graveyard,
-        bool requireFaceUp = true, SynchroMaterialRequirements? synchro = null, XyzMaterialRequirements? xyz = null, bool anyMaterial = false)
+        bool requireFaceUp = true, SynchroMaterialRequirements? synchro = null, XyzMaterialRequirements? xyz = null, bool anyMaterial = false,
+        CardFilter? overlayFrom = null, string? properProcedureId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(procedureId);
         ArgumentNullException.ThrowIfNull(targetCardIds);
@@ -27,7 +32,10 @@ public sealed class ExtraDeckMaterialProcedureProfile
         if (anyMaterial && (materials.Length != 0 || synchro is null && xyz is null))
             throw new ArgumentException("An any-material procedure is a Synchro or Xyz procedure with no explicit material list.", nameof(anyMaterial));
         AnyMaterial = anyMaterial;
-        if (targets.Length == 0 || materials.Length == 0 && !anyMaterial || targets.Any(id => id == 0) || materials.Any(id => id == 0) ||
+        if (overlayFrom is not null && (xyz is null || anyMaterial || materials.Length != 0 || materialCount != 1 || string.IsNullOrWhiteSpace(properProcedureId)) ||
+            overlayFrom is null && properProcedureId is not null)
+            throw new ArgumentException("An overlay procedure is an Xyz procedure using exactly one Xyz Monster and names the card's main procedure.", nameof(overlayFrom));
+        if (targets.Length == 0 || materials.Length == 0 && !anyMaterial && overlayFrom is null || targets.Any(id => id == 0) || materials.Any(id => id == 0) ||
             targets.Distinct().Count() != targets.Length || materials.Distinct().Count() != materials.Length ||
             materialCount is < 1 or > 5 || !Enum.IsDefined(destination))
             throw new ArgumentException("Supply distinct target and material IDs, one to five materials and a supported destination.");
@@ -36,10 +44,11 @@ public sealed class ExtraDeckMaterialProcedureProfile
             !anyMaterial && !materials.Order().SequenceEqual(synchro.TunerCardIds.Concat(synchro.NonTunerCardIds).Order())))
             throw new ArgumentException("Synchro profiles require face-up Graveyard materials, a matching allowlist and minimum count.");
         if ((destination == MaterialDestination.Attached) != (xyz is not null) ||
-            xyz is not null && (!requireFaceUp || materialCount < 2 || synchro is not null))
+            xyz is not null && (!requireFaceUp || materialCount < (overlayFrom is null ? 2 : 1) || synchro is not null))
             throw new ArgumentException("Xyz procedures require face-up attachment of two to five materials and no Synchro requirements.");
         ProcedureId = procedureId; TargetCardIds = Array.AsReadOnly(targets); MaterialCardIds = Array.AsReadOnly(materials);
         MaterialCount = materialCount; Destination = destination; RequireFaceUp = requireFaceUp; Synchro = synchro; Xyz = xyz;
+        OverlayFrom = overlayFrom; ProperProcedureId = properProcedureId ?? procedureId;
     }
 }
 

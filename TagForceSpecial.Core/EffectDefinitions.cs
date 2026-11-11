@@ -325,7 +325,7 @@ public sealed class EffectDefinition
     internal static bool IsFieldTargetStep(EffectStep s) => s is DestroyTargetsStep or ReturnTargetsToHandStep or ChangeTargetsToDefenseStep or
         BanishFieldTargetsStep or NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep or DestroyAndBanishTargetsStep or ModifyCombatantStatsStep or
         EquipTargetStep or UnionEquipStep or PlaceCounterStep or ModifyTargetsUntilEndStep or FlipTargetsFaceDownStep or FlipTargetsFaceUpStep or
-        AttachSourceStep or AttachTargetsToSelfStep;
+        AttachSourceStep or AttachTargetsToSelfStep or DetachAllStep or RankUpStep or AttachFromStep { ToTarget: true };
     /// <summary>Cost choices answered before the target choices, each binding a field target answer.</summary>
     internal int CostTargetSteps => Cost switch { TributeCost tribute => tribute.Count, BanishFromGraveyardCost banish => banish.Count, _ => 0 };
     internal static bool IsAutomatic(EffectTarget t) => t is AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget or TriggerTargetedMonster or TriggerSourceMonster;
@@ -389,7 +389,9 @@ public sealed class EffectDefinition
                     FlipTargetsFaceUpStep s => s.Position is not (BattlePosition.FaceUpAttack or BattlePosition.FaceUpDefense),
                     ReturnSourceToDeckTopStep => kind != EffectKind.MonsterTrigger,
                     BanishFieldTargetsStep or NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep or DestroyAndBanishTargetsStep => false,
-                    AttachSourceStep or AttachTargetsToSelfStep => false,
+                    AttachSourceStep or AttachTargetsToSelfStep or DetachAllStep or TakeOpponentMaterialStep => false,
+                    AttachFromStep s => s.Filter is null || !s.Hand && !s.Graveyard,
+                    RankUpStep s => s.Into is null || s.RankChange is 0 or < -12 or > 12,
                     ModifyCombatantStatsStep s => s.Attack == 0 && s.Defense == 0,
                     BanishAllStep s => !Enum.IsDefined(s.Side) || !Enum.IsDefined(s.Filter),
                     DestroyAllStep s => !Enum.IsDefined(s.Kind) || !Enum.IsDefined(s.Side) || !Enum.IsDefined(s.Filter),
@@ -451,7 +453,13 @@ public sealed class EffectDefinition
             snapshot.Any(s => s is PlaceCounterStep) && fields is not ([TriggerSourceMonster] or [FieldTarget { Count: 1 }]) ||
             (snapshot.Any(s => s is AttachSourceStep or SpecialSummonTargetStep { Link: RevivalLink.Material }) &&
                 kind is not (EffectKind.NormalSpell or EffectKind.QuickPlaySpell or EffectKind.NormalTrap)) ||
-            snapshot.Any(s => s is AttachSourceStep) && fields is not [FieldTarget { Kind: FieldCardKind.Monster, Count: 1 }] ||
+            snapshot.Any(s => s is AttachSourceStep or DetachAllStep or RankUpStep or AttachFromStep { ToTarget: true }) &&
+                (fields.Length == 0 || fields.Any(f => f is not FieldTarget { Kind: FieldCardKind.Monster, Count: 1 }) ||
+                 snapshot.Any(s => s is AttachSourceStep a && a.Target >= fields.Length || s is DetachAllStep d && d.Target >= fields.Length)) ||
+            snapshot.Any(s => s is RankUpStep) && (fields is not [FieldTarget { Side: TargetSide.Own }] ||
+                kind is not (EffectKind.NormalSpell or EffectKind.QuickPlaySpell or EffectKind.NormalTrap)) ||
+            snapshot.Any(s => s is TakeOpponentMaterialStep) && !snapshot.Any(s => s is RankUpStep) ||
+            snapshot.Any(s => s is AttachFromStep { ToTarget: false }) && (!monsterKind || fields.Length != 0) ||
             snapshot.Any(s => s is AttachTargetsToSelfStep) && (!monsterKind || fields.Any(f => f is not FieldTarget { Kind: FieldCardKind.Monster })))
             throw new ArgumentException("Equip, revival, Union and counter steps need their card kinds and bound targets.", nameof(steps));
         if (kind == EffectKind.MonsterTrigger && (required.Length != 0 || cost is not null || target is not null || fields is not ([] or [TriggerTargetedMonster] or [TriggerSourceMonster] or [ZoneTarget { MinCount: 1, MaxCount: 1 }]) || locksOtherSummonsThisTurn) ||

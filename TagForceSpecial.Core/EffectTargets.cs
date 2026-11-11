@@ -43,6 +43,9 @@ public sealed record FieldTarget : EffectTarget
     public bool NoUnionEquipped { get; }
     /// <summary>This choice pays a Tribute cost, so it is not targeting.</summary>
     public bool ForTribute { get; init; }
+    /// <summary>Fewest and most Xyz Materials the chosen monster may have.</summary>
+    public int MinXyzMaterials { get; init; }
+    public int MaxXyzMaterials { get; init; } = int.MaxValue;
 
     public FieldTarget(FieldCardKind kind, TargetSide side = TargetSide.Either, FieldCardFilter filter = FieldCardFilter.Any, int count = 1,
         CardFilter? cardFilter = null, bool noUnionEquipped = false)
@@ -159,11 +162,26 @@ public sealed record ZoneTarget : EffectTarget
 public sealed record AnyCardFilter : CardFilter;
 /// <summary>Matches a card the inner filter rejects.</summary>
 public sealed record NotFilter(CardFilter Filter) : CardFilter;
-/// <summary>Matches Xyz Monsters.</summary>
-public sealed record XyzMonsterFilter : CardFilter;
+/// <summary>Matches Xyz Monsters whose Rank is in [MinRank, MaxRank].</summary>
+public sealed record XyzMonsterFilter(uint MinRank = 0, uint MaxRank = 13) : CardFilter;
 
 /// <summary>Attaches the resolving Spell or Trap to its bound Xyz Monster as Xyz Material, if both are still there.</summary>
-public sealed record AttachSourceStep : EffectStep;
+public sealed record AttachSourceStep(int Target = 0) : EffectStep;
+
+/// <summary>Detaches every Xyz Material from the bound target at <paramref name="Target"/>; the rest of the effect stops if it has none.</summary>
+public sealed record DetachAllStep(int Target = 0) : EffectStep;
+
+/// <summary>Attaches one chosen card from the hand or Graveyard to the bound Xyz Monster, or to the activating monster when <paramref name="ToTarget"/> is false.</summary>
+public sealed record AttachFromStep(CardFilter Filter, bool Hand = true, bool Graveyard = false, bool ToTarget = true) : EffectStep;
+
+/// <summary>
+/// Special Summons an Extra Deck Xyz Monster of the bound Xyz Monster's Rank plus <paramref name="RankChange"/> into its zone, using it and its
+/// materials as the new monster's materials. The Summon is treated as an Xyz Summon.
+/// </summary>
+public sealed record RankUpStep(CardFilter Into, int RankChange = 1, bool SameType = false) : EffectStep;
+
+/// <summary>If possible, moves one Xyz Material from a monster the opponent controls to the monster this effect just Summoned.</summary>
+public sealed record TakeOpponentMaterialStep : EffectStep;
 
 /// <summary>Attaches every bound target monster to the activating monster as Xyz Material; Tokens cannot be attached.</summary>
 public sealed record AttachTargetsToSelfStep : EffectStep;

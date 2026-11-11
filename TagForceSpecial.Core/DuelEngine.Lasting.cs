@@ -73,6 +73,9 @@ public sealed partial class DuelEngine
 
     private bool TargetPasses(DuelState state, FieldTarget spec, FieldCardTarget target) =>
         (spec.CardFilter is null || MatchesFilter(target.Card, spec.CardFilter)) &&
+        (spec.MinXyzMaterials == 0 && spec.MaxXyzMaterials == int.MaxValue || target.Location == FieldLocation.MonsterZone &&
+            state.GetPlayer(target.Player).MonsterZones[target.Zone] is { } holder &&
+            holder.XyzMaterials.Count >= spec.MinXyzMaterials && holder.XyzMaterials.Count <= spec.MaxXyzMaterials) &&
         (!spec.NoUnionEquipped || target.Location != FieldLocation.MonsterZone || !HasUnionEquipped(state, new(target.Player, target.Zone, target.Card, target.PlacementId)));
 
     private static bool HasUnionEquipped(DuelState state, MonsterBinding monster) =>

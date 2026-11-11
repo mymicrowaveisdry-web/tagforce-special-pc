@@ -72,6 +72,8 @@ public sealed partial class DuelEngine
     {
         var player = State.GetPlayer(playerId);
         if (definition.NameLimit is { } limit && NameLimitReached(State, playerId, limit)) return DuelError.EffectAlreadyUsed;
+        if (definition.Steps.OfType<AttachFromStep>().ToArray() is { Length: > 0 } attaches &&
+            AttachCandidates(State, playerId, attaches[0], card).Count() < attaches.Length) return DuelError.DecisionUnavailable;
         if (ActivationLocked(State, playerId, card, definition)) return DuelError.LockedByEffect;
         if (definition.Cost is TributeSelfCost && RuleLocked(State, LockedAction.BeTributed, playerId, card, MonsterOf(State, card))) return DuelError.LockedByEffect;
         foreach (var condition in definition.Conditions)
@@ -537,11 +539,72 @@ public sealed partial class DuelEngine
                     definition.EffectId, events);
                 choice = null;
             }
-            else if (step is AttachSourceStep)
+            else if (step is AttachSourceStep attachSource)
             {
                 // The bound monster only has to still be there; it may have been turned face-down.
-                if (link.Activation.FieldTargets is [{ } host] && host.IsStillPresent(state)) state = AttachSourceAsMaterial(state, link, host, events);
+                if (BoundTarget(link, attachSource.Target) is { } host && host.IsStillPresent(state)) state = AttachSourceAsMaterial(state, link, host, events);
                 else events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
+            }
+            else if (step is DetachAllStep detachAll)
+            {
+                if (BoundTarget(link, detachAll.Target) is not { } bound || !bound.IsStillPresent(state) ||
+                    state.GetPlayer(bound.Player).MonsterZones[bound.Zone] is not { XyzMaterials.Count: > 0 })
+                {
+                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
+                    break;
+                }
+                state = DetachAll(state, bound, events);
+            }
+            else if (step is RankUpStep rankUp)
+            {
+                if (BoundTarget(link, 0) is not { } bound || !bound.IsStillPresent(state) ||
+                    state.GetPlayer(bound.Player).MonsterZones[bound.Zone]!.Position == BattlePosition.FaceDownDefense)
+                {
+                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
+                    break;
+                }
+                var options = RankUpOptions(state, bound, rankUp).ToArray();
+                var picked = choice is ChooseDefinitionSummon place ? options.FirstOrDefault(c => c.InstanceId == place.CardInstanceId) : null;
+                if (options.Length == 0 || choice is ChooseDefinitionSummon && picked is null)
+                {
+                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.SummonUnavailable));
+                    break;
+                }
+                if (picked is null)
+                    return (state, new PendingDefinitionSummon(checked(State.Revision + 1), controller, definition.EffectId, link.Number, i,
+                        options.Select(c => new DefinitionSummonOption(c, DecisionCardSource.ExtraDeck, controller)), [bound.Zone]));
+                state = RankUpSummon(state, bound, picked, ((ChooseDefinitionSummon)choice!).Position, definition.EffectId, events);
+                choice = null;
+            }
+            else if (step is TakeOpponentMaterialStep)
+            {
+                var pool = state.GetPlayer(Other(controller)).MonsterZones.Where(m => m is not null).SelectMany(m => m!.XyzMaterials).ToArray();
+                if (BoundTarget(link, 0) is not { } summonedAt || state.GetPlayer(controller).MonsterZones[summonedAt.Zone] is not { } summoned || pool.Length == 0) continue;
+                if (pool.Length > 1 && choice is not ChooseDefinitionCard)
+                    return (state, new PendingDefinitionCardChoice(checked(State.Revision + 1), controller, definition.EffectId, link.Number, i, pool));
+                var taken = choice is ChooseDefinitionCard take ? pool.FirstOrDefault(c => c.InstanceId == take.CardInstanceId) ?? pool[0] : pool[0];
+                state = MoveXyzMaterial(state, Other(controller), taken, new(controller, FieldLocation.MonsterZone, summonedAt.Zone, summoned.Card, summoned.PlacementId),
+                    definition.EffectId, events);
+                choice = null;
+            }
+            else if (step is AttachFromStep attachFrom)
+            {
+                var host = attachFrom.ToTarget ? BoundTarget(link, 0) : ActivatingMonster(state, link);
+                if (host is null || !host.IsStillPresent(state))
+                {
+                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
+                    break;
+                }
+                var candidates = AttachCandidates(state, controller, attachFrom, link.Activation.Spell).ToArray();
+                if (candidates.Length == 0)
+                {
+                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
+                    continue;
+                }
+                if (choice is not ChooseDefinitionCard chosen)
+                    return (state, new PendingDefinitionCardChoice(checked(State.Revision + 1), controller, definition.EffectId, link.Number, i, candidates));
+                state = AttachFromZone(state, controller, candidates.FirstOrDefault(c => c.InstanceId == chosen.CardInstanceId) ?? candidates[0], host, definition.EffectId, events);
+                choice = null;
             }
             else if (EffectDefinition.IsFieldTargetStep(step) || EffectDefinition.IsZoneTargetStep(step))
             {
@@ -784,7 +847,8 @@ public sealed partial class DuelEngine
             level <= limit.MaxLevel && level >= limit.MinLevel && (limit.TypeCode is not { } typeCode || catalog[card.GameCardId].Codes?.Type == typeCode),
         AnyOfFilter any => any.Filters.Any(f => MatchesFilter(card, f, inGraveyard)),
         NotFilter not => !MatchesFilter(card, not.Filter, inGraveyard),
-        XyzMonsterFilter => rule.Category == CardCategory.Monster && IsXyzCard(card),
+        XyzMonsterFilter xyz => rule.Category == CardCategory.Monster && IsXyzCard(card) &&
+            catalog[card.GameCardId].Statistics.Level is var rank && rank >= xyz.MinRank && rank <= xyz.MaxRank,
         AllOfFilter all => all.Filters.All(f => MatchesFilter(card, f, inGraveyard)),
         MonsterTraitFilter trait => rule.Category == CardCategory.Monster && !trait.ExcludedCardIds.Contains(card.GameCardId) &&
             (trait.AttributeCode is not { } code || catalog[card.GameCardId].Codes?.Attribute == code) &&
@@ -1125,10 +1189,12 @@ public sealed partial class DuelEngine
         var option = pending.Options.SingleOrDefault(o => o.Card.InstanceId == command.CardInstanceId);
         if (option is null) return Reject(DuelError.InvalidDecisionChoice);
         var link = chain.Links[pending.LinkNumber - 1];
-        if (CheckSpecialSummon(State, pending.Player, option.Card, command.MonsterZone, command.Position, option.Source,
+        var definition = LinkDefinition(link);
+        // A Rank-Up goes into the zone its material frees; its options were already checked against that zone.
+        if (definition.Steps[pending.StepIndex] is not RankUpStep &&
+            CheckSpecialSummon(State, pending.Player, option.Card, command.MonsterZone, command.Position, option.Source,
                 lockExemptSource: link.Activation.Spell, sourcePlayer: option.From, allowFaceDown: true) is not DuelError.None and var error)
             return Reject(error);
-        var definition = LinkDefinition(link);
         var remaining = pending.Options.Where(o => o != option).ToArray();
         var zones = pending.MonsterZoneOptions.Where(z => z != command.MonsterZone).ToArray();
         if (definition.Steps[pending.StepIndex] is not SpecialSummonStep { AnyNumber: true } || remaining.Length == 0 || zones.Length == 0)
