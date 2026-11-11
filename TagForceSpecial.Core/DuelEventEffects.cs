@@ -20,7 +20,7 @@ public sealed record MonsterEventOccurrence(MonsterEventKind Kind, MonsterBindin
 }
 public sealed record TriggerActivation(int Id, TriggerEffectProfile Profile, MonsterBinding Source,
     MonsterEventOccurrence Occurrence, CardInstance? DiscardedCost = null, int PaidLifePoints = 0,
-    MonsterBinding? Target = null, FieldCardTarget? TargetCard = null)
+    MonsterBinding? Target = null, FieldCardTarget? TargetCard = null, int? Declared = null)
 {
     public PlayerId Player => Source.Player;
     public IReadOnlyList<CardInstance> DetachedCost { get; internal init; } = Array.AsReadOnly(Array.Empty<CardInstance>());
@@ -64,7 +64,7 @@ public sealed record EffectiveMonsterStatistics(MonsterBinding Monster, int? Att
 public sealed record TriggerUse(PlayerId Player, int Turn, string Key, int? InstanceId, long? PlacementId);
 public sealed record MonsterEffectNegation(string EffectId, MonsterBinding Source, MonsterBinding Target,
     long ResolutionId, int ExpiresOnTurn, int ActionOrdinal = 0);
-public enum TriggerCommitmentKind { DiscardCost, MonsterTarget, DetachCost, ZoneTarget, TributeCost }
+public enum TriggerCommitmentKind { DiscardCost, MonsterTarget, DetachCost, ZoneTarget, TributeCost, Declaration }
 public sealed class PendingTriggerCommitment
 {
     public long DecisionId { get; }
@@ -75,9 +75,15 @@ public sealed class PendingTriggerCommitment
     public IReadOnlyList<MonsterBinding> TargetOptions { get; }
     /// <summary>Graveyard or banished cards that can be targeted.</summary>
     public IReadOnlyList<FieldCardTarget> ZoneOptions { get; }
+    /// <summary>What a declaring trigger declares, and its values (empty for card names, where any card can be named).</summary>
+    public DeclarationKind? Declaration { get; }
+    public IReadOnlyList<int> DeclarationOptions { get; }
     internal PendingTriggerCommitment(long id, TriggerActivation trigger, TriggerCommitmentKind kind,
-        IEnumerable<CardInstance>? cards = null, IEnumerable<MonsterBinding>? targets = null, IEnumerable<FieldCardTarget>? zones = null)
+        IEnumerable<CardInstance>? cards = null, IEnumerable<MonsterBinding>? targets = null, IEnumerable<FieldCardTarget>? zones = null,
+        DeclarationKind? declaration = null, IEnumerable<int>? declarationOptions = null)
     {
+        Declaration = declaration;
+        DeclarationOptions = Array.AsReadOnly(declarationOptions?.ToArray() ?? []);
         ZoneOptions = Array.AsReadOnly(zones?.ToArray() ?? []);
         DecisionId = id; Trigger = trigger; Kind = kind;
         CardOptions = Array.AsReadOnly(cards?.ToArray() ?? []);

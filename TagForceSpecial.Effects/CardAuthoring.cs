@@ -139,6 +139,12 @@ public sealed class CardTable(string prefix)
         return card with { Definitions = Array.AsReadOnly(card.Definitions.Select(d => d.WithNameLimit(limit)).ToArray()) };
     }
 
+    /// <summary>The card's activated effects declare <paramref name="kind"/> when activated; continuous markers do not.</summary>
+    public static AuthoredCard Declaring(AuthoredCard card, DeclarationKind kind) => card with
+    {
+        Definitions = Array.AsReadOnly(card.Definitions.Select(d => d.Kind is EffectKind.ContinuousSpell or EffectKind.ContinuousTrap ? d : d.WithDeclaration(kind)).ToArray())
+    };
+
     private RuleLockProfile Locked(uint id, RuleLock rule) => new(Effect(id, "lock"), id, rule);
 
     /// <summary>A Continuous card whose only effect is a "cannot" rule while it stays face-up.</summary>
@@ -206,9 +212,11 @@ public sealed class CardTable(string prefix)
     /// <summary>A trigger on one event; the default is a mandatory "when" effect on this face-up monster.</summary>
     public AuthoredCard Trigger(uint id, string name, MonsterEventKind when, EffectStep[] steps, TriggerRequirement requirement = TriggerRequirement.Mandatory,
         TriggerSourceLocation location = TriggerSourceLocation.FaceUpMonster, TriggerEventCause cause = TriggerEventCause.Any, TriggerTiming timing = TriggerTiming.When,
-        EffectTarget[]? targets = null, MonsterTargetPolicy? targetPolicy = null, DuelCardRules? rules = null, uint getterKind = EffectMonsterKind, string exceptions = "none")
+        EffectTarget[]? targets = null, MonsterTargetPolicy? targetPolicy = null, DuelCardRules? rules = null, uint getterKind = EffectMonsterKind, string exceptions = "none",
+        DeclarationKind? declares = null)
     {
         var definition = new EffectDefinition(Effect(id, "trigger"), id, EffectKind.MonsterTrigger, steps, fieldTargets: targets);
+        if (declares is { } kind) definition = definition.WithDeclaration(kind);
         return new(id, name, CardKind.Monster, getterKind, IconNormal, rules ?? MonsterRules, [definition], exceptions)
         {
             Triggers = [new TriggerEffectProfile(definition, when, EffectRelation.Self, requirement, location, timing, cause, target: targetPolicy)]

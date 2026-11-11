@@ -106,12 +106,19 @@ public sealed partial class DuelEngine
         if (kind == MonsterEventKind.FlipSummoned) yield return new(MonsterEventKind.FlippedFaceUp, subject, point);
     }
 
-    /// <summary>An attack declaration, with the attacker as subject; and on entering the Standby Phase, one per face-up Spell or Trap.</summary>
+    /// <summary>
+    /// An attack declaration, with the attacker as subject; battle damage, with the monster that inflicted it; and on entering the
+    /// Standby Phase, one per face-up Spell or Trap.
+    /// </summary>
     private IEnumerable<MonsterEventOccurrence> AttackAndStandbyOccurrences(DuelState before, DuelState after, DuelEvent emitted)
     {
         var point = new EffectTimingPoint(checked(State.Revision + 1), emitted.TimingGroup ?? 0);
         if (emitted is AttackDeclared declared && before.GetPlayer(declared.Player).MonsterZones[declared.AttackerZone] is { } attacker)
             yield return new(MonsterEventKind.AttackDeclared, new(declared.Player, declared.AttackerZone, attacker.Card, attacker.PlacementId), point);
+        // The monster on the other side of the battle from the damaged player inflicted the damage.
+        if (emitted is BattleDamageDealt { Damage: > 0 } damage && before.Battle?.Attack is { } attack &&
+            (damage.Player != attack.Attacker.Player ? attack.Attacker : attack.Defender) is { } dealer && dealer.Player != damage.Player)
+            yield return new(MonsterEventKind.InflictedBattleDamage, dealer, point);
         if (emitted is PhaseChanged { To: DuelPhase.Standby })
             foreach (var (_, _, field) in ActiveCards(after))
                 yield return new(MonsterEventKind.StandbyPhase, new(after.ActivePlayer, -1, field.Card, field.PlacementId), point);

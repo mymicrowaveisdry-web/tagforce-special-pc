@@ -84,6 +84,10 @@ public sealed partial class DuelEngine
             if (trigger is { TargetCard: null, Profile.Definition.FieldTargets: [FieldTarget field] })
                 return RequestTriggerCommitment(next, remaining, committed, queue,
                     new(checked(State.Revision + 1), trigger, TriggerCommitmentKind.ZoneTarget, zones: TriggerFieldTargets(next, trigger, field)), events);
+            if (trigger.Profile.Definition?.Declares is { } declares && trigger.Declared is null)
+                return RequestTriggerCommitment(next, remaining, committed, queue,
+                    new(checked(State.Revision + 1), trigger, TriggerCommitmentKind.Declaration, declaration: declares,
+                        declarationOptions: DeclarationOptions(declares)), events);
             if (trigger.Profile.DetachMaterialCount != 0 && trigger.DetachedCost.Count == 0)
                 return RequestTriggerCommitment(next, remaining, committed, queue,
                     new(checked(State.Revision + 1), trigger, TriggerCommitmentKind.DetachCost,
@@ -125,7 +129,7 @@ public sealed partial class DuelEngine
             _ => null
         };
         return new(number, new(trigger.Player, trigger.Profile.EffectId, trigger.Source.Card, trigger.Source.Zone, trigger.DiscardedCost, null, bound),
-            trigger.Source.PlacementId, ChainOperation.TriggerEffect, Trigger: trigger);
+            trigger.Source.PlacementId, ChainOperation.TriggerEffect, Trigger: trigger, Declared: trigger.Declared);
     }
 
     private DuelActionResult RequestTriggerCommitment(DuelState next, TriggerActivation[] remaining,
@@ -154,7 +158,7 @@ public sealed partial class DuelEngine
         var pending = State.EventEffects.PendingCommitment!;
         var batch = State.EventEffects.PendingTriggers!;
         var id = command switch { ChooseTriggerCostCard c => c.DecisionId, ChooseTriggerMonsterTarget t => t.DecisionId,
-            ChooseTriggerXyzMaterials x => x.DecisionId, ChooseTriggerZoneTarget z => z.DecisionId, _ => -1 };
+            ChooseTriggerXyzMaterials x => x.DecisionId, ChooseTriggerZoneTarget z => z.DecisionId, DeclareValue d => d.DecisionId, _ => -1 };
         if (id == -1) return Reject(DuelError.TriggerCommitmentPending);
         if (id != pending.DecisionId) return Reject(DuelError.StaleTriggerDecision);
         if (command.Player != pending.Player) return Reject(DuelError.NotTriggerPlayer);
@@ -189,6 +193,14 @@ public sealed partial class DuelEngine
                 if (card is null || !player.Hand.Contains(card) || player.LifePoints <= trigger.Profile.LifePointCost)
                     return Reject(DuelError.InvalidTriggerCommitment);
                 (next, trigger) = PayTriggerCost(next, trigger, card, events);
+                break;
+            }
+            case DeclareValue declared:
+            {
+                if (pending.Kind != TriggerCommitmentKind.Declaration) return Reject(DuelError.WrongTriggerCommitment);
+                if (!DeclarationValid(pending.Declaration!.Value, declared.Value)) return Reject(DuelError.InvalidTriggerCommitment);
+                trigger = trigger with { Declared = declared.Value };
+                events.Add(new DeclarationMade(command.Player, pending.Declaration.Value, declared.Value, trigger.Profile.EffectId));
                 break;
             }
             case ChooseTriggerZoneTarget zone:

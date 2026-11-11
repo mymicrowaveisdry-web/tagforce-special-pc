@@ -291,6 +291,18 @@ public sealed class EffectDefinition
     /// <summary>A limit shared by every copy the player controls, checked before activation.</summary>
     public NameLimit? NameLimit { get; private set; }
 
+    /// <summary>What this effect declares when activated; steps read it through <see cref="DeclaredFilter"/>.</summary>
+    public DeclarationKind? Declares { get; private set; }
+
+    /// <summary>A copy of this definition that declares <paramref name="kind"/> when activated.</summary>
+    public EffectDefinition WithDeclaration(DeclarationKind kind)
+    {
+        if (!Enum.IsDefined(kind)) throw new ArgumentOutOfRangeException(nameof(kind));
+        var copy = (EffectDefinition)MemberwiseClone();
+        copy.Declares = kind;
+        return copy;
+    }
+
     /// <summary>A copy of this definition with a by-name limit.</summary>
     public EffectDefinition WithNameLimit(NameLimit limit)
     {
@@ -410,7 +422,10 @@ public sealed class EffectDefinition
                     OpponentCallsRandomHandCardStep or ReturnAttackerToHandStep => false,
                     StopUnlessHandHoldsStep s => s.Filter is null || !Enum.IsDefined(s.Side),
                     ExcavateStep s => s.Count is < 1 or > 10,
-                    TakeExcavatedStep => false,
+                    TakeExcavatedStep or SendExcavatedToGraveyardStep => false,
+                    OpponentSendsFromDeckStep s => s.Filter is null,
+                    OpponentAddsFromDeckStep s => s.Filter is null,
+                    OpponentDiscardsMatchingStep s => s.Filter is null,
                     StopUnlessMilledStep s => s.Filter is null,
                     ApplyDamageRuleStep s => s.Rule is null || !Enum.IsDefined(s.Rule.Kind) || (s.Rule.Applies & DamageKinds.Any) == 0 || !Enum.IsDefined(s.Scope),
                     ModifyCombatantStatsStep s => s.Attack == 0 && s.Defense == 0,
@@ -433,7 +448,7 @@ public sealed class EffectDefinition
             if ((snapshot[i] is StopUnlessRollStep || CountOf(snapshot[i]) == EffectCount.DieRoll) && (roll < 0 || roll > i) ||
                 (snapshot[i] is StopUnlessHeadsStep || CountOf(snapshot[i]) == EffectCount.Heads) && (toss < 0 || toss > i) ||
                 (snapshot[i] is StopUnlessMilledStep || CountOf(snapshot[i]) == EffectCount.MilledLevel) && (mill < 0 || mill > i) ||
-                snapshot[i] is TakeExcavatedStep && (dig < 0 || dig > i))
+                snapshot[i] is TakeExcavatedStep or SendExcavatedToGraveyardStep && (dig < 0 || dig > i))
                 throw new ArgumentException("A die or coin result is read only after the effect rolls or tosses.", nameof(steps));
         var required = (conditions ?? []).Take(9).ToArray();
         if (required.Length > 8 || required.Any(c => c is null) || required.Distinct().Count() != required.Length)

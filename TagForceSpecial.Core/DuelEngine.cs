@@ -228,6 +228,14 @@ public sealed partial class DuelEngine
                  .. d.FieldTargets.Where(t => !EffectDefinition.IsAutomatic(t)).SelectMany(spec => Enumerable.Range(0, EffectDefinition.MaxCount(spec))
                      .Select(i => DecisionStep.FieldTargetChoice(spec, optional: i >= EffectDefinition.MinCount(spec))))],
                 stopAfterCompletion: false));
+        static bool UsesDeclared(CardFilter filter) => filter switch
+        {
+            DeclaredFilter => true, AnyOfFilter any => any.Filters.Any(UsesDeclared), AllOfFilter all => all.Filters.Any(UsesDeclared),
+            NotFilter not => UsesDeclared(not.Filter), _ => false
+        };
+        if (definitionList.Concat(triggerEffects.Select(p => p.Definition).OfType<EffectDefinition>())
+                .Any(d => d.Declares is null && d.Steps.SelectMany(StepFilters).Any(UsesDeclared)))
+            throw new ArgumentException("A declared filter belongs to an effect that declares.", nameof(effectDefinitions));
         bool IsMonster(uint id) => this.rules.TryGetValue(id, out var rule) && rule.Category == CardCategory.Monster;
         int nextInstance = 1;
         DuelPlayerState CreatePlayer(PlayerId id, IEnumerable<uint> ids)
@@ -292,7 +300,7 @@ public sealed partial class DuelEngine
         if (State.PendingSummon is not null) return ExecuteSummonWindow(command);
         if (command is PassSummonResponse or ActivateSummonNegation) return Reject(DuelError.NoPendingSummon);
         if (command is PassChainResponse or ActivateChainResponse or ActivateHandChainResponse or ActivateMonsterChainResponse or ActivateZoneEffectResponse or ActivateFieldEffectResponse or ResolveNextChainLink or
-            ChooseEffectSummon or ChooseDefinitionSummon or FinishDefinitionSummon or ChooseDefinitionCard or CallCardType) return Reject(DuelError.NoPendingChain);
+            ChooseEffectSummon or ChooseDefinitionSummon or FinishDefinitionSummon or ChooseDefinitionCard or CallCardType or DeclareValue) return Reject(DuelError.NoPendingChain);
         // A definition answering its cost/target decisions before its first link exists (hand, set or open-window
         // activation); the decision may belong to the non-turn player.
         if (State.PendingDecision is not null && State.PendingSpellActivation is { } activating &&

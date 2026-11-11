@@ -8,7 +8,9 @@ public enum MonsterEventKind { NormalSummoned, SpecialSummoned, FlipSummoned, De
     /// <summary>A monster declared an attack; the attacker is the subject.</summary>
     AttackDeclared,
     /// <summary>A Standby Phase began; the turn player is the subject's player. Only face-up Spells and Traps use it.</summary>
-    StandbyPhase }
+    StandbyPhase,
+    /// <summary>This monster inflicted battle damage to its controller's opponent.</summary>
+    InflictedBattleDamage }
 /// <summary>Narrows a Destroyed or SentToGraveyard event by where it came from or what caused it.</summary>
 public enum TriggerEventCause { Any, FromField, ByBattle }
 public enum EffectRelation { Self, Controller, Opponent, Any }
@@ -153,7 +155,7 @@ public sealed class TriggerEffectProfile
             sourceLocation == TriggerSourceLocation.GraveyardSelf && (eventKind is not (MonsterEventKind.SentToGraveyard or MonsterEventKind.TributedForSummon) || relation != EffectRelation.Self) ||
             eventKind == MonsterEventKind.TributedForSummon && sourceLocation != TriggerSourceLocation.GraveyardSelf)
             throw new ArgumentException("Graveyard sources require the matching self event.");
-        if (eventKind is MonsterEventKind.EndPhaseAfterSummonOrFlip or MonsterEventKind.DestroyedOpponentByBattle && (sourceLocation != TriggerSourceLocation.FaceUpMonster || relation != EffectRelation.Self) ||
+        if (eventKind is MonsterEventKind.EndPhaseAfterSummonOrFlip or MonsterEventKind.DestroyedOpponentByBattle or MonsterEventKind.InflictedBattleDamage && (sourceLocation != TriggerSourceLocation.FaceUpMonster || relation != EffectRelation.Self) ||
             requiresGeminiActive && sourceLocation != TriggerSourceLocation.FaceUpMonster)
             throw new ArgumentException("This trigger needs its face-up source.");
         if (eventKind == MonsterEventKind.StandbyPhase && (sourceLocation != TriggerSourceLocation.FaceUpSpellTrap || relation == EffectRelation.Self))

@@ -419,6 +419,8 @@ public sealed partial class DuelEngine
                 ? chain!.Links[^1].Number : null,
             SummonAttemptId: chain is null && definition.Steps.Any(s => s is NegateSummonStep) ? State.PendingSummon?.AttemptId : null);
         var pending = new PendingChain(checked(State.Revision + 1), (chain?.Links ?? []).Append(link), Other(receipt.Player));
+        // A declaring effect declares as it is activated, before either player can respond.
+        if (definition.Declares is { } declares) pending = AskDeclaration(pending, link, definition, receipt.Player, DeclarationOptions(declares));
         var next = state.WithCommittedActivation(receipt).WithChain(pending);
         if (definition.NameLimit is { } named) next = RecordNamedUse(next, receipt.Player, named);
         // A link added during battle reopens the battle window for the other player, as battle responses do.
@@ -433,7 +435,7 @@ public sealed partial class DuelEngine
             events.Add(new SummonLockApplied(applied));
         }
         events.Add(new ChainLinkAdded(link));
-        events.Add(new ChainResponseRequested(pending.Responder, pending.DecisionId));
+        events.Add(pending.Declaration is { } declaring ? new DeclarationRequested(declaring) : new ChainResponseRequested(pending.Responder, pending.DecisionId));
         return Accept(next, events.ToArray());
     }
 
@@ -502,8 +504,12 @@ public sealed partial class DuelEngine
     private (DuelState State, PendingDefinitionChoice? Pause) ResolveDefinitionSteps(DuelState state, ChainLink[] links,
         ChainLink link, int start, DuelCommand? choice, List<DuelEvent> events)
     {
-        try { return ResolveDefinitionStepsCore(state, links, link, start, choice, events); }
-        finally { replacementContext = null; }
+        try
+        {
+            resolvingDeclaration = LinkDefinition(link).Declares is { } kind && link.Declared is { } value ? (kind, value) : null;
+            return ResolveDefinitionStepsCore(state, links, link, start, choice, events);
+        }
+        finally { replacementContext = null; resolvingDeclaration = null; }
     }
 
     private (DuelState State, PendingDefinitionChoice? Pause) ResolveDefinitionStepsCore(DuelState state, ChainLink[] links,
@@ -583,6 +589,22 @@ public sealed partial class DuelEngine
                 if (choice is not ChooseDefinitionCard taken)
                     return (state, new PendingDefinitionCardChoice(checked(State.Revision + 1), controller, definition.EffectId, link.Number, i, options));
                 state = TakeFromDeck(state, controller, options.FirstOrDefault(c => c.InstanceId == taken.CardInstanceId) ?? options[0], definition.EffectId, events);
+                choice = null;
+                continue;
+            }
+            if (step is OpponentSendsFromDeckStep send)
+            {
+                var options = state.GetPlayer(Other(controller)).Deck.Where(c => MatchesFilter(c, send.Filter)).ToArray();
+                if (options.Length == 0)
+                {
+                    // The activating player may look at the opponent's Deck to confirm (Vampire Lord, OCG ruling).
+                    events.Add(new CardsLookedAt(controller, Other(controller), state.GetPlayer(Other(controller)).Deck, definition.EffectId));
+                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
+                    continue;
+                }
+                if (choice is not ChooseDefinitionCard sent)
+                    return (state, new PendingDefinitionCardChoice(checked(State.Revision + 1), Other(controller), definition.EffectId, link.Number, i, options));
+                state = OpponentSendsFromDeck(state, controller, options.FirstOrDefault(c => c.InstanceId == sent.CardInstanceId) ?? options[0], definition.EffectId, events);
                 choice = null;
                 continue;
             }
@@ -813,6 +835,9 @@ public sealed partial class DuelEngine
                     DiceDuelStep dice => DiceDuel(state, controller, dice, definition.EffectId, events),
                     ExcavateStep excavate => Excavate(state, controller, excavate.Count, definition.EffectId, events),
                     ReturnAttackerToHandStep => ReturnAttacker(state, link, definition.EffectId, events),
+                    OpponentAddsFromDeckStep add => OpponentAddsFromDeck(state, controller, add, definition.EffectId, events),
+                    SendExcavatedToGraveyardStep => SendExcavatedToGraveyard(state, controller, definition.EffectId, events),
+                    OpponentDiscardsMatchingStep discard => OpponentDiscardsMatching(state, controller, discard, definition.EffectId, events),
                     ApplyGraveyardRedirectStep redirect => AddTimedRedirect(state, controller, redirect.Rule),
                     RollDieStep => RollDie(state, controller, definition.EffectId, events),
                     TossCoinsStep coins => TossCoins(state, controller, coins.Count, definition.EffectId, events),
@@ -928,6 +953,7 @@ public sealed partial class DuelEngine
         CardIdFilter ids => ids.CardIds.Contains(card.GameCardId),
         AnyMonsterFilter => rule.Category == CardCategory.Monster,
         AnyCardFilter => true,
+        DeclaredFilter => resolvingDeclaration is not { } declared || DeclaredMatches(card, declared.Kind, declared.Value),
         CardCategoryFilter category => rule.Category == category.Category,
         MonsterTypeFilter types => rule.Category == CardCategory.Monster && catalog[card.GameCardId].Codes is { } codes && types.TypeCodes.Contains(codes.Type),
         NormalMonsterFilter normal => normal.CardIds.Contains(card.GameCardId) || inGraveyard && rule.IsGemini,

@@ -24,7 +24,8 @@ public sealed record ChainLink(int Number, CommittedActivation Activation, long 
     int? TargetLinkNumber = null, ChainNegation Negation = ChainNegation.None,
     TriggerActivation? Trigger = null,
     long? SummonAttemptId = null,
-    bool IsPendulumScale = false)
+    bool IsPendulumScale = false,
+    int? Declared = null)
 {
     public bool ActivationNegated => Negation == ChainNegation.Activation;
     public bool EffectNegated => Negation != ChainNegation.None;
@@ -49,6 +50,8 @@ public sealed class PendingChain
     public PendingReplacementChoice? ReplacementChoice => definitionChoice as PendingReplacementChoice;
     /// <summary>A resolving effect paused while a player calls the type of a card they cannot see.</summary>
     public PendingTypeCall? TypeCall => definitionChoice as PendingTypeCall;
+    /// <summary>A just-added link waits for its declaration before responses open.</summary>
+    public PendingDeclaration? Declaration => definitionChoice as PendingDeclaration;
     internal PendingDefinitionChoice? DefinitionChoice => definitionChoice;
     internal PendingChain(long decisionId, IEnumerable<ChainLink> links, PlayerId responder,
         int consecutivePasses = 0, int nextLink = 0, PendingEffectSummon? summonDecision = null,

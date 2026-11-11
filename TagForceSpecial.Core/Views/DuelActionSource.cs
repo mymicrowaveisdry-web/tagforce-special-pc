@@ -62,6 +62,8 @@ public sealed class DuelActionSource
             : state.PendingChain?.DefinitionCardChoice is { } pick && pick.Player == player
                 ? new(pick.DecisionId, "DefinitionCard", PlayerProjection.Read(pick.Options
                     .Select(c => PlayerProjection.Card(c, true, null, catalog))))
+            : state.PendingChain?.Declaration is { } declaring && declaring.Player == player
+                ? new(declaring.DecisionId, "Declaration", PlayerProjection.Read(Array.Empty<CardView>()))
             : state.PendingChain?.DefinitionChoice is PendingTypeCall call && call.Player == player
                 ? new(call.DecisionId, "TypeCall", PlayerProjection.Read(Array.Empty<CardView>()))
             : state.OpenWindow is { } window && actor == player ? new(window.DecisionId, "OpenWindow", PlayerProjection.Read(Array.Empty<CardView>()))
@@ -123,6 +125,8 @@ public sealed class DuelActionSource
             foreach (var card in commitment.CardOptions)
                 yield return B(new ChooseTriggerCostCard(player, commitment.DecisionId, card.InstanceId), ActionKind.ChooseCard,
                     $"Discard {catalog[card.GameCardId].Name}", card.InstanceId);
+        if (commitment is { Kind: TriggerCommitmentKind.Declaration, Declaration: { } kind })
+            foreach (var bound in DeclarationActions(engine.State, player, commitment.DecisionId, kind, commitment.DeclarationOptions)) yield return bound;
         foreach (var option in commitment.ZoneOptions)
             yield return option.Location is FieldLocation.Graveyard or FieldLocation.Banished
                 ? B(new ChooseTriggerZoneTarget(player, commitment.DecisionId, option.Player, option.Card.InstanceId), ActionKind.ChooseCard,
@@ -139,6 +143,31 @@ public sealed class DuelActionSource
         foreach (var cards in Combinations(commitment.CardOptions, commitment.Trigger.Profile.DetachMaterialCount, 0).Take(MaximumTriggerOrders))
             yield return B(new ChooseTriggerXyzMaterials(player, commitment.DecisionId, cards.Select(c => c.InstanceId)), ActionKind.ChooseCard,
                 $"Detach {string.Join(", ", cards.Select(c => catalog[c.GameCardId].Name))}", target: ordinal++);
+    }
+
+    /// <summary>
+    /// Declarable values. Any card name is legal, so names are offered from the cards this player knows of: all their own and
+    /// the opponent's public cards.
+    /// </summary>
+    private IEnumerable<Bound> DeclarationActions(DuelState state, PlayerId player, long decisionId, DeclarationKind kind, IReadOnlyList<int> options)
+    {
+        if (kind is not (DeclarationKind.CardName or DeclarationKind.MonsterCardName))
+        {
+            foreach (int value in options)
+                yield return B(new DeclareValue(player, decisionId, value), ActionKind.ChooseCard,
+                    kind == DeclarationKind.CardType ? $"Declare {(CardCategory)value}" : $"Declare Type {value}", target: value);
+            yield break;
+        }
+        var own = state.GetPlayer(player);
+        var opponent = state.GetPlayer(Other(player));
+        var known = own.Deck.Concat(own.Hand).Concat(own.Graveyard).Concat(own.Banished).Concat(own.ExtraDeck).Concat(own.FaceUpExtraDeck)
+            .Concat(own.MonsterZones.OfType<FieldMonster>().Select(m => m.Card)).Concat(own.SpellTrapFields.OfType<FieldSpellTrap>().Select(f => f.Card))
+            .Concat(opponent.Graveyard).Concat(opponent.Banished).Concat(opponent.FaceUpExtraDeck)
+            .Concat(opponent.MonsterZones.OfType<FieldMonster>().Where(m => m.Position != BattlePosition.FaceDownDefense).Select(m => m.Card))
+            .Concat(opponent.SpellTrapFields.OfType<FieldSpellTrap>().Where(f => f.IsFaceUp).Select(f => f.Card));
+        foreach (var id in known.Select(c => c.GameCardId).Distinct().Where(id => engine.DeclarationValid(kind, (int)id))
+                     .GroupBy(id => catalog[id].Name).Select(g => g.Min()).Order())
+            yield return B(new DeclareValue(player, decisionId, (int)id), ActionKind.ChooseCard, $"Declare {catalog[id].Name}", target: (int)id);
     }
 
     private static IEnumerable<CardInstance[]> Combinations(IReadOnlyList<CardInstance> cards, int count, int start)
@@ -274,6 +303,11 @@ public sealed class DuelActionSource
                             ActionKind.ChooseCard, $"Summon {catalog[option.Card.GameCardId].Name} ({option.Source}) [{zone + 1}] {position}",
                             option.Card.InstanceId, zone, position: position);
             if (summon.CanFinish) yield return B(new FinishDefinitionSummon(player, summon.DecisionId), ActionKind.FinishChoice, "Done");
+            yield break;
+        }
+        if (state.PendingChain?.Declaration is { } declaration)
+        {
+            foreach (var bound in DeclarationActions(state, player, declaration.DecisionId, declaration.Kind, declaration.Options)) yield return bound;
             yield break;
         }
         if (state.PendingChain?.DefinitionChoice is PendingTypeCall call)
