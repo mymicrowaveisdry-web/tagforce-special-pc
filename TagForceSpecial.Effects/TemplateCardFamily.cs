@@ -12,6 +12,10 @@ public static class TemplateCardFamily
 
     private const string EndsWithEndPhase = "The change ends when the End Phase begins.";
     private static readonly CardTable T = new("template");
+    /// <summary>"Cards with that name, and their effects, cannot be used": Summoned, Set, activated, used to attack or used as Synchro/Xyz Material.</summary>
+    private const LockedAction PsiBlocked = LockedAction.NormalSummon | LockedAction.SetMonster | LockedAction.SpecialSummon | LockedAction.FusionSummon |
+        LockedAction.ActivateSpell | LockedAction.ActivateTrap | LockedAction.ActivateMonsterEffect | LockedAction.SetSpellTrap | LockedAction.Attack |
+        LockedAction.BeSynchroMaterial | LockedAction.BeXyzMaterial;
     /// <summary>"Savior" Synchro Monsters (Savior Star Dragon, Savior Demon Dragon).</summary>
     private static readonly uint[] SaviorSynchros = [8475, 8651];
     private static readonly FieldTarget FaceUpMonster = new(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUp);
@@ -169,7 +173,7 @@ public static class TemplateCardFamily
         CardTable.Declaring(T.Ignition(9644, "Gishki Diviner", [new ExcavateStep(1), new TakeExcavatedStep(new DeclaredFilter())], oncePerTurn: true),
             DeclarationKind.CardName),
         CardTable.Declaring(T.Ignition(5660, "Tribe-Infecting Virus",
-            [new DestroyAllStep(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUp, new DeclaredFilter())], new DiscardCost()), DeclarationKind.MonsterType),
+            [new DestroyAllStep(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUp, new DeclaredFilter(), IncludeSelf: true)], new DiscardCost()), DeclarationKind.FaceUpMonsterType),
         CardTable.Declaring(T.Trap(6147, "Mind Crush", [new OpponentDiscardsMatchingStep(new DeclaredFilter(), RandomOwnDiscardOtherwise: true)]), DeclarationKind.CardName),
         CardTable.Declaring(T.Normal(5480, "Dark Designator", [new OpponentAddsFromDeckStep(new DeclaredFilter())]), DeclarationKind.MonsterCardName),
         T.Normal(4860, "Change of Heart", [new TakeControlStep(ControlDuration.UntilEndPhase)], targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Opponent)],
@@ -207,6 +211,17 @@ public static class TemplateCardFamily
         T.Normal(4817, "Mind Control", [new LockTargetsUntilEndStep(LockedAction.Attack | LockedAction.BeTributed), new TakeControlStep(ControlDuration.UntilEndPhase)],
             targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Opponent)], conditions: [new FreeMonsterZonesCondition(1)]),
         T.ContinuousLock(9353, "Terminal World", trap: false, new RuleLock(LockedAction.EnterMainPhase2), conditions: [new PhaseCondition(DuelPhase.Main1)]),
+        T.ContinuousTrait(4951, "DNA Surgery", trap: true, DeclarationKind.MonsterType, new(IdentityTrait.Type, TraitScope.AllFaceUp)),
+        T.ContinuousTrait(3764, "Declaration of Rebirth", trap: true, DeclarationKind.MonsterType, new(IdentityTrait.Type, TraitScope.Graveyards)),
+        T.EquipTrait(5211, "Scroll of Bewitchment", DeclarationKind.Attribute, IdentityTrait.Attribute),
+        CardTable.Declaring(T.Ignition(8551, "Genex Ally Changer", [new ChangeTargetsTraitStep(IdentityTrait.Attribute)], targets: [FaceUpMonster], oncePerTurn: true),
+            DeclarationKind.Attribute),
+        CardTable.Declaring(T.ContinuousWithEffects(3784, "Attribute Chameleon", trap: true, quick: true,
+            new EffectOption([new ChangeTargetsTraitStep(IdentityTrait.Attribute)], Targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Opponent, FieldCardFilter.FaceUp)],
+                Conditions: [new TurnTimingCondition(TurnOwner.Opponent)])), DeclarationKind.Attribute),
+        CardTable.Declaring(T.Ignition(9283, "Psi-Blocker", [new ApplyRuleLockStep(new RuleLock(PsiBlocked, TargetSide.Either, new DeclaredFilter()), ThroughOpponentsNextTurn: true)],
+            oncePerTurn: true), DeclarationKind.CardName),
+        CardTable.Declaring(T.QuickPlay(11585, "Pendulum Shift", [new SetTargetScaleStep()], targets: [new FieldTarget(FieldCardKind.PendulumScale)]), DeclarationKind.PendulumScale),
         T.ContinuousLock(5134, "Gravity Bind", trap: true, new RuleLock(LockedAction.Attack, Cards: new MonsterLevelFilter(12, minLevel: 4))),
         T.ContinuousLock(5281, "Vengeful Bog Spirit", trap: false, new RuleLock(LockedAction.Attack, SummonedThisTurnOnly: true)),
         T.ContinuousLock(6522, "Non-Fusion Area", trap: true, new RuleLock(LockedAction.FusionSummon)),

@@ -1,7 +1,8 @@
 namespace TagForceSpecial.Core;
 
 /// <summary>Which field cards a target or "all matching" step considers.</summary>
-public enum FieldCardKind { Monster, SpellTrap, Any }
+/// <summary>What a field target can be; <see cref="PendulumScale"/> is a card in a Pendulum Zone only.</summary>
+public enum FieldCardKind { Monster, SpellTrap, Any, PendulumScale }
 
 /// <summary>Whose field, relative to the activating player.</summary>
 public enum TargetSide { Either, Own, Opponent }
@@ -73,7 +74,9 @@ public sealed record ReturnTargetsToHandStep : EffectStep;
 public sealed record ChangeTargetsToDefenseStep : EffectStep;
 
 /// <summary>Destroys every matching field card (never the resolving source), activating player's side first. <paramref name="Cards"/> narrows the match.</summary>
-public sealed record DestroyAllStep(FieldCardKind Kind, TargetSide Side = TargetSide.Either, FieldCardFilter Filter = FieldCardFilter.Any, CardFilter? Cards = null) : EffectStep;
+/// <summary>With <paramref name="IncludeSelf"/>, a monster's own effect can destroy that monster too ("all ... monsters", not "all other").</summary>
+public sealed record DestroyAllStep(FieldCardKind Kind, TargetSide Side = TargetSide.Either, FieldCardFilter Filter = FieldCardFilter.Any, CardFilter? Cards = null,
+    bool IncludeSelf = false) : EffectStep;
 
 /// <summary>Returns every matching field card (never the resolving source) to its owner's hand.</summary>
 public sealed record ReturnAllToHandStep(FieldCardKind Kind, TargetSide Side = TargetSide.Either) : EffectStep;

@@ -62,13 +62,16 @@ public sealed record RuleLockProfile(string EffectId, uint CardId, RuleLock Lock
 }
 
 /// <summary>Applies a lock that lasts until the end of this turn, relative to the activating player.</summary>
-public sealed record ApplyRuleLockStep(RuleLock Lock) : EffectStep;
+public sealed record ApplyRuleLockStep(RuleLock Lock, bool ThroughOpponentsNextTurn = false) : EffectStep;
 
 internal sealed record TimedRuleLock(PlayerId Controller, int TurnNumber, RuleLock Lock)
 {
     /// <summary>The one monster a self-scoped timed lock is bound to.</summary>
     public CardInstance? BoundCard { get; init; }
     public long BoundPlacementId { get; init; }
+    /// <summary>The last turn the lock holds; by default the turn it was applied.</summary>
+    public int? LastTurn { get; init; }
+    internal bool HoldsOn(int turn) => turn >= TurnNumber && turn <= (LastTurn ?? TurnNumber);
 }
 internal sealed record RuleLockUse(int InstanceId, string EffectId, int TurnNumber);
 
@@ -83,7 +86,7 @@ public sealed partial class DuelEngine
 
     private IEnumerable<ActiveLock> ActiveLocks(DuelState state)
     {
-        foreach (var timed in state.Bookkeeping.TimedLocks.Where(t => t.TurnNumber == state.TurnNumber))
+        foreach (var timed in state.Bookkeeping.TimedLocks.Where(t => t.HoldsOn(state.TurnNumber)))
             yield return new(timed.Controller, timed.Lock, timed.BoundCard is { } bound ? new(bound, timed.BoundPlacementId) : null, null, "", 0);
         if (ruleLockProfiles.Count == 0) yield break;
         foreach (var (binding, monster) in FieldMonsters(state))
@@ -218,10 +221,10 @@ public sealed partial class DuelEngine
         return null;
     }
 
-    private static DuelState ApplyTimedLock(DuelState state, PlayerId controller, RuleLock rule, string effectId, List<DuelEvent> events)
+    private static DuelState ApplyTimedLock(DuelState state, PlayerId controller, RuleLock rule, string effectId, List<DuelEvent> events, int? lastTurn = null)
     {
         events.Add(new RuleLockApplied(controller, effectId));
-        return state.WithBookkeeping(state.Bookkeeping with { TimedLocks = Array.AsReadOnly(state.Bookkeeping.TimedLocks.Where(t => t.TurnNumber == state.TurnNumber)
-            .Append(new(controller, state.TurnNumber, rule)).ToArray()) });
+        return state.WithBookkeeping(state.Bookkeeping with { TimedLocks = Array.AsReadOnly(state.Bookkeeping.TimedLocks.Where(t => t.HoldsOn(state.TurnNumber))
+            .Append(new(controller, state.TurnNumber, rule) { LastTurn = lastTurn }).ToArray()) });
     }
 }

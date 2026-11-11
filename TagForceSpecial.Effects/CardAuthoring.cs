@@ -237,6 +237,19 @@ public sealed class CardTable(string prefix)
         };
     }
 
+    /// <summary>A Continuous card that declares a Type or Attribute when activated; the monsters in the change's scope take it while the card is face-up.</summary>
+    public AuthoredCard ContinuousTrait(uint id, string name, bool trap, DeclarationKind declares, LastingTraitChange change, string exceptions = "none") =>
+        new(id, name, trap ? CardKind.Trap : CardKind.Spell, trap ? TrapKind : SpellKind, IconContinuous, trap ? TrapRules : SpellRules,
+            [new EffectDefinition(Effect(id, "continuous"), id, trap ? EffectKind.ContinuousTrap : EffectKind.ContinuousSpell, [], isMarker: true)
+                .WithDeclaration(declares).WithLastingTrait(change)], exceptions);
+
+    /// <summary>An Equip Spell that declares a Type or Attribute when activated; the equipped monster takes it.</summary>
+    public AuthoredCard EquipTrait(uint id, string name, DeclarationKind declares, IdentityTrait trait) =>
+        new(id, name, CardKind.Spell, SpellKind, IconEquip, SpellRules,
+            [new EffectDefinition(Effect(id, "equip"), id, EffectKind.EquipSpell, [new EquipTargetStep()], fieldTargets: [FaceUpMonster])
+                .WithDeclaration(declares).WithLastingTrait(new(trait, TraitScope.Equipped))],
+            "Destroyed when the equipped monster leaves the field or is flipped face-down.");
+
     /// <summary>An Equip Spell whose effect is a "cannot" rule on the equipped monster.</summary>
     public AuthoredCard EquipLock(uint id, string name, LockedAction actions, CardFilter? only = null)
     {

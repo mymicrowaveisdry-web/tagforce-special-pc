@@ -155,7 +155,7 @@ public sealed class DuelActionSource
         {
             foreach (int value in options)
                 yield return B(new DeclareValue(player, decisionId, value), ActionKind.ChooseCard,
-                    kind == DeclarationKind.CardType ? $"Declare {(CardCategory)value}" : $"Declare Type {value}", target: value);
+                    kind == DeclarationKind.CardType ? $"Declare {(CardCategory)value}" : $"Declare {kind} {value}", target: value);
             yield break;
         }
         var own = state.GetPlayer(player);

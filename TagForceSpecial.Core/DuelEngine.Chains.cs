@@ -221,7 +221,7 @@ public sealed partial class DuelEngine
     {
         var player = state.GetPlayer(link.Activation.Player);
         int zone = link.Activation.SpellTrapZone;
-        return state.With(player: player.WithSpellTrapAt(zone, player.SpellTrapAt(zone)! with { EffectActive = true }));
+        return state.With(player: player.WithSpellTrapAt(zone, player.SpellTrapAt(zone)! with { EffectActive = true, Declared = link.Declared }));
     }
 
     /// <summary>

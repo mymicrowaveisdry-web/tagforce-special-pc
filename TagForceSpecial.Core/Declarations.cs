@@ -10,7 +10,13 @@ public enum DeclarationKind
     /// <summary>A monster Type; the value is its raw Type code.</summary>
     MonsterType,
     /// <summary>Monster, Spell or Trap; the value is a <see cref="CardCategory"/>.</summary>
-    CardType
+    CardType,
+    /// <summary>A monster Attribute; the value is its raw Attribute code.</summary>
+    Attribute,
+    /// <summary>A Pendulum Scale from 1 to 10.</summary>
+    PendulumScale,
+    /// <summary>A monster Type that a face-up monster on the field currently has (Tribe-Infecting Virus ruling).</summary>
+    FaceUpMonsterType
 }
 
 /// <summary>Matches cards fitting the effect's declaration. Before anything is declared, any card could match.</summary>
@@ -50,6 +56,7 @@ public sealed record DeclarationMade(PlayerId Player, DeclarationKind Kind, int 
 public sealed partial class DuelEngine
 {
     private int[]? monsterTypeCodes;
+    private int[]? monsterAttributeCodes;
 
     /// <summary>The declaration of the link now resolving, read by <see cref="DeclaredFilter"/>.</summary>
     private (DeclarationKind Kind, int Value)? resolvingDeclaration;
@@ -61,6 +68,12 @@ public sealed partial class DuelEngine
             .Where(c => rules.TryGetValue(c.GameCardId, out var rule) && rule.Category == CardCategory.Monster && !IsTokenId(c.GameCardId) && c.Codes is not null)
             .Select(c => (int)c.Codes!.Type).Distinct().Order().ToArray(),
         DeclarationKind.CardType => [(int)CardCategory.Monster, (int)CardCategory.Spell, (int)CardCategory.Trap],
+        DeclarationKind.Attribute => monsterAttributeCodes ??= catalog.Cards
+            .Where(c => rules.TryGetValue(c.GameCardId, out var rule) && rule.Category == CardCategory.Monster && !IsTokenId(c.GameCardId) && c.Codes is not null)
+            .Select(c => (int)c.Codes!.Attribute).Distinct().Order().ToArray(),
+        DeclarationKind.PendulumScale => [.. Enumerable.Range(1, 10)],
+        DeclarationKind.FaceUpMonsterType => [.. FieldMonsters(State).Where(e => e.Monster.Position != BattlePosition.FaceDownDefense)
+            .Select(e => TypeCode(e.Monster.Card)).OfType<uint>().Select(t => (int)t).Distinct().Order()],
         _ => []
     };
 
@@ -76,7 +89,8 @@ public sealed partial class DuelEngine
         rules.TryGetValue(card.GameCardId, out var rule) && kind switch
         {
             DeclarationKind.CardName or DeclarationKind.MonsterCardName => catalog[card.GameCardId].Name == catalog[(uint)value].Name,
-            DeclarationKind.MonsterType => rule.Category == CardCategory.Monster && catalog[card.GameCardId].Codes?.Type == (uint)value,
+            DeclarationKind.MonsterType or DeclarationKind.FaceUpMonsterType => rule.Category == CardCategory.Monster && TypeCode(card) == (uint)value,
+            DeclarationKind.Attribute => rule.Category == CardCategory.Monster && AttributeCode(card) == (uint)value,
             DeclarationKind.CardType => rule.Category == (CardCategory)value,
             _ => false
         };
@@ -151,6 +165,7 @@ public sealed partial class DuelEngine
         OpponentAddsFromDeckStep add => [add.Filter],
         OpponentDiscardsMatchingStep discard => [discard.Filter],
         ChooseFromOpponentHandStep { Filter: { } filter } => [filter],
+        ApplyRuleLockStep { Lock.Cards: { } locked } => [locked],
         _ => []
     };
 }

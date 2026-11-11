@@ -18,7 +18,7 @@ public sealed partial class DuelEngine
         events.Add(new RuleLockApplied(controller, effectId));
         return state.WithBookkeeping(state.Bookkeeping with
         {
-            TimedLocks = Array.AsReadOnly(state.Bookkeeping.TimedLocks.Where(t => t.TurnNumber == state.TurnNumber).Append(timed).ToArray())
+            TimedLocks = Array.AsReadOnly(state.Bookkeeping.TimedLocks.Where(t => t.HoldsOn(state.TurnNumber)).Append(timed).ToArray())
         });
     }
 

@@ -291,6 +291,20 @@ public sealed class EffectDefinition
     /// <summary>A limit shared by every copy the player controls, checked before activation.</summary>
     public NameLimit? NameLimit { get; private set; }
 
+    /// <summary>Type or Attribute changes that apply while this lasting card is face-up, using its declared value.</summary>
+    public IReadOnlyList<LastingTraitChange> LastingTraits { get; private set; } = [];
+
+    /// <summary>A copy of this definition whose lasting card also applies <paramref name="change"/>.</summary>
+    public EffectDefinition WithLastingTrait(LastingTraitChange change)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+        if (!Enum.IsDefined(change.Trait) || !Enum.IsDefined(change.Scope) || Kind is not (EffectKind.ContinuousSpell or EffectKind.ContinuousTrap or EffectKind.EquipSpell))
+            throw new ArgumentException("A lasting Type or Attribute change belongs to a Continuous or Equip card.", nameof(change));
+        var copy = (EffectDefinition)MemberwiseClone();
+        copy.LastingTraits = Array.AsReadOnly([.. LastingTraits, change]);
+        return copy;
+    }
+
     /// <summary>What this effect declares when activated; steps read it through <see cref="DeclaredFilter"/>.</summary>
     public DeclarationKind? Declares { get; private set; }
 
@@ -344,7 +358,7 @@ public sealed class EffectDefinition
         BanishFieldTargetsStep or NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep or DestroyAndBanishTargetsStep or ModifyCombatantStatsStep or
         EquipTargetStep or UnionEquipStep or PlaceCounterStep or ModifyTargetsUntilEndStep or FlipTargetsFaceDownStep or FlipTargetsFaceUpStep or
         AttachSourceStep or AttachTargetsToSelfStep or DetachAllStep or RankUpStep or AttachFromStep { ToTarget: true } or
-        TakeControlStep or GiveControlStep or SwitchControlStep or LockTargetsUntilEndStep;
+        TakeControlStep or GiveControlStep or SwitchControlStep or LockTargetsUntilEndStep or ChangeTargetsTraitStep or SetTargetScaleStep;
     /// <summary>Cost choices answered before the target choices, each binding a field target answer.</summary>
     internal int CostTargetSteps => Cost switch { TributeCost tribute => tribute.Count, BanishFromGraveyardCost banish => banish.Count, _ => 0 };
     internal static bool IsAutomatic(EffectTarget t) => t is AttackingMonsterTarget or DefendingMonsterTarget or SummonedMonsterTarget or TriggerTargetedMonster or TriggerSourceMonster;
@@ -436,6 +450,8 @@ public sealed class EffectDefinition
                     EndBattlePhaseStep => false,
                     LockTargetsUntilEndStep s => s.Actions == LockedAction.None,
                     StopUnlessOwnTurnStep => false,
+                    ChangeTargetsTraitStep s => !Enum.IsDefined(s.Trait),
+                    SetTargetScaleStep => false,
                     StopUnlessSpecialSummonedStep or SendSourceToGraveyardStep => kind != EffectKind.MonsterTrigger,
                     StopUnlessMilledStep s => s.Filter is null,
                     ApplyDamageRuleStep s => s.Rule is null || !Enum.IsDefined(s.Rule.Kind) || (s.Rule.Applies & DamageKinds.Any) == 0 || !Enum.IsDefined(s.Scope),

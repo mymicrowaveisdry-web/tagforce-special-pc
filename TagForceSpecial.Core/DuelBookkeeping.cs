@@ -30,6 +30,10 @@ internal sealed record DuelBookkeeping(int NextInstanceId = 1, DuelRandomState? 
     public IReadOnlyList<ControlGrant> ControlGrants { get; init; } = Array.AsReadOnly(Array.Empty<ControlGrant>());
     /// <summary>One-time phase skips still to come.</summary>
     public IReadOnlyList<PhaseSkip> PhaseSkips { get; init; } = Array.AsReadOnly(Array.Empty<PhaseSkip>());
+    /// <summary>Type and Attribute changes made to field monsters by resolved effects.</summary>
+    public IReadOnlyList<IdentityChange> IdentityChanges { get; init; } = Array.AsReadOnly(Array.Empty<IdentityChange>());
+    /// <summary>Pendulum Scales changed for this turn.</summary>
+    public IReadOnlyList<ScaleChange> ScaleChanges { get; init; } = Array.AsReadOnly(Array.Empty<ScaleChange>());
 }
 
 internal sealed record ActivatedEffectUse(int InstanceId, int TurnNumber, string Key, long? PlacementId = null);

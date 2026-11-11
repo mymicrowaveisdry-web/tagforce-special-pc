@@ -71,7 +71,7 @@ public sealed partial class DuelEngine
         if (player.LastPendulumSummonTurn == State.TurnNumber) return Reject(DuelError.PendulumSummonLimitReached);
         if (player.PendulumZones[0] is not { } left || player.PendulumZones[1] is not { } right)
             return Reject(DuelError.PendulumScalesUnavailable);
-        uint first = pendulumCards[left.Card.GameCardId].LeftScale, second = pendulumCards[right.Card.GameCardId].RightScale;
+        uint first = CurrentScale(State, left, left: true), second = CurrentScale(State, right, left: false);
         uint low = Math.Min(first, second), high = Math.Max(first, second);
         var choices = command.Selections;
         if (choices.Count is < 1 or > 5 || choices.Any(c => c is null) ||

@@ -159,7 +159,7 @@ public sealed partial class DuelEngine
                 SwapChosenMonstersStep => !Swappable(State, playerId).Any() || !Swappable(State, Other(playerId)).Any(),
                 AddFromDeckToHandStep search => !DeckMatches(State, playerId, search.Filter).Any(),
                 SendFromDeckToGraveyardStep send => !DeckMatches(State, playerId, send.Filter).Any(),
-                DestroyAllStep all => !FieldMatches(State, playerId, all.Kind, all.Side, all.Filter, card.InstanceId).Any(t => all.Cards is null || MatchesFilter(t.Card, all.Cards)),
+                DestroyAllStep all => !FieldMatches(State, playerId, all.Kind, all.Side, all.Filter, all.IncludeSelf ? null : card.InstanceId).Any(t => all.Cards is null || MatchesFilter(t.Card, all.Cards)),
                 ReturnAllToHandStep all => !FieldMatches(State, playerId, all.Kind, all.Side, FieldCardFilter.Any, card.InstanceId).Any(),
                 ChangeAllToDefenseStep all => !FieldMatches(State, playerId, FieldCardKind.Monster, all.Side, FieldCardFilter.AttackPosition, null).Any(),
                 DestroyExtremeMonsterStep extreme => ExtremeCandidates(State, playerId, extreme).Length == 0,
@@ -519,7 +519,7 @@ public sealed partial class DuelEngine
             resolvingDeclaration = LinkDefinition(link).Declares is { } kind && link.Declared is { } value ? (kind, value) : null;
             return ResolveDefinitionStepsCore(state, links, link, start, choice, events);
         }
-        finally { replacementContext = null; resolvingDeclaration = null; }
+        finally { replacementContext = null; resolvingDeclaration = null; identityView = null; }
     }
 
     private (DuelState State, PendingDefinitionChoice? Pause) ResolveDefinitionStepsCore(DuelState state, ChainLink[] links,
@@ -530,6 +530,7 @@ public sealed partial class DuelEngine
         for (int i = start; i < definition.Steps.Count; i++)
         {
             var step = definition.Steps[i];
+            identityView = state;
             replacementContext = null;
             // Optional replacements are answered before the step destroys anything; nothing can happen in between.
             if (DestructionBatch(state, links, link, definition, step, controller) is { Count: > 0 } batch)
@@ -782,6 +783,14 @@ public sealed partial class DuelEngine
                         state = ChangeControl(state, link, target, receiver, duration, definition.EffectId, events);
                     continue;
                 }
+                if (step is ChangeTargetsTraitStep or SetTargetScaleStep)
+                {
+                    if (link.Declared is int declared)
+                        foreach (var target in valid)
+                            state = step is ChangeTargetsTraitStep trait ? ChangeTrait(state, target, trait, declared, definition.EffectId, events)
+                                : SetScale(state, target, declared, definition.EffectId, events);
+                    continue;
+                }
                 if (step is LockTargetsUntilEndStep lockTargets)
                 {
                     foreach (var target in valid.Where(t => t.Location == FieldLocation.MonsterZone))
@@ -888,7 +897,9 @@ public sealed partial class DuelEngine
                     SummonTokensStep tokens => SummonTokens(state, link, tokens, events),
                     ShuffleDeckStep => ShuffleDeck(state, controller, definition.EffectId, events),
                     GrantNormalSummonStep => GrantNormalSummon(state, definition.EffectId, events),
-                    ApplyRuleLockStep apply => ApplyTimedLock(state, controller, apply.Lock, definition.EffectId, events),
+                    // A declared name is fixed when the lock is applied; "until the End of your opponent's next turn" counts from whose turn it is.
+                    ApplyRuleLockStep apply => ApplyTimedLock(state, controller, apply.Lock with { Cards = apply.Lock.Cards is { } locked ? ConcreteDeclared(locked) : null },
+                        definition.EffectId, events, apply.ThroughOpponentsNextTurn ? state.TurnNumber + (state.ActivePlayer == controller ? 1 : 2) : null),
                     EachPlayerTossesCoinStep coins => EachPlayerTosses(state, controller, coins, definition.EffectId, events),
                     DiceDuelStep dice => DiceDuel(state, controller, dice, definition.EffectId, events),
                     ExcavateStep excavate => Excavate(state, controller, excavate.Count, definition.EffectId, events),
@@ -918,7 +929,7 @@ public sealed partial class DuelEngine
                     DrawCardsStep draw => DrawingPlayers(controller, draw.Players)
                         .Aggregate(state, (s, p) => s.Outcome is null ? DrawCards(s, p, draw.Count, events) : s),
                     MillTopOfDeckStep mill => MillAndRecord(state, controller, mill.Count, definition.EffectId, events),
-                    DestroyAllStep all => FieldMatches(state, controller, all.Kind, all.Side, all.Filter, link.Activation.Spell.InstanceId)
+                    DestroyAllStep all => FieldMatches(state, controller, all.Kind, all.Side, all.Filter, all.IncludeSelf ? null : link.Activation.Spell.InstanceId)
                         .Where(t => all.Cards is null || MatchesFilter(t.Card, all.Cards)).ToArray().Aggregate(state, (s, t) => DestroyFieldCard(s, t, events)),
                     ReturnAllToHandStep all => FieldMatches(state, controller, all.Kind, all.Side, FieldCardFilter.Any, link.Activation.Spell.InstanceId)
                         .ToArray().Aggregate(state, (s, t) => ReturnFieldCardToHand(s, t, definition.EffectId, events)),
@@ -946,7 +957,7 @@ public sealed partial class DuelEngine
         foreach (var id in players)
         {
             var player = state.GetPlayer(id);
-            if (kind != FieldCardKind.SpellTrap)
+            if (kind is not (FieldCardKind.SpellTrap or FieldCardKind.PendulumScale))
                 for (int zone = 0; zone < 5; zone++)
                     if (player.MonsterZones[zone] is { } monster && monster.Card.InstanceId != excludeInstanceId && filter switch
                         {
@@ -959,14 +970,16 @@ public sealed partial class DuelEngine
                         })
                         yield return new(id, FieldLocation.MonsterZone, zone, monster.Card, monster.PlacementId);
             if (kind == FieldCardKind.Monster || filter is not (FieldCardFilter.Any or FieldCardFilter.FaceUp)) continue;
-            for (int zone = 0; zone < 5; zone++)
+            // A Pendulum Scale target is only a card in a Pendulum Zone.
+            if (kind != FieldCardKind.PendulumScale)
+                for (int zone = 0; zone < 5; zone++)
                 if (player.SpellTrapFields[zone] is { } field && field.Card.InstanceId != excludeInstanceId &&
                     (filter == FieldCardFilter.Any || field.IsFaceUp))
                     yield return new(id, FieldLocation.SpellTrapZone, zone, field.Card, field.PlacementId);
             for (int zone = 0; zone < 2; zone++)
                 if (player.PendulumZones[zone] is { } scale && scale.Card.InstanceId != excludeInstanceId)
                     yield return new(id, FieldLocation.PendulumZone, zone, scale.Card, scale.PlacementId);
-            if (player.FieldSpell is { } fieldSpell && fieldSpell.Card.InstanceId != excludeInstanceId && (filter == FieldCardFilter.Any || fieldSpell.IsFaceUp))
+            if (kind != FieldCardKind.PendulumScale && player.FieldSpell is { } fieldSpell && fieldSpell.Card.InstanceId != excludeInstanceId && (filter == FieldCardFilter.Any || fieldSpell.IsFaceUp))
                 yield return new(id, FieldLocation.SpellTrapZone, DuelPlayerState.FieldZoneIndex, fieldSpell.Card, fieldSpell.PlacementId);
         }
     }
@@ -1018,18 +1031,18 @@ public sealed partial class DuelEngine
         AnyCardFilter => true,
         DeclaredFilter => resolvingDeclaration is not { } declared || DeclaredMatches(card, declared.Kind, declared.Value),
         CardCategoryFilter category => rule.Category == category.Category,
-        MonsterTypeFilter types => rule.Category == CardCategory.Monster && catalog[card.GameCardId].Codes is { } codes && types.TypeCodes.Contains(codes.Type),
+        MonsterTypeFilter types => rule.Category == CardCategory.Monster && TypeCode(card) is { } type && types.TypeCodes.Contains(type),
         NormalMonsterFilter normal => normal.CardIds.Contains(card.GameCardId) || inGraveyard && rule.IsGemini,
-        MonsterAttributeFilter attribute => rule.Category == CardCategory.Monster && catalog[card.GameCardId].Codes?.Attribute == attribute.AttributeCode,
+        MonsterAttributeFilter attribute => rule.Category == CardCategory.Monster && AttributeCode(card) == attribute.AttributeCode,
         MonsterLevelFilter limit => rule.Category == CardCategory.Monster && !IsXyzCard(card) && catalog[card.GameCardId].Statistics.Level is > 0 and var level &&
-            level <= limit.MaxLevel && level >= limit.MinLevel && (limit.TypeCode is not { } typeCode || catalog[card.GameCardId].Codes?.Type == typeCode),
+            level <= limit.MaxLevel && level >= limit.MinLevel && (limit.TypeCode is not { } typeCode || TypeCode(card) == typeCode),
         AnyOfFilter any => any.Filters.Any(f => MatchesFilter(card, f, inGraveyard)),
         NotFilter not => !MatchesFilter(card, not.Filter, inGraveyard),
         XyzMonsterFilter xyz => rule.Category == CardCategory.Monster && IsXyzCard(card) &&
             catalog[card.GameCardId].Statistics.Level is var rank && rank >= xyz.MinRank && rank <= xyz.MaxRank,
         AllOfFilter all => all.Filters.All(f => MatchesFilter(card, f, inGraveyard)),
         MonsterTraitFilter trait => rule.Category == CardCategory.Monster && !trait.ExcludedCardIds.Contains(card.GameCardId) &&
-            (trait.AttributeCode is not { } code || catalog[card.GameCardId].Codes?.Attribute == code) &&
+            (trait.AttributeCode is not { } code || AttributeCode(card) == code) &&
             (trait.Stat == MonsterStat.Attack ? catalog[card.GameCardId].Statistics.Attack : catalog[card.GameCardId].Statistics.Defense) is int value &&
             value >= trait.Min && value <= trait.Max,
         _ => false

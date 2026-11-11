@@ -22,6 +22,9 @@ public sealed record FieldSpellTrap(CardInstance Card, bool IsFaceUp, long Place
     /// <summary>The turn this card was activated as a Pendulum scale.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public int ActivatedOnTurn { get; internal init; }
+    /// <summary>The value declared when this lasting card was activated, read by its lasting changes.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int? Declared { get; internal init; }
     /// <summary>Counters on this card; a card effect places and removes them.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public int Counters { get; internal init; }

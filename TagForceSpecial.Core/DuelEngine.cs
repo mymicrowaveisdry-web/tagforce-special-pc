@@ -612,7 +612,9 @@ public sealed partial class DuelEngine
         state = ApplyControlReturns(state, emitted);
         state = ApplyGraveyardRedirects(state, emitted);
         state = PrepareSummonHistory(State, state, emitted);
-        state = PrepareEventEffects(State, state, emitted);
+        identityView = state;
+        try { state = PrepareEventEffects(State, state, emitted); }
+        finally { identityView = null; }
         State = state.With(revision: checked(State.Revision + 1));
         TrackSummons(emitted);
         return new(true, DuelError.None, State, emitted.AsReadOnly());
