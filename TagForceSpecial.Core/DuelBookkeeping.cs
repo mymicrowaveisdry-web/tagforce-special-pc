@@ -28,6 +28,8 @@ internal sealed record DuelBookkeeping(int NextInstanceId = 1, DuelRandomState? 
     public RandomResult? LastRandom { get; init; }
     /// <summary>Control of monsters taken for a while; each returns when its time is up.</summary>
     public IReadOnlyList<ControlGrant> ControlGrants { get; init; } = Array.AsReadOnly(Array.Empty<ControlGrant>());
+    /// <summary>Field monsters that are banished when they leave the field.</summary>
+    public IReadOnlyList<LeaveBanish> BanishOnLeave { get; init; } = Array.AsReadOnly(Array.Empty<LeaveBanish>());
     /// <summary>One-time phase skips still to come.</summary>
     public IReadOnlyList<PhaseSkip> PhaseSkips { get; init; } = Array.AsReadOnly(Array.Empty<PhaseSkip>());
     /// <summary>Type and Attribute changes made to field monsters by resolved effects.</summary>

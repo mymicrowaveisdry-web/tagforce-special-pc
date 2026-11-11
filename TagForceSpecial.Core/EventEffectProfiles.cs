@@ -12,14 +12,20 @@ public enum MonsterEventKind { NormalSummoned, SpecialSummoned, FlipSummoned, De
     /// <summary>This monster inflicted battle damage to its controller's opponent.</summary>
     InflictedBattleDamage,
     /// <summary>An End Phase began; like <see cref="StandbyPhase"/>, only face-up Spells, Traps and scales use it.</summary>
-    EndPhase }
+    EndPhase,
+    /// <summary>Control of this face-up monster changed; the subject is the monster in its new place.</summary>
+    ControlChanged }
 /// <summary>Narrows a Destroyed or SentToGraveyard event by where it came from or what caused it.</summary>
 public enum TriggerEventCause { Any, FromField, ByBattle }
 public enum EffectRelation { Self, Controller, Opponent, Any }
 public enum TriggerRequirement { Mandatory, Optional }
-public enum TriggerSourceLocation { FaceUpMonster, DestroyedSelf, GraveyardSelf, FaceUpSpellTrap, PendulumZone }
+public enum TriggerSourceLocation { FaceUpMonster, DestroyedSelf, GraveyardSelf, FaceUpSpellTrap, PendulumZone,
+    /// <summary>The card is in a player's hand; the event is relative to that player.</summary>
+    Hand }
 public enum TriggerTiming { If, When }
-public enum TriggerTurnLimit { None, PerPlacement, SharedPerPlayer, SharedPerDuel }
+public enum TriggerTurnLimit { None, PerPlacement, SharedPerPlayer, SharedPerDuel,
+    /// <summary>Once while this card stays face-up on the field, whoever controls it.</summary>
+    WhileFaceUp }
 public enum TriggerOperation
 {
     GainLifePoints, ModifyEventMonsterUntilEndPhase, ModifyTargetMonsterUntilEndPhase,
@@ -112,6 +118,10 @@ public sealed class TriggerEffectProfile
     public bool TributeCost { get; init; }
     /// <summary>When set, a Special Summon only triggers this if that procedure performed it.</summary>
     public string? RequiredProcedureId { get; init; }
+    /// <summary>When set, only an event whose subject matches triggers this.</summary>
+    public CardFilter? SubjectFilter { get; init; }
+    /// <summary>An attack declaration triggers this only if it is a direct attack.</summary>
+    public bool DirectAttackOnly { get; init; }
 
     /// <summary>A trigger whose resolution is a <see cref="EffectKind.MonsterTrigger"/> definition.</summary>
     public TriggerEffectProfile(EffectDefinition definition, MonsterEventKind eventKind, EffectRelation relation, TriggerRequirement requirement,
@@ -157,7 +167,7 @@ public sealed class TriggerEffectProfile
             sourceLocation == TriggerSourceLocation.GraveyardSelf && (eventKind is not (MonsterEventKind.SentToGraveyard or MonsterEventKind.TributedForSummon) || relation != EffectRelation.Self) ||
             eventKind == MonsterEventKind.TributedForSummon && sourceLocation != TriggerSourceLocation.GraveyardSelf)
             throw new ArgumentException("Graveyard sources require the matching self event.");
-        if (eventKind is MonsterEventKind.EndPhaseAfterSummonOrFlip or MonsterEventKind.DestroyedOpponentByBattle or MonsterEventKind.InflictedBattleDamage && (sourceLocation != TriggerSourceLocation.FaceUpMonster || relation != EffectRelation.Self) ||
+        if (eventKind is MonsterEventKind.EndPhaseAfterSummonOrFlip or MonsterEventKind.DestroyedOpponentByBattle or MonsterEventKind.InflictedBattleDamage or MonsterEventKind.ControlChanged && (sourceLocation != TriggerSourceLocation.FaceUpMonster || relation != EffectRelation.Self) ||
             requiresGeminiActive && sourceLocation != TriggerSourceLocation.FaceUpMonster)
             throw new ArgumentException("This trigger needs its face-up source.");
         // A face-up monster's own End Phase effect is the only monster use of these events.
@@ -171,6 +181,10 @@ public sealed class TriggerEffectProfile
             throw new ArgumentException("A trigger definition must be a monster trigger.", nameof(definition));
         if (lifePointCost < 0 || limitKey is not null && (turnLimit == TriggerTurnLimit.None || string.IsNullOrWhiteSpace(limitKey)))
             throw new ArgumentException("Invalid activation cost or turn-limit key.");
+        if (sourceLocation == TriggerSourceLocation.Hand && (definition is null || relation == EffectRelation.Self))
+            throw new ArgumentException("A hand trigger needs a definition and an event relative to its player.");
+        if (turnLimit == TriggerTurnLimit.WhileFaceUp && sourceLocation != TriggerSourceLocation.FaceUpMonster)
+            throw new ArgumentException("A once-while-face-up limit needs a face-up monster source.");
         if (detachMaterialCount is < 0 or > 5 || detachMaterialCount != 0 && sourceLocation != TriggerSourceLocation.FaceUpMonster)
             throw new ArgumentException("Detach costs require a field source and one to five materials.");
         var discards = discardCardIds is null ? [] : DecisionStep.Card(DecisionCardSource.Hand, discardCardIds).AllowedCardIds.ToArray();

@@ -9,6 +9,8 @@ public sealed partial class DuelEngine
         TriggerTurnLimit.SharedPerPlayer => new(trigger.Player, state.TurnNumber, trigger.Profile.LimitKey, null, null),
         // Turn 0 marks a use that lasts the whole Duel.
         TriggerTurnLimit.SharedPerDuel => new(trigger.Player, 0, trigger.Profile.LimitKey, null, null),
+        // Kept by the card's owner so a change of control does not reset it; a new placement does.
+        TriggerTurnLimit.WhileFaceUp => new(trigger.Source.Card.Owner, 0, trigger.Profile.LimitKey, trigger.Source.Card.InstanceId, trigger.Source.PlacementId),
         _ => null
     };
 

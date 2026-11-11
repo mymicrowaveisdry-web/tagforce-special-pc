@@ -72,6 +72,7 @@ public sealed partial class DuelEngine
     /// </summary>
     private DuelState ApplyGraveyardRedirects(DuelState next, List<DuelEvent> emitted)
     {
+        next = ApplyBanishOnLeave(next, emitted);
         if (redirectProfiles.Count == 0 && next.Bookkeeping.TimedRedirects.Count == 0) return next;
         Dictionary<CardInstance, GraveyardDestination> moved = [];
         HashSet<PlayerId> shuffle = [];

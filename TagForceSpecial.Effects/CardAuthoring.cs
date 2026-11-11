@@ -56,7 +56,7 @@ public static class TrapTiming
 /// <summary>Short builders for families of cards. Effect IDs take the table's prefix.</summary>
 public sealed class CardTable(string prefix)
 {
-    private const uint SpellKind = 13, TrapKind = 14, EffectMonsterKind = 1, IconNormal = 0, IconField = 2, IconEquip = 3, IconContinuous = 4, IconQuickPlay = 5, IconCounter = 1;
+    private const uint SpellKind = 13, TrapKind = 14, EffectMonsterKind = 1, SpiritKind = 7,IconNormal = 0, IconField = 2, IconEquip = 3, IconContinuous = 4, IconQuickPlay = 5, IconCounter = 1;
     private static readonly DuelCardRules SpellRules = new(CardCategory.Spell, AllowsSpellTrapSet: true);
     private static readonly DuelCardRules TrapRules = new(CardCategory.Trap, AllowsSpellTrapSet: true);
     private static readonly DuelCardRules MonsterRules = new(CardCategory.Monster, AllowsNormalSummon: true, AllowsBasicBattle: true, AllowsTributeForSummon: true);
@@ -302,13 +302,44 @@ public sealed class CardTable(string prefix)
     public AuthoredCard Trigger(uint id, string name, MonsterEventKind when, EffectStep[] steps, TriggerRequirement requirement = TriggerRequirement.Mandatory,
         TriggerSourceLocation location = TriggerSourceLocation.FaceUpMonster, TriggerEventCause cause = TriggerEventCause.Any, TriggerTiming timing = TriggerTiming.When,
         EffectTarget[]? targets = null, MonsterTargetPolicy? targetPolicy = null, DuelCardRules? rules = null, uint getterKind = EffectMonsterKind, string exceptions = "none",
-        DeclarationKind? declares = null)
+        DeclarationKind? declares = null, TriggerTurnLimit limit = TriggerTurnLimit.None)
     {
         var definition = new EffectDefinition(Effect(id, "trigger"), id, EffectKind.MonsterTrigger, steps, fieldTargets: targets);
         if (declares is { } kind) definition = definition.WithDeclaration(kind);
         return new(id, name, CardKind.Monster, getterKind, IconNormal, rules ?? MonsterRules, [definition], exceptions)
         {
-            Triggers = [new TriggerEffectProfile(definition, when, EffectRelation.Self, requirement, location, timing, cause, target: targetPolicy)]
+            Triggers = [new TriggerEffectProfile(definition, when, EffectRelation.Self, requirement, location, timing, cause, limit, target: targetPolicy)]
+        };
+    }
+
+    /// <summary>
+    /// An optional "when" trigger activated from the hand, on an event relative to the player holding the card; <paramref name="subject"/>
+    /// narrows the monster the event is about and <paramref name="directAttack"/> an attack declaration to a direct attack.
+    /// </summary>
+    public AuthoredCard HandTrigger(uint id, string name, MonsterEventKind when, EffectRelation relation, EffectStep[] steps, CardFilter? subject = null,
+        bool directAttack = false, string exceptions = "none")
+    {
+        var definition = new EffectDefinition(Effect(id, "hand-trigger"), id, EffectKind.MonsterTrigger, steps, origin: EffectOrigin.Hand);
+        return new(id, name, CardKind.Monster, EffectMonsterKind, IconNormal, MonsterRules, [definition], exceptions)
+        {
+            Triggers = [new TriggerEffectProfile(definition, when, relation, TriggerRequirement.Optional, TriggerSourceLocation.Hand, TriggerTiming.When)
+                { SubjectFilter = subject, DirectAttackOnly = directAttack }]
+        };
+    }
+
+    /// <summary>
+    /// Makes a monster a Spirit: it cannot be Special Summoned and returns to the hand in the End Phase of a turn it was Normal Summoned
+    /// or flipped face-up.
+    /// </summary>
+    public AuthoredCard Spirit(AuthoredCard card)
+    {
+        var returns = new EffectDefinition(Effect(card.Id, "return"), card.Id, EffectKind.MonsterTrigger, [new ReturnTargetsToHandStep()], fieldTargets: [new TriggerSourceMonster()]);
+        return card with
+        {
+            GetterKind = SpiritKind,
+            Rules = card.Rules with { CannotBeSpecialSummoned = true },
+            Definitions = Array.AsReadOnly([.. card.Definitions, returns]),
+            Triggers = [.. card.Triggers, new TriggerEffectProfile(returns, MonsterEventKind.EndPhaseAfterSummonOrFlip, EffectRelation.Self, TriggerRequirement.Mandatory)]
         };
     }
 

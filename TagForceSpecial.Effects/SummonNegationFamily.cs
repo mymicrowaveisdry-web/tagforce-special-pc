@@ -10,9 +10,9 @@ public static class SummonNegationFamily
     public const string FamilyId = "summon-negation-definition";
     public const string BatchId = "tfsp-family-batch-10c-04d-3";
 
-    private const string Timing = "Set card, not the turn it was set: the window of a Normal, Tribute or Special Summon attempt (opened only when a negator can answer); Spell Speed 3.";
+    private const string Timing = "Set card, not the turn it was set: the window of a Normal, Tribute, Flip or Special Summon attempt (opened only when a negator can answer); Spell Speed 3.";
     private const string Negation = "Negates the Summon; the monster is destroyed and sent to its owner's Graveyard without entering the field. Ordinary cleanup.";
-    private const string NoFlip = "Flip and Pendulum Summons open no would-be-Summoned window yet.";
+    private const string NoFlip = "A negated Flip Summon sends the still face-down monster to the Graveyard.";
 
     private static DefinitionCardProfile Card(uint id, string name, string operation, MonsterWouldBeSummonedCondition condition,
         EffectCost? cost, string costs, string requirement, string negation = Negation) =>
@@ -24,14 +24,14 @@ public static class SummonNegationFamily
     public static IReadOnlyList<DefinitionCardProfile> Cards { get; } = Array.AsReadOnly(new[]
     {
         Card(4864, "Horn of Heaven", "Counter Trap: when a monster would be Summoned, Tribute 1 monster; negate the Summon and destroy that monster.",
-            new(SummonKinds.Normal | SummonKinds.Special), new TributeCost(), "Tribute 1 monster you control (never refunded).",
-            "A monster would be Normal or Special Summoned by either player; needs a monster to Tribute."),
+            new(SummonKinds.Any), new TributeCost(), "Tribute 1 monster you control (never refunded).",
+            "A monster would be Normal, Flip or Special Summoned by either player; needs a monster to Tribute."),
         Card(6918, "Black Horn of Heaven", "Counter Trap: when the opponent would Special Summon a monster, negate it and destroy that monster.",
             new(SummonKinds.Special, ByOpponent: true), null, "none", "The opponent would Special Summon a monster."),
         Card(4861, "Solemn Judgment", "Counter Trap: when a monster would be Summoned or a Spell/Trap is activated, pay half your LP; negate it and destroy that card.",
-            new(SummonKinds.Normal | SummonKinds.Special, OrSpellTrapActivation: true), new PayHalfLifePointsCost(),
+            new(SummonKinds.Any, OrSpellTrapActivation: true), new PayHalfLifePointsCost(),
             "Pay half your LP, rounded down (never refunded).",
-            "A monster would be Normal or Special Summoned, or as a chain response to a Spell/Trap activation.",
+            "A monster would be Normal, Flip or Special Summoned, or as a chain response to a Spell/Trap activation.",
             Negation[..^"Ordinary cleanup.".Length] + "As a chain response, negates that activation and destroys the card. Ordinary cleanup.")
     });
 

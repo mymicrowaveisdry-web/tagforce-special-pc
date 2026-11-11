@@ -41,6 +41,7 @@ public sealed partial class DuelEngine
             return next.WithSummon(null);
         }
         if (pending.IsGeminiSummon) return CompleteGeminiSummon(next, pending, events).WithSummon(null);
+        if (pending.IsFlipSummon) return CompleteFlipSummon(next, pending, events).WithSummon(null);
         // The supported negation chain cannot move monsters or occupy this reserved slot.
         if (next.GetPlayer(pending.Player).MonsterZones[pending.MonsterZone] is not null)
             throw new InvalidOperationException("A pending summon destination was occupied by an unsupported operation.");
@@ -50,6 +51,18 @@ public sealed partial class DuelEngine
                 timingGroup: pending.Source == DecisionCardSource.ExtraDeck ? 1 : null, xyzMaterials: pending.XyzMaterials)
             : PlaceSuccessfulSummon(next, pending.Player, pending.Card, pending.MonsterZone, false, events, pending.Tributes);
         return next.WithSummon(null);
+    }
+
+    /// <summary>Flips the monster face-up, if it is still the face-down one the attempt named.</summary>
+    private static DuelState CompleteFlipSummon(DuelState next, PendingSummon pending, List<DuelEvent> events)
+    {
+        var player = next.GetPlayer(pending.Player);
+        if (player.MonsterZones[pending.MonsterZone] is not { Position: BattlePosition.FaceDownDefense } monster || monster.Card != pending.Card) return next;
+        var changed = monster with { Position = pending.Position, PositionChangedOnTurn = next.TurnNumber, SummonedOnTurn = next.TurnNumber };
+        var monsters = player.MonsterZones.ToArray();
+        monsters[pending.MonsterZone] = changed;
+        events.Add(new MonsterFlipSummoned(player.Id, changed, pending.MonsterZone) { TimingGroup = 1 });
+        return next.With(player: player.With(monsters: monsters));
     }
 
     private DuelActionResult ExecuteSummonWindow(DuelCommand command)
@@ -106,7 +119,7 @@ public sealed partial class DuelEngine
             }
             return next.WithSummon(pending with { Negated = true });
         }
-        if (pending.IsGeminiSummon)
+        if (pending.IsGeminiSummon || pending.IsFlipSummon)
         {
             var controller = next.GetPlayer(pending.Player);
             var zones = controller.MonsterZones.ToArray();

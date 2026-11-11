@@ -11,6 +11,7 @@ public static class TemplateCardFamily
     public const string BatchId = "tfsp-family-batch-10d-01";
 
     private const string EndsWithEndPhase = "The change ends when the End Phase begins.";
+    private const string GainedControl = "The player who gained control activates it, so its effect is written from that player's side; it does not activate if the card was face-down.";
     private static readonly CardTable T = new("template");
     /// <summary>"Cards with that name, and their effects, cannot be used": Summoned, Set, activated, used to attack or used as Synchro/Xyz Material.</summary>
     private const LockedAction PsiBlocked = LockedAction.NormalSummon | LockedAction.SetMonster | LockedAction.SpecialSummon | LockedAction.FusionSummon |
@@ -222,6 +223,21 @@ public static class TemplateCardFamily
         CardTable.Declaring(T.Ignition(9283, "Psi-Blocker", [new ApplyRuleLockStep(new RuleLock(PsiBlocked, TargetSide.Either, new DeclaredFilter()), ThroughOpponentsNextTurn: true)],
             oncePerTurn: true), DeclarationKind.CardName),
         CardTable.Declaring(T.QuickPlay(11585, "Pendulum Shift", [new SetTargetScaleStep()], targets: [new FieldTarget(FieldCardKind.PendulumScale)]), DeclarationKind.PendulumScale),
+        T.Spirit(T.Trigger(5375, "Yata-Garasu", MonsterEventKind.InflictedBattleDamage, [new SkipPhaseStep(DuelPhase.Draw, TargetSide.Opponent)])),
+        T.Trigger(4490, "Ameba", MonsterEventKind.ControlChanged, [new TakeDamageStep(2000)], limit: TriggerTurnLimit.WhileFaceUp, exceptions: GainedControl),
+        T.Trigger(4553, "Griggle", MonsterEventKind.ControlChanged, [new GainLifePointsStep(3000, EffectPlayers.Opponent)], limit: TriggerTurnLimit.WhileFaceUp, exceptions: GainedControl),
+        T.Trigger(7725, "Kunoichi", MonsterEventKind.ControlChanged, [new DiscardRandomStep()], exceptions: GainedControl),
+        T.HandTrigger(8617, "Battle Fader", MonsterEventKind.AttackDeclared, EffectRelation.Opponent,
+            [new SpecialSummonSelfStep(), new BanishSourceWhenItLeavesStep(), new EndBattlePhaseStep()], directAttack: true),
+        T.HandTrigger(10898, "Gorgonic Gargoyle", MonsterEventKind.NormalSummoned, EffectRelation.Controller, [new SpecialSummonSelfStep()], OfType(Rock)),
+        T.FromZone(9078, "Swift Scarecrow", EffectOrigin.Hand, new([new NegateAttackStep(), new EndBattlePhaseStep()], new SendSelfCost(SelfDestination.Graveyard),
+            TrapTiming.Attacker, [new OpponentAttackDeclaredCondition(), new DirectAttackCondition()]), quick: true),
+        T.QuickPlay(5486, "Spell of Pain", [new RedirectRespondedDamageStep()], conditions: [new RespondsToDamageCondition()]),
+        T.Counter(5543, "Barrel Behind the Door", [new RedirectRespondedDamageStep()], [new RespondsToDamageCondition(ByOpponent: false)]),
+        T.Counter(7765, "Intercept", [new TakeControlStep()], [new MonsterSummonedCondition(SummonKinds.Normal), new TributeCountCondition(1)], targets: TrapTiming.Summoned,
+            exceptions: "Offered only for the opponent's Summons; taking your own monster would do nothing."),
+        T.Trap(9941, "Splash Capture", [new TakeControlStep()], new BanishFromGraveyardCost(OfType(Fish), 2), TrapTiming.Summoned,
+            [new MonsterSummonedCondition(SummonKinds.Special), new XyzSummonedCondition()]),
         T.ContinuousLock(5134, "Gravity Bind", trap: true, new RuleLock(LockedAction.Attack, Cards: new MonsterLevelFilter(12, minLevel: 4))),
         T.ContinuousLock(5281, "Vengeful Bog Spirit", trap: false, new RuleLock(LockedAction.Attack, SummonedThisTurnOnly: true)),
         T.ContinuousLock(6522, "Non-Fusion Area", trap: true, new RuleLock(LockedAction.FusionSummon)),

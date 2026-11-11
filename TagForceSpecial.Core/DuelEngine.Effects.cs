@@ -63,6 +63,9 @@ public sealed partial class DuelEngine
             // A Counter Trap that answers an attack is activated in the battle window it waits for.
             (ActivationContext.BattleWindow, EffectKind.CounterTrap) when definition.Conditions.Any(c => c is OpponentAttackDeclaredCondition or BattleTimingCondition)
                 => setThisTurn ? DuelError.SetThisTurn : DuelError.None,
+            // So is one whose own timing is a Summon that just happened, in the window after it.
+            (ActivationContext.OpenWindow, EffectKind.CounterTrap) when definition.Conditions.Any(c => c is MonsterSummonedCondition)
+                => setThisTurn ? DuelError.SetThisTurn : DuelError.None,
             (ActivationContext.OwnSetCard or ActivationContext.OpenWindow or ActivationContext.BattleWindow, _) => DuelError.ActivationTimingNotAllowed,
             (ActivationContext.ChainResponse, EffectKind.NormalSpell or EffectKind.ContinuousSpell or EffectKind.FieldSpell or EffectKind.EquipSpell) => DuelError.ActivationTimingNotAllowed,
             (ActivationContext.ChainResponse, _) => setThisTurn ? DuelError.SetThisTurn
@@ -100,7 +103,14 @@ public sealed partial class DuelEngine
                     h.TurnNumber == State.TurnNumber && h.Method != SummonMethod.Set),
                 OpponentAttackDeclaredCondition => State.Battle is { Window.Timing: BattleTiming.AttackDeclaration, Attack: { Cancellation: null } attack } &&
                     attack.Attacker.Player != playerId && attack.Attacker.IsStillPresent(State),
-                MonsterSummonedCondition summoned => SummonedMatches(State, playerId, summoned).Any(),
+                MonsterSummonedCondition summoned => SummonedMatches(State, playerId, summoned, definition.Conditions).Any(),
+                // Read by SummonedMatches together with the summon condition.
+                TributeCountCondition or XyzSummonedCondition => true,
+                DirectAttackCondition => State.Battle?.Attack is { Defender: null },
+                RespondsToDamageCondition damages => preceding is not null && (!damages.ByOpponent || preceding.Activation.Player != playerId) &&
+                    // A scale activation, effect Summon or older trigger link has no definition, and inflicts no damage.
+                    (preceding.Trigger?.Profile.Definition ?? effectsById.GetValueOrDefault(preceding.Activation.EffectId)) is { } answered &&
+                    WouldDamage(answered, preceding.Activation.Player, playerId),
                 OpponentHandAtLeastCondition hand => State.GetPlayer(Other(playerId)).Hand.Count >= hand.Count,
                 PhaseCondition phase => State.Phase == phase.Phase,
                 LifePointsBehindCondition behind => (long)State.GetPlayer(Other(playerId)).LifePoints - player.LifePoints >= behind.Amount,
@@ -110,7 +120,7 @@ public sealed partial class DuelEngine
                 MonsterWouldBeSummonedCondition would => preceding is null
                     ? State.PendingChain is null && State.PendingSummon is { Negated: false } attempt && (!would.ByOpponent || attempt.Player != playerId) &&
                         (would.Group || attempt.PendulumGroup.Count <= 1) &&
-                        would.Kinds.HasFlag(attempt.IsSpecialSummon ? SummonKinds.Special : SummonKinds.Normal)
+                        would.Kinds.HasFlag(attempt.IsFlipSummon ? SummonKinds.Flip : attempt.IsSpecialSummon ? SummonKinds.Special : SummonKinds.Normal)
                     : would.OrSpellTrapActivation && preceding is { Trigger: null } &&
                         (preceding.IsPendulumScale || rules[preceding.Activation.Spell.GameCardId].Category is CardCategory.Spell or CardCategory.Trap),
                 _ => false
@@ -237,10 +247,10 @@ public sealed partial class DuelEngine
     /// True when a Summon attempt pauses for responses: its card opted in, or the responder of
     /// <paramref name="attempt"/> has a set Counter Trap that can negate it.
     /// </summary>
-    private bool OpensSummonWindow(DuelState attempt, uint cardId)
+    private bool OpensSummonWindow(DuelState attempt, uint cardId, bool optedIn = true)
     {
         if (unnegatableSummons.Contains(cardId)) return false;
-        if (summonWindows.Contains(cardId)) return true;
+        if (optedIn && summonWindows.Contains(cardId)) return true;
         if (!SummonNegators) return false;
         var saved = State;
         State = attempt;
@@ -323,17 +333,18 @@ public sealed partial class DuelEngine
                 ResponseToLink: chain?.Links[^1].Number ?? 0, SourcePlacementId: placement) { IsMonsterEffect = definition.IsMonsterEffect };
             return Accept(placed.WithActivation(pending).WithDecision(decision), [.. head, new DecisionRequested(decision)]);
         }
-        // The combatant or just-Summoned monsters are bound automatically; no decision is needed.
-        IReadOnlyList<FieldCardTarget>? automatic = definition.FieldTargets switch
-        {
-            [AttackingMonsterTarget or DefendingMonsterTarget] when LiveCombatant(State, definition) is { } combatant =>
-                [new(combatant.Player, FieldLocation.MonsterZone, combatant.Zone, combatant.Card, combatant.PlacementId)],
-            [SummonedMonsterTarget] => [.. SummonedMatches(State, playerId, definition.Conditions.OfType<MonsterSummonedCondition>().First())],
-            _ => null
-        };
-        return AddDefinitionLink(placed, new(playerId, definition.EffectId, card, zone, null, null, automatic), definition, placement,
+        return AddDefinitionLink(placed, new(playerId, definition.EffectId, card, zone, null, null, AutomaticTargets(State, playerId, definition)), definition, placement,
             chain, [.. head]);
     }
+
+    /// <summary>The combatant or just-Summoned monsters, bound automatically without a decision; null for other targets.</summary>
+    private IReadOnlyList<FieldCardTarget>? AutomaticTargets(DuelState state, PlayerId playerId, EffectDefinition definition) => definition.FieldTargets switch
+    {
+        [AttackingMonsterTarget or DefendingMonsterTarget] when LiveCombatant(state, definition) is { } combatant =>
+            [new(combatant.Player, FieldLocation.MonsterZone, combatant.Zone, combatant.Card, combatant.PlacementId)],
+        [SummonedMonsterTarget] => [.. SummonedMatches(state, playerId, definition.Conditions.OfType<MonsterSummonedCondition>().First(), definition.Conditions)],
+        _ => null
+    };
 
     /// <summary>Cost then target answers; the final answer adds the link. The cost stays paid if a later step waits.</summary>
     private DuelActionResult AnswerDefinitionDecision(PendingDecision pending, DecisionAnswer answer, DecisionAnswer[] answers)
@@ -413,7 +424,9 @@ public sealed partial class DuelEngine
         var receipt = new CommittedActivation(activation.Player, definition.EffectId, activation.Spell,
             activation.SpellTrapZone, activation.DiscardedCost, target,
             answers.Skip(definition.CostTargetSteps).Any(a => a.FieldTarget is not null)
-                ? Array.AsReadOnly(answers.Skip(definition.CostTargetSteps).Select(a => a.FieldTarget).OfType<FieldCardTarget>().ToArray()) : null);
+                ? Array.AsReadOnly(answers.Skip(definition.CostTargetSteps).Select(a => a.FieldTarget).OfType<FieldCardTarget>().ToArray())
+                // A cost was chosen but the targets are bound automatically.
+                : AutomaticTargets(next, activation.Player, definition));
         events.Add(new DecisionSequenceCompleted(result));
         return AddDefinitionLink(next.WithDecision(null, result).WithActivation(null), receipt, definition,
             activation.SourcePlacementId, State.PendingChain, events);
@@ -894,6 +907,10 @@ public sealed partial class DuelEngine
                     DealDamageStep damage => Scaled(state, controller, damage.Amount, damage.PerCount) is int amount and > 0
                         ? DealEffectDamage(state, Other(controller), amount, definition.EffectId, events) : state,
                     DamageBothPlayersStep both => DamageBothPlayers(state, controller, both, definition.EffectId, events),
+                    TakeDamageStep take => DealEffectDamage(state, controller, take.Amount, definition.EffectId, events),
+                    DiscardRandomStep discard => DiscardRandom(state, controller, discard, events),
+                    BanishSourceWhenItLeavesStep => BanishSourceWhenItLeaves(state, link),
+                    RedirectRespondedDamageStep => RedirectRespondedDamage(state, controller, link),
                     SummonTokensStep tokens => SummonTokens(state, link, tokens, events),
                     ShuffleDeckStep => ShuffleDeck(state, controller, definition.EffectId, events),
                     GrantNormalSummonStep => GrantNormalSummon(state, definition.EffectId, events),
@@ -1200,12 +1217,13 @@ public sealed partial class DuelEngine
     }
 
     /// <summary>The just-Summoned monsters, still in place, that meet a summon condition for this player.</summary>
-    private IEnumerable<FieldCardTarget> SummonedMatches(DuelState state, PlayerId playerId, MonsterSummonedCondition condition)
+    private IEnumerable<FieldCardTarget> SummonedMatches(DuelState state, PlayerId playerId, MonsterSummonedCondition condition, IEnumerable<EffectCondition> how)
     {
         if (state.Bookkeeping.RecentSummon is not { } summoned || condition.Single && summoned.Count != 1) yield break;
-        foreach (var (monster, kind) in summoned)
+        foreach (var entry in summoned)
         {
-            if ((condition.Kinds & kind) == 0 || condition.ByOpponent && monster.Player == playerId || !monster.IsStillPresent(state)) continue;
+            var (monster, kind) = entry;
+            if ((condition.Kinds & kind) == 0 || condition.ByOpponent && monster.Player == playerId || !monster.IsStillPresent(state) || !SummonedHow(entry, how)) continue;
             var stats = GetMonsterStatistics(state, monster.Player, monster.Zone);
             if ((condition.Stat == MonsterStat.Attack ? stats?.Attack : stats?.Defense) is int value && value >= condition.Min && value <= condition.Max)
                 yield return new(monster.Player, FieldLocation.MonsterZone, monster.Zone, monster.Card, monster.PlacementId);
@@ -1224,9 +1242,11 @@ public sealed partial class DuelEngine
         if (!SummonResponders) return;
         SummonedMonster[] summoned = [.. emitted.Select(e => e switch
         {
-            MonsterNormalSummoned n => new SummonedMonster(new(n.Player, n.Zone, n.Monster.Card, n.Monster.PlacementId), SummonKinds.Normal),
+            MonsterNormalSummoned n => new SummonedMonster(new(n.Player, n.Zone, n.Monster.Card, n.Monster.PlacementId), SummonKinds.Normal) { Tributes = n.Tributes.Count },
             MonsterFlipSummoned f => new SummonedMonster(new(f.Player, f.Zone, f.Monster.Card, f.Monster.PlacementId), SummonKinds.Flip),
-            MonsterSpecialSummoned s => new SummonedMonster(new(s.Player, s.Zone, s.Monster.Card, s.Monster.PlacementId), SummonKinds.Special),
+            // An Xyz Summon brings an Extra Deck Xyz Monster with materials already attached.
+            MonsterSpecialSummoned s => new SummonedMonster(new(s.Player, s.Zone, s.Monster.Card, s.Monster.PlacementId), SummonKinds.Special)
+                { Xyz = s.Source == DecisionCardSource.ExtraDeck && IsXyzCard(s.Monster.Card) && s.Monster.XyzMaterials.Count > 0 },
             _ => null
         }).OfType<SummonedMonster>()];
         bool open = State.Outcome is null && State.PendingChain is null && State.OpenWindow is null && State.PendingDecision is null &&

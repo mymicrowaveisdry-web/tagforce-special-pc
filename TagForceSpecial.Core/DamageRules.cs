@@ -24,14 +24,16 @@ public sealed record DamageRuleProfile(string EffectId, uint CardId, DamageRule 
 /// <summary>Applies a rule to the activating player for this turn, or for the attack in progress.</summary>
 public sealed record ApplyDamageRuleStep(DamageRule Rule, DamageRuleScope Scope = DamageRuleScope.ThisTurn) : EffectStep;
 
-internal sealed record TimedDamageRule(PlayerId Player, int TurnNumber, long? AttackId, DamageRule Rule);
+/// <summary>With <paramref name="LinkNumber"/>, the rule applies only while that link of the current chain resolves.</summary>
+internal sealed record TimedDamageRule(PlayerId Player, int TurnNumber, long? AttackId, DamageRule Rule, int? LinkNumber = null);
 
 public sealed partial class DuelEngine
 {
     private bool HasDamageRule(DuelState state, PlayerId player, DamageRuleKind kind, DamageKinds damage)
     {
         if (state.Bookkeeping.TimedDamageRules.Any(t => t.Player == player && t.TurnNumber == state.TurnNumber && t.Rule.Kind == kind &&
-                (t.Rule.Applies & damage) != 0 && (t.AttackId is null || state.Battle?.Attack?.Id == t.AttackId)))
+                (t.Rule.Applies & damage) != 0 && (t.AttackId is null || state.Battle?.Attack?.Id == t.AttackId) &&
+                (t.LinkNumber is null || state.PendingChain is { NextLink: > 0 } resolving && resolving.NextLink == t.LinkNumber)))
             return true;
         if (damageRuleProfiles.Count == 0) return false;
         bool Applies(PlayerId controller, DamageRuleProfile profile) => profile.Rule.Kind == kind && (profile.Rule.Applies & damage) != 0 &&

@@ -23,7 +23,8 @@ public sealed partial class DuelEngine
     {
         if (rules[trigger.Source.Card.GameCardId].Category == CardCategory.Monster && trigger.Profile.SourceLocation != TriggerSourceLocation.PendulumZone &&
             RuleLocked(state, LockedAction.ActivateMonsterEffect, trigger.Player, trigger.Source.Card, kind: EffectKind.MonsterTrigger)) return false;
-        bool location = trigger.Profile.SourceLocation == TriggerSourceLocation.FaceUpSpellTrap ? SpellTrapSourcePresent(state, trigger.Source) :
+        bool location = trigger.Profile.SourceLocation == TriggerSourceLocation.Hand ? state.GetPlayer(trigger.Player).Hand.Contains(trigger.Source.Card) :
+            trigger.Profile.SourceLocation == TriggerSourceLocation.FaceUpSpellTrap ? SpellTrapSourcePresent(state, trigger.Source) :
             trigger.Profile.SourceLocation == TriggerSourceLocation.PendulumZone ? ScaleSourcePresent(state, trigger.Source) :
             trigger.Profile.SourceLocation != TriggerSourceLocation.FaceUpMonster
             ? state.GetPlayer(trigger.Player).Graveyard.Contains(trigger.Source.Card) ||
@@ -114,18 +115,20 @@ public sealed partial class DuelEngine
     }
 
     /// <summary>
-    /// An attack declaration, with the attacker as subject; battle damage, with the monster that inflicted it; and on entering the
-    /// Standby Phase, one per face-up Spell or Trap.
+    /// An attack declaration, with the attacker as subject; battle damage, with the monster that inflicted it; a change of control, with
+    /// the monster in its new place; and on entering the Standby Phase, one per face-up Spell or Trap.
     /// </summary>
     private IEnumerable<MonsterEventOccurrence> AttackAndStandbyOccurrences(DuelState before, DuelState after, DuelEvent emitted)
     {
         var point = new EffectTimingPoint(checked(State.Revision + 1), emitted.TimingGroup ?? 0);
         if (emitted is AttackDeclared declared && before.GetPlayer(declared.Player).MonsterZones[declared.AttackerZone] is { } attacker)
-            yield return new(MonsterEventKind.AttackDeclared, new(declared.Player, declared.AttackerZone, attacker.Card, attacker.PlacementId), point);
+            yield return new(MonsterEventKind.AttackDeclared, new(declared.Player, declared.AttackerZone, attacker.Card, attacker.PlacementId), point) { DirectAttack = declared.TargetZone is null };
         // The monster on the other side of the battle from the damaged player inflicted the damage.
         if (emitted is BattleDamageDealt { Damage: > 0 } damage && before.Battle?.Attack is { } attack &&
             (damage.Player != attack.Attacker.Player ? attack.Attacker : attack.Defender) is { } dealer && dealer.Player != damage.Player)
             yield return new(MonsterEventKind.InflictedBattleDamage, dealer, point);
+        if (emitted is ControlChanged moved && after.GetPlayer(moved.To).MonsterZones[moved.ToZone] is { } taken && taken.Card == moved.Card)
+            yield return new(MonsterEventKind.ControlChanged, new(moved.To, moved.ToZone, taken.Card, taken.PlacementId), point);
         if (emitted is PhaseChanged { To: DuelPhase.End })
             foreach (var (binding, monster) in FieldMonsters(after))
                 if (monster.Position != BattlePosition.FaceDownDefense) yield return new(MonsterEventKind.EndPhase, binding, point);
@@ -157,6 +160,8 @@ public sealed partial class DuelEngine
         definition.Steps.All(step => step switch
         {
             SpecialSummonStep summon => SpecialSummonOptions(state, trigger.Player, summon, trigger.Source.Card).Any(),
+            SpecialSummonSelfStep self => trigger.Profile.SourceLocation != TriggerSourceLocation.Hand || Enumerable.Range(0, 5).Any(zone =>
+                CheckSpecialSummon(state, trigger.Player, trigger.Source.Card, zone, self.Position ?? BattlePosition.FaceUpAttack, DecisionCardSource.Hand) == DuelError.None),
             AddFromDeckToHandStep search => DeckMatches(state, trigger.Player, search.Filter).Any(),
             SendFromDeckToGraveyardStep send => DeckMatches(state, trigger.Player, send.Filter).Any(),
             _ => true
@@ -180,6 +185,17 @@ public sealed partial class DuelEngine
                 {
                     if (occurrence.FromSpellTrapZone && profile.SourceLocation is TriggerSourceLocation.FaceUpMonster or TriggerSourceLocation.FaceUpSpellTrap or TriggerSourceLocation.PendulumZone) continue;
                     if (profile.RequiredProcedureId is { } procedure && occurrence.ProcedureId != procedure) continue;
+                    if (profile.DirectAttackOnly && !occurrence.DirectAttack || profile.SubjectFilter is { } subjects && !MatchesFilter(occurrence.Subject.Card, subjects)) continue;
+                    if (profile.SourceLocation == TriggerSourceLocation.Hand)
+                    {
+                        foreach (var holder in after.Players)
+                            foreach (var held in holder.Hand.Where(c => c.GameCardId == profile.CardId))
+                            {
+                                MonsterBinding source = new(holder.Id, -1, held, 0);
+                                if (Relates(profile.Relation, source, occurrence.Subject)) yield return new(id++, profile, source, occurrence);
+                            }
+                        continue;
+                    }
                     if (profile.SourceLocation is TriggerSourceLocation.FaceUpSpellTrap or TriggerSourceLocation.PendulumZone)
                     {
                         var faceUp = profile.SourceLocation == TriggerSourceLocation.PendulumZone ? ActiveScales(after) : ActiveCards(after);
@@ -218,7 +234,7 @@ public sealed partial class DuelEngine
                 MonsterDestroyed or MonsterTributed or SummonMaterialSentToGraveyard or SummonMaterialSentToFaceUpExtraDeck or FusionMaterialSentToGraveyard or FusionMaterialSentToFaceUpExtraDeck or RitualMaterialTributed or CardSentToFaceUpExtraDeck or PendulumScaleActivated or SummonMaterialBanished or XyzMaterialAttached or XyzMaterialSentToGraveyard or SummonAttempted or SummonNegated or CardDiscarded or ActivationCostPaid or TriggerCostPaid or MonsterRevealed or SpellTrapDestroyed or
                 MonsterBanished or LifePointsGained or BattleDamageDealt or EffectDamageDealt or MonsterModifierCreated or MonsterEffectsNegated or
                 SpellActivated or ChainResponseActivated or MonsterPositionChanged or MonsterSet or SpellTrapSet or CardDrawn or CardSearched or CardSentFromDeckToGraveyard or CardReturnedToHand or LifePointsPaid or CardMovedToHand or CardBanishedFromGraveyard or CardReturnedToGraveyard or CardShuffledIntoDeck or
-                PhaseChanged or TurnStarted or AttackDeclared or BattleFlipEffectWindowOpened)
+                PhaseChanged or TurnStarted or AttackDeclared or BattleFlipEffectWindowOpened or ControlChanged)
                 point = new(checked(State.Revision + 1), emitted.TimingGroup ?? 0);
         return point;
     }

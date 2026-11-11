@@ -13,6 +13,9 @@ public sealed record PendingSummon(long AttemptId, long DecisionId, PlayerId Pla
     /// <summary>A face-up Gemini monster Normal Summoned again; it stays in its zone during the attempt.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public bool IsGeminiSummon { get; internal init; }
+    /// <summary>A face-down monster being Flip Summoned; it stays face-down in its zone during the attempt.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsFlipSummon { get; internal init; }
 }
 
 public sealed record PassSummonResponse(PlayerId Player, long DecisionId) : DuelCommand(Player);

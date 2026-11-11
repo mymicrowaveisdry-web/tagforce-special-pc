@@ -257,13 +257,21 @@ public sealed record SummonedMonsterTarget : EffectTarget;
 public sealed record DestroyAndBanishTargetsStep : EffectStep;
 
 /// <summary>A monster that was just Summoned, and how.</summary>
-public sealed record SummonedMonster(MonsterBinding Monster, SummonKinds Kind);
+public sealed record SummonedMonster(MonsterBinding Monster, SummonKinds Kind)
+{
+    /// <summary>How many monsters were Tributed for a Tribute Summon; 0 otherwise.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int Tributes { get; internal init; }
+    /// <summary>The Special Summon was an Xyz Summon.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool Xyz { get; internal init; }
+}
 
 /// <summary>After a successful Summon, the opponent may activate a set card before play continues.</summary>
 public sealed record SummonResponseWindowRequested(PlayerId Responder, long DecisionId, IReadOnlyList<SummonedMonster> Summoned) : DuelEvent;
 
 /// <summary>
-/// A monster would be Normal or Special Summoned and no chain has started; by the opponent when ByOpponent is set.
+/// A monster would be Normal, Flip or Special Summoned and no chain has started; by the opponent when ByOpponent is set.
 /// With OrSpellTrapActivation, a preceding Spell/Trap activation also qualifies; a group Summon needs Group.
 /// </summary>
 public sealed record MonsterWouldBeSummonedCondition(SummonKinds Kinds, bool ByOpponent = false, bool OrSpellTrapActivation = false,

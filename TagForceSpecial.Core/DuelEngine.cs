@@ -492,6 +492,15 @@ public sealed partial class DuelEngine
         if (flip && IsSummonLocked(State, player.Id)) return Reject(DuelError.SummonLocked);
         var changed = monster with { Position = target, PositionChangedOnTurn = State.TurnNumber,
             SummonedOnTurn = flip ? State.TurnNumber : monster.SummonedOnTurn };
+        if (flip)
+        {
+            // A Flip Summon pauses only when the opponent has a set card that can negate it.
+            var pending = new PendingSummon(checked(State.Revision + 1), checked(State.Revision + 1), player.Id, monster.Card, zone, Other(player.Id),
+                Position: target) { IsFlipSummon = true };
+            var attempted = State.WithSummon(pending);
+            if (OpensSummonWindow(attempted, monster.Card.GameCardId, optedIn: false))
+                return Accept(attempted, new SummonAttempted(pending) { TimingGroup = 1 }, new SummonResponseRequested(pending));
+        }
         var zones = player.MonsterZones.ToArray();
         zones[zone] = changed;
         return Accept(State.With(player: player.With(monsters: zones)), flip
@@ -610,6 +619,7 @@ public sealed partial class DuelEngine
         state = PrepareXyzMaterials(State, state, emitted);
         state = ApplyFieldLinks(State, state, emitted);
         state = ApplyControlReturns(state, emitted);
+        state = DropLinkDamageRules(state);
         state = ApplyGraveyardRedirects(state, emitted);
         state = PrepareSummonHistory(State, state, emitted);
         identityView = state;

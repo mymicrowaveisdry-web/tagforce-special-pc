@@ -405,6 +405,10 @@ public sealed class EffectDefinition
                     GainLifePointsStep s => s.Amount <= 0 || !Enum.IsDefined(s.Players) || !Enum.IsDefined(s.PerCount),
                     DealDamageStep s => s.Amount <= 0 || !Enum.IsDefined(s.PerCount),
                     DamageBothPlayersStep s => s.ToOpponent <= 0 || s.ToSelf <= 0,
+                    TakeDamageStep s => s.Amount <= 0,
+                    BanishSourceWhenItLeavesStep => false,
+                    RedirectRespondedDamageStep => false,
+                    DiscardRandomStep s => s.Player is not (TargetSide.Own or TargetSide.Opponent),
                     // Validated by their constructors; the engine checks Token rules and the seed.
                     SummonTokensStep or ShuffleDeckStep or SpecialSummonStep => false,
                     DrawCardsStep s => s.Count is < 1 or > 10 || !Enum.IsDefined(s.Players),
@@ -482,22 +486,29 @@ public sealed class EffectDefinition
             throw new ArgumentException("Supply up to 8 distinct conditions.", nameof(conditions));
         if (required.OfType<MonsterSummonedCondition>().Any(c => c.Kinds is <= 0 or > SummonKinds.Any || !Enum.IsDefined(c.Stat) || c.Min < 0 || c.Min > c.Max))
             throw new ArgumentException("A summon condition needs summon kinds and a valid stat range.", nameof(conditions));
+        if (snapshot.Any(s => s is RedirectRespondedDamageStep) != required.Any(c => c is RespondsToDamageCondition) ||
+            required.Any(c => c is RespondsToDamageCondition) && kind is not (EffectKind.QuickPlaySpell or EffectKind.NormalTrap or EffectKind.CounterTrap) ||
+            required.Any(c => c is DirectAttackCondition) && !required.Any(c => c is OpponentAttackDeclaredCondition) ||
+            required.Any(c => c is TributeCountCondition or XyzSummonedCondition) && !required.Any(c => c is MonsterSummonedCondition) ||
+            required.OfType<TributeCountCondition>().Any(c => c.Tributes is < 1 or > 3))
+            throw new ArgumentException("How a monster was Summoned narrows a summon condition.", nameof(conditions));
         if (required.OfType<BattleTimingCondition>().Any(c => c.Windows == BattleTiming.None || (c.Windows & ~BattleTiming.All) != 0 ||
                 c.Windows.HasFlag(BattleTiming.Calculation) && !c.DuringCalculation))
             throw new ArgumentException("A battle timing condition needs supported timings; during calculation needs an explicit exception.", nameof(conditions));
         if (cost is not (null or DiscardCost or PayLifePointsCost or TributeCost or PayHalfLifePointsCost or TributeSelfCost or RemoveCounterCost or BanishFromGraveyardCost or DetachCost or SendSelfCost or RevealSelfCost) ||
             cost is TributeSelfCost or RemoveCounterCost or DetachCost && !monsterKind ||
             cost is DiscardCost { Count: < 1 or > 5 } or TributeCost { Count: < 1 or > 5 }) throw new ArgumentOutOfRangeException(nameof(cost));
-        if (!Enum.IsDefined(origin) || origin is EffectOrigin.Hand or EffectOrigin.Graveyard && !monsterKind && kind is not (EffectKind.SpellTrapIgnition or EffectKind.SpellTrapQuick) ||
+        if (!Enum.IsDefined(origin) || origin is EffectOrigin.Hand or EffectOrigin.Graveyard && !monsterKind && kind is not (EffectKind.SpellTrapIgnition or EffectKind.SpellTrapQuick) &&
+                !(kind == EffectKind.MonsterTrigger && origin == EffectOrigin.Hand) ||
             origin == EffectOrigin.PendulumZone && (kind is not (EffectKind.SpellTrapIgnition or EffectKind.SpellTrapQuick or EffectKind.ContinuousSpell) ||
                 cost is SendSelfCost or RevealSelfCost) ||
             cost is SendSelfCost self && (!Enum.IsDefined(self.Destination) || origin == EffectOrigin.Field || origin == EffectOrigin.Hand && self.Destination == SelfDestination.Banish ||
                 origin == EffectOrigin.Graveyard && self.Destination != SelfDestination.Banish) || cost is RevealSelfCost && origin != EffectOrigin.Hand ||
             snapshot.Any(s => s is SpecialSummonSelfStep) && origin == EffectOrigin.Field)
             throw new ArgumentException("Hand and Graveyard effects belong to activated effects, with a self-cost that matches where the card is.", nameof(origin));
-        if (required.OfType<MonsterWouldBeSummonedCondition>().Any(c => c.Kinds is <= 0 || (c.Kinds & ~(SummonKinds.Normal | SummonKinds.Special)) != 0) ||
+        if (required.OfType<MonsterWouldBeSummonedCondition>().Any(c => c.Kinds is <= 0 or > SummonKinds.Any) ||
             snapshot.Any(s => s is NegateSummonStep) != required.Any(c => c is MonsterWouldBeSummonedCondition) || snapshot.Any(s => s is NegateSummonStep) && kind != EffectKind.CounterTrap)
-            throw new ArgumentException("Summon negation needs a Counter Trap with a Normal/Special would-be-Summoned condition.", nameof(steps));
+            throw new ArgumentException("Summon negation needs a Counter Trap with a would-be-Summoned condition.", nameof(steps));
         if (target is not (null or SpellTrapOnFieldTarget)) throw new ArgumentOutOfRangeException(nameof(target));
         bool responds = required.Any(c => c is RespondsToSpellActivationCondition or RespondsToActivationCondition);
         if (required.OfType<RespondsToActivationCondition>().Any(c => c.Category is not (null or CardCategory.Monster or CardCategory.Spell or CardCategory.Trap)))
@@ -540,7 +551,9 @@ public sealed class EffectDefinition
             snapshot.Any(s => s is AttachFromStep { ToTarget: false }) && (!monsterKind || fields.Length != 0) ||
             snapshot.Any(s => s is AttachTargetsToSelfStep) && (!monsterKind || fields.Any(f => f is not FieldTarget { Kind: FieldCardKind.Monster })))
             throw new ArgumentException("Equip, revival, Union and counter steps need their card kinds and bound targets.", nameof(steps));
-        if (snapshot.Any(s => s is TakeControlStep or GiveControlStep) && fields.Any(f => f is not FieldTarget { Kind: FieldCardKind.Monster }) ||
+        // Taking a monster the opponent just Summoned binds it automatically.
+        bool takesSummoned = snapshot.Any(s => s is TakeControlStep) && fields is [SummonedMonsterTarget] && required.OfType<MonsterSummonedCondition>().All(c => c.ByOpponent);
+        if (snapshot.Any(s => s is TakeControlStep or GiveControlStep) && !takesSummoned && fields.Any(f => f is not FieldTarget { Kind: FieldCardKind.Monster }) ||
             snapshot.Any(s => s is TakeControlStep) && fields.Any(f => f is FieldTarget { Side: not TargetSide.Opponent }) ||
             snapshot.Any(s => s is GiveControlStep) && fields.Any(f => f is FieldTarget { Side: not TargetSide.Own }) ||
             snapshot.Any(s => s is SwitchControlStep) && fields is not ([FieldTarget { Kind: FieldCardKind.Monster, Count: 1, Side: TargetSide.Opponent },

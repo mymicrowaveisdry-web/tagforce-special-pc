@@ -25,13 +25,13 @@ public sealed partial class DuelEngine
                 case SummonAttempted e:
                     var a = e.Attempt;
                     Record(a.Player, a.Card, a.MonsterZone, a.Position,
-                        a.ProcedureId == "pendulum" ? SummonMethod.Pendulum : a.IsSpecialSummon ? SummonMethod.SpecialProcedure : SummonMethod.Normal,
+                        a.IsFlipSummon ? SummonMethod.Flip : a.ProcedureId == "pendulum" ? SummonMethod.Pendulum : a.IsSpecialSummon ? SummonMethod.SpecialProcedure : SummonMethod.Normal,
                         a.Source, SummonStatus.Pending, null, a.AttemptId, a.ProcedureId);
                     break;
                 case SummonNegated e:
                     var n = e.Attempt;
                     Record(n.Player, n.Card, n.MonsterZone, n.Position,
-                        n.ProcedureId == "pendulum" ? SummonMethod.Pendulum : n.IsSpecialSummon ? SummonMethod.SpecialProcedure : SummonMethod.Normal,
+                        n.IsFlipSummon ? SummonMethod.Flip : n.ProcedureId == "pendulum" ? SummonMethod.Pendulum : n.IsSpecialSummon ? SummonMethod.SpecialProcedure : SummonMethod.Normal,
                         n.Source, SummonStatus.Negated, null, n.AttemptId, n.ProcedureId);
                     break;
                 case MonsterSpecialSummoned e:

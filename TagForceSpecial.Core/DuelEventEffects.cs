@@ -17,6 +17,9 @@ public sealed record MonsterEventOccurrence(MonsterEventKind Kind, MonsterBindin
     /// <summary>The procedure that performed this Special Summon, if any.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public string? ProcedureId { get; internal init; }
+    /// <summary>The declared attack was a direct attack.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool DirectAttack { get; internal init; }
 }
 public sealed record TriggerActivation(int Id, TriggerEffectProfile Profile, MonsterBinding Source,
     MonsterEventOccurrence Occurrence, CardInstance? DiscardedCost = null, int PaidLifePoints = 0,
