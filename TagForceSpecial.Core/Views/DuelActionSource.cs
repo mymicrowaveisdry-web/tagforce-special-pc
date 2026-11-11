@@ -395,6 +395,20 @@ public sealed class DuelActionSource
                             $"Toon Summon {name} [{z + 1}] {position}", card.InstanceId, z, position: position, target: tributes.Aggregate(0, (mask, t) => mask | 1 << t));
         }
         yield return B(new ActivateSetSpell(player, DuelPlayerState.FieldZoneIndex), ActionKind.ActivateSetSpell, "Activate set [Field]", own.FieldSpell?.Card.InstanceId, DuelPlayerState.FieldZoneIndex);
+        // Pendulum scales, one-card Pendulum Summons and Pendulum Effects; the engine filters out what is not legal.
+        foreach (var card in own.Hand)
+            for (int z = 0; z < 2; z++)
+                yield return B(new ActivatePendulumScale(player, card.InstanceId, z), ActionKind.ActivateSpell, $"Scale {catalog[card.GameCardId].Name} [{z + 1}]",
+                    card.InstanceId, z, target: 100 + z);
+        if (Enumerable.Range(0, 5).FirstOrDefault(z => own.MonsterZones[z] is null, -1) is int free and >= 0)
+            foreach (var (card, from) in own.Hand.Select(c => (c, DecisionCardSource.Hand)).Concat(own.FaceUpExtraDeck.Select(c => (c, DecisionCardSource.FaceUpExtraDeck))))
+                yield return B(new PendulumSummon(player, state.Revision, [new(card.InstanceId, from, free)]), ActionKind.Summon,
+                    $"Pendulum Summon {catalog[card.GameCardId].Name}", card.InstanceId, free, target: 300);
+        for (int z = 0; z < 2; z++)
+            if (own.PendulumZones[z] is { } scale)
+                foreach (int i in engine.PendulumEffectIndexes(scale.Card.GameCardId))
+                    yield return B(new ActivatePendulumEffect(player, z, i), ActionKind.CardEffect, $"Use {catalog[scale.Card.GameCardId].Name} Pendulum Effect",
+                        scale.Card.InstanceId, z, 200 + i);
         foreach (var (command, instance, zone, position, tag) in engine.SummonProcedureOptions(state, player))
             yield return B(command, ActionKind.Summon, $"Special Summon {tag}", instance, zone, tag, position);
         for (int z = 0; z < 5; z++)

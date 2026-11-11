@@ -10,12 +10,14 @@ public enum MonsterEventKind { NormalSummoned, SpecialSummoned, FlipSummoned, De
     /// <summary>A Standby Phase began; the turn player is the subject's player. Only face-up Spells and Traps use it.</summary>
     StandbyPhase,
     /// <summary>This monster inflicted battle damage to its controller's opponent.</summary>
-    InflictedBattleDamage }
+    InflictedBattleDamage,
+    /// <summary>An End Phase began; like <see cref="StandbyPhase"/>, only face-up Spells, Traps and scales use it.</summary>
+    EndPhase }
 /// <summary>Narrows a Destroyed or SentToGraveyard event by where it came from or what caused it.</summary>
 public enum TriggerEventCause { Any, FromField, ByBattle }
 public enum EffectRelation { Self, Controller, Opponent, Any }
 public enum TriggerRequirement { Mandatory, Optional }
-public enum TriggerSourceLocation { FaceUpMonster, DestroyedSelf, GraveyardSelf, FaceUpSpellTrap }
+public enum TriggerSourceLocation { FaceUpMonster, DestroyedSelf, GraveyardSelf, FaceUpSpellTrap, PendulumZone }
 public enum TriggerTiming { If, When }
 public enum TriggerTurnLimit { None, PerPlacement, SharedPerPlayer, SharedPerDuel }
 public enum TriggerOperation
@@ -158,7 +160,8 @@ public sealed class TriggerEffectProfile
         if (eventKind is MonsterEventKind.EndPhaseAfterSummonOrFlip or MonsterEventKind.DestroyedOpponentByBattle or MonsterEventKind.InflictedBattleDamage && (sourceLocation != TriggerSourceLocation.FaceUpMonster || relation != EffectRelation.Self) ||
             requiresGeminiActive && sourceLocation != TriggerSourceLocation.FaceUpMonster)
             throw new ArgumentException("This trigger needs its face-up source.");
-        if (eventKind == MonsterEventKind.StandbyPhase && (sourceLocation != TriggerSourceLocation.FaceUpSpellTrap || relation == EffectRelation.Self))
+        if (eventKind is MonsterEventKind.StandbyPhase or MonsterEventKind.EndPhase &&
+            (sourceLocation is not (TriggerSourceLocation.FaceUpSpellTrap or TriggerSourceLocation.PendulumZone) || relation == EffectRelation.Self))
             throw new ArgumentException("A Standby Phase trigger belongs to a face-up Spell or Trap.");
         if (cause != TriggerEventCause.Any && eventKind is not (MonsterEventKind.Destroyed or MonsterEventKind.SentToGraveyard))
             throw new ArgumentException("Only destruction and Graveyard events have a cause.");

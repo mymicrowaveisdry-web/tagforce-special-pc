@@ -46,7 +46,11 @@ public sealed record RuleLock(LockedAction Actions, TargetSide Side = TargetSide
 public sealed record BattleOpponent(CardFilter? Cards = null, int MinAttack = 0, int MaxAttack = int.MaxValue);
 
 /// <summary>A lock that holds while the card is face-up: a monster not negated, or a Spell or Trap whose effect is active.</summary>
-public sealed record RuleLockProfile(string EffectId, uint CardId, RuleLock Lock);
+public sealed record RuleLockProfile(string EffectId, uint CardId, RuleLock Lock)
+{
+    /// <summary>A Pendulum Effect: it holds while the card is an active scale, and Spell negation does not stop it.</summary>
+    public bool PendulumZone { get; init; }
+}
 
 /// <summary>Applies a lock that lasts until the end of this turn, relative to the activating player.</summary>
 public sealed record ApplyRuleLockStep(RuleLock Lock) : EffectStep;
@@ -71,13 +75,17 @@ public sealed partial class DuelEngine
         foreach (var (binding, monster) in FieldMonsters(state))
             if (monster.Position != BattlePosition.FaceDownDefense && !state.EventEffects.NegatedMonsters.Contains(binding) &&
                 ruleLockProfiles.TryGetValue(monster.Card.GameCardId, out var monsterLocks))
-                foreach (var profile in monsterLocks)
+                foreach (var profile in monsterLocks.Where(p => !p.PendulumZone))
                     yield return new(binding.Player, profile.Lock, new(monster.Card, monster.PlacementId), null, profile.EffectId, monster.Card.InstanceId);
         bool spellsNegated = IsSpellsNegated(state);
         foreach (var (player, _, field) in ActiveCards(state))
             if (!(spellsNegated && IsSpellCard(field)) && ruleLockProfiles.TryGetValue(field.Card.GameCardId, out var cardLocks))
-                foreach (var profile in cardLocks)
+                foreach (var profile in cardLocks.Where(p => !p.PendulumZone))
                     yield return new(player, profile.Lock, null, field.EquippedTo, profile.EffectId, field.Card.InstanceId);
+        foreach (var (player, _, scale) in ActiveScales(state))
+            if (ruleLockProfiles.TryGetValue(scale.Card.GameCardId, out var scaleLocks))
+                foreach (var profile in scaleLocks.Where(p => p.PendulumZone))
+                    yield return new(player, profile.Lock, null, null, profile.EffectId, scale.Card.InstanceId);
     }
 
     private bool LockApplies(DuelState state, ActiveLock active, LockedAction action, PlayerId subject, CardInstance? card, FieldMonster? monster,

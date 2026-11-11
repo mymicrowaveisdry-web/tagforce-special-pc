@@ -72,7 +72,7 @@ public sealed partial class DuelEngine
     private static bool EffectGroupsValid(EffectDefinition[] effects) => effects.GroupBy(d => d.CardId).All(group =>
     {
         var kinds = group.Where(d => d.Origin == EffectOrigin.Field).Select(d => d.Kind).ToArray();
-        if (kinds.Length == 0) return group.All(d => d.IsMonsterEffect);
+        if (kinds.Length == 0) return group.All(d => d.IsMonsterEffect || d.Origin == EffectOrigin.PendulumZone);
         if (kinds.Any(k => k is EffectKind.SpellTrapIgnition or EffectKind.SpellTrapQuick))
             return kinds[0] is EffectKind.ContinuousSpell or EffectKind.ContinuousTrap or EffectKind.FieldSpell or EffectKind.EquipSpell && kinds.Skip(1).All(k => k is EffectKind.SpellTrapIgnition or EffectKind.SpellTrapQuick);
         return kinds.Length == 1 || kinds.All(k => k is EffectKind.MonsterIgnition or EffectKind.MonsterQuick) ||
@@ -109,7 +109,7 @@ public sealed partial class DuelEngine
 
     /// <summary>The effects of this card used from the hand or Graveyard.</summary>
     internal IEnumerable<int> ZoneEffectIndexes(uint cardId) => effectsByCard.TryGetValue(cardId, out var effects)
-        ? Enumerable.Range(0, effects.Length).Where(i => effects[i].Origin != EffectOrigin.Field) : [];
+        ? Enumerable.Range(0, effects.Length).Where(i => effects[i].Origin is EffectOrigin.Hand or EffectOrigin.Graveyard) : [];
 
     /// <summary>The Quick Effects of this card used while it is face-up.</summary>
     internal IEnumerable<int> FaceUpEffectIndexes(uint cardId) => effectsByCard.TryGetValue(cardId, out var effects)

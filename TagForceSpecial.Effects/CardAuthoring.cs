@@ -24,6 +24,8 @@ public sealed record AuthoredCard(uint Id, string Name, CardKind Kind, uint Gett
     IReadOnlyList<EffectDefinition> Definitions, string Exceptions = "none")
 {
     public IReadOnlyList<TriggerEffectProfile> Triggers { get; init; } = [];
+    /// <summary>Printed Pendulum Scales; checked against the catalog.</summary>
+    public IReadOnlyList<PendulumCardProfile> Scales { get; init; } = [];
     public IReadOnlyList<RuleLockProfile> Locks { get; init; } = [];
     public IReadOnlyList<BattleAbilityProfile> BattleAbilities { get; init; } = [];
     public IReadOnlyList<DestructionReplacementProfile> Replacements { get; init; } = [];
@@ -58,6 +60,8 @@ public sealed class CardTable(string prefix)
     private static readonly DuelCardRules TrapRules = new(CardCategory.Trap, AllowsSpellTrapSet: true);
     private static readonly DuelCardRules MonsterRules = new(CardCategory.Monster, AllowsNormalSummon: true, AllowsBasicBattle: true, AllowsTributeForSummon: true);
     private static readonly DuelCardRules TributeMonsterRules = MonsterRules with { AllowsTributeSummon = true };
+    private static readonly DuelCardRules PendulumMonsterRules = TributeMonsterRules with { AllowsPendulumSummon = true };
+    private const uint NormalPendulumKind = 25;
     private static readonly FieldTarget FaceUpMonster = new(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUp);
 
     private string Effect(uint id, string role) => $"{prefix}-{id}-{role}-v1";
@@ -175,6 +179,36 @@ public sealed class CardTable(string prefix)
         var trigger = new EffectDefinition(Effect(id, "standby"), id, EffectKind.MonsterTrigger, standby);
         return card with { Definitions = Array.AsReadOnly([equip, trigger]),
             Triggers = [new TriggerEffectProfile(trigger, MonsterEventKind.StandbyPhase, standbyOf, TriggerRequirement.Mandatory, TriggerSourceLocation.FaceUpSpellTrap)] };
+    }
+
+    /// <summary>
+    /// A Normal Pendulum Monster, whose only effects are its Pendulum Effects: once-per-turn activated effects, a "cannot" rule and
+    /// stat changes, each applying while the card is an active scale.
+    /// </summary>
+    public AuthoredCard NormalPendulum(uint id, string name, uint scale, EffectOption[]? effects = null, RuleLock? scaleLock = null,
+        LastingStatModifier[]? modifiers = null, string exceptions = "none")
+    {
+        List<EffectDefinition> definitions = [.. (effects ?? []).Select((o, i) => new EffectDefinition(Effect(id, $"pendulum-{i + 1}"), id, EffectKind.SpellTrapIgnition,
+            o.Steps, o.Conditions, o.Cost, fieldTargets: o.Targets, oncePerTurn: true, origin: EffectOrigin.PendulumZone))];
+        if (modifiers is { Length: > 0 })
+            definitions.Add(new EffectDefinition(Effect(id, "pendulum-lasting"), id, EffectKind.ContinuousSpell, [], lastingModifiers: modifiers, origin: EffectOrigin.PendulumZone));
+        return new(id, name, CardKind.Monster, NormalPendulumKind, IconNormal, PendulumMonsterRules, definitions, exceptions)
+        {
+            Scales = [new PendulumCardProfile(id, scale, scale)],
+            Locks = scaleLock is null ? [] : [Locked(id, scaleLock) with { PendulumZone = true }]
+        };
+    }
+
+    /// <summary>Adds a Pendulum Effect that triggers while the card is an active scale.</summary>
+    public AuthoredCard PendulumTrigger(AuthoredCard card, MonsterEventKind when, EffectRelation relation, EffectStep[] steps,
+        TriggerRequirement requirement = TriggerRequirement.Mandatory, EffectTarget[]? targets = null)
+    {
+        var trigger = new EffectDefinition(Effect(card.Id, "pendulum-trigger"), card.Id, EffectKind.MonsterTrigger, steps, fieldTargets: targets);
+        return card with
+        {
+            Definitions = Array.AsReadOnly([.. card.Definitions, trigger]),
+            Triggers = [.. card.Triggers, new TriggerEffectProfile(trigger, when, relation, requirement, TriggerSourceLocation.PendulumZone)]
+        };
     }
 
     /// <summary>An Equip Spell whose effect is a "cannot" rule on the equipped monster.</summary>
@@ -296,7 +330,8 @@ public sealed class CardTable(string prefix)
             BattleAbilities = Array.AsReadOnly(cards.SelectMany(c => c.BattleAbilities).ToArray()),
             DestructionReplacements = Array.AsReadOnly(cards.SelectMany(c => c.Replacements).ToArray()),
             GraveyardRedirects = Array.AsReadOnly(cards.SelectMany(c => c.Redirects).ToArray()),
-            DamageRules = Array.AsReadOnly(cards.SelectMany(c => c.DamageRules).ToArray())
+            DamageRules = Array.AsReadOnly(cards.SelectMany(c => c.DamageRules).ToArray()),
+            PendulumCards = Array.AsReadOnly(cards.SelectMany(c => c.Scales).ToArray())
         };
     }
 
@@ -311,6 +346,9 @@ public sealed class CardTable(string prefix)
                 actual.Effects is not { State: CardEffectState.Referenced } effects || !effects.References.SequenceEqual(card.References) ||
                 actual.Codes is { } codes && (codes.GetterKind != card.GetterKind || codes.Icon != card.Icon))
                 throw new InvalidDataException($"Card {card.Id} metadata differs from this family.");
+        foreach (var scale in cards.SelectMany(c => c.Scales))
+            if (byId[scale.CardId].Codes is { } codes && (codes.Field23To26 != scale.LeftScale || codes.Field27To30 != scale.RightScale))
+                throw new InvalidDataException($"Card {scale.CardId} has different Pendulum Scales.");
     }
 
     private static DefinitionCardProfile Profile(AuthoredCard card)

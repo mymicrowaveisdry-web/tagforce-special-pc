@@ -430,6 +430,7 @@ public sealed class EffectDefinition
                     TakeControlStep s => !Enum.IsDefined(s.Duration),
                     GiveControlStep s => !Enum.IsDefined(s.Duration),
                     SwitchControlStep or SwapChosenMonstersStep => false,
+                    StopUnlessActivatedThisTurnStep => false,
                     StopUnlessMilledStep s => s.Filter is null,
                     ApplyDamageRuleStep s => s.Rule is null || !Enum.IsDefined(s.Rule.Kind) || (s.Rule.Applies & DamageKinds.Any) == 0 || !Enum.IsDefined(s.Scope),
                     ModifyCombatantStatsStep s => s.Attack == 0 && s.Defense == 0,
@@ -465,7 +466,9 @@ public sealed class EffectDefinition
         if (cost is not (null or DiscardCost or PayLifePointsCost or TributeCost or PayHalfLifePointsCost or TributeSelfCost or RemoveCounterCost or BanishFromGraveyardCost or DetachCost or SendSelfCost or RevealSelfCost) ||
             cost is TributeSelfCost or RemoveCounterCost or DetachCost && !monsterKind ||
             cost is DiscardCost { Count: < 1 or > 5 } or TributeCost { Count: < 1 or > 5 }) throw new ArgumentOutOfRangeException(nameof(cost));
-        if (!Enum.IsDefined(origin) || origin != EffectOrigin.Field && !monsterKind && kind is not (EffectKind.SpellTrapIgnition or EffectKind.SpellTrapQuick) ||
+        if (!Enum.IsDefined(origin) || origin is EffectOrigin.Hand or EffectOrigin.Graveyard && !monsterKind && kind is not (EffectKind.SpellTrapIgnition or EffectKind.SpellTrapQuick) ||
+            origin == EffectOrigin.PendulumZone && (kind is not (EffectKind.SpellTrapIgnition or EffectKind.SpellTrapQuick or EffectKind.ContinuousSpell) ||
+                cost is SendSelfCost or RevealSelfCost) ||
             cost is SendSelfCost self && (!Enum.IsDefined(self.Destination) || origin == EffectOrigin.Field || origin == EffectOrigin.Hand && self.Destination == SelfDestination.Banish ||
                 origin == EffectOrigin.Graveyard && self.Destination != SelfDestination.Banish) || cost is RevealSelfCost && origin != EffectOrigin.Hand ||
             snapshot.Any(s => s is SpecialSummonSelfStep) && origin == EffectOrigin.Field)

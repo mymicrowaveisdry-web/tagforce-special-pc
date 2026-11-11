@@ -21,8 +21,10 @@ public sealed partial class DuelEngine
 
     private bool CanActivateTrigger(DuelState state, TriggerActivation trigger)
     {
-        if (rules[trigger.Source.Card.GameCardId].Category == CardCategory.Monster && RuleLocked(state, LockedAction.ActivateMonsterEffect, trigger.Player, trigger.Source.Card, kind: EffectKind.MonsterTrigger)) return false;
+        if (rules[trigger.Source.Card.GameCardId].Category == CardCategory.Monster && trigger.Profile.SourceLocation != TriggerSourceLocation.PendulumZone &&
+            RuleLocked(state, LockedAction.ActivateMonsterEffect, trigger.Player, trigger.Source.Card, kind: EffectKind.MonsterTrigger)) return false;
         bool location = trigger.Profile.SourceLocation == TriggerSourceLocation.FaceUpSpellTrap ? SpellTrapSourcePresent(state, trigger.Source) :
+            trigger.Profile.SourceLocation == TriggerSourceLocation.PendulumZone ? ScaleSourcePresent(state, trigger.Source) :
             trigger.Profile.SourceLocation != TriggerSourceLocation.FaceUpMonster
             ? state.GetPlayer(trigger.Player).Graveyard.Contains(trigger.Source.Card) ||
                 trigger.Profile.SourceLocation == TriggerSourceLocation.DestroyedSelf && state.GetPlayer(trigger.Player).FaceUpExtraDeck.Contains(trigger.Source.Card)
@@ -43,6 +45,8 @@ public sealed partial class DuelEngine
         // A leading hand check is also the trigger's activation condition.
         if (trigger.Profile.Definition?.Steps is [StopUnlessHandHoldsStep holds, ..] && !HandHolds(state, trigger.Player, holds)) return false;
         if (trigger.Profile.Definition?.Steps is [OpponentCallsRandomHandCardStep, ..] && state.GetPlayer(trigger.Player).Hand.Count == 0) return false;
+        if (trigger.Profile.Definition?.Steps is [StopUnlessActivatedThisTurnStep, ..] &&
+            !ScaleActivatedThisTurn(state, trigger.Player, trigger.Source.Zone, trigger.Source.Card, trigger.Source.PlacementId)) return false;
         if (trigger.Profile.TributeCost && trigger.TributedCost is null &&
             !FieldMonsters(state).Any(e => e.Binding.Player == trigger.Player && !e.Monster.BattleDestroyed && !RuleLocked(state, LockedAction.BeTributed, e.Binding.Player, e.Monster.Card, e.Monster))) return false;
         if (trigger.DiscardedCost is not null || trigger.PaidLifePoints > 0 || trigger.DetachedCost.Count > 0) return true;
@@ -120,9 +124,10 @@ public sealed partial class DuelEngine
         if (emitted is BattleDamageDealt { Damage: > 0 } damage && before.Battle?.Attack is { } attack &&
             (damage.Player != attack.Attacker.Player ? attack.Attacker : attack.Defender) is { } dealer && dealer.Player != damage.Player)
             yield return new(MonsterEventKind.InflictedBattleDamage, dealer, point);
-        if (emitted is PhaseChanged { To: DuelPhase.Standby })
-            foreach (var (_, _, field) in ActiveCards(after))
-                yield return new(MonsterEventKind.StandbyPhase, new(after.ActivePlayer, -1, field.Card, field.PlacementId), point);
+        if (emitted is PhaseChanged { To: DuelPhase.Standby or DuelPhase.End } phase)
+            foreach (var (_, _, field) in ActiveCards(after).Concat(ActiveScales(after)))
+                yield return new(phase.To == DuelPhase.Standby ? MonsterEventKind.StandbyPhase : MonsterEventKind.EndPhase,
+                    new(after.ActivePlayer, -1, field.Card, field.PlacementId), point);
     }
 
     /// <summary>On entering the End Phase, one occurrence per face-up monster Summoned or flipped face-up this turn.</summary>
@@ -166,15 +171,16 @@ public sealed partial class DuelEngine
                     ? destructionSources : FieldMonsters(after);
                 foreach (var profile in triggerEffects.Where(p => p.EventKind == occurrence.Kind && CauseMatches(p, occurrence)).OrderBy(p => p.EffectId, StringComparer.Ordinal))
                 {
-                    if (occurrence.FromSpellTrapZone && profile.SourceLocation is TriggerSourceLocation.FaceUpMonster or TriggerSourceLocation.FaceUpSpellTrap) continue;
+                    if (occurrence.FromSpellTrapZone && profile.SourceLocation is TriggerSourceLocation.FaceUpMonster or TriggerSourceLocation.FaceUpSpellTrap or TriggerSourceLocation.PendulumZone) continue;
                     if (profile.RequiredProcedureId is { } procedure && occurrence.ProcedureId != procedure) continue;
-                    if (profile.SourceLocation == TriggerSourceLocation.FaceUpSpellTrap)
+                    if (profile.SourceLocation is TriggerSourceLocation.FaceUpSpellTrap or TriggerSourceLocation.PendulumZone)
                     {
-                        foreach (var (owner, zone, field) in ActiveCards(after).Where(e => e.Field.Card.GameCardId == profile.CardId))
+                        var faceUp = profile.SourceLocation == TriggerSourceLocation.PendulumZone ? ActiveScales(after) : ActiveCards(after);
+                        foreach (var (owner, zone, field) in faceUp.Where(e => e.Field.Card.GameCardId == profile.CardId))
                         {
                             MonsterBinding source = new(owner, zone, field.Card, field.PlacementId);
                             if (Relates(profile.Relation, source, occurrence.Subject) &&
-                                (occurrence.Kind != MonsterEventKind.StandbyPhase || occurrence.Subject.Card == field.Card))
+                                (occurrence.Kind is not (MonsterEventKind.StandbyPhase or MonsterEventKind.EndPhase) || occurrence.Subject.Card == field.Card))
                                 yield return new(id++, profile, source, occurrence);
                         }
                         continue;
@@ -323,7 +329,11 @@ public sealed partial class DuelEngine
                 foreach (var (target, _) in monsters)
                     if (Relates(profile.Affects, source, target) && (profile.Filter is null || MatchesFilter(target.Card, profile.Filter)))
                         result.Add(new(profile.EffectId, source, target, profile.AttackDelta, profile.DefenseDelta));
-        if (HasLastingModifiers) AddLastingModifiers(state, monsters, negated, result);
+        if (HasLastingModifiers)
+        {
+            AddLastingModifiers(state, monsters, negated, result);
+            AddPendulumModifiers(state, monsters, result);
+        }
         return result.ToArray();
     }
 

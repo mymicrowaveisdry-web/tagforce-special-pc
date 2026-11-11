@@ -163,7 +163,9 @@ public sealed partial class DuelEngine
         if (definitionList.Any(d => d is null || d.Cost is DiscardCost { Filter: CardIdFilter discardFilter } && discardFilter.CardIds.Any(id => !knownIds.Contains(id)) ||
                 d.Steps.OfType<SummonTokensStep>().Any(s => s.TokenCardIds.Any(id => !IsTokenId(id))) ||
                 d.Kind == EffectKind.MonsterTrigger || shuffleSeed is null && NeedsShuffle(d) ||
-                !this.rules.TryGetValue(d.CardId, out var rule) || (d.IsMonsterEffect ? rule.Category != CardCategory.Monster : d.IsFaceUpEffect ? rule.Category is not (CardCategory.Spell or CardCategory.Trap) : !rule.AllowsSpellTrapSet ||
+                // A Pendulum Effect belongs to a monster; without a registered scale it never applies.
+                !this.rules.TryGetValue(d.CardId, out var rule) || (d.Origin == EffectOrigin.PendulumZone ? rule.Category != CardCategory.Monster :
+                d.IsMonsterEffect ? rule.Category != CardCategory.Monster : d.IsFaceUpEffect ? rule.Category is not (CardCategory.Spell or CardCategory.Trap) : !rule.AllowsSpellTrapSet ||
                 rule.Category != (d.Kind is EffectKind.NormalSpell or EffectKind.QuickPlaySpell or EffectKind.ContinuousSpell or EffectKind.FieldSpell or EffectKind.EquipSpell ? CardCategory.Spell : CardCategory.Trap)) ||
 
                 summonEffects.ContainsKey(d.CardId) || usedEffectIds.Contains(d.EffectId) ||
@@ -183,6 +185,7 @@ public sealed partial class DuelEngine
         if (lockList.Any(l => l is null || l.Lock.Actions == LockedAction.None || !this.rules.TryGetValue(l.CardId, out var rule) ||
                 l.Lock.Scope == LockScope.Equipped && rule.Category != CardCategory.Spell || l.Lock.Scope == LockScope.Self && rule.Category != CardCategory.Monster ||
                 l.Lock.UsesPerTurn < 0 || l.Lock.UsesPerTurn != 0 && (l.Lock.Actions & ~(LockedAction.BeDestroyedByBattle | LockedAction.BeDestroyedByEffect)) != 0) ||
+            lockList.Any(l => l.PendulumZone && l.Lock.Scope != LockScope.Side) ||
             lockList.Select(l => l.EffectId).Distinct(StringComparer.Ordinal).Count() != lockList.Length)
             throw new ArgumentException("Rule locks need distinct IDs, known source cards and a scope that suits the source.", nameof(ruleLocks));
         ruleLockProfiles = lockList.GroupBy(l => l.CardId).ToFrozenDictionary(g => g.Key, g => g.ToArray());
@@ -327,6 +330,7 @@ public sealed partial class DuelEngine
             ActivatePendulumScale scale => ActivateScale(scale),
             PendulumSummon pendulum => ExecutePendulumSummon(pendulum),
             ResolveDrawStep => Draw(),
+            ActivatePendulumEffect pendulum => BeginPendulumEffect(pendulum.Player, pendulum.PendulumZone, pendulum.EffectIndex),
             ChangePhase phase => RequestPhase(phase.Target),
             NormalSummon summon => Summon(summon.CardInstanceId, summon.MonsterZone, false),
             SetMonster set => Summon(set.CardInstanceId, set.MonsterZone, true),

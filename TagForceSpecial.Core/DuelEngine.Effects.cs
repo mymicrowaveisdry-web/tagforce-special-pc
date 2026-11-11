@@ -21,6 +21,9 @@ public sealed partial class DuelEngine
     private DuelError DefinitionActivationError(EffectDefinition definition, ActivationContext context, PlayerId player,
         CardInstance card, FieldSpellTrap? source, ChainLink? preceding = null)
     {
+        // A Pendulum Effect is used only from an active scale.
+        if (definition.Origin == EffectOrigin.PendulumZone && context is not (ActivationContext.SpellTrapField or ActivationContext.SpellTrapChain or ActivationContext.SpellTrapWindow))
+            return DuelError.UnsupportedSpellEffect;
         // The Damage Step admits only definitions whose battle timing condition lists the current timing.
         if (State.Battle is { } battle && (battle.Window.Timing & DamageStepTimings) != 0 &&
             !definition.Conditions.OfType<BattleTimingCondition>().Any(c => c.Windows.HasFlag(battle.Window.Timing)))
@@ -568,6 +571,12 @@ public sealed partial class DuelEngine
                     definition.EffectId, events);
                 choice = null;
                 continue;
+            }
+            if (step is StopUnlessActivatedThisTurnStep)
+            {
+                if (ScaleActivatedThisTurn(state, controller, link.Activation.SpellTrapZone, link.Activation.Spell, link.SourcePlacementId)) continue;
+                events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
+                break;
             }
             if (step is StopUnlessHandHoldsStep holds)
             {

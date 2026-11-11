@@ -94,7 +94,8 @@ public sealed record FlipTargetsFaceUpStep(BattlePosition Position = BattlePosit
 public sealed record GrantNormalSummonStep : EffectStep;
 
 /// <summary>Where a card's activated effect is used from.</summary>
-public enum EffectOrigin { Field, Hand, Graveyard }
+/// <summary>Where an effect is used from; <see cref="PendulumZone"/> marks a Pendulum Effect of an active scale.</summary>
+public enum EffectOrigin { Field, Hand, Graveyard, PendulumZone }
 
 public enum SelfDestination { Graveyard, Discard, Banish }
 

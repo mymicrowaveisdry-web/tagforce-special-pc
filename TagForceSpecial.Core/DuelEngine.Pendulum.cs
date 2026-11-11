@@ -50,9 +50,11 @@ public sealed partial class DuelEngine
         var card = player.Hand.SingleOrDefault(c => c.InstanceId == command.CardInstanceId);
         if (card is null) return Reject(DuelError.CardNotInHand);
         if (!pendulumCards.ContainsKey(card.GameCardId)) return Reject(DuelError.UnsupportedPendulumCard);
+        // Placing a scale is the activation of a Spell Card, so "cannot activate Spell Cards" stops it.
+        if (RuleLocked(State, LockedAction.ActivateSpell, player.Id, card, onField: false)) return Reject(DuelError.LockedByEffect);
         if (player.PendulumZones[command.PendulumZone] is not null) return Reject(DuelError.PendulumZoneOccupied);
         var zones = player.PendulumZones.ToArray(); long placement = checked(State.Revision + 1);
-        zones[command.PendulumZone] = new(card, true, placement);
+        zones[command.PendulumZone] = new(card, true, placement) { ActivatedOnTurn = State.TurnNumber };
         var receipt = new CommittedActivation(player.Id, "pendulum-scale", card, command.PendulumZone, null, null);
         var link = new ChainLink(1, receipt, placement, ChainOperation.ActivatePendulumScale, IsPendulumScale: true);
         var chain = new PendingChain(placement, [link], Other(player.Id));

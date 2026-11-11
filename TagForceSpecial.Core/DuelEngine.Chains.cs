@@ -92,6 +92,10 @@ public sealed partial class DuelEngine
         else if (link.Operation == ChainOperation.MonsterEffect && next.EventEffects.NegatedMonsters.Contains(
                 new MonsterBinding(activation.Player, activation.SpellTrapZone, activation.Spell, link.SourcePlacementId)))
             events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.SourceEffectsNegated));
+        // A Pendulum Effect is a Spell effect, so Spell negation stops it when it resolves; the scale stays (OCG rulings).
+        else if ((link.Operation == ChainOperation.ZoneEffect && LinkDefinition(link).Origin == EffectOrigin.PendulumZone ||
+                link.Trigger?.Profile.SourceLocation == TriggerSourceLocation.PendulumZone) && IsSpellsNegated(next))
+            events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.SourceEffectsNegated));
         else if (IsLastingLink(link) && !LastingSourceInPlace(next, link))
             events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.SourceLeftField));
         else if (link.Operation is ChainOperation.Definition or ChainOperation.EffectSummon or ChainOperation.FieldEffect && rules[activation.Spell.GameCardId].Category == CardCategory.Spell && IsSpellsNegated(next))
@@ -134,7 +138,10 @@ public sealed partial class DuelEngine
                 if (IsLastingLink(link) && LastingSourceInPlace(next, link)) next = ActivateLastingEffect(next, link);
                 break;
             }
-            case ChainOperation.ActivatePendulumScale: break; // Source already occupies its dedicated zone; never recreate it.
+            // Source already occupies its dedicated zone; never recreate it. Its Pendulum Effects now apply.
+            case ChainOperation.ActivatePendulumScale:
+                next = ActivateScaleEffects(next, link);
+                break;
             case ChainOperation.EffectSummon:
             {
                 var profile = summonEffects[activation.Spell.GameCardId];
