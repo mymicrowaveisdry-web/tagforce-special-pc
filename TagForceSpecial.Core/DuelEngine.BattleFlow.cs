@@ -87,6 +87,15 @@ public sealed partial class DuelEngine
         if (!battle.Window.Closed) return Reject(DuelError.BattleWindowPending);
         if (command is DeclareAttack declaration) return DeclareStagedAttack(declaration.AttackerZone, declaration.TargetZone);
         if (command is ChooseAttackReplay choice) return ChooseBattleReplay(choice);
+        if (command is ChangePhase { Target: DuelPhase.Main2 or DuelPhase.End } change && battle.Step == BattleStep.End &&
+            (change.Target == DuelPhase.End) != PhaseSkipPending(State, State.ActivePlayer, DuelPhase.Main2))
+            return Reject(DuelError.PhaseSkipped);
+        if (command is ChangePhase { Target: DuelPhase.End } && battle.Step == BattleStep.End)
+        {
+            List<DuelEvent> ending = [new PhaseChanged(DuelPhase.Battle, DuelPhase.End)];
+            var ended = SpendTurnSkips(ResolveEndPhaseBanishments(State.With(phase: DuelPhase.End).WithBattle(null), ending), ending);
+            return Accept(ended, ending.ToArray());
+        }
         if (command is ChangePhase { Target: DuelPhase.Main2 } && battle.Step == BattleStep.End)
             return Accept(State.With(phase: DuelPhase.Main2).WithBattle(null), new PhaseChanged(DuelPhase.Battle, DuelPhase.Main2));
         if (command is not AdvanceBattle) return Reject(DuelError.WrongBattleStep);

@@ -26,6 +26,7 @@ public sealed record AuthoredCard(uint Id, string Name, CardKind Kind, uint Gett
     public IReadOnlyList<TriggerEffectProfile> Triggers { get; init; } = [];
     /// <summary>Printed Pendulum Scales; checked against the catalog.</summary>
     public IReadOnlyList<PendulumCardProfile> Scales { get; init; } = [];
+    public IReadOnlyList<TributeProcedureProfile> TributeProcedures { get; init; } = [];
     public IReadOnlyList<RuleLockProfile> Locks { get; init; } = [];
     public IReadOnlyList<BattleAbilityProfile> BattleAbilities { get; init; } = [];
     public IReadOnlyList<DestructionReplacementProfile> Replacements { get; init; } = [];
@@ -199,6 +200,25 @@ public sealed class CardTable(string prefix)
         };
     }
 
+    /// <summary>
+    /// An Egyptian God: 3 Tributes to Normal Summon and no Set, a Normal Summon that cannot be negated or answered, and "During the End
+    /// Phase, if this card was Special Summoned: Send it to the Graveyard". Its own effects come as an activated effect and a lock on itself.
+    /// </summary>
+    public AuthoredCard EgyptianGod(uint id, string name, uint getterKind, EffectOption? effect = null, RuleLock? selfLock = null, string exceptions = "none")
+    {
+        var endPhase = new EffectDefinition(Effect(id, "end-phase"), id, EffectKind.MonsterTrigger, [new StopUnlessSpecialSummonedStep(), new SendSourceToGraveyardStep()]);
+        List<EffectDefinition> definitions = [];
+        if (effect is not null)
+            definitions.Add(new EffectDefinition(Effect(id, "effect"), id, EffectKind.MonsterIgnition, effect.Steps, effect.Conditions, effect.Cost, fieldTargets: effect.Targets));
+        definitions.Add(endPhase);
+        return new(id, name, CardKind.Monster, getterKind, IconNormal, TributeMonsterRules with { RequiresRegisteredTributeProcedure = true }, definitions, exceptions)
+        {
+            Triggers = [new TriggerEffectProfile(endPhase, MonsterEventKind.EndPhase, EffectRelation.Self, TriggerRequirement.Mandatory)],
+            TributeProcedures = [new TributeProcedureProfile(Effect(id, "three-tributes"), id, 3, allowsSet: false) { CannotBeNegated = true, NoResponses = true }],
+            Locks = selfLock is null ? [] : [Locked(id, selfLock)]
+        };
+    }
+
     /// <summary>Adds a Pendulum Effect that triggers while the card is an active scale.</summary>
     public AuthoredCard PendulumTrigger(AuthoredCard card, MonsterEventKind when, EffectRelation relation, EffectStep[] steps,
         TriggerRequirement requirement = TriggerRequirement.Mandatory, EffectTarget[]? targets = null)
@@ -331,7 +351,8 @@ public sealed class CardTable(string prefix)
             DestructionReplacements = Array.AsReadOnly(cards.SelectMany(c => c.Replacements).ToArray()),
             GraveyardRedirects = Array.AsReadOnly(cards.SelectMany(c => c.Redirects).ToArray()),
             DamageRules = Array.AsReadOnly(cards.SelectMany(c => c.DamageRules).ToArray()),
-            PendulumCards = Array.AsReadOnly(cards.SelectMany(c => c.Scales).ToArray())
+            PendulumCards = Array.AsReadOnly(cards.SelectMany(c => c.Scales).ToArray()),
+            TributeProcedures = Array.AsReadOnly(cards.SelectMany(c => c.TributeProcedures).ToArray())
         };
     }
 

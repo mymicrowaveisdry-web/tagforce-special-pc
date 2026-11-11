@@ -24,6 +24,9 @@ public sealed partial class DuelEngine
     private readonly FrozenDictionary<string, ExtraDeckMaterialProcedureProfile> materialProcedures;
     private readonly FrozenDictionary<uint, SummonEffectProfile> summonEffects;
     private readonly FrozenDictionary<uint, PendulumCardProfile> pendulumCards;
+    private readonly FrozenSet<uint> unnegatableSummons;
+    /// <summary>Monsters whose Normal Summon nothing can respond to.</summary>
+    private readonly FrozenSet<uint> unanswerableSummons;
     /// <summary>Definition-driven card effects, keyed by source card ID.</summary>
     private readonly FrozenDictionary<uint, EffectDefinition> definitions;
     /// <summary>Every effect of each card in registration order; <see cref="definitions"/> holds the first.</summary>
@@ -146,6 +149,8 @@ public sealed partial class DuelEngine
             summonIds.Any(eventIds.Contains))
             throw new ArgumentException("Summon effect IDs must be distinct and unreserved.");
         tributeProcedures = procedures.ToFrozenDictionary(p => p.ProcedureId, StringComparer.Ordinal);
+        unnegatableSummons = procedures.Where(p => p.CannotBeNegated).Select(p => p.CardId).ToFrozenSet();
+        unanswerableSummons = procedures.Where(p => p.NoResponses).Select(p => p.CardId).ToFrozenSet();
         summonWindows = windows.Select(p => p.CardId).ToFrozenSet();
         summonEffects = ValidateSummonEffects(experimentalSummonEffects ?? [],
             eventIds.Concat(summonIds));
@@ -355,33 +360,47 @@ public sealed partial class DuelEngine
     {
         if (State.Phase != DuelPhase.Draw) return Reject(DuelError.WrongPhase);
         var player = State.GetPlayer(State.ActivePlayer);
-        if (State.TurnNumber == 1)
-            return Accept(State.With(phase: DuelPhase.Standby), new FirstDrawSkipped(player.Id),
-                new PhaseChanged(DuelPhase.Draw, DuelPhase.Standby));
-        if (player.Deck.Count == 0)
+        var next = State;
+        List<DuelEvent> events = [];
+        if (State.TurnNumber == 1) events.Add(new FirstDrawSkipped(player.Id));
+        // A skipped Draw Phase draws nothing, so an empty Deck does not lose the duel.
+        else if (PhaseSkipPending(next, player.Id, DuelPhase.Draw)) next = ConsumePhaseSkip(next, player.Id, DuelPhase.Draw, events);
+        else if (player.Deck.Count == 0)
         {
             var outcome = new DuelOutcome(Other(player.Id), player.Id, DuelEndReason.UnableToDraw);
             return Accept(State.With(outcome: outcome), new DuelEnded(outcome));
         }
-        if (RuleLocked(State, LockedAction.Draw, player.Id, null))
-            return Accept(State.With(phase: DuelPhase.Standby), new PhaseChanged(DuelPhase.Draw, DuelPhase.Standby));
-        var card = player.Deck[0];
-        var next = player.With(deck: player.Deck.Skip(1), hand: player.Hand.Append(card));
-        return Accept(State.With(player: next, phase: DuelPhase.Standby), new CardDrawn(player.Id, card),
-            new PhaseChanged(DuelPhase.Draw, DuelPhase.Standby));
+        else if (!RuleLocked(State, LockedAction.Draw, player.Id, null))
+        {
+            var card = player.Deck[0];
+            next = next.With(player: player.With(deck: player.Deck.Skip(1), hand: player.Hand.Append(card)));
+            events.Add(new CardDrawn(player.Id, card));
+        }
+        if (PhaseSkipPending(next, player.Id, DuelPhase.Standby))
+        {
+            next = ConsumePhaseSkip(next, player.Id, DuelPhase.Standby, events);
+            events.Add(new PhaseChanged(DuelPhase.Draw, DuelPhase.Main1));
+            return Accept(next.With(phase: DuelPhase.Main1), events.ToArray());
+        }
+        events.Add(new PhaseChanged(DuelPhase.Draw, DuelPhase.Standby));
+        return Accept(next.With(phase: DuelPhase.Standby), events.ToArray());
     }
 
     private DuelError PhaseChangeError(DuelPhase target)
     {
         if (State.Phase == DuelPhase.Main1 && target == DuelPhase.Battle && State.TurnNumber == 1)
             return DuelError.FirstTurnBattleNotAllowed;
+        if (State.Phase == DuelPhase.Main1 && target == DuelPhase.Battle && PhaseSkipPending(State, State.ActivePlayer, DuelPhase.Battle) ||
+            State.Phase == DuelPhase.Battle && target == DuelPhase.Main2 && PhaseSkipPending(State, State.ActivePlayer, DuelPhase.Main2))
+            return DuelError.PhaseSkipped;
         bool valid = (State.Phase, target) is
             (DuelPhase.Standby, DuelPhase.Main1) or
             (DuelPhase.Main1, DuelPhase.Battle) or (DuelPhase.Main1, DuelPhase.End) or
-            (DuelPhase.Battle, DuelPhase.Main2) or (DuelPhase.Main2, DuelPhase.End);
+            (DuelPhase.Battle, DuelPhase.Main2) or (DuelPhase.Main2, DuelPhase.End) ||
+            (State.Phase, target) is (DuelPhase.Battle, DuelPhase.End) && PhaseSkipPending(State, State.ActivePlayer, DuelPhase.Main2);
         if (!valid) return DuelError.InvalidPhaseTransition;
         if ((State.Phase == DuelPhase.Main1 && target == DuelPhase.End ||
-                State.Phase == DuelPhase.Battle && target == DuelPhase.Main2) && RequiredAttackPending()) return DuelError.MustAttack;
+                State.Phase == DuelPhase.Battle && target is DuelPhase.Main2 or DuelPhase.End) && RequiredAttackPending()) return DuelError.MustAttack;
         return DuelError.None;
     }
 
@@ -402,7 +421,7 @@ public sealed partial class DuelEngine
         }
         events.Add(new PhaseChanged(State.Phase, target));
         state = state.With(phase: target);
-        if (target == DuelPhase.End) state = ResolveEndPhaseBanishments(state, events);
+        if (target == DuelPhase.End) state = SpendTurnSkips(ResolveEndPhaseBanishments(state, events), events);
         return Accept(state, events.ToArray());
     }
 

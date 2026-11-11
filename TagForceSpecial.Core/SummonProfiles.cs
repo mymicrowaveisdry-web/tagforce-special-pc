@@ -32,6 +32,10 @@ public sealed class TributeProcedureProfile
     public IReadOnlyList<uint> AllowedTributeCardIds { get; }
     public bool RequireFaceUpTributes { get; }
     public bool AllowsSet { get; }
+    /// <summary>The Summon cannot be negated: it opens no Summon response window.</summary>
+    public bool CannotBeNegated { get; init; }
+    /// <summary>When it is Normal Summoned, no cards or effects can be activated in response.</summary>
+    public bool NoResponses { get; init; }
 
     public TributeProcedureProfile(string procedureId, uint cardId, int tributeCount,
         IEnumerable<uint>? allowedTributeCardIds = null, bool requireFaceUpTributes = false, bool allowsSet = true)

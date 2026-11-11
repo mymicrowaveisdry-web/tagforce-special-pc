@@ -19,6 +19,7 @@ public sealed record CardFamily(string FamilyId, string BatchId, IReadOnlyList<D
     public IReadOnlyList<ExtraDeckMaterialProcedureProfile> MaterialProcedures { get; init; } = [];
     public IReadOnlyList<SummonEffectProfile> SummonEffects { get; init; } = [];
     public IReadOnlyList<PendulumCardProfile> PendulumCards { get; init; } = [];
+    public IReadOnlyList<TributeProcedureProfile> TributeProcedures { get; init; } = [];
     public IReadOnlyList<RuleLockProfile> RuleLocks { get; init; } = [];
     public IReadOnlyList<BattleAbilityProfile> BattleAbilities { get; init; } = [];
     public IReadOnlyList<DestructionReplacementProfile> DestructionReplacements { get; init; } = [];
@@ -91,7 +92,8 @@ public static class CardFamilies
             SummonEffects = SummonProcedureFamily.SummonEffects,
             PendulumCards = SummonProcedureFamily.PendulumCards
         },
-        TemplateCardFamily.Family
+        TemplateCardFamily.Family,
+        EgyptianGodFamily.Family
     });
 }
 
@@ -129,6 +131,7 @@ public static class CardPool
             experimentalMaterialProcedures: families.SelectMany(f => f.MaterialProcedures),
             experimentalSummonEffects: families.SelectMany(f => f.SummonEffects),
             experimentalPendulumCards: families.SelectMany(f => f.PendulumCards),
+            experimentalTributeProcedures: families.SelectMany(f => f.TributeProcedures),
             effectDefinitions: definitions, shuffleSeed: shuffleSeed, ruleLocks: families.SelectMany(f => f.RuleLocks),
             battleAbilities: families.SelectMany(f => f.BattleAbilities),
             destructionReplacements: families.SelectMany(f => f.DestructionReplacements),

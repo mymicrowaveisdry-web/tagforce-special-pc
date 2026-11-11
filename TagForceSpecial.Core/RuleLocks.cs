@@ -27,7 +27,11 @@ public enum LockedAction
     /// <summary>Keeping the hand hidden: the locked side plays with its hand revealed.</summary>
     HideHand = 524288,
     /// <summary>Control of the card switching to the other player.</summary>
-    SwitchControl = 1048576
+    SwitchControl = 1048576,
+    /// <summary>Entering the Battle Phase: the locked side skips it.</summary>
+    EnterBattlePhase = 2097152,
+    /// <summary>Entering Main Phase 2: the locked side skips it.</summary>
+    EnterMainPhase2 = 4194304
 }
 
 /// <summary>Who or what a lock applies to.</summary>

@@ -370,6 +370,7 @@ public sealed class DuelActionSource
                 yield return B(new ChooseAttackReplay(player, battle.Window.DecisionId, z), ActionKind.ReplayAttack, $"Replay target [{z + 1}]", target: z);
             foreach (var attack in Attacks(own, player)) yield return attack;
             yield return B(new ChangePhase(player, DuelPhase.Main2), ActionKind.Phase, "Phase: Main2", phase: DuelPhase.Main2);
+            yield return B(new ChangePhase(player, DuelPhase.End), ActionKind.Phase, "Phase: End", phase: DuelPhase.End);
             yield break;
         }
         yield return B(new ResolveDrawStep(player), ActionKind.Draw, "Draw / begin turn");
@@ -387,6 +388,19 @@ public sealed class DuelActionSource
             yield return B(new ActivateSpell(player, card.InstanceId, DuelPlayerState.FieldZoneIndex), ActionKind.ActivateSpell, $"Activate {name} [Field]", card.InstanceId, DuelPlayerState.FieldZoneIndex);
             yield return B(new SetSpellTrap(player, card.InstanceId, DuelPlayerState.FieldZoneIndex), ActionKind.SetSpellTrap, $"Set {name} [Field]", card.InstanceId, DuelPlayerState.FieldZoneIndex);
             yield return B(new DiscardForHandLimit(player, card.InstanceId), ActionKind.Discard, $"Discard {name}", card.InstanceId);
+            // Tribute Summons and Sets, with every choice of Tributes the card needs; the engine checks each offer.
+            int[] occupied = Enumerable.Range(0, 5).Where(z => own.MonsterZones[z] is not null).ToArray();
+            foreach (var (procedure, count, allowsSet) in engine.TributeOptions(state, player, card))
+                foreach (var zones in ZoneCombinations(occupied, count, 0))
+                {
+                    var tributes = zones.Select(z => new MonsterBinding(player, z, own.MonsterZones[z]!.Card, own.MonsterZones[z]!.PlacementId)).ToArray();
+                    int mask = zones.Aggregate(0, (m, z) => m | 1 << z);
+                    yield return B(new TributeSummon(player, state.Revision, card.InstanceId, zones[0], tributes, procedureId: procedure), ActionKind.Summon,
+                        $"Tribute Summon {name}", card.InstanceId, zones[0], 2000 + mask);
+                    if (allowsSet)
+                        yield return B(new TributeSummon(player, state.Revision, card.InstanceId, zones[0], tributes, faceDown: true, procedureId: procedure), ActionKind.SetMonster,
+                            $"Tribute Set {name}", card.InstanceId, zones[0], 2000 + mask);
+                }
             if (!engine.IsToonCard(card.GameCardId)) continue;
             foreach (var tributes in ZoneSubsets(own))
                 for (int z = 0; z < 5; z++)
@@ -455,6 +469,14 @@ public sealed class DuelActionSource
         for (int z = 0; z < 5; z++)
             foreach (var position in Enum.GetValues<BattlePosition>())
                 yield return B(new ChangeMonsterPosition(player, z, position), ActionKind.Position, $"Position {z + 1}: {position}", own.MonsterZones[z]?.Card.InstanceId, z, position: position);
+    }
+
+    private static IEnumerable<int[]> ZoneCombinations(int[] zones, int count, int start)
+    {
+        if (count == 0) { yield break; }
+        for (int i = start; i <= zones.Length - count; i++)
+            if (count == 1) yield return [zones[i]];
+            else foreach (var rest in ZoneCombinations(zones, count - 1, i + 1)) yield return [zones[i], .. rest];
     }
 
     /// <summary>Sets of 0 to 2 occupied Monster Zones, the Tribute choices a Toon Summon can use.</summary>

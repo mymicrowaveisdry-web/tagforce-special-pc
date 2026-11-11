@@ -45,6 +45,7 @@ public sealed partial class DuelEngine
         // A leading hand check is also the trigger's activation condition.
         if (trigger.Profile.Definition?.Steps is [StopUnlessHandHoldsStep holds, ..] && !HandHolds(state, trigger.Player, holds)) return false;
         if (trigger.Profile.Definition?.Steps is [OpponentCallsRandomHandCardStep, ..] && state.GetPlayer(trigger.Player).Hand.Count == 0) return false;
+        if (trigger.Profile.Definition?.Steps is [StopUnlessSpecialSummonedStep, ..] && !WasSpecialSummoned(state, trigger.Source)) return false;
         if (trigger.Profile.Definition?.Steps is [StopUnlessActivatedThisTurnStep, ..] &&
             !ScaleActivatedThisTurn(state, trigger.Player, trigger.Source.Zone, trigger.Source.Card, trigger.Source.PlacementId)) return false;
         if (trigger.Profile.TributeCost && trigger.TributedCost is null &&
@@ -124,6 +125,9 @@ public sealed partial class DuelEngine
         if (emitted is BattleDamageDealt { Damage: > 0 } damage && before.Battle?.Attack is { } attack &&
             (damage.Player != attack.Attacker.Player ? attack.Attacker : attack.Defender) is { } dealer && dealer.Player != damage.Player)
             yield return new(MonsterEventKind.InflictedBattleDamage, dealer, point);
+        if (emitted is PhaseChanged { To: DuelPhase.End })
+            foreach (var (binding, monster) in FieldMonsters(after))
+                if (monster.Position != BattlePosition.FaceDownDefense) yield return new(MonsterEventKind.EndPhase, binding, point);
         if (emitted is PhaseChanged { To: DuelPhase.Standby or DuelPhase.End } phase)
             foreach (var (_, _, field) in ActiveCards(after).Concat(ActiveScales(after)))
                 yield return new(phase.To == DuelPhase.Standby ? MonsterEventKind.StandbyPhase : MonsterEventKind.EndPhase,
@@ -160,6 +164,8 @@ public sealed partial class DuelEngine
     private IEnumerable<TriggerActivation> CollectTriggers(DuelState before, DuelState after, IReadOnlyList<DuelEvent> events, int firstId)
     {
         int id = firstId;
+        // "When Normal Summoned, cards and effects cannot be activated": nothing triggers at that time.
+        if (events.Any(e => e is MonsterNormalSummoned summoned && unanswerableSummons.Contains(summoned.Monster.Card.GameCardId))) yield break;
         var destructionSources = FieldMonsters(before).Select(entry =>
             events.OfType<MonsterRevealed>().Any(e => e.Card == entry.Monster.Card)
                 ? (entry.Binding, entry.Monster with { Position = BattlePosition.FaceUpDefense }) : entry).ToArray();

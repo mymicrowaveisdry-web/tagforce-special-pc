@@ -431,6 +431,10 @@ public sealed class EffectDefinition
                     GiveControlStep s => !Enum.IsDefined(s.Duration),
                     SwitchControlStep or SwapChosenMonstersStep => false,
                     StopUnlessActivatedThisTurnStep => false,
+                    SkipPhaseStep s => s.Phase is not (DuelPhase.Draw or DuelPhase.Standby or DuelPhase.Battle or DuelPhase.Main2) ||
+                        s.Count is < 1 or > 3 || !Enum.IsDefined(s.Player),
+                    EndBattlePhaseStep => false,
+                    StopUnlessSpecialSummonedStep or SendSourceToGraveyardStep => kind != EffectKind.MonsterTrigger,
                     StopUnlessMilledStep s => s.Filter is null,
                     ApplyDamageRuleStep s => s.Rule is null || !Enum.IsDefined(s.Rule.Kind) || (s.Rule.Applies & DamageKinds.Any) == 0 || !Enum.IsDefined(s.Scope),
                     ModifyCombatantStatsStep s => s.Attack == 0 && s.Defense == 0,

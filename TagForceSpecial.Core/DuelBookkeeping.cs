@@ -28,6 +28,8 @@ internal sealed record DuelBookkeeping(int NextInstanceId = 1, DuelRandomState? 
     public RandomResult? LastRandom { get; init; }
     /// <summary>Control of monsters taken for a while; each returns when its time is up.</summary>
     public IReadOnlyList<ControlGrant> ControlGrants { get; init; } = Array.AsReadOnly(Array.Empty<ControlGrant>());
+    /// <summary>One-time phase skips still to come.</summary>
+    public IReadOnlyList<PhaseSkip> PhaseSkips { get; init; } = Array.AsReadOnly(Array.Empty<PhaseSkip>());
 }
 
 internal sealed record ActivatedEffectUse(int InstanceId, int TurnNumber, string Key, long? PlacementId = null);

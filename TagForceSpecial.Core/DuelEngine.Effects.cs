@@ -60,6 +60,9 @@ public sealed partial class DuelEngine
             (ActivationContext.OwnSetCard, EffectKind.NormalSpell or EffectKind.ContinuousSpell or EffectKind.FieldSpell or EffectKind.EquipSpell) => DuelError.None,
             (ActivationContext.OwnSetCard or ActivationContext.OpenWindow or ActivationContext.BattleWindow, EffectKind.QuickPlaySpell or EffectKind.NormalTrap or EffectKind.ContinuousTrap)
                 => setThisTurn ? DuelError.SetThisTurn : DuelError.None,
+            // A Counter Trap that answers an attack is activated in the battle window it waits for.
+            (ActivationContext.BattleWindow, EffectKind.CounterTrap) when definition.Conditions.Any(c => c is OpponentAttackDeclaredCondition or BattleTimingCondition)
+                => setThisTurn ? DuelError.SetThisTurn : DuelError.None,
             (ActivationContext.OwnSetCard or ActivationContext.OpenWindow or ActivationContext.BattleWindow, _) => DuelError.ActivationTimingNotAllowed,
             (ActivationContext.ChainResponse, EffectKind.NormalSpell or EffectKind.ContinuousSpell or EffectKind.FieldSpell or EffectKind.EquipSpell) => DuelError.ActivationTimingNotAllowed,
             (ActivationContext.ChainResponse, _) => setThisTurn ? DuelError.SetThisTurn
@@ -99,6 +102,7 @@ public sealed partial class DuelEngine
                     attack.Attacker.Player != playerId && attack.Attacker.IsStillPresent(State),
                 MonsterSummonedCondition summoned => SummonedMatches(State, playerId, summoned).Any(),
                 OpponentHandAtLeastCondition hand => State.GetPlayer(Other(playerId)).Hand.Count >= hand.Count,
+                LifePointsBehindCondition behind => (long)State.GetPlayer(Other(playerId)).LifePoints - player.LifePoints >= behind.Amount,
                 NoSpecialSummonThisTurnCondition => !State.SummonHistory.Any(h => h.Player == playerId && h.TurnNumber == State.TurnNumber &&
                     h.Status != SummonStatus.Negated && h.Method is SummonMethod.SpecialEffect or SummonMethod.SpecialProcedure or SummonMethod.Token or SummonMethod.Pendulum),
                 BattleTimingCondition timing => State.Battle is { } current && timing.Windows.HasFlag(current.Window.Timing),
@@ -234,6 +238,7 @@ public sealed partial class DuelEngine
     /// </summary>
     private bool OpensSummonWindow(DuelState attempt, uint cardId)
     {
+        if (unnegatableSummons.Contains(cardId)) return false;
         if (summonWindows.Contains(cardId)) return true;
         if (!SummonNegators) return false;
         var saved = State;
@@ -572,6 +577,12 @@ public sealed partial class DuelEngine
                 choice = null;
                 continue;
             }
+            if (step is StopUnlessSpecialSummonedStep)
+            {
+                if (link.Trigger?.Source is { } summonedSource && WasSpecialSummoned(state, summonedSource)) continue;
+                events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
+                break;
+            }
             if (step is StopUnlessActivatedThisTurnStep)
             {
                 if (ScaleActivatedThisTurn(state, controller, link.Activation.SpellTrapZone, link.Activation.Spell, link.SourcePlacementId)) continue;
@@ -869,6 +880,9 @@ public sealed partial class DuelEngine
                     DiceDuelStep dice => DiceDuel(state, controller, dice, definition.EffectId, events),
                     ExcavateStep excavate => Excavate(state, controller, excavate.Count, definition.EffectId, events),
                     ReturnAttackerToHandStep => ReturnAttacker(state, link, definition.EffectId, events),
+                    SkipPhaseStep skip => AddPhaseSkips(state, controller, skip),
+                    EndBattlePhaseStep => EndBattlePhase(state, events),
+                    SendSourceToGraveyardStep => SendSourceToGraveyard(state, link, events),
                     OpponentAddsFromDeckStep add => OpponentAddsFromDeck(state, controller, add, definition.EffectId, events),
                     SendExcavatedToGraveyardStep => SendExcavatedToGraveyard(state, controller, definition.EffectId, events),
                     OpponentDiscardsMatchingStep discard => OpponentDiscardsMatching(state, controller, discard, definition.EffectId, events),
@@ -1193,6 +1207,12 @@ public sealed partial class DuelEngine
         {
             var summoner = summoned[^1].Monster.Player;
             State = State.WithBookkeeping(State.Bookkeeping with { RecentSummon = [.. summoned.Where(s => s.Monster.Player == summoner)] });
+        }
+        // A Normal Summon nothing can respond to opens no response window.
+        if (summoned.Any(s => s.Kind == SummonKinds.Normal && unanswerableSummons.Contains(s.Monster.Card.GameCardId)))
+        {
+            State = State.WithBookkeeping(State.Bookkeeping with { RecentSummon = null });
+            return;
         }
         if (!open || State.Bookkeeping.RecentSummon is not { } recent) return;
         PlayerId? responder = summoned.Length == 0 ? null
