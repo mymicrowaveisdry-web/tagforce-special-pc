@@ -9,6 +9,8 @@ These contracts describe content data without loading packs or registering gamep
 | `ArchetypeMembershipsDocument` | `schemaVersion`, `memberships` |
 | `ArchetypeIdentityRulesDocument` | `schemaVersion`, `rules` |
 | `NativeArchetypeMappingsDocument` | `schemaVersion`, `mappings` |
+| `NativeArchetypeTableDocument` | `schemaVersion`, `sourceSha256`, `catalogSha256`, `membershipCount`, `tokenCardIds`, `groups` |
+| `NativeArchetypeLabelsDocument` | `schemaVersion`, `labels` |
 
 All document schemas currently use version 1. JSON field names and string enum values use camel case; unknown/duplicate properties, missing required constructor fields and numeric enums are rejected. Each document is limited to 16 MiB and 32 nesting levels. Explicit empty lists are valid where no declarations are needed; null lists/items are invalid.
 
@@ -23,3 +25,5 @@ Memberships list distinct archetype IDs for an explicitly known source card. Nat
 Identity rules declare either `permanentName` with only `name`, or `permanentArchetype` with only `archetype`. Contradictory permanent names for one source card are invalid. These declarations do not change static membership or evaluate conditional duel state.
 
 The document records are authoring DTOs, not immutable published snapshots. Runtime pack composition, cross-pack relationship checks, static indexes, conditional identity evaluation and consumer migration are separate work.
+
+`NativeArchetypeIndex` deep-copies a historical table into a read-only numeric adapter: complete ordered slots, contiguous offsets and sorted positive signed-halfword IDs, including Tokens. Its native format bounds do not restrict universal archetype or source-card identifiers. Semantic import requires explicit unique reviewed IDs; candidate labels retain no semantic ID and remain diagnostics. The generated semantic memberships exclude Tokens, while the native table and explicit catalog Token list preserve them. Native evidence and semantic label evidence remain separate.

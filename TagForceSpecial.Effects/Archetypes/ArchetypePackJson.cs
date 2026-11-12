@@ -57,7 +57,8 @@ public static class ArchetypePackJson
         Type type = typeof(T);
         if (type != typeof(ArchetypePackManifest) && type != typeof(ArchetypeDefinitionsDocument) &&
             type != typeof(ArchetypeMembershipsDocument) && type != typeof(ArchetypeIdentityRulesDocument) &&
-            type != typeof(NativeArchetypeMappingsDocument))
+            type != typeof(NativeArchetypeMappingsDocument) && type != typeof(NativeArchetypeTableDocument) &&
+            type != typeof(NativeArchetypeLabelsDocument))
             throw new ArgumentException("Only the separate archetype authoring document types are supported.");
     }
 
