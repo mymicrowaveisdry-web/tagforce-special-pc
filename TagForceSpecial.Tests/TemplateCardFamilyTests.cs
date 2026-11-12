@@ -175,10 +175,11 @@ public sealed class TemplateCardFamilyTests
     public void ArchetypeListsHoldMonstersOnly()
     {
         var spellsAndTraps = TemplateCardFamily.Family.Cards.Select(c => c.CardId).Where(id => TemplateCardFamily.Family.Rules[id].Category != CardCategory.Monster).ToHashSet();
-        foreach (var list in new[] { CardArchetypes.ElementalHero, CardArchetypes.Resonator, CardArchetypes.Hieratic, CardArchetypes.IceBarrier, CardArchetypes.Nordic })
+        foreach (var group in new[] { "elemental-hero", "resonator", "hieratic", "ice-barrier", "nordic" })
         {
-            Assert.NotEmpty(list);
-            Assert.Empty(list.Intersect(spellsAndTraps));
+            var members = TagForceSpecial.Effects.Archetypes.ClassicArchetypes.GetMembers("official:" + group, new(Kind: CardKind.Monster));
+            Assert.NotEmpty(members);
+            Assert.Empty(members.Intersect(spellsAndTraps));
         }
     }
 

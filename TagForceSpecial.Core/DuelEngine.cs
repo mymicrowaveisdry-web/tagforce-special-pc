@@ -64,7 +64,8 @@ public sealed partial class DuelEngine
         IEnumerable<PendulumCardProfile>? experimentalPendulumCards = null,
         IEnumerable<EffectDefinition>? effectDefinitions = null, ulong? shuffleSeed = null, IEnumerable<RuleLockProfile>? ruleLocks = null, IEnumerable<BattleAbilityProfile>? battleAbilities = null,
         IEnumerable<DestructionReplacementProfile>? destructionReplacements = null, IEnumerable<GraveyardRedirectProfile>? graveyardRedirects = null,
-        IEnumerable<DamageRuleProfile>? damageRules = null, IEnumerable<MonsterStatProfile>? monsterStats = null)
+        IEnumerable<DamageRuleProfile>? damageRules = null, IEnumerable<MonsterStatProfile>? monsterStats = null,
+        ICardArchetypeResolver? archetypeResolver = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(rules);
@@ -73,6 +74,7 @@ public sealed partial class DuelEngine
         if (startingPlayer is not (PlayerId.One or PlayerId.Two))
             throw new ArgumentOutOfRangeException(nameof(startingPlayer));
         this.catalog = catalog;
+        this.archetypeResolver = archetypeResolver;
         var knownIds = catalog.Cards.Select(c => c.GameCardId).ToHashSet();
         foreach (var (id, profile) in rules)
             if (!knownIds.Contains(id) || profile is null || !Enum.IsDefined(profile.Category) ||

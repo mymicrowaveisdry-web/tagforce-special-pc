@@ -118,7 +118,8 @@ public static class CardPool
 
     /// <summary>Decks are top-first. The seed drives every in-duel shuffle.</summary>
     public static DuelEngine CreateEngine(CardCatalog catalog, IEnumerable<uint> first, IEnumerable<uint> second,
-        IEnumerable<uint>? firstExtra, IEnumerable<uint>? secondExtra, ulong shuffleSeed, PlayerId startingPlayer = PlayerId.One)
+        IEnumerable<uint>? firstExtra, IEnumerable<uint>? secondExtra, ulong shuffleSeed, PlayerId startingPlayer = PlayerId.One,
+        Archetypes.ArchetypeLoadedContent? archetypeContent = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         var families = CardFamilies.All;
@@ -139,6 +140,7 @@ public static class CardPool
             battleAbilities: families.SelectMany(f => f.BattleAbilities),
             destructionReplacements: families.SelectMany(f => f.DestructionReplacements),
             graveyardRedirects: families.SelectMany(f => f.GraveyardRedirects), damageRules: families.SelectMany(f => f.DamageRules),
-            monsterStats: families.SelectMany(f => f.MonsterStats));
+            monsterStats: families.SelectMany(f => f.MonsterStats),
+            archetypeResolver: archetypeContent is null ? Archetypes.ClassicArchetypes.Resolver : new Archetypes.ArchetypeIdentityResolver(archetypeContent));
     }
 }

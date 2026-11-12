@@ -1116,6 +1116,7 @@ public sealed partial class DuelEngine
     private bool MatchesFilter(CardInstance card, CardFilter filter, bool inGraveyard = false) => rules.TryGetValue(card.GameCardId, out var rule) && filter switch
     {
         CardIdFilter ids => ids.CardIds.Contains(card.GameCardId),
+        ArchetypeFilter archetype => MatchesArchetype(card, archetype),
         AnyMonsterFilter => rule.Category == CardCategory.Monster,
         AnyCardFilter => true,
         DeclaredFilter => resolvingDeclaration is not { } declared || DeclaredMatches(card, declared.Kind, declared.Value),

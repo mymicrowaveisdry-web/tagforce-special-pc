@@ -10,12 +10,15 @@ public sealed record EffectiveCardIdentity(SourceCardId CardId, string Name, IRe
 }
 
 /// <summary>Resolves full-information identity against one immutable content selection and the engine's current state.</summary>
-public sealed class ArchetypeIdentityResolver
+public sealed class ArchetypeIdentityResolver : ICardArchetypeResolver
 {
     private readonly ArchetypeContentSnapshot snapshot;
     private readonly FrozenDictionary<uint, SourceCardId> cards;
     private readonly FrozenDictionary<SourceCardId, ArchetypeIdentityRule[]> rules;
     private readonly FrozenDictionary<ArchetypeId, ArchetypeId[]> closure;
+    public string Fingerprint { get; }
+    public bool Contains(string archetypeId) => ContentIdentifier.IsValid(archetypeId) && snapshot.Get(new(archetypeId)) is not null;
+    public bool IsMember(CardIdentityState card, string archetypeId) => Contains(archetypeId) && Resolve(card)?.IsMember(new(archetypeId)) == true;
 
     public ArchetypeIdentityResolver(ArchetypeLoadedContent content) : this(content.Snapshot,
         content.Snapshot.Cards.ToDictionary(c => content.GetCatalogCardId(c.CardId)
@@ -28,6 +31,8 @@ public sealed class ArchetypeIdentityResolver
         if (catalogMappings.Values.Distinct().Count() != catalogMappings.Count || catalogMappings.Values.Any(id => snapshot.GetCard(id) is null))
             throw new InvalidDataException("Catalog identity mappings must be unambiguous and reference selected cards.");
         cards = catalogMappings.ToFrozenDictionary();
+        string identity = snapshot.Fingerprint + "\n" + string.Join("\n", catalogMappings.OrderBy(p => p.Key).Select(p => p.Key + "=" + p.Value.Value));
+        Fingerprint = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(identity)));
         rules = snapshot.Packs.SelectMany(p => p.IdentityRules.Rules).GroupBy(r => r.CardId)
             .ToFrozenDictionary(g => g.Key, g => g.OrderBy(r => r.Id, StringComparer.Ordinal).ToArray());
         var parents = snapshot.Packs.SelectMany(p => p.Definitions.Relationships).GroupBy(r => r.Child)
@@ -49,7 +54,13 @@ public sealed class ArchetypeIdentityResolver
     {
         ArgumentNullException.ThrowIfNull(engine); ArgumentNullException.ThrowIfNull(card);
         var context = engine.GetCardIdentityState(card);
-        if (context is null || !cards.TryGetValue(card.GameCardId, out var id)) return null;
+        return context is null ? null : Resolve(context);
+    }
+
+    public EffectiveCardIdentity? Resolve(CardIdentityState context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        if (!cards.TryGetValue(context.Card.GameCardId, out var id)) return null;
         var active = Rules(id).Where(r => r.Condition is null || Applies(r.Condition, context)).ToArray();
         List<string> applied = [];
         var conditionalNames = active.Where(r => r.Treatment == ArchetypeIdentityTreatment.ConditionalName).ToArray();
@@ -62,7 +73,8 @@ public sealed class ArchetypeIdentityResolver
             // A copied name uses that card's permanent identity, never its unrelated current location or effects.
             var targetNames = Rules(target).Where(r => r.Treatment == ArchetypeIdentityTreatment.PermanentName).ToArray();
             ValidateNames(targetNames);
-            name = targetNames.FirstOrDefault()?.Name ?? engine.GetOriginalCardName(changed);
+            name = targetNames.FirstOrDefault()?.Name ?? context.ChangedName
+                ?? throw new InvalidDataException("A resolved name change requires its catalog name in the identity context.");
             membership = targetNames.FirstOrDefault()?.NameArchetypes ?? snapshot.GetArchetypes(target);
             applied.AddRange(targetNames.Select(r => r.Id));
             applied.Add("resolved-name:" + target.Value);

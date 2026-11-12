@@ -4,7 +4,7 @@ public enum CardIdentityLocation { Deck, Hand, MonsterZone, SpellTrapZone, Field
 
 /// <summary>Full-information identity context for a present card; callers must enforce visibility separately.</summary>
 public sealed record CardIdentityState(CardInstance Card, string PrintedName, CardIdentityLocation Location,
-    PlayerId Controller, bool FaceUp, bool EffectsNegated, long PlacementId, uint? ChangedNameCardId);
+    PlayerId Controller, bool FaceUp, bool EffectsNegated, long PlacementId, uint? ChangedNameCardId, string? ChangedName = null);
 
 /// <summary>Gives bound face-up monsters another catalog card's name; it does not copy effects or statistics.</summary>
 public sealed record ChangeTargetsNameStep(uint NameCardId, bool UntilEndOfTurn = true) : EffectStep;
@@ -15,22 +15,27 @@ public sealed partial class DuelEngine
 {
     public string GetOriginalCardName(uint cardId) => catalog[cardId].Name;
 
-    public CardIdentityState? GetCardIdentityState(CardInstance card)
+    public CardIdentityState? GetCardIdentityState(CardInstance card) => GetCardIdentityState(State, card);
+
+    private CardIdentityState? GetCardIdentityState(DuelState state, CardInstance card)
     {
         ArgumentNullException.ThrowIfNull(card);
         CardIdentityState Context(CardIdentityLocation location, PlayerId controller, bool faceUp = false,
-            bool negated = false, long placement = 0) => new(card, catalog[card.GameCardId].Name,
-                location, controller, faceUp, negated, placement,
-                location == CardIdentityLocation.MonsterZone && faceUp
-                    ? State.Bookkeeping.NameChanges.LastOrDefault(c => c.Card == card && c.PlacementId == placement && c.LastTurn >= State.TurnNumber)?.NameCardId : null);
-        foreach (var player in State.Players)
+            bool negated = false, long placement = 0)
+        {
+            uint? changed = location == CardIdentityLocation.MonsterZone && faceUp
+                ? state.Bookkeeping.NameChanges.LastOrDefault(c => c.Card == card && c.PlacementId == placement && c.LastTurn >= state.TurnNumber)?.NameCardId : null;
+            return new(card, catalog[card.GameCardId].Name, location, controller, faceUp, negated, placement,
+                changed, changed is { } id ? catalog[id].Name : null);
+        }
+        foreach (var player in state.Players)
         {
             for (int zone = 0; zone < player.MonsterZones.Count; zone++)
             {
                 var monster = player.MonsterZones[zone];
                 if (monster?.Card == card)
                     return Context(CardIdentityLocation.MonsterZone, player.Id, monster.Position != BattlePosition.FaceDownDefense,
-                        State.EventEffects.NegatedMonsters.Contains(new MonsterBinding(player.Id, zone, card, monster.PlacementId)), monster.PlacementId);
+                        state.EventEffects.NegatedMonsters.Contains(new MonsterBinding(player.Id, zone, card, monster.PlacementId)), monster.PlacementId);
                 if (monster?.XyzMaterials.Contains(card) == true) return Context(CardIdentityLocation.Material, player.Id);
             }
             foreach (var (location, fields) in new[] {
@@ -40,7 +45,7 @@ public sealed partial class DuelEngine
                 foreach (var field in fields)
                     if (field?.Card == card)
                         return Context(location, player.Id, field.IsFaceUp,
-                            (location == CardIdentityLocation.PendulumZone || rules[card.GameCardId].Category == CardCategory.Spell) && IsSpellsNegated(State), field.PlacementId);
+                            (location == CardIdentityLocation.PendulumZone || rules[card.GameCardId].Category == CardCategory.Spell) && IsSpellsNegated(state), field.PlacementId);
             foreach (var (location, cards) in new[] {
                 (CardIdentityLocation.Deck, player.Deck), (CardIdentityLocation.Hand, player.Hand),
                 (CardIdentityLocation.Graveyard, player.Graveyard), (CardIdentityLocation.Banished, player.Banished),

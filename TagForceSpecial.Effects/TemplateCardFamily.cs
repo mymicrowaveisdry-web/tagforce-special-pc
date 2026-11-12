@@ -1,3 +1,4 @@
+using TagForceSpecial.Effects.Archetypes;
 using TagForceSpecial.Core;
 using static TagForceSpecial.Effects.MonsterAttributes;
 using static TagForceSpecial.Effects.MonsterTypes;
@@ -21,7 +22,7 @@ public static class TemplateCardFamily
     private static readonly uint[] SaviorSynchros = [8475, 8651];
     private static readonly FieldTarget FaceUpMonster = new(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUp);
     /// <summary>"You cannot Special Summon monsters, except 'Qli' monsters."</summary>
-    private static readonly RuleLock QliOnly = new(LockedAction.SpecialSummon, TargetSide.Own, new NotFilter(new AllOfFilter([new AnyMonsterFilter(), new CardIdFilter(CardArchetypes.Qli)])));
+    private static readonly RuleLock QliOnly = new(LockedAction.SpecialSummon, TargetSide.Own, new NotFilter(new AllOfFilter([new AnyMonsterFilter(), ClassicArchetypes.Filter("official:qli")])));
 
     private static MonsterTypeFilter OfType(uint type) => new([type]);
     private static MonsterAttributeFilter OfAttribute(uint attribute) => new(attribute);
@@ -42,7 +43,7 @@ public static class TemplateCardFamily
     /// </summary>
     private static AuthoredCard Kepler()
     {
-        var dd = new CardIdFilter(CardArchetypes.DD);
+        var dd = ClassicArchetypes.Filter("official:dd");
         var card = T.PendulumTrigger(T.NormalPendulum(11442, "D/D Magical Astronomer Kepler", 10,
                 scaleLock: new RuleLock(LockedAction.PendulumSummon, TargetSide.Own, new NotFilter(dd)), getterKind: 26),
             MonsterEventKind.StandbyPhase, EffectRelation.Controller, [new ReduceSourceScaleStep(2), new DestroyAboveSourceScaleStep(dd)]);
@@ -50,7 +51,7 @@ public static class TemplateCardFamily
         card = T.WithTrigger(card, "return", summoned, EffectRelation.Self, [new ReturnTargetsToHandStep()], TriggerRequirement.Optional,
             targets: [new FieldTarget(FieldCardKind.Any, TargetSide.Own, cardFilter: new AllOfFilter([dd, new NotFilter(new CardIdFilter([11442]))]))],
             timing: TriggerTiming.If, sharedLimit: "summoned");
-        return T.WithTrigger(card, "search", summoned, EffectRelation.Self, [new AddFromDeckToHandStep(new CardIdFilter(CardArchetypes.Covenant))], TriggerRequirement.Optional,
+        return T.WithTrigger(card, "search", summoned, EffectRelation.Self, [new AddFromDeckToHandStep(ClassicArchetypes.Filter("official:covenant"))], TriggerRequirement.Optional,
             timing: TriggerTiming.If, sharedLimit: "summoned") with
         {
             Exceptions = "The two Summon effects are separate triggers sharing one use per turn; \"other\" excludes every copy of this card."
@@ -70,7 +71,7 @@ public static class TemplateCardFamily
     private static AuthoredCard DiscardToSearch(uint id, string name, uint target) =>
         T.FromZone(id, name, EffectOrigin.Hand, new EffectOption([new AddFromDeckToHandStep(new CardIdFilter([target]))], new SendSelfCost(SelfDestination.Discard)));
 
-    private static EffectStep[] SearchFor(IReadOnlyList<uint> ids) => [new AddFromDeckToHandStep(new CardIdFilter(ids))];
+    private static EffectStep[] SearchFor(CardFilter filter) => [new AddFromDeckToHandStep(filter)];
 
     private static AuthoredCard Recover(uint id, string name, CardFilter filter, int count = 1, CardZone zone = CardZone.Graveyard, EffectCost? cost = null) =>
         T.Normal(id, name, [new AddTargetsToHandStep()], cost, [new ZoneTarget(zone, TargetSide.Own, filter, count, count)]);
@@ -123,14 +124,14 @@ public static class TemplateCardFamily
         Recover(7151, "Recurring Nightmare", new MonsterTraitFilter(MonsterStat.Defense, 0, attributeCode: Dark), count: 2),
         Recover(5908, "Salvage", new MonsterTraitFilter(MonsterStat.Attack, 1500, attributeCode: Water), count: 2),
         Recover(7630, "Light of Redemption", OfAttribute(Light), zone: CardZone.Banished, cost: new PayLifePointsCost(800)),
-        T.Normal(6672, "E - Emergency Call", SearchFor(CardArchetypes.ElementalHero)),
-        T.Normal(9518, "Resonator Call", SearchFor(CardArchetypes.Resonator)),
-        T.Normal(10079, "Hieratic Seal of Convocation", SearchFor(CardArchetypes.Hieratic)),
-        T.Normal(9131, "Medallion of the Ice Barrier", SearchFor(CardArchetypes.IceBarrier)),
-        T.Trap(9364, "Gleipnir, the Fetters of Fenrir", SearchFor(CardArchetypes.Nordic)),
+        T.Normal(6672, "E - Emergency Call", SearchFor(ClassicArchetypes.Filter("official:elemental-hero", monstersOnly: true))),
+        T.Normal(9518, "Resonator Call", SearchFor(ClassicArchetypes.Filter("official:resonator", monstersOnly: true))),
+        T.Normal(10079, "Hieratic Seal of Convocation", SearchFor(ClassicArchetypes.Filter("official:hieratic", monstersOnly: true))),
+        T.Normal(9131, "Medallion of the Ice Barrier", SearchFor(ClassicArchetypes.Filter("official:ice-barrier", monstersOnly: true))),
+        T.Trap(9364, "Gleipnir, the Fetters of Fenrir", SearchFor(ClassicArchetypes.Filter("official:nordic", monstersOnly: true))),
         T.Trap(4992, "Enchanted Javelin", [new GainByTargetAttackStep()], targets: TrapTiming.Attacker, conditions: TrapTiming.OpponentAttacks),
         T.WhenSummoned(5510, "Gravekeeper's Curse", [new DealDamageStep(500)]),
-        T.WhenBattleDestroyed(6506, "Scarr, Scout of Dark World", SearchFor(CardArchetypes.DarkWorldLevelFourOrLower)),
+        T.WhenBattleDestroyed(6506, "Scarr, Scout of Dark World", SearchFor(new AllOfFilter(new MonsterLevelFilter(4), ClassicArchetypes.Filter("official:dark-world")))),
         T.QuickPlay(4905, "Rush Recklessly", [new ModifyTargetsUntilEndStep(700)], targets: [FaceUpMonster], exceptions: EndsWithEndPhase),
         T.QuickPlay(5432, "Book of Moon", [new FlipTargetsFaceDownStep()], targets: [FaceUpMonster], exceptions: "Tokens and Xyz Monsters stay face-up."),
         T.Normal(5431, "Book of Taiyou", [new FlipTargetsFaceUpStep()], targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceDown)],
@@ -153,16 +154,16 @@ public static class TemplateCardFamily
             targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUp, cardFilter: new XyzMonsterFilter())]),
         T.Trap(9950, "Xyz Reborn", [new SpecialSummonTargetStep(Link: RevivalLink.Material)],
             targets: [new ZoneTarget(CardZone.Graveyard, TargetSide.Own, new XyzMonsterFilter(), mustBeSummonable: true)]),
-        T.Normal(10570, "Rank-Up-Magic Limited Barian's Force", [new RankUpStep(new CardIdFilter(CardArchetypes.NumberC))],
+        T.Normal(10570, "Rank-Up-Magic Limited Barian's Force", [new RankUpStep(ClassicArchetypes.Filter("official:number-c", monstersOnly: true))],
             targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Own, FieldCardFilter.FaceUp, cardFilter: new XyzMonsterFilter(4, 4))]),
-        T.Normal(10541, "Rank-Up-Magic Barian's Force", [new RankUpStep(new CardIdFilter([.. CardArchetypes.NumberC, .. CardArchetypes.CXyz]), SameType: true),
+        T.Normal(10541, "Rank-Up-Magic Barian's Force", [new RankUpStep(new AnyOfFilter(ClassicArchetypes.Filter("official:number-c", monstersOnly: true), ClassicArchetypes.Filter("official:cxyz", monstersOnly: true)), SameType: true),
             new TakeOpponentMaterialStep()], targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Own, FieldCardFilter.FaceUp, cardFilter: new XyzMonsterFilter())]),
         T.Normal(10726, "Overlay Capture", [new DetachAllStep(0), new AttachSourceStep(1)],
             targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Opponent, FieldCardFilter.FaceUp, cardFilter: new XyzMonsterFilter()) { MinXyzMaterials = 1 },
                 new FieldTarget(FieldCardKind.Monster, TargetSide.Own, FieldCardFilter.FaceUp, cardFilter: new XyzMonsterFilter())]),
         T.Trap(10802, "Numbers Overlay Boost", [new AttachFromStep(new AnyMonsterFilter()), new AttachFromStep(new AnyMonsterFilter())],
             targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Own, FieldCardFilter.FaceUp,
-                cardFilter: new AllOfFilter(new XyzMonsterFilter(), new CardIdFilter(CardArchetypes.Number))) { MaxXyzMaterials = 0 }]),
+                cardFilter: new AllOfFilter(new XyzMonsterFilter(), ClassicArchetypes.Filter("official:number", monstersOnly: true))) { MaxXyzMaterials = 0 }]),
         T.ReplacementCard(10194, "Catapult Zone", trap: false, field: true,
             CardTable.Instead(ReplacementSubject.Monsters, new(ReplacementAction.SendFromDeckToGraveyard, OfType(Rock)), DestructionCause.Battle, oncePerTurn: true)),
         T.MonsterReplacement(7720, "Telekinetic Shocker", CardTable.Instead(ReplacementSubject.Monsters, new(ReplacementAction.DestroySource, LifePoints: 500),
@@ -222,10 +223,10 @@ public static class TemplateCardFamily
             [new FreeMonsterZonesCondition(1)])),
         T.MonsterLock(5714, "Blindly Loyal Goblin", new RuleLock(LockedAction.SwitchControl, Scope: LockScope.Self)),
         T.NormalPendulum(11353, "Qliphort Scout", 9,
-            [new([new AddFromDeckToHandStep(new AllOfFilter([new CardIdFilter(CardArchetypes.Qli), new NotFilter(new CardIdFilter([11353]))]))], new PayLifePointsCost(800))],
-            new RuleLock(LockedAction.SpecialSummon, TargetSide.Own, new NotFilter(new AllOfFilter([new AnyMonsterFilter(), new CardIdFilter(CardArchetypes.Qli)])))),
+            [new([new AddFromDeckToHandStep(new AllOfFilter([ClassicArchetypes.Filter("official:qli"), new NotFilter(new CardIdFilter([11353]))]))], new PayLifePointsCost(800))],
+            new RuleLock(LockedAction.SpecialSummon, TargetSide.Own, new NotFilter(new AllOfFilter([new AnyMonsterFilter(), ClassicArchetypes.Filter("official:qli")])))),
         T.WhenTributed(T.Qliphort(T.NormalPendulum(11354, "Qliphort Carrier", 1, scaleLock: QliOnly,
-            modifiers: [new LastingStatModifier(TargetSide.Own, 300, 0, new CardIdFilter(CardArchetypes.Qli))], getterKind: 26)),
+            modifiers: [new LastingStatModifier(TargetSide.Own, 300, 0, ClassicArchetypes.Filter("official:qli"))], getterKind: 26)),
             [new ReturnTargetsToHandStep()], new FieldTarget(FieldCardKind.Monster)),
         T.WhenTributed(T.Qliphort(T.NormalPendulum(11355, "Qliphort Helix", 9, scaleLock: QliOnly,
             modifiers: [new LastingStatModifier(TargetSide.Opponent, -300, 0)], getterKind: 26)),
@@ -238,7 +239,7 @@ public static class TemplateCardFamily
         T.WithTrigger(T.NormalPendulum(11330, "D/D Proud Chevalier", 6,
                 [new([new ModifyTargetsStep(-500)], new PayLifePointsCost(500), [new FieldTarget(FieldCardKind.Monster, TargetSide.Opponent, FieldCardFilter.FaceUp)])], getterKind: 26) with
             {
-                Scales = [new PendulumCardProfile(11330, 6, 6) { PartnerFilter = new CardIdFilter(CardArchetypes.DD), ScaleWithoutPartner = 5 }]
+                Scales = [new PendulumCardProfile(11330, 6, 6) { PartnerFilter = ClassicArchetypes.Filter("official:dd"), ScaleWithoutPartner = 5 }]
             },
             "summoned", [MonsterEventKind.NormalSummoned], EffectRelation.Self, [new AddFromFaceUpExtraDeckStep(OfAttribute(Dark))], TriggerRequirement.Optional),
         Kepler(),

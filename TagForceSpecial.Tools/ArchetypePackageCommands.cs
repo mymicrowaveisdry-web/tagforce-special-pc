@@ -14,7 +14,18 @@ public static class ArchetypePackageCommands
         try
         {
             object result;
-            if (command == "archetype-load" && args.Length == 1)
+            if (command == "archetype-classic" && args.Length == 0)
+            {
+                result = new { status = "pass", ClassicArchetypes.Resolver.Fingerprint,
+                    snapshotFingerprint = ClassicArchetypes.Snapshot.Fingerprint,
+                    cards = ClassicArchetypes.Snapshot.Cards.Count,
+                    authoredCards = TagForceSpecial.Effects.TemplateCardFamily.Family.Cards.Count,
+                    groups = ClassicArchetypes.Snapshot.GetAll().Select(d => new { id = d.Id.Value,
+                        members = ClassicArchetypes.GetMembers(d.Id.Value),
+                        monsters = ClassicArchetypes.GetMembers(d.Id.Value, new(Kind: CardKind.Monster)),
+                        levelFourOrLower = ClassicArchetypes.GetMembers(d.Id.Value, new(Kind: CardKind.Monster, MaxLevel: 4)) }) };
+            }
+            else if (command == "archetype-load" && args.Length == 1)
             {
                 var content = ArchetypeContentLoader.LoadFile(args[0]);
                 result = new { status = "pass", profile = content.Snapshot.Profile.ToString(), content.Fingerprint,

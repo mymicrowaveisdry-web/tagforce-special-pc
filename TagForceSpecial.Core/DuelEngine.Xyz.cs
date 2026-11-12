@@ -2,7 +2,7 @@ namespace TagForceSpecial.Core;
 
 public sealed partial class DuelEngine
 {
-    private bool IsXyzCard(CardInstance card) => materialProcedures.Values.Any(p =>
+    private bool IsXyzCard(CardInstance card) => catalog[card.GameCardId].Codes?.GetterKind is 22 or 23 || materialProcedures.Values.Any(p =>
         p.Xyz is not null && p.TargetCardIds.Contains(card.GameCardId));
 
     /// <summary>Attaches the resolving Spell or Trap to a monster; nothing happens if the card already left its zone.</summary>
