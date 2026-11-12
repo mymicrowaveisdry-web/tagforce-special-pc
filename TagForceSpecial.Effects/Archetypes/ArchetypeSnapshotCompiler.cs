@@ -15,12 +15,7 @@ internal static class ArchetypeSnapshotCompiler
         if (!Enum.IsDefined(profile)) throw new ArgumentException("Unknown content profile.", nameof(profile));
         var selected = Copy(packs).Select(Freeze).OrderBy(p => p.Manifest.PackId.Value, StringComparer.Ordinal).ToArray();
         var facts = Copy(cards).OrderBy(c => c.CardId.Value, StringComparer.Ordinal).ToArray();
-        var cardIds = new HashSet<SourceCardId>();
-        foreach (var card in facts)
-            if (!ContentIdentifier.IsValid(card.CardId.Value) || !cardIds.Add(card.CardId) || !Enum.IsDefined(card.Kind) ||
-                card.Level is not null && card.Rank is not null ||
-                card.Kind != CardKind.Monster && (card.Level is not null || card.Rank is not null || card.IsToken))
-                throw new InvalidDataException("Card facts require distinct source IDs, known kinds and independent monster Level/Rank metadata.");
+        ArchetypeCardFacts.ValidateAll(facts);
         if (selected.Select(p => p.Manifest.PackId).Distinct().Count() != selected.Length)
             throw new InvalidDataException("The selected pack IDs must be unique.");
         var exports = selected.Select(p => new ArchetypeDependencyExports(p.Manifest.PackId, p.Manifest.Version,

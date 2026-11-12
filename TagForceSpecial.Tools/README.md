@@ -10,7 +10,7 @@ dotnet run --project TagForceSpecial.Tools --no-build -- duel-demo
 inspect local inputs and emit JSON. `CardCatalogImporter` validates PSP encoding
 before creating a format-independent catalog; authored cards use the Cards API directly.
 `catalog-import <file> <min> <max> <new-directory>` stores a versioned local package;
-`catalog-check <directory>` validates it. `native-archetype-import|native-archetype-check <table.bin> <catalog-package> <labels.json> <expected-sha256> <directory>` creates a new private archetype package or checks reproducibility and numeric membership parity; candidates remain diagnostics. `card-support` emits per-source support
+`catalog-check <directory>` validates it. `native-archetype-import|native-archetype-check <table.bin> <catalog-package> <labels.json> <expected-sha256> <directory>` creates a new private archetype package or checks reproducibility and numeric membership parity; candidates remain diagnostics. `archetype-package <authoring-directory> <dependency-startup.json|-> <new-directory>` packages reviewed JSON, `archetype-package-native` accepts the same inputs as native import for a startup-ready package, and `archetype-load <startup.json>` inspects its pinned profile/dependencies ([schema](../TagForceSpecial.Effects/Archetypes/Schema.md)). `card-support` emits per-source support
 manifests; `preview-duel` accepts either a package directory or the file/ID-range arguments.
 `pool-duel <package-directory> [duels] [seed] [report.json]` plays seeded duels over every supported card, checking engine invariants and replay.
 `source-check`, `cache-create`, `cache-check`, `foundation-examples` and `deck-check`
