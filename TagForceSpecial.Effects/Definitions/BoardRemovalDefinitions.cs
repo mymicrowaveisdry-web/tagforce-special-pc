@@ -1,4 +1,5 @@
 using TagForceSpecial.Core;
+using static TagForceSpecial.Effects.Definitions.DefinitionBuilders;
 
 namespace TagForceSpecial.Effects.Definitions;
 
@@ -10,6 +11,7 @@ public static class BoardRemovalDefinitions
     [
         t.Normal(4343, "Raigeki", [new DestroyAllStep(FieldCardKind.Monster, TargetSide.Opponent)]),
         t.Normal(4678, "Harpie's Feather Duster", [new DestroyAllStep(FieldCardKind.SpellTrap, TargetSide.Opponent)]),
-        t.Normal(3827, "Harpie's Feather Duster", [new DestroyAllStep(FieldCardKind.SpellTrap, TargetSide.Opponent)])
+        t.Normal(3827, "Harpie's Feather Duster", [new DestroyAllStep(FieldCardKind.SpellTrap, TargetSide.Opponent)]),
+        t.Trap(6519, "Weed Out", [new DestroyAllStep(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUpAttack, Level(3))], new PayLifePointsCost(500))
     ];
 }
