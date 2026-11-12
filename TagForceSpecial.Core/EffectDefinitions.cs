@@ -371,7 +371,7 @@ public sealed class EffectDefinition
         BanishFieldTargetsStep or NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep or DestroyAndBanishTargetsStep or ModifyCombatantStatsStep or
         EquipTargetStep or UnionEquipStep or PlaceCounterStep or ModifyTargetsUntilEndStep or FlipTargetsFaceDownStep or FlipTargetsFaceUpStep or
         AttachSourceStep or AttachTargetsToSelfStep or DetachAllStep or RankUpStep or AttachFromStep { ToTarget: true } or
-        TakeControlStep or GiveControlStep or SwitchControlStep or LockTargetsUntilEndStep or ChangeTargetsTraitStep or SetTargetScaleStep or
+        TakeControlStep or GiveControlStep or SwitchControlStep or LockTargetsUntilEndStep or ChangeTargetsTraitStep or ChangeTargetsNameStep or SetTargetScaleStep or
         DestroyTargetAtStep or GiveTargetControlStep or ModifyTargetsStep;
     /// <summary>Cost choices answered before the target choices, each binding a field target answer.</summary>
     internal int CostTargetSteps => Cost switch { TributeCost tribute => tribute.Count, BanishFromGraveyardCost banish => banish.Count, _ => 0 };
@@ -481,6 +481,7 @@ public sealed class EffectDefinition
                     LockTargetsUntilEndStep s => s.Actions == LockedAction.None,
                     StopUnlessOwnTurnStep => false,
                     ChangeTargetsTraitStep s => !Enum.IsDefined(s.Trait),
+                    ChangeTargetsNameStep => false,
                     SetTargetScaleStep => false,
                     StopUnlessSpecialSummonedStep or SendSourceToGraveyardStep => kind != EffectKind.MonsterTrigger,
                     StopUnlessMilledStep s => s.Filter is null,

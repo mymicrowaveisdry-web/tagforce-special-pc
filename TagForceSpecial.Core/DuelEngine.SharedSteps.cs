@@ -25,7 +25,7 @@ public sealed partial class DuelEngine
         var zones = player.MonsterZones.ToArray();
         zones[target.Zone] = monster with { Position = BattlePosition.FaceDownDefense, Counters = 0, GeminiActive = false };
         events.Add(new MonsterPositionChanged(player.Id, target.Zone, monster.Position, BattlePosition.FaceDownDefense));
-        return ForgetUses(state.With(player: player.With(monsters: zones)), monster.Card);
+        return ForgetUses(PruneNameChanges(state.With(player: player.With(monsters: zones))), monster.Card);
     }
 
     /// <summary>Flips a face-down monster face-up by an effect, which counts as flipped for Flip effects but is not a Flip Summon.</summary>

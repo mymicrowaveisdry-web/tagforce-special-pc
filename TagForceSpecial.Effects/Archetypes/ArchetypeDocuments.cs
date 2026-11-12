@@ -3,7 +3,7 @@ namespace TagForceSpecial.Effects.Archetypes;
 public enum ArchetypeReviewStatus { Candidate, Reviewed }
 public enum ArchetypeContentProfile { TfsClassic, Expanded }
 public enum ArchetypePackKind { Native, Expansion, Synthetic }
-public enum ArchetypeIdentityTreatment { PermanentName, PermanentArchetype }
+public enum ArchetypeIdentityTreatment { PermanentName, PermanentArchetype, ConditionalName, ConditionalArchetype }
 public enum ArchetypeValidationMode { ReviewedContent, Diagnostic }
 
 public sealed record ArchetypeEvidence(string Reference, string Sha256, string Reason);
@@ -28,9 +28,16 @@ public sealed record ArchetypeCardMembership(SourceCardId CardId, IReadOnlyList<
     ArchetypeReviewStatus Review, ArchetypeEvidence Evidence);
 public sealed record ArchetypeMembershipsDocument(int SchemaVersion, IReadOnlyList<ArchetypeCardMembership> Memberships);
 
-/// <summary>Authoring data for permanent treatment; duel-state resolution is a separate contract.</summary>
+public sealed record ArchetypeIdentityCondition(IReadOnlyList<TagForceSpecial.Core.CardIdentityLocation> Locations,
+    bool RequireFaceUp = true, bool RequireEffectsActive = true, TagForceSpecial.Core.PlayerId? Controller = null);
+
+/// <summary>Reviewed identity treatment; name memberships are explicit rather than inferred from text.</summary>
 public sealed record ArchetypeIdentityRule(string Id, SourceCardId CardId, ArchetypeIdentityTreatment Treatment,
-    ArchetypeReviewStatus Review, ArchetypeEvidence Evidence, string? Name = null, ArchetypeId? Archetype = null);
+    ArchetypeReviewStatus Review, ArchetypeEvidence Evidence, string? Name = null, ArchetypeId? Archetype = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    ArchetypeIdentityCondition? Condition = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<ArchetypeId>? NameArchetypes = null);
 public sealed record ArchetypeIdentityRulesDocument(int SchemaVersion, IReadOnlyList<ArchetypeIdentityRule> Rules);
 
 public sealed record NativeArchetypeMapping(int NativeGroupId, ArchetypeId? Archetype,

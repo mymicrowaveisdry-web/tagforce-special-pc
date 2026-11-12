@@ -167,6 +167,7 @@ public static class ArchetypePackValidator
         Schema(pack.IdentityRules.SchemaVersion, "identityRules.schemaVersion");
         var ruleIds = new HashSet<string>(StringComparer.Ordinal);
         var permanentNames = new Dictionary<SourceCardId, string>();
+        var permanentNameGroups = new Dictionary<SourceCardId, IReadOnlyList<ArchetypeId>?>();
         foreach (var rule in Items(pack.IdentityRules.Rules, "identityRules.rules"))
         {
             if (rule is null) { Error("identityRules.rules", "null-entry", "An identity rule cannot be null."); continue; }
@@ -174,19 +175,39 @@ public static class ArchetypePackValidator
             Id(rule.Id, path + ".id"); Card(rule.CardId, path + ".cardId");
             Review(rule.Review, path + ".review"); Evidence(rule.Evidence, path + ".evidence");
             if (rule.Id is not null && !ruleIds.Add(rule.Id)) Error(path, "duplicate-rule", "Identity rule IDs must be unique.");
-            if (rule.Treatment == ArchetypeIdentityTreatment.PermanentName && rule.Archetype is null)
+            bool conditional = rule.Treatment is ArchetypeIdentityTreatment.ConditionalName or ArchetypeIdentityTreatment.ConditionalArchetype;
+            if (conditional != (rule.Condition is not null))
+                Error(path, "invalid-condition", "Only conditional treatment requires a condition.");
+            if (rule.Condition is { } condition)
+            {
+                var locations = Items(condition.Locations, path + ".condition.locations");
+                if (locations.Count == 0 || locations.Distinct().Count() != locations.Count || locations.Any(l => !Enum.IsDefined(l)) ||
+                    condition.Controller is { } controller && !Enum.IsDefined(controller))
+                    Error(path, "invalid-condition", "Conditions require distinct known locations and a valid optional controller.");
+            }
+            if (rule.NameArchetypes is { } nameGroups)
+            {
+                if (nameGroups.Distinct().Count() != nameGroups.Count) Error(path, "duplicate-name-archetype", "Name archetypes must be distinct.");
+                foreach (var group in nameGroups) Archetype(group, path + ".nameArchetypes");
+            }
+            if (rule.Treatment is ArchetypeIdentityTreatment.PermanentName or ArchetypeIdentityTreatment.ConditionalName && rule.Archetype is null)
             {
                 Text(rule.Name, path + ".name");
-                if (rule.Name is not null)
+                if (conditional && rule.NameArchetypes is null) Error(path, "missing-name-archetypes", "Conditional names require explicit name membership, including an empty list.");
+                if (!conditional && rule.Name is not null)
                 {
                     if (permanentNames.TryGetValue(rule.CardId, out var previous) && previous != rule.Name)
                         Error(path, "conflicting-name-treatment", "A card cannot have contradictory permanent names in one pack.");
                     else permanentNames[rule.CardId] = rule.Name;
+                    if (permanentNameGroups.TryGetValue(rule.CardId, out var previousGroups) &&
+                        ((previousGroups is null) != (rule.NameArchetypes is null) || !(previousGroups ?? []).ToHashSet().SetEquals(rule.NameArchetypes ?? [])))
+                        Error(path, "conflicting-name-treatment", "Permanent name memberships cannot contradict each other.");
+                    else permanentNameGroups[rule.CardId] = rule.NameArchetypes;
                 }
             }
-            else if (rule.Treatment == ArchetypeIdentityTreatment.PermanentArchetype && rule.Name is null && rule.Archetype is { } target)
+            else if (rule.Treatment is ArchetypeIdentityTreatment.PermanentArchetype or ArchetypeIdentityTreatment.ConditionalArchetype && rule.Name is null && rule.NameArchetypes is null && rule.Archetype is { } target)
                 Archetype(target, path + ".archetype");
-            else Error(path, "invalid-treatment", "A permanent name rule needs only a name; a permanent archetype rule needs only an archetype.");
+            else Error(path, "invalid-treatment", "Name treatment needs a name; archetype treatment needs only an archetype.");
         }
         Schema(pack.NativeMappings.SchemaVersion, "nativeMappings.schemaVersion");
         var nativeIds = new HashSet<int>();

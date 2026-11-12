@@ -179,6 +179,9 @@ public sealed partial class DuelEngine
             !EffectGroupsValid(definitionList) ||
             definitionList.Select(d => d.EffectId).Distinct(StringComparer.Ordinal).Count() != definitionList.Length)
             throw new ArgumentException("Effect definitions require distinct, unreserved IDs, matching settable card rules, Token rules for Token steps and a seed for shuffle steps.", nameof(effectDefinitions));
+        if (definitionList.Concat(triggerEffects.Where(p => p.Definition is not null).Select(p => p.Definition!))
+            .Any(d => d.Steps.OfType<ChangeTargetsNameStep>().Any(s => !knownIds.Contains(s.NameCardId))))
+            throw new ArgumentException("Name changes must reference a catalog card.");
         if (shuffleSeed is null && triggerEffects.Any(p => p.Definition is { } d && NeedsShuffle(d)))
             throw new ArgumentException("Triggers that search or Summon from the Deck need a seed.", nameof(shuffleSeed));
         // Attack-declaration and Damage Step responses only have a window in the staged flow.
@@ -631,6 +634,7 @@ public sealed partial class DuelEngine
         state = DropLinkDamageRules(state);
         state = ApplyGraveyardRedirects(state, emitted);
         state = PrepareSummonHistory(State, state, emitted);
+        state = PruneNameChanges(state);
         identityView = state;
         try { state = PrepareEventEffects(State, state, emitted); }
         finally { identityView = null; }

@@ -49,6 +49,7 @@ internal static class ArchetypeSnapshotCompiler
         }
         var ruleIds = new HashSet<string>(StringComparer.Ordinal);
         var permanentNames = new Dictionary<SourceCardId, string>();
+        var permanentNameGroups = new Dictionary<SourceCardId, IReadOnlyList<ArchetypeId>?>();
         foreach (var rule in selected.SelectMany(p => p.IdentityRules.Rules))
         {
             if (!ruleIds.Add(rule.Id)) throw new InvalidDataException("Identity rule IDs conflict across selected packs.");
@@ -57,6 +58,10 @@ internal static class ArchetypeSnapshotCompiler
                 if (permanentNames.TryGetValue(rule.CardId, out var name) && name != rule.Name)
                     throw new InvalidDataException("Selected packs declare conflicting permanent names for a card.");
                 permanentNames[rule.CardId] = rule.Name!;
+                if (permanentNameGroups.TryGetValue(rule.CardId, out var previous) &&
+                    ((previous is null) != (rule.NameArchetypes is null) || !(previous ?? []).SequenceEqual(rule.NameArchetypes ?? [])))
+                    throw new InvalidDataException("Selected packs declare conflicting permanent name memberships.");
+                permanentNameGroups[rule.CardId] = rule.NameArchetypes;
             }
         }
         var relationships = selected.SelectMany(p => p.Definitions.Relationships).Select(r => (r.Parent, r.Child)).Distinct().ToArray();
@@ -99,7 +104,10 @@ internal static class ArchetypeSnapshotCompiler
         {
             Memberships = Copy(Copy(pack.Memberships.Memberships).OrderBy(m => m.CardId.Value, StringComparer.Ordinal)
                 .Select(m => m with { Archetypes = Copy(Copy(m.Archetypes).OrderBy(id => id.Value, StringComparer.Ordinal)) }))
-        }, pack.IdentityRules with { Rules = Copy(Copy(pack.IdentityRules.Rules).OrderBy(r => r.Id, StringComparer.Ordinal)) },
+        }, pack.IdentityRules with { Rules = Copy(Copy(pack.IdentityRules.Rules).OrderBy(r => r.Id, StringComparer.Ordinal).Select(r => r with {
+            NameArchetypes = r.NameArchetypes is null ? null : Copy(r.NameArchetypes.OrderBy(id => id.Value, StringComparer.Ordinal)),
+            Condition = r.Condition is null ? null : r.Condition with { Locations = Copy(Copy(r.Condition.Locations).Order()) }
+        })) },
         pack.NativeMappings with { Mappings = Copy(Copy(pack.NativeMappings.Mappings).OrderBy(m => m.NativeGroupId)) });
     }
 

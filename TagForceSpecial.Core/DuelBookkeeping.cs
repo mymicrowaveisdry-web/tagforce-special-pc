@@ -34,6 +34,7 @@ internal sealed record DuelBookkeeping(int NextInstanceId = 1, DuelRandomState? 
     public IReadOnlyList<PhaseSkip> PhaseSkips { get; init; } = Array.AsReadOnly(Array.Empty<PhaseSkip>());
     /// <summary>Type and Attribute changes made to field monsters by resolved effects.</summary>
     public IReadOnlyList<IdentityChange> IdentityChanges { get; init; } = Array.AsReadOnly(Array.Empty<IdentityChange>());
+    public IReadOnlyList<CardNameChange> NameChanges { get; init; } = Array.AsReadOnly(Array.Empty<CardNameChange>());
     /// <summary>Pendulum Scales changed for this turn.</summary>
     public IReadOnlyList<ScaleChange> ScaleChanges { get; init; } = Array.AsReadOnly(Array.Empty<ScaleChange>());
 }

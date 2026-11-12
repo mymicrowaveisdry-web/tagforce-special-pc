@@ -862,6 +862,11 @@ public sealed partial class DuelEngine
                                 : SetScale(state, target, declared, definition.EffectId, events);
                     continue;
                 }
+                if (step is ChangeTargetsNameStep nameChange)
+                {
+                    foreach (var target in valid) state = ChangeName(state, target, nameChange, definition.EffectId, events);
+                    continue;
+                }
                 if (step is LockTargetsUntilEndStep lockTargets)
                 {
                     foreach (var target in valid.Where(t => t.Location == FieldLocation.MonsterZone))
