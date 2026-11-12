@@ -96,7 +96,8 @@ public static class CardFamilies
         TemplateCardFamily.Family,
         EgyptianGodFamily.Family,
         TokenCardFamily.Family,
-        ApoqliphortFamily.Family
+        ApoqliphortFamily.Family,
+        ShortTextCardFamily.Family
     });
 }
 

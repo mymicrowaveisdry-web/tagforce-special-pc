@@ -25,6 +25,18 @@ public sealed class CardPoolTests
         Assert.Equal(ids.Length, ids.Distinct().Count());
     }
 
+    /// <summary>Moving cards between families or modules must not register any effect twice.</summary>
+    [Fact]
+    public void NoEffectIsRegisteredTwice()
+    {
+        var ids = CardFamilies.All.SelectMany(f => f.Definitions.Select(d => d.EffectId)
+            .Concat(f.Triggers.Select(t => t.EffectId)).Concat(f.ContinuousEffects.Select(c => c.EffectId))
+            .Concat(f.RuleLocks.Select(l => l.EffectId)).Concat(f.BattleAbilities.Select(b => b.EffectId))
+            .Concat(f.DestructionReplacements.Select(r => r.EffectId)).Concat(f.GraveyardRedirects.Select(r => r.EffectId))
+            .Concat(f.DamageRules.Select(r => r.EffectId)).Concat(f.MonsterStats.Select(s => s.EffectId))).ToArray();
+        Assert.Empty(ids.GroupBy(id => id).Where(g => g.Count() > 1).Select(g => g.Key));
+    }
+
     [Fact]
     public void EveryFamilyCardHasRulesAndReviewedMetadata()
     {

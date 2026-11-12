@@ -10,7 +10,7 @@ namespace TagForceSpecial.Effects;
 public static class MonsterTypes
 {
     public const uint Dragon = 1, Zombie = 2, Fiend = 3, Pyro = 4, SeaSerpent = 5, Rock = 6, Machine = 7, Fish = 8, Dinosaur = 9, Insect = 10,
-        Beast = 11, BeastWarrior = 12, Plant = 13, Aqua = 14, Warrior = 15, WingedBeast = 16, Fairy = 17, Spellcaster = 18, Thunder = 19, Psychic = 21;
+        Beast = 11, BeastWarrior = 12, Plant = 13, Aqua = 14, Warrior = 15, WingedBeast = 16, Fairy = 17, Spellcaster = 18, Thunder = 19, Reptile = 20, Psychic = 21;
 }
 
 /// <summary>Raw monster Attribute codes, checked against well-known monsters in the decoded catalog.</summary>
