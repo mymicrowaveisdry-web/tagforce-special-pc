@@ -27,7 +27,11 @@ public static class ShortTextCardFamily
         .. ResourceSpellDefinitions.Cards(T),
         .. StatChangeDefinitions.Cards(T),
         .. GraveyardAndBanishedDefinitions.Cards(T),
-        .. ArchetypeInteractionDefinitions.Cards(T)
+        .. ArchetypeInteractionDefinitions.Cards(T),
+        .. GenexDefinitions.Cards(T),
+        .. GladiatorBeastDefinitions.Cards(T),
+        .. GravekeeperDefinitions.Cards(T),
+        .. NaturiaDefinitions.Cards(T)
     ]);
 
     public static CardFamily Family { get; } = CardTable.Family(FamilyId, BatchId, ["ShortTextCardFamilyTests", "CardPoolTests"], Cards);

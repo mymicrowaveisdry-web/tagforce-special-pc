@@ -155,6 +155,7 @@ public sealed partial class DuelEngine
     private static bool CauseMatches(TriggerEffectProfile profile, MonsterEventOccurrence occurrence) => profile.Cause switch
     {
         TriggerEventCause.FromField => occurrence.Subject.Zone >= 0,
+        TriggerEventCause.FromOwnField => occurrence.Subject.Zone >= 0 && occurrence.Subject.Player == occurrence.Subject.Card.Owner,
         TriggerEventCause.ByBattle => occurrence.ByBattle,
         _ => true
     };

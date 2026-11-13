@@ -17,8 +17,11 @@ public enum MonsterEventKind { NormalSummoned, SpecialSummoned, FlipSummoned, De
     ControlChanged,
     /// <summary>This monster was Tributed, for a Summon or as a cost; only its Graveyard trigger uses it.</summary>
     Tributed }
-/// <summary>Narrows a Destroyed or SentToGraveyard event by where it came from or what caused it.</summary>
-public enum TriggerEventCause { Any, FromField, ByBattle }
+/// <summary>
+/// Narrows a Destroyed or SentToGraveyard event by where it came from or what caused it; <see cref="FromOwnField"/> is "this card you
+/// control is sent to your Graveyard", from a field zone while its owner controlled it.
+/// </summary>
+public enum TriggerEventCause { Any, FromField, ByBattle, FromOwnField }
 public enum EffectRelation { Self, Controller, Opponent, Any }
 public enum TriggerRequirement { Mandatory, Optional }
 public enum TriggerSourceLocation { FaceUpMonster, DestroyedSelf, GraveyardSelf, FaceUpSpellTrap, PendulumZone,

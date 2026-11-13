@@ -9,7 +9,7 @@ namespace TagForceSpecial.Tests;
 public sealed class ShortTextCardFamilyTests
 {
     private const uint DarkMonster = 901, EarthMonster = 902, FishMonster = 903, MachineMonster = 904,
-        DarkSword = 4308, Umi = 4340, ThunderShort = 9664, CrystalSkull = 3611;
+        DarkSword = 4308, Umi = 4340, ThunderShort = 9664, CrystalSkull = 3611, BigMonster = 905, ChangeOfHeart = 4860, Recruiter = 9282;
 
     private static CardNumericCodes Codes(uint type, uint attribute) => new(attribute, type, 1, 1, 0, 0, 0);
 
@@ -78,6 +78,57 @@ public sealed class ShortTextCardFamilyTests
         Summon(e, EarthMonster, 0); Next(e);
         Ok(e, new ActivateSpell(PlayerId.One, Hand(e, ThunderShort), 4)); Resolve(e);
         Assert.Equal(7600, e.State.GetPlayer(PlayerId.Two).LifePoints);
+    }
+
+    /// <summary>The family plus a Level 6 monster and Change of Heart, for "this card you control is sent to your Graveyard".</summary>
+    private static DuelEngine OwnFieldEngine(uint[] first, uint[] second)
+    {
+        var catalog = new CardCatalog(new(null, "synthetic-short-text-own-field"), Catalog().Cards.Concat(
+        [
+            new(BigMonster, "Big", "", new(2400, 1000, 6), Codes(MonsterTypes.Warrior, MonsterAttributes.Earth)),
+            new(ChangeOfHeart, "Change of Heart", "", new(0, 0, 0), Codes(0, 0))
+        ]));
+        var rules = ShortTextCardFamily.Family.Rules.ToDictionary();
+        rules[EarthMonster] = new(CardCategory.Monster, AllowsNormalSummon: true, AllowsBasicBattle: true, AllowsTributeForSummon: true);
+        rules[BigMonster] = new(CardCategory.Monster, AllowsNormalSummon: true, AllowsBasicBattle: true, AllowsTributeSummon: true);
+        rules[ChangeOfHeart] = TemplateCardFamily.Family.Rules[ChangeOfHeart];
+        return new(catalog, rules, first, second, experimentalTriggerEffects: ShortTextCardFamily.Family.Triggers,
+            effectDefinitions: [.. ShortTextCardFamily.Family.Definitions, .. TemplateCardFamily.Family.Definitions.Where(d => d.CardId == ChangeOfHeart)],
+            shuffleSeed: 5);
+    }
+
+    private static List<DuelEvent> TributeFor(DuelEngine e, PlayerId player, uint tributedId)
+    {
+        int zone = Array.FindIndex(e.State.GetPlayer(player).MonsterZones.ToArray(), m => m?.Card.GameCardId == tributedId);
+        var tributed = e.State.GetPlayer(player).MonsterZones[zone]!;
+        int free = Array.FindIndex(e.State.GetPlayer(player).MonsterZones.ToArray(), m => m is null);
+        var events = Ok(e, new TributeSummon(player, e.State.Revision, Hand(e, BigMonster), free,
+            [new MonsterBinding(player, zone, tributed.Card, tributed.PlacementId)])).Events.ToList();
+        events.AddRange(EventEffectScenario.Drain(e));
+        return events;
+    }
+
+    [Fact]
+    public void OwnFieldTriggerNeedsItsOwnerToControlTheCard()
+    {
+        uint[] recruiterDeck = [Recruiter, EarthMonster, EarthMonster, EarthMonster, EarthMonster, EarthMonster, EarthMonster, EarthMonster, Recruiter];
+        var owned = OwnFieldEngine(Deck([Recruiter, BigMonster, .. recruiterDeck.Skip(2)]), Deck());
+        EnterMain(owned); Summon(owned, Recruiter, 0); Next(owned); Next(owned);
+        var searched = Assert.Single(TributeFor(owned, PlayerId.One, Recruiter).OfType<CardSearched>());
+        Assert.Equal((PlayerId.One, Recruiter), (searched.Player, searched.Card.GameCardId));
+
+        var taken = OwnFieldEngine(Deck(ChangeOfHeart, BigMonster), Deck(recruiterDeck));
+        EnterMain(taken); Next(taken);
+        Summon(taken, Recruiter, 0); Next(taken);
+        Ok(taken, new ActivateSpell(PlayerId.One, Hand(taken, ChangeOfHeart), 0));
+        var pending = taken.State.PendingDecision!;
+        var target = Assert.Single(pending.FieldTargetOptions!);
+        Ok(taken, new ChooseDecisionFieldTarget(pending.Player, pending.DecisionId, target.Player, target.Location, target.Zone, target.Card.InstanceId));
+        Resolve(taken);
+        var events = TributeFor(taken, PlayerId.One, Recruiter);
+        Assert.Empty(events.OfType<CardSearched>());
+        Assert.Empty(events.OfType<TriggerActivated>());
+        Assert.Contains(taken.State.GetPlayer(PlayerId.Two).Graveyard, c => c.GameCardId == Recruiter);
     }
 
     [Fact]
