@@ -25,6 +25,8 @@ public static class GraveyardTriggerDefinitions
         t.BattleDestroyed(8642, "Pandaborg", [new SpecialSummonStep(SpecialSummonSources.Deck, new AllOfFilter(Level(4), OfType(Psychic)))], optional: true,
             lifePointCost: 800),
         t.BattleDestroyed(7715, "Doctor Cranium", Search(OfType(Psychic)), optional: true, lifePointCost: 800),
+        t.BattleDestroyed(8375, "Moja", [new AddFromGraveyardToHandStep(new MonsterLevelFilter(4, Beast, minLevel: 4))], optional: true),
+        t.BattleDestroyed(7048, "Harvest Angel of Wisdom", [new AddFromGraveyardToHandStep(CounterTrap)], optional: true),
         t.BattleDestroyed(6327, "Mine Golem", [new DealDamageStep(500)]),
         t.BattleDestroyed(7527, "Blizzed, Defender of the Ice Barrier", [new DrawCardsStep(1)]),
         t.BattleDestroyed(8088, "Violet Witch", Search(new AllOfFilter(OfType(Plant), new MonsterTraitFilter(MonsterStat.Defense, 1500))), timing: TriggerTiming.If),

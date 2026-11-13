@@ -426,6 +426,7 @@ public sealed class EffectDefinition
                     PayDownToGainStep s => s.Remaining < 1 || kind != EffectKind.MonsterTrigger,
                     SetDeclaredLevelStep s => s.Filter is null || s.MinLevel < 1 || s.MaxLevel > 12 || s.MinLevel > s.MaxLevel,
                     AddFromDeckOrGraveyardStep s => s.Filter is null,
+                    AddFromGraveyardToHandStep s => s.Filter is null,
                     AddFromFaceUpExtraDeckStep s => s.Filter is null,
                     ReduceSourceScaleStep s => s.By < 1 || s.Minimum < 0 || kind != EffectKind.MonsterTrigger,
                     DestroyAboveSourceScaleStep s => s.Except is null || kind != EffectKind.MonsterTrigger,

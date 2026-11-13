@@ -19,7 +19,18 @@ public sealed record MonsterStatProfile(string EffectId, uint CardId)
     public bool UnaffectedByLowerMonsters { get; init; }
     /// <summary>Once Normal Summoned or Set, it is unaffected by Spell and Trap effects.</summary>
     public bool UnaffectedBySpellTraps { get; init; }
+    /// <summary>ATK and DEF gained for each card matching <see cref="CountFilter"/> in <see cref="CountZone"/>, while it is face-up and its effects apply.</summary>
+    public int AttackPerCount { get; init; }
+    public int DefensePerCount { get; init; }
+    public CardFilter? CountFilter { get; init; }
+    public StatCountZone CountZone { get; init; }
 }
+
+/// <summary>Where a monster's per-card stat gain counts: its controller's face-up monsters or Graveyard, or banished monsters of both players.</summary>
+public enum StatCountZone { OwnFaceUpMonsters, OwnGraveyard, BanishedMonsters }
+
+/// <summary>The activating player adds 1 matching card from their Graveyard to their hand, without targeting it.</summary>
+public sealed record AddFromGraveyardToHandStep(CardFilter Filter) : EffectStep;
 
 /// <summary>A monster in face-up Attack Position on the field.</summary>
 public sealed record FaceUpAttackFilter : CardFilter;
@@ -112,8 +123,29 @@ public sealed partial class DuelEngine
             int gain = profile.PerHandCard * state.GetPlayer(binding.Player).Hand.Count;
             attack += gain; defense += gain;
         }
+        if ((profile.AttackPerCount != 0 || profile.DefensePerCount != 0) && monster.Position != BattlePosition.FaceDownDefense &&
+            !state.EventEffects.NegatedMonsters.Contains(binding))
+        {
+            int count = StatCount(state, binding.Player, profile);
+            attack += profile.AttackPerCount * count; defense += profile.DefensePerCount * count;
+        }
         return (attack, defense);
     }
+
+    private int StatCount(DuelState state, PlayerId controller, MonsterStatProfile profile)
+    {
+        var filter = profile.CountFilter ?? new AnyMonsterFilter();
+        return profile.CountZone switch
+        {
+            StatCountZone.OwnFaceUpMonsters => state.GetPlayer(controller).MonsterZones.Count(m => m is { Position: not BattlePosition.FaceDownDefense } &&
+                MatchesFilter(m.Card, filter)),
+            StatCountZone.OwnGraveyard => state.GetPlayer(controller).Graveyard.Count(c => MatchesFilter(c, filter, inGraveyard: true)),
+            _ => state.Players.Sum(p => p.Banished.Count(c => MatchesFilter(c, filter)))
+        };
+    }
+
+    private DuelState AddFromGraveyard(DuelState state, PlayerId controller, CardInstance card, string effectId, List<DuelEvent> events) =>
+        MoveZoneCardToHand(state, new(controller, FieldLocation.Graveyard, -1, card, 0), effectId, events);
 
     /// <summary>
     /// Whether the effect of <paramref name="link"/> applies to <paramref name="target"/>: a face-up monster Normal Summoned or Set with an

@@ -38,7 +38,7 @@ public sealed record AuthoredCard(uint Id, string Name, CardKind Kind, uint Gett
     public IReadOnlyList<SpecialSummonCardProfile> SpecialSummons { get; init; } = [];
     /// <summary>Everything the card's reviewed metadata refers to.</summary>
     public IEnumerable<string> References => Definitions.Select(d => d.EffectId).Concat(Locks.Select(l => l.EffectId)).Concat(BattleAbilities.Select(p => p.EffectId)).Concat(Replacements.Select(r => r.EffectId))
-        .Concat(Redirects.Select(r => r.EffectId)).Concat(DamageRules.Select(r => r.EffectId));
+        .Concat(Redirects.Select(r => r.EffectId)).Concat(DamageRules.Select(r => r.EffectId)).Concat(Stats is { } stats ? [stats.EffectId] : []);
 }
 
 /// <summary>One option of a card whose effects are chosen at activation.</summary>
@@ -369,6 +369,17 @@ public sealed class CardTable(string prefix)
 
     public AuthoredCard MonsterLock(uint id, string name, RuleLock rule, uint getterKind = EffectMonsterKind, string exceptions = "none", DuelCardRules? rules = null) =>
         new(id, name, CardKind.Monster, getterKind, IconNormal, rules ?? TributeMonsterRules, [], exceptions) { Locks = [Locked(id, rule)] };
+
+    /// <summary>
+    /// A monster whose only effect gains ATK and DEF for each card matching <paramref name="counted"/> in <paramref name="zone"/>; a null filter counts
+    /// every monster there.
+    /// </summary>
+    public AuthoredCard CountedStats(uint id, string name, int attack, int defense, StatCountZone zone, CardFilter? counted = null, bool unknownIsZero = false) =>
+        new(id, name, CardKind.Monster, EffectMonsterKind, IconNormal, TributeMonsterRules, [])
+        {
+            Stats = new MonsterStatProfile(Effect(id, "stats"), id)
+                { AttackPerCount = attack, DefensePerCount = defense, CountFilter = counted, CountZone = zone, UnknownIsZero = unknownIsZero }
+        };
 
     /// <summary>A monster whose continuous effect grants battle permissions or requirements.</summary>
     public AuthoredCard BattleMonster(uint id, string name, BattleAbilities abilities, uint getterKind = EffectMonsterKind) =>

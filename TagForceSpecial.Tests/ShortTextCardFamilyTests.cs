@@ -10,7 +10,8 @@ public sealed class ShortTextCardFamilyTests
 {
     private const uint DarkMonster = 901, EarthMonster = 902, FishMonster = 903, MachineMonster = 904,
         DarkSword = 4308, Umi = 4340, ThunderShort = 9664, CrystalSkull = 3611, BigMonster = 905, ChangeOfHeart = 4860, Recruiter = 9282,
-        FusionMonster = 906, FieldCard = 907, EquipCard = 908, PlanetPathfinder = 10232, FusionWeapon = 6138, Bowganian = 5687;
+        FusionMonster = 906, FieldCard = 907, EquipCard = 908, PlanetPathfinder = 10232, FusionWeapon = 6138, Bowganian = 5687,
+        SwampBattleguard = 4018, LavaBattleguard = 4560, MonsterEye = 4408, Polymerization = 4837;
 
     private static CardNumericCodes Codes(uint type, uint attribute) => new(attribute, type, 1, 1, 0, 0, 0);
 
@@ -139,13 +140,14 @@ public sealed class ShortTextCardFamilyTests
         [
             new(FusionMonster, "Fusion", "", new(2000, 1000, 4), new(MonsterAttributes.Earth, MonsterTypes.Warrior, 3, 3, 0, 0, 0)),
             new(FieldCard, "Field", "", new(0, 0, 0), new(8, 25, 13, 13, 2, 0, 0)),
-            new(EquipCard, "Equip", "", new(0, 0, 0), new(8, 25, 13, 13, 3, 0, 0))
+            new(EquipCard, "Equip", "", new(0, 0, 0), new(8, 25, 13, 13, 3, 0, 0)),
+            new(Polymerization, "Polymerization", "", new(0, 0, 0), new(8, 25, 13, 13, 0, 0, 0))
         ]));
         var rules = ShortTextCardFamily.Family.Rules.ToDictionary();
         rules[EarthMonster] = rules[FusionMonster] = new(CardCategory.Monster, AllowsNormalSummon: true, AllowsBasicBattle: true, AllowsTributeForSummon: true);
-        rules[FieldCard] = rules[EquipCard] = new(CardCategory.Spell);
+        rules[FieldCard] = rules[EquipCard] = rules[Polymerization] = new(CardCategory.Spell);
         return new(catalog, rules, first, Deck(), experimentalTriggerEffects: ShortTextCardFamily.Family.Triggers,
-            effectDefinitions: ShortTextCardFamily.Family.Definitions, shuffleSeed: 5);
+            effectDefinitions: ShortTextCardFamily.Family.Definitions, shuffleSeed: 5, monsterStats: ShortTextCardFamily.Family.MonsterStats);
     }
 
     [Fact]
@@ -183,6 +185,28 @@ public sealed class ShortTextCardFamilyTests
         Ok(e, new ResolveDrawStep(PlayerId.One)); EventEffectScenario.Drain(e);
         Assert.Equal(7400, e.State.GetPlayer(PlayerId.Two).LifePoints);
         Assert.Equal(8000, e.State.GetPlayer(PlayerId.One).LifePoints);
+    }
+
+    [Fact]
+    public void CountedStatsAndGraveyardAddsReadTheCurrentZones()
+    {
+        var guards = KindEngine(Deck(SwampBattleguard, LavaBattleguard));
+        EnterMain(guards); Summon(guards, SwampBattleguard, 0);
+        Assert.Equal(1000, Atk(guards, PlayerId.One, 0));
+        Next(guards); Next(guards);
+        Summon(guards, LavaBattleguard, 1);
+        Assert.Equal((1500, 1500), (Atk(guards, PlayerId.One, 0), Atk(guards, PlayerId.One, 1)));
+
+        // The 7th card, drawn on turn 5, is discarded for the hand limit and then recovered without targeting.
+        var eye = KindEngine(Deck(MonsterEye, EarthMonster, EarthMonster, EarthMonster, EarthMonster, EarthMonster, Polymerization));
+        EnterMain(eye);
+        for (int turn = 1; turn < 7; turn++) Next(eye);
+        Assert.Contains(eye.State.GetPlayer(PlayerId.One).Graveyard, c => c.GameCardId == Polymerization);
+        Summon(eye, MonsterEye, 0);
+        Ok(eye, new ActivateMonsterEffect(PlayerId.One, 0));
+        EventEffectScenario.Drain(eye);
+        Assert.Equal(7000, eye.State.GetPlayer(PlayerId.One).LifePoints);
+        Assert.Contains(eye.State.GetPlayer(PlayerId.One).Hand, c => c.GameCardId == Polymerization);
     }
 
     [Fact]

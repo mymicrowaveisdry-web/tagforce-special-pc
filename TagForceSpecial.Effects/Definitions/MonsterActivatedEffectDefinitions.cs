@@ -23,6 +23,7 @@ public static class MonsterActivatedEffectDefinitions
         t.TributeSelf(8782, "Second Booster", [new ModifyTargetsUntilEndStep(1500)], [new FieldTarget(FieldCardKind.Monster, TargetSide.Own, FieldCardFilter.FaceUpAttack)]),
         t.Ignition(8321, "Genetic Woman", [new AddTargetsToHandStep()], new PayLifePointsCost(1000),
             [new ZoneTarget(CardZone.Banished, TargetSide.Own, OfType(MonsterTypes.Psychic))], oncePerTurn: true),
+        t.Ignition(4408, "Monster Eye", [new AddFromGraveyardToHandStep(Named(Polymerization))], new PayLifePointsCost(1000)),
         t.TributeSelf(10232, "Planet Pathfinder", Search(FieldSpell)),
         t.TributeSelf(3709, "Sacred Knight's Spearholder", Search(EquipSpell)),
         t.Ignition(8442, "Regulus", [new ShuffleTargetsIntoDeckStep()], targets: [new ZoneTarget(CardZone.Graveyard, TargetSide.Own, FieldSpell)], oncePerTurn: true),

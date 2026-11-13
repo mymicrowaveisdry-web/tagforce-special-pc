@@ -32,7 +32,8 @@ public static class ShortTextCardFamily
         .. GladiatorBeastDefinitions.Cards(T),
         .. GravekeeperDefinitions.Cards(T),
         .. NaturiaDefinitions.Cards(T),
-        .. PhaseTriggerDefinitions.Cards(T)
+        .. PhaseTriggerDefinitions.Cards(T),
+        .. CountedStatDefinitions.Cards(T)
     ]);
 
     public static CardFamily Family { get; } = CardTable.Family(FamilyId, BatchId, ["ShortTextCardFamilyTests", "CardPoolTests"], Cards);

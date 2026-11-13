@@ -17,6 +17,12 @@ internal static class DefinitionBuilders
     /// <summary>The six catalog records of the printed card "Blue-Eyes White Dragon": same name, statistics, codes and text.</summary>
     public static readonly uint[] BlueEyesWhiteDragon = [3800, 3801, 3802, 3849, 3862, 4007];
 
+    /// <summary>The two catalog records of the printed card "Polymerization": same name, codes and text.</summary>
+    public static readonly uint[] Polymerization = [4837, 4867];
+
+    /// <summary>Counter Trap Cards by their decoded icon.</summary>
+    public static readonly CardIconFilter CounterTrap = new(CardCategory.Trap, 1);
+
     /// <summary>Spell Cards by their decoded icon.</summary>
     public static readonly CardIconFilter FieldSpell = new(CardCategory.Spell, 2), EquipSpell = new(CardCategory.Spell, 3);
 

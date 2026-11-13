@@ -172,6 +172,7 @@ public sealed partial class DuelEngine
             SpecialSummonStep summon => SpecialSummonOptions(state, trigger.Player, summon, trigger.Source.Card).Any(),
             PayDownToGainStep pay => state.GetPlayer(trigger.Player).LifePoints > pay.Remaining,
             AddFromFaceUpExtraDeckStep extra => state.GetPlayer(trigger.Player).FaceUpExtraDeck.Any(c => MatchesFilter(c, extra.Filter)),
+            AddFromGraveyardToHandStep add => state.GetPlayer(trigger.Player).Graveyard.Any(c => MatchesFilter(c, add.Filter, inGraveyard: true)),
             AddFromDeckOrGraveyardStep either => DeckMatches(state, trigger.Player, either.Filter).Any() ||
                 state.GetPlayer(trigger.Player).Graveyard.Any(c => MatchesFilter(c, either.Filter, inGraveyard: true)),
             SpecialSummonSelfStep self => trigger.Profile.SourceLocation != TriggerSourceLocation.Hand || Enumerable.Range(0, 5).Any(zone =>

@@ -168,6 +168,7 @@ public sealed partial class DuelEngine
                 ExcavateStep excavate => player.Deck.Count < excavate.Count,
                 SwapChosenMonstersStep => !Swappable(State, playerId).Any() || !Swappable(State, Other(playerId)).Any(),
                 AddFromDeckToHandStep search => !DeckMatches(State, playerId, search.Filter).Any(),
+                AddFromGraveyardToHandStep add => !player.Graveyard.Any(c => MatchesFilter(c, add.Filter, inGraveyard: true)),
                 SendFromDeckToGraveyardStep send => !DeckMatches(State, playerId, send.Filter).Any(),
                 DestroyAllStep all => !FieldMatches(State, playerId, all.Kind, all.Side, all.Filter, all.IncludeSelf ? null : card.InstanceId).Any(t => all.Cards is null || MatchesFilter(t.Card, all.Cards)),
                 ReturnAllToHandStep all => !FieldMatches(State, playerId, all.Kind, all.Side, FieldCardFilter.Any, card.InstanceId).Any(),
@@ -693,6 +694,20 @@ public sealed partial class DuelEngine
                 var holder = state.GetPlayer(controller);
                 state = state.With(player: holder.With(faceUpExtraDeck: holder.FaceUpExtraDeck.Where(c => c != card), hand: holder.Hand.Append(card)));
                 events.Add(new CardAddedFromExtraDeck(controller, card, definition.EffectId));
+                choice = null;
+                continue;
+            }
+            if (step is AddFromGraveyardToHandStep fromGraveyard)
+            {
+                var options = state.GetPlayer(controller).Graveyard.Where(c => MatchesFilter(c, fromGraveyard.Filter, inGraveyard: true)).ToArray();
+                if (options.Length == 0)
+                {
+                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
+                    continue;
+                }
+                if (choice is not ChooseDefinitionCard recovered)
+                    return (state, new PendingDefinitionCardChoice(checked(State.Revision + 1), controller, definition.EffectId, link.Number, i, options));
+                state = AddFromGraveyard(state, controller, options.FirstOrDefault(c => c.InstanceId == recovered.CardInstanceId) ?? options[0], definition.EffectId, events);
                 choice = null;
                 continue;
             }
