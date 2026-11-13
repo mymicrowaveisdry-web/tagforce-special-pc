@@ -20,6 +20,9 @@ public static class FlipEffectDefinitions
         t.FlipEffect(10746, "Baby Raccoon Tantan", [new SpecialSummonStep(SpecialSummonSources.Deck,
             new AllOfFilter(new MonsterLevelFilter(2, Beast, minLevel: 2), new NotFilter(Named(10746))))]),
         t.FlipEffect(10164, "Dust Knight", [new SendFromDeckToGraveyardStep(OfAttribute(Earth))]),
+        t.FlipEffect(5769, "Iron Blacksmith Kotetsu", Search(EquipSpell)),
+        t.FlipEffect(10640, "Cheepcheepcheep", [new SpecialSummonStep(SpecialSummonSources.Deck, new AllOfFilter(Tuner, new MonsterLevelFilter(12, minLevel: 5)))],
+            optional: true),
         t.FlipEffect(5661, "Des Koala", [new DealDamageStep(400, EffectCount.OpponentHand)]),
         t.FlipEffect(5139, "4-Starred Ladybug of Doom", [new DestroyAllStep(FieldCardKind.Monster, TargetSide.Opponent, FieldCardFilter.FaceUp, Level(4))]),
         t.FlipEffect(7439, "Magnetic Mosquito", [new DestroyAllStep(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUp, OfType(Machine))])

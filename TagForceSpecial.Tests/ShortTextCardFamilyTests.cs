@@ -9,7 +9,8 @@ namespace TagForceSpecial.Tests;
 public sealed class ShortTextCardFamilyTests
 {
     private const uint DarkMonster = 901, EarthMonster = 902, FishMonster = 903, MachineMonster = 904,
-        DarkSword = 4308, Umi = 4340, ThunderShort = 9664, CrystalSkull = 3611, BigMonster = 905, ChangeOfHeart = 4860, Recruiter = 9282;
+        DarkSword = 4308, Umi = 4340, ThunderShort = 9664, CrystalSkull = 3611, BigMonster = 905, ChangeOfHeart = 4860, Recruiter = 9282,
+        FusionMonster = 906, FieldCard = 907, EquipCard = 908, PlanetPathfinder = 10232, FusionWeapon = 6138;
 
     private static CardNumericCodes Codes(uint type, uint attribute) => new(attribute, type, 1, 1, 0, 0, 0);
 
@@ -129,6 +130,45 @@ public sealed class ShortTextCardFamilyTests
         Assert.Empty(events.OfType<CardSearched>());
         Assert.Empty(events.OfType<TriggerActivated>());
         Assert.Contains(taken.State.GetPlayer(PlayerId.Two).Graveyard, c => c.GameCardId == Recruiter);
+    }
+
+    /// <summary>The family plus a Fusion-coded monster and Field and Equip Spells, for the decoded icon and kind filters.</summary>
+    private static DuelEngine KindEngine(uint[] first)
+    {
+        var catalog = new CardCatalog(new(null, "synthetic-short-text-kinds"), Catalog().Cards.Concat(
+        [
+            new(FusionMonster, "Fusion", "", new(2000, 1000, 4), new(MonsterAttributes.Earth, MonsterTypes.Warrior, 3, 3, 0, 0, 0)),
+            new(FieldCard, "Field", "", new(0, 0, 0), new(8, 25, 13, 13, 2, 0, 0)),
+            new(EquipCard, "Equip", "", new(0, 0, 0), new(8, 25, 13, 13, 3, 0, 0))
+        ]));
+        var rules = ShortTextCardFamily.Family.Rules.ToDictionary();
+        rules[EarthMonster] = rules[FusionMonster] = new(CardCategory.Monster, AllowsNormalSummon: true, AllowsBasicBattle: true, AllowsTributeForSummon: true);
+        rules[FieldCard] = rules[EquipCard] = new(CardCategory.Spell);
+        return new(catalog, rules, first, Deck(), experimentalTriggerEffects: ShortTextCardFamily.Family.Triggers,
+            effectDefinitions: ShortTextCardFamily.Family.Definitions, shuffleSeed: 5);
+    }
+
+    [Fact]
+    public void IconAndKindFiltersReadDecodedCardData()
+    {
+        var search = KindEngine(Deck(PlanetPathfinder, EarthMonster, EarthMonster, EarthMonster, EarthMonster, EarthMonster, EarthMonster, EquipCard, FieldCard));
+        EnterMain(search); Summon(search, PlanetPathfinder, 0);
+        Ok(search, new ActivateMonsterEffect(PlayerId.One, 0));
+        IReadOnlyList<CardInstance>? offered = null;
+        while (search.State.PendingChain is { } chain)
+        {
+            if (chain.DefinitionCardChoice is { } pick) { offered = pick.Options; Ok(search, new ChooseDefinitionCard(pick.Player, pick.DecisionId, pick.Options[0].InstanceId)); }
+            else if (chain.NextLink == 0) Ok(search, new PassChainResponse(chain.Responder, chain.DecisionId));
+            else Ok(search, new ResolveNextChainLink(PlayerId.One, chain.DecisionId));
+        }
+        Assert.Equal([FieldCard], offered!.Select(c => c.GameCardId).Distinct());
+
+        var equip = KindEngine(Deck(FusionWeapon, FusionMonster, EarthMonster));
+        EnterMain(equip); Summon(equip, EarthMonster, 0); Next(equip); Next(equip);
+        Summon(equip, FusionMonster, 1);
+        Ok(equip, new ActivateSpell(PlayerId.One, Hand(equip, FusionWeapon), 4));
+        var target = Assert.Single(equip.State.PendingDecision!.FieldTargetOptions!);
+        Assert.Equal(FusionMonster, target.Card.GameCardId);
     }
 
     [Fact]

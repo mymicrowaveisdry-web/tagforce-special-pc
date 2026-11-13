@@ -324,6 +324,15 @@ public sealed record TriggerSourceMonster : EffectTarget;
 /// <summary>Cards of one category.</summary>
 public sealed record CardCategoryFilter(CardCategory Category) : CardFilter;
 
+/// <summary>Spells or Traps with this decoded icon code (Spells: 2 Field, 3 Equip, 4 Continuous, 5 Quick-Play, 6 Ritual; Traps: 1 Counter, 4 Continuous).</summary>
+public sealed record CardIconFilter(CardCategory Category, uint Icon) : CardFilter;
+
+/// <summary>A monster card kind read from decoded card data; Dark Tuners and Dark Synchro Monsters are neither Tuners nor Synchro Monsters.</summary>
+public enum MonsterKind { Fusion, Ritual, Synchro, Tuner }
+
+/// <summary>Monsters of one kind.</summary>
+public sealed record MonsterKindFilter(MonsterKind Kind) : CardFilter;
+
 /// <summary>Reviewed Normal Monsters; in the Graveyard, Gemini monsters also count.</summary>
 public sealed record NormalMonsterFilter : CardFilter
 {

@@ -1124,6 +1124,8 @@ public sealed partial class DuelEngine
         // Whether the targets share the trait is checked as they are picked.
         SharedTraitFilter shared => rule.Category == CardCategory.Monster && (shared.Trait == IdentityTrait.Attribute ? AttributeCode(card) : TypeCode(card)) is not null,
         CardCategoryFilter category => rule.Category == category.Category,
+        CardIconFilter icon => rule.Category == icon.Category && catalog[card.GameCardId].Codes?.Icon == icon.Icon,
+        MonsterKindFilter kind => rule.Category == CardCategory.Monster && IsMonsterKind(card, rule, kind.Kind),
         MonsterTypeFilter types => rule.Category == CardCategory.Monster && TypeCode(card) is { } type && types.TypeCodes.Contains(type),
         NormalMonsterFilter normal => normal.CardIds.Contains(card.GameCardId) || inGraveyard && rule.IsGemini,
         MonsterAttributeFilter attribute => rule.Category == CardCategory.Monster && AttributeCode(card) == attribute.AttributeCode,
@@ -1139,6 +1141,15 @@ public sealed partial class DuelEngine
             (trait.Stat == MonsterStat.Attack ? catalog[card.GameCardId].Statistics.Attack : catalog[card.GameCardId].Statistics.Defense) is int value &&
             value >= trait.Min && value <= trait.Max,
         _ => false
+    };
+
+    /// <summary>Decoded getter kinds per monster kind; a card registered as a Tuner is one whatever its code.</summary>
+    private bool IsMonsterKind(CardInstance card, DuelCardRules rule, MonsterKind kind) => catalog[card.GameCardId].Codes?.GetterKind is var code && kind switch
+    {
+        MonsterKind.Fusion => code is 2 or 3,
+        MonsterKind.Ritual => code is 4 or 5,
+        MonsterKind.Synchro => code is 17 or 18 or 19,
+        _ => rule.IsTuner || code is 15 or 16 or 19 or 30 or 32
     };
 
     /// <summary>Face-up monsters sharing the lowest or highest current stat; monsters without that stat are ignored.</summary>

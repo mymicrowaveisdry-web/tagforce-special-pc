@@ -17,6 +17,8 @@ public static class EquipAndFieldDefinitions
         t.AttributeEquip(4315, "Steel Shell", Water),
         t.AttributeEquip(4846, "Burning Spear", Fire),
         t.AttributeEquip(4847, "Gust Fan", Wind),
+        t.Equip(6139, "Ritual Weapon", 1500, 1500, new AllOfFilter(Ritual, new MonsterLevelFilter(6))),
+        t.Equip(6138, "Fusion Weapon", 1500, 1500, new AllOfFilter(Fusion, new MonsterLevelFilter(6))),
         t.Field(4340, "Umi", new LastingStatModifier(TargetSide.Either, 200, 200, OfType(Fish, SeaSerpent, Thunder, Aqua)),
             new LastingStatModifier(TargetSide.Either, -200, -200, OfType(Machine, Pyro)))
     ];

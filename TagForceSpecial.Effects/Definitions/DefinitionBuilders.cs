@@ -17,6 +17,11 @@ internal static class DefinitionBuilders
     /// <summary>The six catalog records of the printed card "Blue-Eyes White Dragon": same name, statistics, codes and text.</summary>
     public static readonly uint[] BlueEyesWhiteDragon = [3800, 3801, 3802, 3849, 3862, 4007];
 
+    /// <summary>Spell Cards by their decoded icon.</summary>
+    public static readonly CardIconFilter FieldSpell = new(CardCategory.Spell, 2), EquipSpell = new(CardCategory.Spell, 3);
+
+    public static readonly MonsterKindFilter Fusion = new(MonsterKind.Fusion), Ritual = new(MonsterKind.Ritual), Tuner = new(MonsterKind.Tuner);
+
     public static MonsterTypeFilter OfType(params uint[] types) => new(types);
     public static MonsterAttributeFilter OfAttribute(uint attribute) => new(attribute);
     public static CardIdFilter Named(params uint[] ids) => new(ids);

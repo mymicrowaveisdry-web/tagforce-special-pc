@@ -26,6 +26,7 @@ public static class ArchetypeInteractionDefinitions
             t.WithTrigger(t.Trigger(10145, "Spellbook Magician of Prophecy", MonsterEventKind.NormalSummoned, spellbookSearch), "flip",
                 [MonsterEventKind.FlippedFaceUp], EffectRelation.Self, spellbookSearch),
             t.Normal(10416, "Heraldry Reborn", [new SpecialSummonTargetStep()], targets: [Revive(Monsters("official:heraldic-beast"))]),
+            t.Normal(8978, "Scrapyard", Search(new AllOfFilter(Monsters("official:scrap"), Tuner))),
             t.Normal(9339, "Shien's Smoke Signal", Search(new AllOfFilter(Monsters("official:six-samurai"), new MonsterLevelFilter(3)))),
             t.TributeSelf(8896, "Gem-Knight Alexandrite", [new SpecialSummonStep(SpecialSummonSources.Deck, new AllOfFilter(Monsters("official:gem-knight"), normal))]),
             t.Normal(6674, "O - Oversoul", [new SpecialSummonTargetStep()], targets: [Revive(new AllOfFilter(Monsters("official:elemental-hero"), normal))]),

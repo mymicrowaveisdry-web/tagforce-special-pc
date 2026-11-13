@@ -23,6 +23,8 @@ public static class TargetedRemovalDefinitions
             cardFilter: new CardCategoryFilter(CardCategory.Trap))]),
         t.QuickPlay(9924, "Galaxy Storm", [new DestroyTargetsStep()], targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUp,
             cardFilter: new XyzMonsterFilter()) { MaxXyzMaterials = 0 }]),
-        t.Normal(5609, "Dark Core", [new BanishFieldTargetsStep()], new DiscardCost(), [FaceUpMonster])
+        t.Normal(5609, "Dark Core", [new BanishFieldTargetsStep()], new DiscardCost(), [FaceUpMonster]),
+        t.Trap(7012, "Ritual Sealing", [new DestroyTargetsStep()], targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUp, cardFilter: Ritual)]),
+        t.Trap(7011, "Anti-Fusion Device", [new DestroyTargetsStep()], targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUp, cardFilter: Fusion)])
     ];
 }
