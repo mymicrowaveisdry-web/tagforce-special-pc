@@ -379,13 +379,14 @@ public sealed class CardTable(string prefix)
     public AuthoredCard Trigger(uint id, string name, MonsterEventKind when, EffectStep[] steps, TriggerRequirement requirement = TriggerRequirement.Mandatory,
         TriggerSourceLocation location = TriggerSourceLocation.FaceUpMonster, TriggerEventCause cause = TriggerEventCause.Any, TriggerTiming timing = TriggerTiming.When,
         EffectTarget[]? targets = null, MonsterTargetPolicy? targetPolicy = null, DuelCardRules? rules = null, uint getterKind = EffectMonsterKind, string exceptions = "none",
-        DeclarationKind? declares = null, TriggerTurnLimit limit = TriggerTurnLimit.None)
+        DeclarationKind? declares = null, TriggerTurnLimit limit = TriggerTurnLimit.None, int lifePointCost = 0)
     {
         var definition = new EffectDefinition(Effect(id, "trigger"), id, EffectKind.MonsterTrigger, steps, fieldTargets: targets);
         if (declares is { } kind) definition = definition.WithDeclaration(kind);
         return new(id, name, CardKind.Monster, getterKind, IconNormal, rules ?? MonsterRules, [definition], exceptions)
         {
-            Triggers = [new TriggerEffectProfile(definition, when, EffectRelation.Self, requirement, location, timing, cause, limit, target: targetPolicy)]
+            Triggers = [new TriggerEffectProfile(definition, when, EffectRelation.Self, requirement, location, timing, cause, limit, lifePointCost: lifePointCost,
+                target: targetPolicy)]
         };
     }
 

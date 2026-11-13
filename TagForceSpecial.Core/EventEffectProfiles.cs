@@ -175,11 +175,11 @@ public sealed class TriggerEffectProfile
         if (eventKind is MonsterEventKind.EndPhaseAfterSummonOrFlip or MonsterEventKind.DestroyedOpponentByBattle or MonsterEventKind.InflictedBattleDamage or MonsterEventKind.ControlChanged && (sourceLocation != TriggerSourceLocation.FaceUpMonster || relation != EffectRelation.Self) ||
             requiresGeminiActive && sourceLocation != TriggerSourceLocation.FaceUpMonster)
             throw new ArgumentException("This trigger needs its face-up source.");
-        // A face-up monster's own End Phase effect is the only monster use of these events.
+        // A face-up monster's own Standby or End Phase effect is the only monster use of these events.
         if (eventKind is MonsterEventKind.StandbyPhase or MonsterEventKind.EndPhase &&
             (sourceLocation is TriggerSourceLocation.FaceUpSpellTrap or TriggerSourceLocation.PendulumZone ? relation == EffectRelation.Self
-                : !(eventKind == MonsterEventKind.EndPhase && sourceLocation == TriggerSourceLocation.FaceUpMonster && relation == EffectRelation.Self)))
-            throw new ArgumentException("A Standby Phase trigger belongs to a face-up Spell or Trap.");
+                : !(sourceLocation == TriggerSourceLocation.FaceUpMonster && relation == EffectRelation.Self)))
+            throw new ArgumentException("A phase trigger belongs to a face-up card and is about that card.");
         if (cause != TriggerEventCause.Any && eventKind is not (MonsterEventKind.Destroyed or MonsterEventKind.SentToGraveyard))
             throw new ArgumentException("Only destruction and Graveyard events have a cause.");
         if (definition is not null && definition.Kind != EffectKind.MonsterTrigger)

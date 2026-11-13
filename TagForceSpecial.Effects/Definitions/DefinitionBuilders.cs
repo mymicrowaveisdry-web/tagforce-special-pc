@@ -32,9 +32,13 @@ internal static class DefinitionBuilders
 
     /// <summary>"When this card is destroyed by battle and sent to the Graveyard".</summary>
     public static AuthoredCard BattleDestroyed(this CardTable t, uint id, string name, EffectStep[] steps, bool optional = false, uint getterKind = 1,
-        DuelCardRules? rules = null, EffectTarget[]? targets = null, TriggerTiming timing = TriggerTiming.When) =>
+        DuelCardRules? rules = null, EffectTarget[]? targets = null, TriggerTiming timing = TriggerTiming.When, int lifePointCost = 0) =>
         t.Trigger(id, name, MonsterEventKind.SentToGraveyard, steps, Requirement(optional), TriggerSourceLocation.GraveyardSelf, TriggerEventCause.ByBattle, timing,
-            targets, getterKind: getterKind, rules: rules);
+            targets, getterKind: getterKind, rules: rules, lifePointCost: lifePointCost);
+
+    /// <summary>"During your Standby Phase: ..." of this face-up monster.</summary>
+    public static AuthoredCard StandbyTrigger(this CardTable t, uint id, string name, EffectStep[] steps, EffectTarget[]? targets = null, DuelCardRules? rules = null) =>
+        t.Trigger(id, name, MonsterEventKind.StandbyPhase, steps, targets: targets, rules: rules);
 
     /// <summary>"When this card is sent to the Graveyard".</summary>
     public static AuthoredCard SentToGraveyard(this CardTable t, uint id, string name, EffectStep[] steps, bool optional = false,

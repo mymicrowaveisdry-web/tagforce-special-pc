@@ -10,7 +10,7 @@ public sealed class ShortTextCardFamilyTests
 {
     private const uint DarkMonster = 901, EarthMonster = 902, FishMonster = 903, MachineMonster = 904,
         DarkSword = 4308, Umi = 4340, ThunderShort = 9664, CrystalSkull = 3611, BigMonster = 905, ChangeOfHeart = 4860, Recruiter = 9282,
-        FusionMonster = 906, FieldCard = 907, EquipCard = 908, PlanetPathfinder = 10232, FusionWeapon = 6138;
+        FusionMonster = 906, FieldCard = 907, EquipCard = 908, PlanetPathfinder = 10232, FusionWeapon = 6138, Bowganian = 5687;
 
     private static CardNumericCodes Codes(uint type, uint attribute) => new(attribute, type, 1, 1, 0, 0, 0);
 
@@ -169,6 +169,20 @@ public sealed class ShortTextCardFamilyTests
         Ok(equip, new ActivateSpell(PlayerId.One, Hand(equip, FusionWeapon), 4));
         var target = Assert.Single(equip.State.PendingDecision!.FieldTargetOptions!);
         Assert.Equal(FusionMonster, target.Card.GameCardId);
+    }
+
+    [Fact]
+    public void MonsterStandbyTriggerResolvesOnlyInItsControllersStandbyPhase()
+    {
+        var e = Engine(Deck(Bowganian), Deck());
+        EnterMain(e); Summon(e, Bowganian, 0);
+        Phase(e, DuelPhase.End); Ok(e, new EndTurn(PlayerId.One));
+        Ok(e, new ResolveDrawStep(PlayerId.Two)); EventEffectScenario.Drain(e);
+        Assert.Equal(8000, e.State.GetPlayer(PlayerId.Two).LifePoints);
+        Phase(e, DuelPhase.Main1); Phase(e, DuelPhase.End); Ok(e, new EndTurn(PlayerId.Two));
+        Ok(e, new ResolveDrawStep(PlayerId.One)); EventEffectScenario.Drain(e);
+        Assert.Equal(7400, e.State.GetPlayer(PlayerId.Two).LifePoints);
+        Assert.Equal(8000, e.State.GetPlayer(PlayerId.One).LifePoints);
     }
 
     [Fact]

@@ -136,6 +136,11 @@ public sealed partial class DuelEngine
         if (emitted is PhaseChanged { To: DuelPhase.End })
             foreach (var (binding, monster) in FieldMonsters(after))
                 if (monster.Position != BattlePosition.FaceDownDefense) yield return new(MonsterEventKind.EndPhase, binding, point);
+        // "During your Standby Phase": one occurrence per face-up monster of the turn player.
+        if (emitted is PhaseChanged { To: DuelPhase.Standby })
+            foreach (var (binding, monster) in FieldMonsters(after))
+                if (binding.Player == after.ActivePlayer && monster.Position != BattlePosition.FaceDownDefense)
+                    yield return new(MonsterEventKind.StandbyPhase, binding, point);
         if (emitted is PhaseChanged { To: DuelPhase.Standby or DuelPhase.End } phase)
             foreach (var (_, _, field) in ActiveCards(after).Concat(ActiveScales(after)))
                 yield return new(phase.To == DuelPhase.Standby ? MonsterEventKind.StandbyPhase : MonsterEventKind.EndPhase,
