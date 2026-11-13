@@ -338,8 +338,12 @@ public sealed partial class DuelEngine
         MonsterBinding binding = new(playerId, zone, monster.Card, monster.PlacementId);
         List<DuelEvent> paid = [.. head];
         if (definition.Cost is TributeSelfCost)
+        {
             next = SendFieldCardToGraveyard(RemovePlacement(next, new(playerId, FieldLocation.MonsterZone, zone, monster.Card, monster.PlacementId)),
                 monster.Card, new MonsterTributed(binding), paid);
+            // Its Equip Cards leave with it before targets are chosen.
+            next = ApplyFieldLinks(State, next, paid);
+        }
         else if (definition.Cost is RemoveCounterCost remove)
         {
             var player = next.GetPlayer(playerId);

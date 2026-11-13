@@ -242,6 +242,14 @@ public sealed record RespondsToActivationCondition(CardCategory? Category = null
 /// <summary>The activating player controls no monsters.</summary>
 public sealed record ControlsNoMonstersCondition : EffectCondition;
 
+/// <summary>
+/// "If [you/your opponent] control(s) [a face-up X]": the number of monsters matching <paramref name="Filter"/> on <paramref name="Side"/>
+/// (relative to the activating player) is within [<paramref name="Min"/>, <paramref name="Max"/>]; checked when activating only. Only face-up
+/// monsters count unless <paramref name="FaceUpOnly"/> is false ("controls 2 or more monsters").
+/// </summary>
+public sealed record ControlsMonstersCondition(CardFilter Filter, TargetSide Side = TargetSide.Own, int Min = 1, int Max = int.MaxValue,
+    bool FaceUpOnly = true) : EffectCondition;
+
 /// <summary>Ends the effect unless the activating player controls no monsters at this point of resolution.</summary>
 public sealed record StopUnlessNoOwnMonstersStep : EffectStep;
 

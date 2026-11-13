@@ -36,6 +36,8 @@ public sealed class TributeProcedureProfile
     public bool CannotBeNegated { get; init; }
     /// <summary>When it is Normal Summoned, no cards or effects can be activated in response.</summary>
     public bool NoResponses { get; init; }
+    /// <summary>"If you control ...": field requirements that must all hold when the Summon is performed.</summary>
+    public IReadOnlyList<ControlsMonstersCondition> Requirements { get; init; } = [];
 
     public TributeProcedureProfile(string procedureId, uint cardId, int tributeCount,
         IEnumerable<uint>? allowedTributeCardIds = null, bool requireFaceUpTributes = false, bool allowsSet = true)

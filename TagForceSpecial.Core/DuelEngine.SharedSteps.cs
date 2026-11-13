@@ -71,6 +71,19 @@ public sealed partial class DuelEngine
             RedirectFor(State, c, false) is null))));
     }
 
+    /// <summary>
+    /// For "Tribute this card", the field after paying the cost: the monster is gone and what is linked to it (its Equip Cards) is destroyed,
+    /// so those cards cannot be chosen as targets.
+    /// </summary>
+    private DuelState? TributePreview(CardInstance source, EffectDefinition definition)
+    {
+        if (definition.Cost is not TributeSelfCost || definition.FieldTargets.Count == 0) return null;
+        var (binding, monster) = FieldMonsters(State).FirstOrDefault(e => e.Monster.Card == source);
+        if (monster is null) return null;
+        var removed = RemovePlacement(State, new(binding.Player, FieldLocation.MonsterZone, binding.Zone, monster.Card, monster.PlacementId));
+        return ApplyFieldLinks(State, removed, []);
+    }
+
     /// <summary>Several effects are allowed on monsters, as "choose 1" options of one kind, or as activated effects after a lasting card's own.</summary>
     private static bool EffectGroupsValid(EffectDefinition[] effects) => effects.GroupBy(d => d.CardId).All(group =>
     {

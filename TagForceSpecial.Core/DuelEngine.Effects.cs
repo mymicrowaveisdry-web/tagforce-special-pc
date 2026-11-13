@@ -92,6 +92,7 @@ public sealed partial class DuelEngine
             {
                 FreeMonsterZonesCondition free => player.MonsterZones.Count(m => m is null) >= free.Count,
                 ControlsNoMonstersCondition => player.MonsterZones.All(m => m is null),
+                ControlsMonstersCondition controls => ControlsMonsters(State, playerId, controls),
                 TurnTimingCondition turn => (turn.Owner == TurnOwner.Either || turn.Owner == TurnOwner.Own == (State.ActivePlayer == playerId)) &&
                     (!turn.MainPhaseOnly || State.Phase is DuelPhase.Main1 or DuelPhase.Main2),
                 // A Pendulum scale activation counts as a Spell activation; monster/trigger effects never do.
@@ -144,7 +145,7 @@ public sealed partial class DuelEngine
         {
             // Simulate one pick per field target so several targets need distinct cards.
             List<DecisionAnswer> simulated = [];
-            var preview = DiscardPreview(playerId, card, definition);
+            var preview = DiscardPreview(playerId, card, definition) ?? TributePreview(card, definition);
             for (int i = 0; i < sequence.Steps.Count && !sequence.Steps[i].Optional; i++)
             {
                 var decision = CreateDecision(sequence, i, simulated, DecisionExclusion(definition, card, i), playerId,
@@ -1073,17 +1074,18 @@ public sealed partial class DuelEngine
                             _ => false
                         })
                         yield return new(id, FieldLocation.MonsterZone, zone, monster.Card, monster.PlacementId);
-            if (kind == FieldCardKind.Monster || filter is not (FieldCardFilter.Any or FieldCardFilter.FaceUp)) continue;
+            if (kind == FieldCardKind.Monster || filter is not (FieldCardFilter.Any or FieldCardFilter.FaceUp or FieldCardFilter.FaceDown)) continue;
+            // Set Spells and Traps are face-down; Pendulum Scales are always face-up.
+            bool Shown(bool faceUp) => filter == FieldCardFilter.Any || faceUp == (filter == FieldCardFilter.FaceUp);
             // A Pendulum Scale target is only a card in a Pendulum Zone.
             if (kind != FieldCardKind.PendulumScale)
                 for (int zone = 0; zone < 5; zone++)
-                if (player.SpellTrapFields[zone] is { } field && field.Card.InstanceId != excludeInstanceId &&
-                    (filter == FieldCardFilter.Any || field.IsFaceUp))
+                if (player.SpellTrapFields[zone] is { } field && field.Card.InstanceId != excludeInstanceId && Shown(field.IsFaceUp))
                     yield return new(id, FieldLocation.SpellTrapZone, zone, field.Card, field.PlacementId);
             for (int zone = 0; zone < 2; zone++)
-                if (player.PendulumZones[zone] is { } scale && scale.Card.InstanceId != excludeInstanceId)
+                if (player.PendulumZones[zone] is { } scale && scale.Card.InstanceId != excludeInstanceId && filter != FieldCardFilter.FaceDown)
                     yield return new(id, FieldLocation.PendulumZone, zone, scale.Card, scale.PlacementId);
-            if (kind != FieldCardKind.PendulumScale && player.FieldSpell is { } fieldSpell && fieldSpell.Card.InstanceId != excludeInstanceId && (filter == FieldCardFilter.Any || fieldSpell.IsFaceUp))
+            if (kind != FieldCardKind.PendulumScale && player.FieldSpell is { } fieldSpell && fieldSpell.Card.InstanceId != excludeInstanceId && Shown(fieldSpell.IsFaceUp))
                 yield return new(id, FieldLocation.SpellTrapZone, DuelPlayerState.FieldZoneIndex, fieldSpell.Card, fieldSpell.PlacementId);
         }
     }
@@ -1157,6 +1159,20 @@ public sealed partial class DuelEngine
             value >= trait.Min && value <= trait.Max,
         _ => false
     };
+
+    /// <summary>Whether the face-up monsters matching the condition's filter on its side number within its range.</summary>
+    private bool ControlsMonsters(DuelState state, PlayerId player, ControlsMonstersCondition condition)
+    {
+        IEnumerable<DuelPlayerState> sides = condition.Side switch
+        {
+            TargetSide.Own => [state.GetPlayer(player)],
+            TargetSide.Opponent => [state.GetPlayer(Other(player))],
+            _ => state.Players
+        };
+        int count = sides.Sum(p => p.MonsterZones.Count(m => m is not null && (!condition.FaceUpOnly || m.Position != BattlePosition.FaceDownDefense) &&
+            MatchesFilter(m.Card, condition.Filter)));
+        return count >= condition.Min && count <= condition.Max;
+    }
 
     /// <summary>Decoded getter kinds per monster kind; a card registered as a Tuner is one whatever its code.</summary>
     private bool IsMonsterKind(CardInstance card, DuelCardRules rule, MonsterKind kind) => catalog[card.GameCardId].Codes?.GetterKind is var code && kind switch

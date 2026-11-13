@@ -17,6 +17,13 @@ internal static class DefinitionBuilders
     /// <summary>The six catalog records of the printed card "Blue-Eyes White Dragon": same name, statistics, codes and text.</summary>
     public static readonly uint[] BlueEyesWhiteDragon = [3800, 3801, 3802, 3849, 3862, 4007];
 
+    /// <summary>The catalog records of the printed cards "Dark Magician" and "Dark Magician Girl": same name, statistics, codes and text.</summary>
+    public static readonly uint[] DarkMagician = [3806, 3808, 3851, 4041, 5165], DarkMagicianGirl = [3832, 3833, 3856, 4766];
+
+    /// <summary>"If [side] control(s) [count] face-up monster(s) matching ...", checked when activating or Summoning.</summary>
+    public static ControlsMonstersCondition Controls(CardFilter filter, TargetSide side = TargetSide.Own, int min = 1, int max = int.MaxValue) =>
+        new(filter, side, min, max);
+
     /// <summary>The two catalog records of the printed card "Polymerization": same name, codes and text.</summary>
     public static readonly uint[] Polymerization = [4837, 4867];
 
@@ -26,9 +33,13 @@ internal static class DefinitionBuilders
     /// <summary>Spell Cards by their decoded icon.</summary>
     public static readonly CardIconFilter FieldSpell = new(CardCategory.Spell, 2), EquipSpell = new(CardCategory.Spell, 3);
 
-    public static readonly MonsterKindFilter Fusion = new(MonsterKind.Fusion), Ritual = new(MonsterKind.Ritual), Tuner = new(MonsterKind.Tuner);
+    public static readonly MonsterKindFilter Fusion = new(MonsterKind.Fusion), Ritual = new(MonsterKind.Ritual), Tuner = new(MonsterKind.Tuner),
+        Synchro = new(MonsterKind.Synchro);
 
     public static MonsterTypeFilter OfType(params uint[] types) => new(types);
+
+    /// <summary>Monster members of a reviewed archetype; the active resolver evaluates membership when the effect runs.</summary>
+    public static CardFilter ArchetypeMonsters(string archetypeId) => Archetypes.ClassicArchetypes.Filter(archetypeId, monstersOnly: true);
     public static MonsterAttributeFilter OfAttribute(uint attribute) => new(attribute);
     public static CardIdFilter Named(params uint[] ids) => new(ids);
     public static MonsterLevelFilter Level(uint level) => new(level, minLevel: level);

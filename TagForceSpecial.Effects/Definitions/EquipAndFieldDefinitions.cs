@@ -19,6 +19,9 @@ public static class EquipAndFieldDefinitions
         t.AttributeEquip(4847, "Gust Fan", Wind),
         t.Continuous(5327, "The A. Forces", trap: false, new LastingStatModifier(TargetSide.Own, 200, 0, OfType(Warrior), perCount: LastingCount.OwnFaceUpMonsters)
             { CountFilter = OfType(Warrior, Spellcaster) }),
+        t.Continuous(9525, "TGX300", trap: false, new LastingStatModifier(TargetSide.Own, 300, 0, perCount: LastingCount.OwnFaceUpMonsters)
+            { CountFilter = ArchetypeMonsters("official:tg") }),
+        t.Continuous(10185, "Chronomaly Pyramid Eye Tablet", trap: false, new LastingStatModifier(TargetSide.Own, 800, 0, ArchetypeMonsters("official:chronomaly"))),
         t.Equip(6139, "Ritual Weapon", 1500, 1500, new AllOfFilter(Ritual, new MonsterLevelFilter(6))),
         t.Equip(6138, "Fusion Weapon", 1500, 1500, new AllOfFilter(Fusion, new MonsterLevelFilter(6))),
         t.Field(4340, "Umi", new LastingStatModifier(TargetSide.Either, 200, 200, OfType(Fish, SeaSerpent, Thunder, Aqua)),

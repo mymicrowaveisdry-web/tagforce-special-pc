@@ -33,7 +33,9 @@ public static class ShortTextCardFamily
         .. GravekeeperDefinitions.Cards(T),
         .. NaturiaDefinitions.Cards(T),
         .. PhaseTriggerDefinitions.Cards(T),
-        .. CountedStatDefinitions.Cards(T)
+        .. CountedStatDefinitions.Cards(T),
+        .. HandSummonDefinitions.Cards(T),
+        .. NoTributeSummonDefinitions.Cards(T)
     ]);
 
     public static CardFamily Family { get; } = CardTable.Family(FamilyId, BatchId, ["ShortTextCardFamilyTests", "CardPoolTests"], Cards);

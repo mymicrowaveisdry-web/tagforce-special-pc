@@ -36,9 +36,11 @@ public sealed record AuthoredCard(uint Id, string Name, CardKind Kind, uint Gett
     public MonsterStatProfile? Stats { get; init; }
     /// <summary>How effects may Special Summon the card, for monsters that cannot be Normal Summoned.</summary>
     public IReadOnlyList<SpecialSummonCardProfile> SpecialSummons { get; init; } = [];
+    /// <summary>Its own Special Summon procedures ("you can Special Summon this card from your hand" with conditions or costs).</summary>
+    public IReadOnlyList<SpecialSummonProcedureProfile> Procedures { get; init; } = [];
     /// <summary>Everything the card's reviewed metadata refers to.</summary>
     public IEnumerable<string> References => Definitions.Select(d => d.EffectId).Concat(Locks.Select(l => l.EffectId)).Concat(BattleAbilities.Select(p => p.EffectId)).Concat(Replacements.Select(r => r.EffectId))
-        .Concat(Redirects.Select(r => r.EffectId)).Concat(DamageRules.Select(r => r.EffectId)).Concat(Stats is { } stats ? [stats.EffectId] : []);
+        .Concat(Redirects.Select(r => r.EffectId)).Concat(DamageRules.Select(r => r.EffectId)).Concat(Stats is { } stats ? [stats.EffectId] : []).Concat(Procedures.Select(p => p.ProcedureId)).Concat(TributeProcedures.Select(p => p.ProcedureId));
 }
 
 /// <summary>One option of a card whose effects are chosen at activation.</summary>
@@ -381,6 +383,31 @@ public sealed class CardTable(string prefix)
                 { AttackPerCount = attack, DefensePerCount = defense, CountFilter = counted, CountZone = zone, UnknownIsZero = unknownIsZero }
         };
 
+    /// <summary>
+    /// "If ..., you can Special Summon this card (from your hand)": a monster that can also be Normal Summoned, with one hand procedure whose
+    /// requirements all hold; <paramref name="positions"/> limits the position ("in face-up Defense Position").
+    /// </summary>
+    public AuthoredCard HandSummon(uint id, string name, ControlsMonstersCondition[] requirements, BattlePosition[]? positions = null, bool emptyOwnField = false,
+        bool opposingMonster = false, uint getterKind = EffectMonsterKind, DuelCardRules? rules = null) =>
+        new(id, name, CardKind.Monster, getterKind, IconNormal, rules ?? TributeMonsterRules, [])
+        {
+            Procedures = [new SpecialSummonProcedureProfile(Effect(id, "hand-summon"), [id], positions: positions, requiresEmptyOwnField: emptyOwnField,
+                requiresOpposingMonster: opposingMonster) { Requirements = requirements }],
+            // Effects may still Special Summon it from anywhere.
+            SpecialSummons = [new SpecialSummonCardProfile(id, SpecialSummonSources.All)]
+        };
+
+    /// <summary>"If ..., you can Normal Summon this card without Tributing": a no-Tribute procedure (not a Set) whose requirements all hold.</summary>
+    public AuthoredCard WithoutTributing(AuthoredCard card, params ControlsMonstersCondition[] requirements) => card with
+    {
+        Rules = card.Rules with { AllowsTributeSummon = true },
+        TributeProcedures = [.. card.TributeProcedures, new TributeProcedureProfile(Effect(card.Id, "no-tributes"), card.Id, 0, allowsSet: false) { Requirements = requirements }]
+    };
+
+    /// <summary>A monster with no effect of its own other than its Summon procedures.</summary>
+    public AuthoredCard ProcedureMonster(uint id, string name, uint getterKind = EffectMonsterKind) =>
+        new(id, name, CardKind.Monster, getterKind, IconNormal, TributeMonsterRules, []);
+
     /// <summary>A monster whose continuous effect grants battle permissions or requirements.</summary>
     public AuthoredCard BattleMonster(uint id, string name, BattleAbilities abilities, uint getterKind = EffectMonsterKind) =>
         new(id, name, CardKind.Monster, getterKind, IconNormal, TributeMonsterRules, [])
@@ -513,7 +540,8 @@ public sealed class CardTable(string prefix)
             PendulumCards = Array.AsReadOnly(cards.SelectMany(c => c.Scales).ToArray()),
             SpecialSummonCards = Array.AsReadOnly(cards.SelectMany(c => c.SpecialSummons).ToArray()),
             MonsterStats = Array.AsReadOnly(cards.Select(c => c.Stats).OfType<MonsterStatProfile>().ToArray()),
-            TributeProcedures = Array.AsReadOnly(cards.SelectMany(c => c.TributeProcedures).ToArray())
+            TributeProcedures = Array.AsReadOnly(cards.SelectMany(c => c.TributeProcedures).ToArray()),
+            Procedures = Array.AsReadOnly(cards.SelectMany(c => c.Procedures).ToArray())
         };
     }
 

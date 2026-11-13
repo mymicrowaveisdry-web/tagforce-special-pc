@@ -37,6 +37,8 @@ public sealed class SpecialSummonProcedureProfile
     public bool RequiresOpposingMonster { get; }
     /// <summary>One filter per card the player must banish from their Graveyard to perform this procedure.</summary>
     public IReadOnlyList<CardFilter> GraveyardBanishCost { get; }
+    /// <summary>"If you control [a face-up X]" requirements, all of which must hold.</summary>
+    public IReadOnlyList<ControlsMonstersCondition> Requirements { get; init; } = [];
     public SpecialSummonProcedureProfile(string procedureId, IEnumerable<uint> cardIds,
         DecisionCardSource source = DecisionCardSource.Hand, IEnumerable<BattlePosition>? positions = null,
         bool requiresEmptyOwnField = false, bool requiresOpposingMonster = false, IEnumerable<CardFilter>? graveyardBanishCost = null)

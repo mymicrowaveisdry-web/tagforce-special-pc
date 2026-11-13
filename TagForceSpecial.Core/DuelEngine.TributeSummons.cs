@@ -21,6 +21,7 @@ public sealed partial class DuelEngine
             (!tributeProcedures.TryGetValue(command.ProcedureId, out procedure) || procedure.CardId != card.GameCardId ||
              command.FaceDown && !procedure.AllowsSet) || command.ProcedureId is null && rule.RequiresRegisteredTributeProcedure)
             return Reject(DuelError.UnsupportedTributeProcedure);
+        if (procedure is not null && procedure.Requirements.Any(r => !ControlsMonsters(State, player.Id, r))) return Reject(DuelError.NormalSummonConditionsNotMet);
         uint level = ComputeHandSummonLevel(State, player.Id, card);
         // Preserve the original high-level command boundary unless a profile explicitly changes it.
         if (level == 0 || procedure is null && level < 5 && catalog[card.GameCardId].Statistics.Level < 5)

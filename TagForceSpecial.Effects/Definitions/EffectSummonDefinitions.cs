@@ -16,6 +16,11 @@ public static class EffectSummonDefinitions
         t.Trap(6817, "Hunting Instinct", [new SpecialSummonStep(SpecialSummonSources.Hand, OfType(Dinosaur))], conditions: TrapTiming.OpponentSummons(SummonKinds.Special)),
         t.Normal(3741, "Crowning of the Emperor", [new SpecialSummonStep(SpecialSummonSources.Hand | SpecialSummonSources.Deck, Named(3740))],
             new TributeCost(Named(3739), Position: FieldCardFilter.FaceUp)),
+        t.Trap(10022, "Evo-Instant", [new SpecialSummonStep(SpecialSummonSources.Deck, ArchetypeMonsters("official:evolsaur"))], new TributeCost(OfType(Reptile))),
+        t.Normal(5758, "Sage's Stone", [new SpecialSummonStep(SpecialSummonSources.Hand | SpecialSummonSources.Deck, Named(DarkMagician))],
+            conditions: [Controls(Named(DarkMagicianGirl))], exceptions: "The condition is checked only when the card is activated."),
+        t.Normal(3759, "D - Mind", [new SpecialSummonStep(SpecialSummonSources.Deck, new AllOfFilter(ArchetypeMonsters("official:destiny-hero"), new MonsterLevelFilter(3)))],
+            conditions: [Controls(ArchetypeMonsters("official:destiny-hero"), max: 0)]),
         t.Normal(5909, "Ultra Evolution Pill", [new SpecialSummonStep(SpecialSummonSources.Hand, OfType(Dinosaur))], new TributeCost(OfType(Reptile)))
     ];
 }

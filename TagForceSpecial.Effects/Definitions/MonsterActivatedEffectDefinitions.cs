@@ -25,6 +25,9 @@ public static class MonsterActivatedEffectDefinitions
             [new ZoneTarget(CardZone.Banished, TargetSide.Own, OfType(MonsterTypes.Psychic))], oncePerTurn: true),
         t.Ignition(4408, "Monster Eye", [new AddFromGraveyardToHandStep(Named(Polymerization))], new PayLifePointsCost(1000)),
         t.TributeSelf(10232, "Planet Pathfinder", Search(FieldSpell)),
+        t.TributeSelf(8565, "Jurrac Aeolo", [new SpecialSummonTargetStep()], [new ZoneTarget(CardZone.Graveyard, TargetSide.Own,
+            new AllOfFilter(ArchetypeMonsters("official:jurrac"), new MonsterLevelFilter(4), new NotFilter(Named(8565))), mustBeSummonable: true)], TunerRules)
+            with { GetterKind = TunerKind },
         t.TributeSelf(3709, "Sacred Knight's Spearholder", Search(EquipSpell)),
         t.Ignition(8442, "Regulus", [new ShuffleTargetsIntoDeckStep()], targets: [new ZoneTarget(CardZone.Graveyard, TargetSide.Own, FieldSpell)], oncePerTurn: true),
         t.FromZone(6949, "Destiny HERO - Malicious", EffectOrigin.Graveyard, new EffectOption([new SpecialSummonStep(SpecialSummonSources.Deck, Named(6949))],

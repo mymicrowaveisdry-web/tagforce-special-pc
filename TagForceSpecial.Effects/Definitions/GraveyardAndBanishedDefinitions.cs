@@ -10,6 +10,8 @@ public static class GraveyardAndBanishedDefinitions
     /// <summary>The cards, with effect IDs from the registering family's table.</summary>
     public static AuthoredCard[] Cards(CardTable t) =>
     [
+        t.Normal(6935, "Ancient Gear Workshop", [new AddTargetsToHandStep()],
+            targets: [new ZoneTarget(CardZone.Graveyard, TargetSide.Own, ArchetypeMonsters("official:ancient-gear"))]),
         t.Trap(5397, "Disappear", [new BanishTargetsStep()], targets: [new ZoneTarget(CardZone.Graveyard, TargetSide.Opponent, new AnyCardFilter())]),
         t.Normal(4845, "Gravedigger Ghoul", [new BanishTargetsStep()], targets: [new ZoneTarget(CardZone.Graveyard, TargetSide.Opponent, new AnyMonsterFilter(), 1, 2)]),
         t.Normal(7751, "Recycling Batteries", [new AddTargetsToHandStep()], targets: [new ZoneTarget(CardZone.Graveyard, TargetSide.Own,

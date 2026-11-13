@@ -12,7 +12,8 @@ public sealed class ShortTextCardFamilyTests
         DarkSword = 4308, Umi = 4340, ThunderShort = 9664, CrystalSkull = 3611, BigMonster = 905, ChangeOfHeart = 4860, Recruiter = 9282,
         FusionMonster = 906, FieldCard = 907, EquipCard = 908, PlanetPathfinder = 10232, FusionWeapon = 6138, Bowganian = 5687,
         SwampBattleguard = 4018, LavaBattleguard = 4560, MonsterEye = 4408, Polymerization = 4837,
-        PsychicMonster = 909, PsychicRejuvenation = 7767, AForces = 5327;
+        PsychicMonster = 909, PsychicRejuvenation = 7767, AForces = 5327,
+        PlantMonster = 910, XyzMonster = 911, Cosmos = 3522, DarkMagician = 3806, DarkMagicAttack = 6057, SetSweep = 912, PowerInvader = 8620;
 
     private static CardNumericCodes Codes(uint type, uint attribute) => new(attribute, type, 1, 1, 0, 0, 0);
 
@@ -135,7 +136,7 @@ public sealed class ShortTextCardFamilyTests
     }
 
     /// <summary>The family plus a Fusion-coded monster and Field and Equip Spells, for the decoded icon and kind filters.</summary>
-    private static DuelEngine KindEngine(uint[] first)
+    private static DuelEngine KindEngine(uint[] first, uint[]? second = null, EffectDefinition[]? extra = null)
     {
         var catalog = new CardCatalog(new(null, "synthetic-short-text-kinds"), Catalog().Cards.Concat(
         [
@@ -143,13 +144,19 @@ public sealed class ShortTextCardFamilyTests
             new(FieldCard, "Field", "", new(0, 0, 0), new(8, 25, 13, 13, 2, 0, 0)),
             new(EquipCard, "Equip", "", new(0, 0, 0), new(8, 25, 13, 13, 3, 0, 0)),
             new(Polymerization, "Polymerization", "", new(0, 0, 0), new(8, 25, 13, 13, 0, 0, 0)),
-            new(PsychicMonster, "Psychic", "", new(1000, 1000, 4), Codes(MonsterTypes.Psychic, MonsterAttributes.Earth))
+            new(PsychicMonster, "Psychic", "", new(1000, 1000, 4), Codes(MonsterTypes.Psychic, MonsterAttributes.Earth)),
+            new(PlantMonster, "Plant", "", new(1000, 1000, 4), Codes(MonsterTypes.Plant, MonsterAttributes.Earth)),
+            new(XyzMonster, "Xyz", "", new(2500, 2000, 6), new(MonsterAttributes.Earth, MonsterTypes.Warrior, 23, 23, 0, 0, 0)),
+            new(DarkMagician, "Dark Magician", "", new(2500, 2100, 4), Codes(MonsterTypes.Spellcaster, MonsterAttributes.Dark)),
+            new(SetSweep, "Set Sweep", "", new(0, 0, 0), new(8, 25, 13, 13, 0, 0, 0))
         ]));
         var rules = ShortTextCardFamily.Family.Rules.ToDictionary();
-        rules[EarthMonster] = rules[FusionMonster] = rules[PsychicMonster] = new(CardCategory.Monster, AllowsNormalSummon: true, AllowsBasicBattle: true, AllowsTributeForSummon: true);
-        rules[FieldCard] = rules[EquipCard] = rules[Polymerization] = new(CardCategory.Spell);
-        return new(catalog, rules, first, Deck(), experimentalTriggerEffects: ShortTextCardFamily.Family.Triggers,
-            effectDefinitions: ShortTextCardFamily.Family.Definitions, shuffleSeed: 5, monsterStats: ShortTextCardFamily.Family.MonsterStats);
+        rules[EarthMonster] = rules[FusionMonster] = rules[PsychicMonster] = rules[PlantMonster] = rules[XyzMonster] = rules[DarkMagician] = new(CardCategory.Monster, AllowsNormalSummon: true, AllowsBasicBattle: true, AllowsTributeForSummon: true);
+        rules[FieldCard] = rules[EquipCard] = rules[Polymerization] = rules[SetSweep] = new(CardCategory.Spell, AllowsSpellTrapSet: true);
+        return new(catalog, rules, first, second ?? Deck(), experimentalTriggerEffects: ShortTextCardFamily.Family.Triggers,
+            effectDefinitions: [.. ShortTextCardFamily.Family.Definitions, .. extra ?? []], shuffleSeed: 5, monsterStats: ShortTextCardFamily.Family.MonsterStats,
+            experimentalSpecialSummonProcedures: ShortTextCardFamily.Family.Procedures, experimentalSpecialSummonCards: ShortTextCardFamily.Family.SpecialSummonCards,
+            experimentalTributeProcedures: ShortTextCardFamily.Family.TributeProcedures);
     }
 
     [Fact]
@@ -223,6 +230,65 @@ public sealed class ShortTextCardFamilyTests
         Assert.Equal(9000, e.State.GetPlayer(PlayerId.One).LifePoints);
         Ok(e, new ActivateSpell(PlayerId.One, Hand(e, AForces), 1)); Resolve(e);
         Assert.Equal((1000, 1200), (Atk(e, PlayerId.One, 0), Atk(e, PlayerId.One, 1)));
+    }
+
+    [Fact]
+    public void ControlsConditionsGateHandSummonsAndActivationsAndSetCardsCanBeSwept()
+    {
+        string cosmos = ShortTextCardFamily.Family.Procedures.Single(p => p.CardIds.Contains(Cosmos)).ProcedureId;
+        var sweep = new EffectDefinition("synthetic:set-sweep", SetSweep, EffectKind.NormalSpell,
+            [new DestroyAllStep(FieldCardKind.Any, TargetSide.Opponent, FieldCardFilter.FaceDown)]);
+        var e = KindEngine(Deck(Cosmos, PlantMonster, PlantMonster, DarkMagicAttack, SetSweep, DarkMagician), Deck(EquipCard), [sweep]);
+        EnterMain(e); Summon(e, PlantMonster, 0);
+        Reject(e, new SpecialSummonByProcedure(PlayerId.One, e.State.Revision, cosmos, Hand(e, Cosmos), 1), DuelError.SpecialSummonConditionsNotMet);
+        Reject(e, new ActivateSpell(PlayerId.One, Hand(e, DarkMagicAttack), 4), DuelError.ActivationConditionNotMet);
+        Next(e);
+        Ok(e, new SetSpellTrap(PlayerId.Two, Hand(e, EquipCard), 0)); Next(e);
+        Summon(e, PlantMonster, 1);
+        Ok(e, new SpecialSummonByProcedure(PlayerId.One, e.State.Revision, cosmos, Hand(e, Cosmos), 2));
+        Ok(e, new ActivateSpell(PlayerId.One, Hand(e, SetSweep), 4)); Resolve(e);
+        Assert.Null(e.State.GetPlayer(PlayerId.Two).SpellTrapFields[0]);
+        Next(e); Next(e);
+        // With Dark Magician the condition holds; the swept Spell/Trap Zone now leaves nothing to destroy.
+        Summon(e, DarkMagician, 3);
+        Reject(e, new ActivateSpell(PlayerId.One, Hand(e, DarkMagicAttack), 4), DuelError.DecisionUnavailable);
+    }
+
+    /// <summary>"Tribute this card" is paid before targets are chosen, so an Equip Card that leaves with the monster cannot be its target.</summary>
+    [Fact]
+    public void TributeSelfCostCannotTargetItsOwnEquipCard()
+    {
+        const uint DeepSweeper = 10229;
+        var catalog = new CardCatalog(new(null, "synthetic-short-text-sweeper"), Catalog().Cards.Select(c =>
+            c.GameCardId == DeepSweeper ? new CardDefinition(c.GameCardId, c.Name, "", c.Statistics, Codes(MonsterTypes.Fiend, MonsterAttributes.Dark)) : c));
+        var rules = ShortTextCardFamily.Family.Rules.ToDictionary();
+        rules[EarthMonster] = new(CardCategory.Monster, AllowsNormalSummon: true, AllowsBasicBattle: true, AllowsTributeForSummon: true);
+        var e = new DuelEngine(catalog, rules, Deck(DeepSweeper, DarkSword), Deck(), experimentalTriggerEffects: ShortTextCardFamily.Family.Triggers,
+            effectDefinitions: ShortTextCardFamily.Family.Definitions, shuffleSeed: 5);
+        EnterMain(e); Summon(e, DeepSweeper, 0);
+        Ok(e, new ActivateSpell(PlayerId.One, Hand(e, DarkSword), 4));
+        var pending = e.State.PendingDecision!;
+        var target = Assert.Single(pending.FieldTargetOptions!);
+        Ok(e, new ChooseDecisionFieldTarget(pending.Player, pending.DecisionId, PlayerId.One, FieldLocation.MonsterZone, 0, target.Card.InstanceId));
+        Resolve(e);
+        Assert.NotNull(e.State.GetPlayer(PlayerId.One).SpellTrapFields[4]);
+        Reject(e, new ActivateMonsterEffect(PlayerId.One, 0), DuelError.DecisionUnavailable);
+    }
+
+    /// <summary>A no-Tribute Normal Summon needs its field requirement when performed; "controls 2 or more monsters" counts face-down ones.</summary>
+    [Fact]
+    public void NoTributeSummonNeedsItsFieldRequirement()
+    {
+        string procedure = ShortTextCardFamily.Family.TributeProcedures.Single(p => p.CardId == PowerInvader).ProcedureId;
+        var e = KindEngine(Deck(PowerInvader));
+        TributeSummon Invade() => new(PlayerId.One, e.State.Revision, Hand(e, PowerInvader), 0, [], procedureId: procedure);
+        EnterMain(e); Next(e);
+        Ok(e, new SetMonster(PlayerId.Two, Hand(e, EarthMonster), 0)); Next(e);
+        Reject(e, Invade(), DuelError.NormalSummonConditionsNotMet);
+        Next(e);
+        Ok(e, new SetMonster(PlayerId.Two, Hand(e, EarthMonster), 1)); Next(e);
+        Ok(e, Invade());
+        Assert.Equal(PowerInvader, e.State.GetPlayer(PlayerId.One).MonsterZones[0]!.Card.GameCardId);
     }
 
     [Fact]

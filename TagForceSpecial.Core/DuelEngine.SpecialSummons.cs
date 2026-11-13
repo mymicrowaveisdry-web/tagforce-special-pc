@@ -98,7 +98,8 @@ public sealed partial class DuelEngine
         if (!procedure.CardIds.Contains(card.GameCardId)) return Reject(DuelError.UnsupportedSpecialSummon);
         if (!procedure.Positions.Contains(command.Position)) return Reject(DuelError.InvalidBattlePosition);
         if (procedure.RequiresEmptyOwnField && player.MonsterZones.Any(m => m is not null) ||
-            procedure.RequiresOpposingMonster && !State.GetPlayer(Other(player.Id)).MonsterZones.Any(m => m is not null))
+            procedure.RequiresOpposingMonster && !State.GetPlayer(Other(player.Id)).MonsterZones.Any(m => m is not null) ||
+            procedure.Requirements.Any(r => !ControlsMonsters(State, player.Id, r)))
             return Reject(DuelError.SpecialSummonConditionsNotMet);
         var error = CheckSpecialSummon(State, player.Id, card, command.MonsterZone, command.Position, procedure.Source, procedure.ProcedureId);
         if (error != DuelError.None) return Reject(error);

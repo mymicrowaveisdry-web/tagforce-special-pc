@@ -93,8 +93,24 @@ public sealed class ArchetypeMigrationTests
         Assert.True(ClassicArchetypes.Resolver.IsMember(context, "official:elemental-hero"));
         Assert.Contains(ClassicArchetypes.GetMembers("official:qli"), id => ClassicArchetypes.Snapshot.GetCard(new("tfs:" + id))!.Kind != CardKind.Monster);
         Assert.All(ClassicArchetypes.GetMembers("official:covenant"), id => Assert.NotEqual(CardKind.Monster, ClassicArchetypes.Snapshot.GetCard(new("tfs:" + id))!.Kind));
-        Assert.Equal(59, ClassicArchetypes.Snapshot.GetAll().Count); Assert.Equal(7254, ClassicArchetypes.Snapshot.Cards.Count);
+        Assert.Equal(71, ClassicArchetypes.Snapshot.GetAll().Count); Assert.Equal(7254, ClassicArchetypes.Snapshot.Cards.Count);
     }
+
+    /// <summary>
+    /// Membership follows the card's name or its own treated-as text, not the native slot: slot members failing that are excluded and
+    /// name-bearing cards outside it are added (owner rule).
+    /// </summary>
+    [Theory]
+    [InlineData("official:synchron", 7758u, false)] // Synchro Deflector
+    [InlineData("official:synchron", 7687u, true)] // Junk Synchron
+    [InlineData("official:toon", 4733u, false)] // Manga Ryu-Ran
+    [InlineData("official:ojama", 6469u, false)] // Ojamuscle
+    [InlineData("official:gem", 7141u, false)] // Gem Flash Energy
+    [InlineData("official:laundsallyn", 11459u, true)] // Number 23: its text treats it as Laundsallyn
+    [InlineData("official:scrap", 7694u, true)] // Scrap-Iron Scarecrow
+    [InlineData("official:frog", 4555u, false)] // Frog the Jam
+    public void MembershipFollowsNamesAndTreatedAsText(string archetype, uint card, bool member) =>
+        Assert.Equal(member, ClassicArchetypes.GetMembers(archetype).Contains(card));
 
     /// <summary>Reviewed native slots agree with each other where one archetype lies inside another, and unreviewed slots stay out.</summary>
     [Theory]
@@ -102,6 +118,7 @@ public sealed class ArchetypeMigrationTests
     [InlineData("official:elemental-hero", "official:hero")]
     [InlineData("official:gem-knight", "official:gem")]
     [InlineData("official:steelswarm", "official:lswarm")]
+    [InlineData("official:r-genex", "official:genex")]
     public void ClassicSubArchetypesLieInsideTheirParentSlots(string child, string parent)
     {
         var members = ClassicArchetypes.GetMembers(child);

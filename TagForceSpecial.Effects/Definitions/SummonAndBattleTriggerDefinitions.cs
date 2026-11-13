@@ -10,6 +10,13 @@ public static class SummonAndBattleTriggerDefinitions
     public static AuthoredCard[] Cards(CardTable t) =>
     [
         t.Trigger(5883, "Sacred Crane", MonsterEventKind.SpecialSummoned, [new DrawCardsStep(1)], timing: TriggerTiming.If),
+        t.Trigger(8249, "R-Genex Magma", MonsterEventKind.NormalSummoned, Search(new AllOfFilter(ArchetypeMonsters("official:r-genex"), Level(2))),
+            TriggerRequirement.Optional),
+        t.Trigger(8248, "R-Genex Crusher", MonsterEventKind.NormalSummoned, Search(new AllOfFilter(ArchetypeMonsters("official:r-genex"), Level(4))),
+            TriggerRequirement.Optional),
+        t.Trigger(8264, "Ojama Red", MonsterEventKind.NormalSummoned, [new SpecialSummonStep(SpecialSummonSources.Hand, ArchetypeMonsters("official:ojama"),
+            BattlePosition.FaceUpAttack, anyNumber: true)], TriggerRequirement.Optional,
+            exceptions: "Up to 4 is the number of free Monster Zones after this card is Summoned."),
         t.WhenSummoned(3611, "Crystal Skull", [new TakeDamageStep(1000)]),
         t.BattleTrigger(3740, "Toy Emperor", MonsterEventKind.DestroyedOpponentByBattle, Search(new CardCategoryFilter(CardCategory.Trap)), optional: true, rules: HighLevel,
             exceptions: "Triggers only when the destroyed monster is sent to the Graveyard."),

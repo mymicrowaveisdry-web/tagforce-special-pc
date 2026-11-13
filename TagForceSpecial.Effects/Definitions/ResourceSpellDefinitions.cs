@@ -18,6 +18,9 @@ public static class ResourceSpellDefinitions
         t.Normal(8656, "Cards of Consonance", [new DrawCardsStep(2)], new DiscardCost(new AllOfFilter(OfType(MonsterTypes.Dragon), Tuner,
             new MonsterTraitFilter(MonsterStat.Attack, 1000)))),
         t.Trap(5739, "Arsenal Robber", [new OpponentSendsFromDeckStep(EquipSpell)]),
+        t.Normal(9122, "Tuning", [new AddFromDeckToHandStep(new AllOfFilter(ArchetypeMonsters("official:synchron"), Tuner)), new MillTopOfDeckStep(1)]),
+        t.Normal(5474, "Toon Table of Contents", Search(new AnyOfFilter(Archetypes.ClassicArchetypes.Filter("official:toon"), Named(4733)))),
+        t.Normal(10414, "Gagagadraw", [new DrawCardsStep(2)], new BanishFromGraveyardCost(ArchetypeMonsters("official:gagaga"), 3)),
         t.Trap(7767, "Psychic Rejuvenation", [new GainLifePointsStep(1000, PerCount: EffectCount.OwnFaceUpMonsters) { CountFilter = OfType(MonsterTypes.Psychic) }]),
         t.Trap(6676, "Elemental Recharge", [new GainLifePointsStep(1000, PerCount: EffectCount.OwnFaceUpMonsters)
             { CountFilter = Archetypes.ClassicArchetypes.Filter("official:elemental-hero", monstersOnly: true) }])
