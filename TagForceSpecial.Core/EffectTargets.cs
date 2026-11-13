@@ -2,7 +2,9 @@ namespace TagForceSpecial.Core;
 
 /// <summary>Which field cards a target or "all matching" step considers.</summary>
 /// <summary>What a field target can be; <see cref="PendulumScale"/> is a card in a Pendulum Zone only.</summary>
-public enum FieldCardKind { Monster, SpellTrap, Any, PendulumScale }
+public enum FieldCardKind { Monster, SpellTrap, Any, PendulumScale,
+    /// <summary>Cards currently treated as Spells, including Pendulum scales and equipped monsters.</summary>
+    Spell }
 
 /// <summary>Whose field, relative to the activating player.</summary>
 public enum TargetSide { Either, Own, Opponent }

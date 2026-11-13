@@ -12,6 +12,7 @@ public static class MonsterActivatedEffectDefinitions
     /// <summary>The cards, with effect IDs from the registering family's table.</summary>
     public static AuthoredCard[] Cards(CardTable t) =>
     [
+        t.Ignition(3516, "Tribulldog", [new SpecialSummonStep(SpecialSummonSources.Hand, Named(3516))], oncePerTurn: true),
         t.Ignition(5953, "The Agent of Creation - Venus", [new SpecialSummonStep(SpecialSummonSources.Hand | SpecialSummonSources.Deck, Named(5949))], new PayLifePointsCost(500)),
         t.Ignition(8376, "Beast Striker", [new SpecialSummonStep(SpecialSummonSources.Deck, Named(8375))], new DiscardCost(), oncePerTurn: true),
         t.Ignition(5205, "Hysteric Fairy", [new GainLifePointsStep(1000)], new TributeCost(Count: 2)),

@@ -9,6 +9,10 @@ public static class SummonAndBattleTriggerDefinitions
     /// <summary>The cards, with effect IDs from the registering family's table.</summary>
     public static AuthoredCard[] Cards(CardTable t) =>
     [
+        t.Trigger(9474, "Salvage Warrior", MonsterEventKind.TributeSummoned,
+            [new SpecialSummonStep(SpecialSummonSources.Hand | SpecialSummonSources.Graveyard, Tuner)], TriggerRequirement.Optional, rules: HighLevel),
+        t.Trigger(6666, "Cyber Prima", MonsterEventKind.TributeSummoned,
+            [new DestroyAllStep(FieldCardKind.Spell, Filter: FieldCardFilter.FaceUp)], rules: HighLevel),
         t.Trigger(5883, "Sacred Crane", MonsterEventKind.SpecialSummoned, [new DrawCardsStep(1)], timing: TriggerTiming.If),
         t.Trigger(8249, "R-Genex Magma", MonsterEventKind.NormalSummoned, Search(new AllOfFilter(ArchetypeMonsters("official:r-genex"), Level(2))),
             TriggerRequirement.Optional),

@@ -5,12 +5,14 @@ using static TagForceSpecial.Effects.MonsterTypes;
 
 namespace TagForceSpecial.Effects.Definitions;
 
-/// <summary>Spells and Traps that Special Summon a monster from the hand or Deck, some after a Tribute or in answer to an opponent's Summon.</summary>
+/// <summary>Spells and Traps that Special Summon a monster from the hand, Deck or Graveyard, some after a Tribute or in answer to an opponent's Summon.</summary>
 public static class EffectSummonDefinitions
 {
     /// <summary>The cards, with effect IDs from the registering family's table.</summary>
     public static AuthoredCard[] Cards(CardTable t) =>
     [
+        t.Normal(3518, "Doubulldog", [new SpecialSummonStep(SpecialSummonSources.Deck | SpecialSummonSources.Graveyard, Named(3516))],
+            conditions: [Controls(OfType(Beast))]),
         t.Trap(5490, "Hidden Soldiers", [new SpecialSummonStep(SpecialSummonSources.Hand, new AllOfFilter(new MonsterLevelFilter(4), OfAttribute(Dark)))],
             conditions: TrapTiming.OpponentSummons(SummonKinds.Normal | SummonKinds.Flip)),
         t.Trap(6817, "Hunting Instinct", [new SpecialSummonStep(SpecialSummonSources.Hand, OfType(Dinosaur))], conditions: TrapTiming.OpponentSummons(SummonKinds.Special)),

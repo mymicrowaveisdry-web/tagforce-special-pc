@@ -120,7 +120,7 @@ public sealed record NegateActivationStep(bool DestroySource) : EffectStep;
 public sealed record NegateEffectStep(bool DestroySource) : EffectStep;
 
 /// <summary>
-/// Special Summons one eligible hand or Deck card chosen at resolution, shuffling after a Deck summon. Optionally
+/// Special Summons one eligible hand, Deck or Graveyard card chosen at resolution, shuffling after a Deck summon. Optionally
 /// banishes it in that turn's End Phase.
 /// </summary>
 public sealed record SpecialSummonStep : EffectStep
@@ -141,8 +141,8 @@ public sealed record SpecialSummonStep : EffectStep
     public SpecialSummonStep(SpecialSummonSources sources, CardFilter filter, BattlePosition? position = null, bool anyNumber = false, int minCount = 1)
     {
         ArgumentNullException.ThrowIfNull(filter);
-        if (sources == SpecialSummonSources.None || (sources & ~(SpecialSummonSources.Hand | SpecialSummonSources.Deck)) != 0)
-            throw new ArgumentOutOfRangeException(nameof(sources), "Only hand and Deck sources are supported.");
+        if (sources == SpecialSummonSources.None || (sources & ~(SpecialSummonSources.Hand | SpecialSummonSources.Deck | SpecialSummonSources.Graveyard)) != 0)
+            throw new ArgumentOutOfRangeException(nameof(sources), "Only hand, Deck and Graveyard sources are supported.");
         if (position is not (null or BattlePosition.FaceUpAttack or BattlePosition.FaceUpDefense or BattlePosition.FaceDownDefense))
             throw new ArgumentOutOfRangeException(nameof(position));
         if (minCount is < 0 or > 1 || !anyNumber && minCount != 1) throw new ArgumentOutOfRangeException(nameof(minCount));
@@ -157,8 +157,8 @@ public sealed record SpecialSummonStep : EffectStep
     public SpecialSummonStep(SpecialSummonSources sources, IEnumerable<uint> eligibleCardIds, bool banishAtEndPhase = false)
     {
         ArgumentNullException.ThrowIfNull(eligibleCardIds);
-        if (sources == SpecialSummonSources.None || (sources & ~(SpecialSummonSources.Hand | SpecialSummonSources.Deck)) != 0)
-            throw new ArgumentOutOfRangeException(nameof(sources), "Only hand and Deck sources are supported.");
+        if (sources == SpecialSummonSources.None || (sources & ~(SpecialSummonSources.Hand | SpecialSummonSources.Deck | SpecialSummonSources.Graveyard)) != 0)
+            throw new ArgumentOutOfRangeException(nameof(sources), "Only hand, Deck and Graveyard sources are supported.");
         var ids = eligibleCardIds.Take(1025).ToArray();
         if (ids.Length is 0 or > 1024 || ids.Any(id => id == 0) || ids.Distinct().Count() != ids.Length)
             throw new ArgumentException("Supply 1–1024 distinct nonzero eligible card IDs.", nameof(eligibleCardIds));

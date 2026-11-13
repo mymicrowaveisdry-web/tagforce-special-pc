@@ -214,7 +214,7 @@ public sealed class DefinitionCommitTests
             conditions: [new NoSummonThisTurnCondition(), new NoSummonThisTurnCondition()]));
         Assert.Throws<ArgumentOutOfRangeException>(() => new FreeMonsterZonesCondition(6));
         Assert.Throws<ArgumentException>(() => new SpecialSummonStep(SpecialSummonSources.Deck, []));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new SpecialSummonStep(SpecialSummonSources.Graveyard, [1]));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new SpecialSummonStep(SpecialSummonSources.Banished, [1]));
         var engine = Engine();
         Reject(engine, new BeginDecisionSequence(PlayerId.One, "activation:lightning-vortex-v1"), DuelError.UnsupportedDecisionSequence);
         var catalog = new CardCatalog(new(null, "x"), new uint[] { 1, 5217 }.Select(id => new CardDefinition(id, $"{id}", "", new(0, 0, 1))));

@@ -16,7 +16,9 @@ public enum MonsterEventKind { NormalSummoned, SpecialSummoned, FlipSummoned, De
     /// <summary>Control of this face-up monster changed; the subject is the monster in its new place.</summary>
     ControlChanged,
     /// <summary>This monster was Tributed, for a Summon or as a cost; only its Graveyard trigger uses it.</summary>
-    Tributed }
+    Tributed,
+    /// <summary>A face-up Normal Summon completed with at least one Tributed monster.</summary>
+    TributeSummoned }
 /// <summary>
 /// Narrows a Destroyed or SentToGraveyard event by where it came from or what caused it; <see cref="FromOwnField"/> is "this card you
 /// control is sent to your Graveyard", from a field zone while its owner controlled it.

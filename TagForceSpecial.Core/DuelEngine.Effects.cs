@@ -1050,7 +1050,7 @@ public sealed partial class DuelEngine
     }
 
     /// <summary>Matching field cards, the activating player's side first: monsters, then Spell/Trap and Pendulum zones.</summary>
-    private static IEnumerable<FieldCardTarget> FieldMatches(DuelState state, PlayerId controller, FieldCardKind kind, TargetSide side,
+    private IEnumerable<FieldCardTarget> FieldMatches(DuelState state, PlayerId controller, FieldCardKind kind, TargetSide side,
         FieldCardFilter filter, int? excludeInstanceId)
     {
         PlayerId[] players = side switch
@@ -1062,7 +1062,7 @@ public sealed partial class DuelEngine
         foreach (var id in players)
         {
             var player = state.GetPlayer(id);
-            if (kind is not (FieldCardKind.SpellTrap or FieldCardKind.PendulumScale))
+            if (kind is not (FieldCardKind.SpellTrap or FieldCardKind.PendulumScale or FieldCardKind.Spell))
                 for (int zone = 0; zone < 5; zone++)
                     if (player.MonsterZones[zone] is { } monster && monster.Card.InstanceId != excludeInstanceId && filter switch
                         {
@@ -1080,7 +1080,9 @@ public sealed partial class DuelEngine
             // A Pendulum Scale target is only a card in a Pendulum Zone.
             if (kind != FieldCardKind.PendulumScale)
                 for (int zone = 0; zone < 5; zone++)
-                if (player.SpellTrapFields[zone] is { } field && field.Card.InstanceId != excludeInstanceId && Shown(field.IsFaceUp))
+                if (player.SpellTrapFields[zone] is { } field && field.Card.InstanceId != excludeInstanceId && Shown(field.IsFaceUp) &&
+                    (kind != FieldCardKind.Spell || field.EquippedTo is not null ||
+                     rules.TryGetValue(field.Card.GameCardId, out var fieldRules) && fieldRules.Category is CardCategory.Spell or CardCategory.Monster))
                     yield return new(id, FieldLocation.SpellTrapZone, zone, field.Card, field.PlacementId);
             for (int zone = 0; zone < 2; zone++)
                 if (player.PendulumZones[zone] is { } scale && scale.Card.InstanceId != excludeInstanceId && filter != FieldCardFilter.FaceDown)
@@ -1499,12 +1501,13 @@ public sealed partial class DuelEngine
         return ResolveChainLink(chain, definitionChoice: command);
     }
 
-    /// <summary>Eligible hand cards first, then Deck cards (in order), each with at least one legal zone.</summary>
+    /// <summary>Eligible hand, Deck, then Graveyard cards, each with at least one legal zone.</summary>
     private IEnumerable<DefinitionSummonOption> SpecialSummonOptions(DuelState state, PlayerId playerId, SpecialSummonStep step,
         CardInstance source)
     {
         var player = state.GetPlayer(playerId);
-        foreach (var (flag, from) in new[] { (SpecialSummonSources.Hand, DecisionCardSource.Hand), (SpecialSummonSources.Deck, DecisionCardSource.Deck) })
+        foreach (var (flag, from) in new[] { (SpecialSummonSources.Hand, DecisionCardSource.Hand), (SpecialSummonSources.Deck, DecisionCardSource.Deck),
+                     (SpecialSummonSources.Graveyard, DecisionCardSource.Graveyard) })
         {
             if (!step.Sources.HasFlag(flag)) continue;
             foreach (var card in SpecialSourceCards(player, from).Where(c => step.Filter is { } filter ? MatchesFilter(c, filter) : step.EligibleCardIds.Contains(c.GameCardId)))

@@ -114,7 +114,10 @@ public sealed partial class DuelEngine
         if (emitted is MonsterDestroyed { DestroyedBy: { } destroyer } && !notToGraveyard)
             yield return new(MonsterEventKind.DestroyedOpponentByBattle, destroyer, point, ByBattle: true);
         if (emitted is MonsterNormalSummoned summoned)
+        {
+            if (summoned.Tributes.Count != 0) yield return new(MonsterEventKind.TributeSummoned, subject, point);
             foreach (var tribute in summoned.Tributes) yield return new(MonsterEventKind.TributedForSummon, tribute, point);
+        }
         if (kind == MonsterEventKind.FlipSummoned) yield return new(MonsterEventKind.FlippedFaceUp, subject, point);
     }
 
