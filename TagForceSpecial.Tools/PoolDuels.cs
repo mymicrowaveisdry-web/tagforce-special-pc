@@ -167,10 +167,13 @@ public static class PoolDuels
         }
     }
 
-    /// <summary>Cards held by a pending Summon; the monster of a Gemini or Flip Summon stays in its zone, so it is not counted again.</summary>
-    private static IEnumerable<int> PendingCards(PendingSummon summon) =>
-        summon.PendulumGroup.SelectMany(PendingCards).Concat(summon.XyzMaterials.Select(c => c.InstanceId))
-            .Concat(summon.IsGeminiSummon || summon.IsFlipSummon ? [] : [summon.Card.InstanceId]);
+    /// <summary>
+    /// Cards held by a pending Summon; the monster of a Gemini or Flip Summon stays in its zone, so it is not counted again. A Pendulum
+    /// Summon's group already holds its first card, which the summon also names, so only the group is counted.
+    /// </summary>
+    public static IEnumerable<int> PendingCards(PendingSummon summon) => summon.PendulumGroup.Count != 0
+        ? summon.PendulumGroup.SelectMany(PendingCards)
+        : summon.XyzMaterials.Select(c => c.InstanceId).Concat(summon.IsGeminiSummon || summon.IsFlipSummon ? [] : [summon.Card.InstanceId]);
 
     private static string? Violation(DuelState state, HashSet<int> initial, CardCatalog catalog)
     {

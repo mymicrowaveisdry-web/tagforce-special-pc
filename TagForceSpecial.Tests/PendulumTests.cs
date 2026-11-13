@@ -101,6 +101,16 @@ public sealed class PendulumTests
         Summon(e, Pend, 2); Assert.True(e.State.NormalSummonUsed);
     }
 
+    /// <summary>The pool-duel checker counts each card of a pending Pendulum Summon once, though the summon also names its first card.</summary>
+    [Fact]
+    public void PoolDuelCheckerCountsAPendingPendulumGroupOnce()
+    {
+        var e = Make(triggers: true, leftScale: 1, rightScale: 8); Scales(e);
+        var command = SummonCommand(e, Ordinary, Pend); Ok(e, command);
+        var counted = TagForceSpecial.Tools.PoolDuels.PendingCards(e.State.PendingSummon!).ToArray();
+        Assert.Equal(command.Selections.Select(s => s.CardInstanceId).Order(), counted.Order());
+    }
+
     [Fact]
     public void InvalidScaleAndBatchSelectionsRejectWithoutPartialMovement()
     {

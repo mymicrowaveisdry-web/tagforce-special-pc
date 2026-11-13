@@ -93,7 +93,21 @@ public sealed class ArchetypeMigrationTests
         Assert.True(ClassicArchetypes.Resolver.IsMember(context, "official:elemental-hero"));
         Assert.Contains(ClassicArchetypes.GetMembers("official:qli"), id => ClassicArchetypes.Snapshot.GetCard(new("tfs:" + id))!.Kind != CardKind.Monster);
         Assert.All(ClassicArchetypes.GetMembers("official:covenant"), id => Assert.NotEqual(CardKind.Monster, ClassicArchetypes.Snapshot.GetCard(new("tfs:" + id))!.Kind));
-        Assert.Equal(12, ClassicArchetypes.Snapshot.GetAll().Count); Assert.Equal(7254, ClassicArchetypes.Snapshot.Cards.Count);
+        Assert.Equal(59, ClassicArchetypes.Snapshot.GetAll().Count); Assert.Equal(7254, ClassicArchetypes.Snapshot.Cards.Count);
+    }
+
+    /// <summary>Reviewed native slots agree with each other where one archetype lies inside another, and unreviewed slots stay out.</summary>
+    [Theory]
+    [InlineData("official:destiny-hero", "official:hero")]
+    [InlineData("official:elemental-hero", "official:hero")]
+    [InlineData("official:gem-knight", "official:gem")]
+    [InlineData("official:steelswarm", "official:lswarm")]
+    public void ClassicSubArchetypesLieInsideTheirParentSlots(string child, string parent)
+    {
+        var members = ClassicArchetypes.GetMembers(child);
+        Assert.NotEmpty(members);
+        Assert.Empty(members.Except(ClassicArchetypes.GetMembers(parent)));
+        Assert.Throws<ArgumentException>(() => ClassicArchetypes.Filter("official:worm"));
     }
 
     [Fact]
