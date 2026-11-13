@@ -11,7 +11,8 @@ public sealed class ShortTextCardFamilyTests
     private const uint DarkMonster = 901, EarthMonster = 902, FishMonster = 903, MachineMonster = 904,
         DarkSword = 4308, Umi = 4340, ThunderShort = 9664, CrystalSkull = 3611, BigMonster = 905, ChangeOfHeart = 4860, Recruiter = 9282,
         FusionMonster = 906, FieldCard = 907, EquipCard = 908, PlanetPathfinder = 10232, FusionWeapon = 6138, Bowganian = 5687,
-        SwampBattleguard = 4018, LavaBattleguard = 4560, MonsterEye = 4408, Polymerization = 4837;
+        SwampBattleguard = 4018, LavaBattleguard = 4560, MonsterEye = 4408, Polymerization = 4837,
+        PsychicMonster = 909, PsychicRejuvenation = 7767, AForces = 5327;
 
     private static CardNumericCodes Codes(uint type, uint attribute) => new(attribute, type, 1, 1, 0, 0, 0);
 
@@ -141,10 +142,11 @@ public sealed class ShortTextCardFamilyTests
             new(FusionMonster, "Fusion", "", new(2000, 1000, 4), new(MonsterAttributes.Earth, MonsterTypes.Warrior, 3, 3, 0, 0, 0)),
             new(FieldCard, "Field", "", new(0, 0, 0), new(8, 25, 13, 13, 2, 0, 0)),
             new(EquipCard, "Equip", "", new(0, 0, 0), new(8, 25, 13, 13, 3, 0, 0)),
-            new(Polymerization, "Polymerization", "", new(0, 0, 0), new(8, 25, 13, 13, 0, 0, 0))
+            new(Polymerization, "Polymerization", "", new(0, 0, 0), new(8, 25, 13, 13, 0, 0, 0)),
+            new(PsychicMonster, "Psychic", "", new(1000, 1000, 4), Codes(MonsterTypes.Psychic, MonsterAttributes.Earth))
         ]));
         var rules = ShortTextCardFamily.Family.Rules.ToDictionary();
-        rules[EarthMonster] = rules[FusionMonster] = new(CardCategory.Monster, AllowsNormalSummon: true, AllowsBasicBattle: true, AllowsTributeForSummon: true);
+        rules[EarthMonster] = rules[FusionMonster] = rules[PsychicMonster] = new(CardCategory.Monster, AllowsNormalSummon: true, AllowsBasicBattle: true, AllowsTributeForSummon: true);
         rules[FieldCard] = rules[EquipCard] = rules[Polymerization] = new(CardCategory.Spell);
         return new(catalog, rules, first, Deck(), experimentalTriggerEffects: ShortTextCardFamily.Family.Triggers,
             effectDefinitions: ShortTextCardFamily.Family.Definitions, shuffleSeed: 5, monsterStats: ShortTextCardFamily.Family.MonsterStats);
@@ -207,6 +209,20 @@ public sealed class ShortTextCardFamilyTests
         EventEffectScenario.Drain(eye);
         Assert.Equal(7000, eye.State.GetPlayer(PlayerId.One).LifePoints);
         Assert.Contains(eye.State.GetPlayer(PlayerId.One).Hand, c => c.GameCardId == Polymerization);
+    }
+
+    [Fact]
+    public void FilteredCountsScaleOnlyByMatchingMonsters()
+    {
+        var e = KindEngine(Deck(PsychicRejuvenation, PsychicMonster, AForces, EarthMonster));
+        EnterMain(e);
+        Ok(e, new SetSpellTrap(PlayerId.One, Hand(e, PsychicRejuvenation), 0));
+        Summon(e, PsychicMonster, 0); Next(e); Next(e);
+        Summon(e, EarthMonster, 1);
+        Ok(e, new ActivateSetSpell(PlayerId.One, 0)); Resolve(e);
+        Assert.Equal(9000, e.State.GetPlayer(PlayerId.One).LifePoints);
+        Ok(e, new ActivateSpell(PlayerId.One, Hand(e, AForces), 1)); Resolve(e);
+        Assert.Equal((1000, 1200), (Atk(e, PlayerId.One, 0), Atk(e, PlayerId.One, 1)));
     }
 
     [Fact]

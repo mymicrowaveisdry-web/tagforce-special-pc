@@ -131,7 +131,7 @@ public sealed partial class DuelEngine
         if (definition.FieldTargets is [AttackingMonsterTarget or DefendingMonsterTarget] && LiveCombatant(State, definition) is null)
             return DuelError.ActivationConditionNotMet;
         // A counted amount needs something to count when activated (it is read again at resolution).
-        if (definition.Counts.Any(count => count is not (EffectCount.DieRoll or EffectCount.Heads or EffectCount.MilledLevel) && CountFor(State, playerId, count) == 0))
+        if (definition.Counts.Any(c => c.Count is not (EffectCount.DieRoll or EffectCount.Heads or EffectCount.MilledLevel) && CountFor(State, playerId, c.Count, c.Filter) == 0))
             return DuelError.ActivationConditionNotMet;
         if (definition.SummonsMonsters && IsSummonLocked(State, playerId)) return DuelError.SummonLocked;
         if (definition.Cost is PayLifePointsCost pay && player.LifePoints <= pay.Amount) return DuelError.InsufficientLifePoints;
@@ -984,7 +984,7 @@ public sealed partial class DuelEngine
                 state = step switch
                 {
                     GainLifePointsStep gain => GainForPlayers(state, controller, gain, definition.EffectId, events),
-                    DealDamageStep damage => Scaled(state, controller, damage.Amount, damage.PerCount) is int amount and > 0
+                    DealDamageStep damage => Scaled(state, controller, damage.Amount, damage.PerCount, damage.CountFilter) is int amount and > 0
                         ? DealEffectDamage(state, Other(controller), amount, definition.EffectId, events) : state,
                     DamageBothPlayersStep both => DamageBothPlayers(state, controller, both, definition.EffectId, events),
                     TakeDamageStep take => DealEffectDamage(state, controller, take.Amount, definition.EffectId, events),
@@ -1616,21 +1616,25 @@ public sealed partial class DuelEngine
     }
 
     /// <summary>The current value of a public count, from the activating player's point of view.</summary>
-    private static int CountFor(DuelState state, PlayerId controller, EffectCount count)
+    private int CountFor(DuelState state, PlayerId controller, EffectCount count, CardFilter? filter = null)
     {
         var own = state.GetPlayer(controller);
         var opponent = state.GetPlayer(Other(controller));
-        int Monsters(DuelPlayerState p) => p.MonsterZones.Count(m => m is not null);
+        int Counted(IEnumerable<CardInstance> cards, bool inGraveyard = false) => filter is null ? cards.Count() : cards.Count(c => MatchesFilter(c, filter, inGraveyard));
+        IEnumerable<CardInstance> Monsters(DuelPlayerState p, bool faceUpOnly = false) =>
+            p.MonsterZones.Where(m => m is not null && (!faceUpOnly || m.Position != BattlePosition.FaceDownDefense)).Select(m => m!.Card);
         return count switch
         {
             EffectCount.None => 1,
-            EffectCount.OpponentMonsters => Monsters(opponent),
-            EffectCount.AllMonsters => Monsters(own) + Monsters(opponent),
-            EffectCount.OpponentHand => opponent.Hand.Count,
-            EffectCount.OpponentHandAndField => opponent.Hand.Count + Monsters(opponent) +
+            EffectCount.OpponentMonsters => Counted(Monsters(opponent)),
+            EffectCount.AllMonsters => Counted(Monsters(own).Concat(Monsters(opponent))),
+            EffectCount.OwnMonsters => Counted(Monsters(own)),
+            EffectCount.OwnFaceUpMonsters => Counted(Monsters(own, faceUpOnly: true)),
+            EffectCount.OpponentHand => Counted(opponent.Hand),
+            EffectCount.OpponentHandAndField => opponent.Hand.Count + Monsters(opponent).Count() +
                 opponent.SpellTrapFields.Count(f => f is not null) + opponent.PendulumZones.Count(f => f is not null) + (opponent.FieldSpell is null ? 0 : 1),
-            EffectCount.OpponentGraveyard => opponent.Graveyard.Count,
-            EffectCount.OpponentBanished => opponent.Banished.Count,
+            EffectCount.OpponentGraveyard => Counted(opponent.Graveyard, inGraveyard: true),
+            EffectCount.OpponentBanished => Counted(opponent.Banished),
             EffectCount.DieRoll => state.Bookkeeping.LastRandom?.Die ?? 0,
             EffectCount.Heads => state.Bookkeeping.LastRandom?.Heads ?? 0,
             EffectCount.MilledLevel => state.Bookkeeping.LastRandom?.MilledLevel ?? 0,
@@ -1639,12 +1643,12 @@ public sealed partial class DuelEngine
     }
 
     /// <summary>Amount times the count, saturated to the integer range; zero when nothing is counted.</summary>
-    private static int Scaled(DuelState state, PlayerId controller, int amount, EffectCount count) =>
-        (int)Math.Min(int.MaxValue, (long)amount * CountFor(state, controller, count));
+    private int Scaled(DuelState state, PlayerId controller, int amount, EffectCount count, CardFilter? filter = null) =>
+        (int)Math.Min(int.MaxValue, (long)amount * CountFor(state, controller, count, filter));
 
     private DuelState GainForPlayers(DuelState state, PlayerId controller, GainLifePointsStep step, string effectId, List<DuelEvent> events)
     {
-        int amount = Scaled(state, controller, step.Amount, step.PerCount);
+        int amount = Scaled(state, controller, step.Amount, step.PerCount, step.CountFilter);
         if (amount == 0) return state;
         if (step.Players is EffectPlayers.Self or EffectPlayers.Both) state = GainLifePoints(state, controller, amount, effectId, events);
         if (step.Players is EffectPlayers.Opponent or EffectPlayers.Both) state = GainLifePoints(state, Other(controller), amount, effectId, events);

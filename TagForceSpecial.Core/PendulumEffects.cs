@@ -64,7 +64,7 @@ public sealed partial class DuelEngine
             foreach (var definition in effects.Where(d => d.Origin == EffectOrigin.PendulumZone))
                 foreach (var lasting in definition.LastingModifiers)
                 {
-                    int multiplier = LastingMultiplier(state, player, lasting.PerCount);
+                    int multiplier = LastingMultiplier(state, player, lasting.PerCount, lasting.CountFilter);
                     foreach (var (target, monster) in monsters)
                         if ((lasting.Side == TargetSide.Either || lasting.Side == TargetSide.Own == (target.Player == player)) &&
                             (lasting.Filter is null || MatchesFilter(monster.Card, lasting.Filter)))

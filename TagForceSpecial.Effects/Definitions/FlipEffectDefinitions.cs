@@ -21,6 +21,7 @@ public static class FlipEffectDefinitions
             new AllOfFilter(new MonsterLevelFilter(2, Beast, minLevel: 2), new NotFilter(Named(10746))))]),
         t.FlipEffect(10164, "Dust Knight", [new SendFromDeckToGraveyardStep(OfAttribute(Earth))]),
         t.FlipEffect(5769, "Iron Blacksmith Kotetsu", Search(EquipSpell)),
+        t.FlipEffect(9754, "Creepy Coney", [new DealDamageStep(1000, EffectCount.OwnFaceUpMonsters) { CountFilter = new NormalMonsterFilter(TfspNormalMonsters.Ids) }]),
         t.FlipEffect(10640, "Cheepcheepcheep", [new SpecialSummonStep(SpecialSummonSources.Deck, new AllOfFilter(Tuner, new MonsterLevelFilter(12, minLevel: 5)))],
             optional: true),
         t.FlipEffect(5661, "Des Koala", [new DealDamageStep(400, EffectCount.OpponentHand)]),

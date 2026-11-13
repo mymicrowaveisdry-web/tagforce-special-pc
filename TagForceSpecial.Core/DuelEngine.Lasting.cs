@@ -45,7 +45,7 @@ public sealed partial class DuelEngine
             if (spellsNegated && IsSpellCard(field) || !definitions.TryGetValue(field.Card.GameCardId, out var definition)) continue;
             foreach (var lasting in definition.LastingModifiers)
             {
-                int multiplier = LastingMultiplier(state, player, lasting.PerCount);
+                int multiplier = LastingMultiplier(state, player, lasting.PerCount, lasting.CountFilter);
                 foreach (var (target, monster) in monsters)
                     if (lasting.EquippedOnly ? target == field.EquippedTo
                         : (lasting.Side == TargetSide.Either || lasting.Side == TargetSide.Own == (target.Player == player)) &&
@@ -59,13 +59,14 @@ public sealed partial class DuelEngine
                 result.Add(new(definition.EffectId, target, target, checked(definition.AttackPerCounter * monster.Counters), 0));
     }
 
-    private static int LastingMultiplier(DuelState state, PlayerId controller, LastingCount count)
+    private int LastingMultiplier(DuelState state, PlayerId controller, LastingCount count, CardFilter? filter = null)
     {
         var player = state.GetPlayer(controller);
         return count switch
         {
             LastingCount.None => 1,
-            LastingCount.OwnFaceUpMonsters => player.MonsterZones.Count(m => m is not null && m.Position != BattlePosition.FaceDownDefense),
+            LastingCount.OwnFaceUpMonsters => player.MonsterZones.Count(m => m is not null && m.Position != BattlePosition.FaceDownDefense &&
+                (filter is null || MatchesFilter(m.Card, filter))),
             LastingCount.OwnSpellTraps => player.SpellTrapFields.Count(f => f is not null) + player.PendulumZones.Count(f => f is not null) + (player.FieldSpell is null ? 0 : 1),
             _ => throw new ArgumentOutOfRangeException(nameof(count))
         };

@@ -34,6 +34,8 @@ public sealed record LastingStatModifier
     public bool EquippedOnly { get; }
     /// <summary>When set, multiplies both changes.</summary>
     public LastingCount PerCount { get; }
+    /// <summary>With <see cref="LastingCount.OwnFaceUpMonsters"/>, only matching monsters are counted.</summary>
+    public CardFilter? CountFilter { get; init; }
 
     public LastingStatModifier(TargetSide side, int attack, int defense, CardFilter? filter = null, bool equippedOnly = false,
         LastingCount perCount = LastingCount.None)

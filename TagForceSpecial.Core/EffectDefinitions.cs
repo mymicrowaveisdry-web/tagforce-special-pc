@@ -44,7 +44,11 @@ public enum EffectCount
     /// <summary>Heads in the effect's latest coin toss; it cannot be known at activation.</summary>
     Heads,
     /// <summary>The Level of the monster the effect last sent from the top of the Deck; it cannot be known at activation.</summary>
-    MilledLevel
+    MilledLevel,
+    /// <summary>Monsters the activating player controls (face-down included).</summary>
+    OwnMonsters,
+    /// <summary>Face-up monsters the activating player controls.</summary>
+    OwnFaceUpMonsters
 }
 
 /// <summary>
@@ -52,13 +56,21 @@ public enum EffectCount
 /// the existing integer saturation policy.
 /// </summary>
 public sealed record GainLifePointsStep(int Amount, EffectPlayers Players = EffectPlayers.Self,
-    EffectCount PerCount = EffectCount.None) : EffectStep;
+    EffectCount PerCount = EffectCount.None) : EffectStep
+{
+    /// <summary>When set, only matching cards are counted.</summary>
+    public CardFilter? CountFilter { get; init; }
+}
 
 /// <summary>
 /// Effect damage to the activating player's opponent (times <see cref="PerCount"/> when set); zero LP is an
 /// immediate terminal defeat.
 /// </summary>
-public sealed record DealDamageStep(int Amount, EffectCount PerCount = EffectCount.None) : EffectStep;
+public sealed record DealDamageStep(int Amount, EffectCount PerCount = EffectCount.None) : EffectStep
+{
+    /// <summary>When set, only matching cards are counted.</summary>
+    public CardFilter? CountFilter { get; init; }
+}
 
 /// <summary>
 /// Simultaneous effect damage to both players. If both reach 0 LP, the duel is a draw; if one does, that player loses.
@@ -361,12 +373,16 @@ public sealed class EffectDefinition
     };
 
     internal bool SummonsMonsters => Steps.Any(s => s is SummonTokensStep or SpecialSummonStep or SpecialSummonSelfStep);
-    internal IEnumerable<EffectCount> Counts => Steps.Select(s => s switch
+    /// <summary>A count filter needs a count that enumerates cards.</summary>
+    private static bool Filterable(EffectCount count, CardFilter? filter) => filter is null || count is EffectCount.OpponentMonsters or EffectCount.AllMonsters or
+        EffectCount.OpponentHand or EffectCount.OpponentGraveyard or EffectCount.OpponentBanished or EffectCount.OwnMonsters or EffectCount.OwnFaceUpMonsters;
+
+    internal IEnumerable<(EffectCount Count, CardFilter? Filter)> Counts => Steps.Select(s => s switch
     {
-        GainLifePointsStep g => g.PerCount,
-        DealDamageStep d => d.PerCount,
-        _ => EffectCount.None
-    }).Where(c => c != EffectCount.None);
+        GainLifePointsStep g => (g.PerCount, g.CountFilter),
+        DealDamageStep d => (d.PerCount, d.CountFilter),
+        _ => (EffectCount.None, null)
+    }).Where(c => c.Item1 != EffectCount.None);
     internal static bool IsFieldTargetStep(EffectStep s) => s is DestroyTargetsStep or ReturnTargetsToHandStep or ChangeTargetsToDefenseStep or
         BanishFieldTargetsStep or NegateAttackStep or DamageByTargetAttackStep or GainByTargetAttackStep or DestroyAndBanishTargetsStep or ModifyCombatantStatsStep or
         EquipTargetStep or UnionEquipStep or PlaceCounterStep or ModifyTargetsUntilEndStep or FlipTargetsFaceDownStep or FlipTargetsFaceUpStep or
@@ -416,8 +432,8 @@ public sealed class EffectDefinition
         foreach (var step in snapshot)
             if (step switch
                 {
-                    GainLifePointsStep s => s.Amount <= 0 || !Enum.IsDefined(s.Players) || !Enum.IsDefined(s.PerCount),
-                    DealDamageStep s => s.Amount <= 0 || !Enum.IsDefined(s.PerCount),
+                    GainLifePointsStep s => s.Amount <= 0 || !Enum.IsDefined(s.Players) || !Enum.IsDefined(s.PerCount) || !Filterable(s.PerCount, s.CountFilter),
+                    DealDamageStep s => s.Amount <= 0 || !Enum.IsDefined(s.PerCount) || !Filterable(s.PerCount, s.CountFilter),
                     DamageBothPlayersStep s => s.ToOpponent <= 0 || s.ToSelf <= 0,
                     TakeDamageStep s => s.Amount <= 0,
                     BanishSourceWhenItLeavesStep => false,
