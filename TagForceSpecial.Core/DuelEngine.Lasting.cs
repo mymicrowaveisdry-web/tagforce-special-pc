@@ -59,18 +59,8 @@ public sealed partial class DuelEngine
                 result.Add(new(definition.EffectId, target, target, checked(definition.AttackPerCounter * monster.Counters), 0));
     }
 
-    private int LastingMultiplier(DuelState state, PlayerId controller, LastingCount count, CardFilter? filter = null)
-    {
-        var player = state.GetPlayer(controller);
-        return count switch
-        {
-            LastingCount.None => 1,
-            LastingCount.OwnFaceUpMonsters => player.MonsterZones.Count(m => m is not null && m.Position != BattlePosition.FaceDownDefense &&
-                (filter is null || MatchesFilter(m.Card, filter))),
-            LastingCount.OwnSpellTraps => player.SpellTrapFields.Count(f => f is not null) + player.PendulumZones.Count(f => f is not null) + (player.FieldSpell is null ? 0 : 1),
-            _ => throw new ArgumentOutOfRangeException(nameof(count))
-        };
-    }
+    private int LastingMultiplier(DuelState state, PlayerId controller, LastingCount count, CardFilter? filter = null) =>
+        CardCountQueries.Lasting(state, controller, count, filter is null ? null : card => MatchesFilter(card, filter));
 
     private bool TargetPasses(DuelState state, FieldTarget spec, FieldCardTarget target) =>
         (spec.CardFilter is null || MatchesFilter(target.Card, spec.CardFilter)) &&

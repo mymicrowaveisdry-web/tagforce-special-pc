@@ -1075,46 +1075,8 @@ public sealed partial class DuelEngine
 
     /// <summary>Matching field cards, the activating player's side first: monsters, then Spell/Trap and Pendulum zones.</summary>
     private IEnumerable<FieldCardTarget> FieldMatches(DuelState state, PlayerId controller, FieldCardKind kind, TargetSide side,
-        FieldCardFilter filter, int? excludeInstanceId)
-    {
-        PlayerId[] players = side switch
-        {
-            TargetSide.Own => [controller],
-            TargetSide.Opponent => [Other(controller)],
-            _ => [controller, Other(controller)]
-        };
-        foreach (var id in players)
-        {
-            var player = state.GetPlayer(id);
-            if (kind is not (FieldCardKind.SpellTrap or FieldCardKind.PendulumScale or FieldCardKind.Spell))
-                for (int zone = 0; zone < 5; zone++)
-                    if (player.MonsterZones[zone] is { } monster && monster.Card.InstanceId != excludeInstanceId && filter switch
-                        {
-                            FieldCardFilter.Any => true,
-                            FieldCardFilter.FaceUp => monster.Position != BattlePosition.FaceDownDefense,
-                            FieldCardFilter.AttackPosition or FieldCardFilter.FaceUpAttack => monster.Position == BattlePosition.FaceUpAttack,
-                            FieldCardFilter.DefensePosition => monster.Position != BattlePosition.FaceUpAttack,
-                            FieldCardFilter.FaceDown => monster.Position == BattlePosition.FaceDownDefense,
-                            _ => false
-                        })
-                        yield return new(id, FieldLocation.MonsterZone, zone, monster.Card, monster.PlacementId);
-            if (kind == FieldCardKind.Monster || filter is not (FieldCardFilter.Any or FieldCardFilter.FaceUp or FieldCardFilter.FaceDown)) continue;
-            // Set Spells and Traps are face-down; Pendulum Scales are always face-up.
-            bool Shown(bool faceUp) => filter == FieldCardFilter.Any || faceUp == (filter == FieldCardFilter.FaceUp);
-            // A Pendulum Scale target is only a card in a Pendulum Zone.
-            if (kind != FieldCardKind.PendulumScale)
-                for (int zone = 0; zone < 5; zone++)
-                if (player.SpellTrapFields[zone] is { } field && field.Card.InstanceId != excludeInstanceId && Shown(field.IsFaceUp) &&
-                    (kind != FieldCardKind.Spell || field.EquippedTo is not null ||
-                     rules.TryGetValue(field.Card.GameCardId, out var fieldRules) && fieldRules.Category is CardCategory.Spell or CardCategory.Monster))
-                    yield return new(id, FieldLocation.SpellTrapZone, zone, field.Card, field.PlacementId);
-            for (int zone = 0; zone < 2; zone++)
-                if (player.PendulumZones[zone] is { } scale && scale.Card.InstanceId != excludeInstanceId && filter != FieldCardFilter.FaceDown)
-                    yield return new(id, FieldLocation.PendulumZone, zone, scale.Card, scale.PlacementId);
-            if (kind != FieldCardKind.PendulumScale && player.FieldSpell is { } fieldSpell && fieldSpell.Card.InstanceId != excludeInstanceId && Shown(fieldSpell.IsFaceUp))
-                yield return new(id, FieldLocation.SpellTrapZone, DuelPlayerState.FieldZoneIndex, fieldSpell.Card, fieldSpell.PlacementId);
-        }
-    }
+        FieldCardFilter filter, int? excludeInstanceId) =>
+        FieldCardQueries.OnField(state, controller, kind, side, filter, excludeInstanceId, rules);
 
     /// <summary>The link's bound field targets that are still in place and still match their specification.</summary>
     private IEnumerable<FieldCardTarget> QualifyingTargets(DuelState state, ChainLink link, EffectDefinition definition)
@@ -1139,21 +1101,11 @@ public sealed partial class DuelEngine
     /// <summary>Graveyard or banished cards matching a zone target, the activating player's side first.</summary>
     private IEnumerable<FieldCardTarget> ZoneMatches(DuelState state, PlayerId controller, ZoneTarget spec)
     {
-        PlayerId[] players = spec.Side switch
-        {
-            TargetSide.Own => [controller],
-            TargetSide.Opponent => [Other(controller)],
-            _ => [controller, Other(controller)]
-        };
-        foreach (var id in players)
-        {
-            var player = state.GetPlayer(id);
-            foreach (var card in spec.Zone == CardZone.Graveyard ? player.Graveyard : player.Banished)
-                if (MatchesFilter(card, spec.Filter, spec.Zone == CardZone.Graveyard) && (!spec.MustBeSummonable || Enumerable.Range(0, 5).Any(z =>
-                        CheckSpecialSummon(state, controller, card, z, BattlePosition.FaceUpAttack, DecisionCardSource.Graveyard,
-                            sourcePlayer: id) == DuelError.None)))
-                    yield return new(id, spec.Zone == CardZone.Graveyard ? FieldLocation.Graveyard : FieldLocation.Banished, -1, card, 0);
-        }
+        foreach (var target in FieldCardQueries.InZone(state, controller, spec.Zone, spec.Side))
+            if (MatchesFilter(target.Card, spec.Filter, spec.Zone == CardZone.Graveyard) && (!spec.MustBeSummonable || Enumerable.Range(0, 5).Any(z =>
+                    CheckSpecialSummon(state, controller, target.Card, z, BattlePosition.FaceUpAttack, DecisionCardSource.Graveyard,
+                        sourcePlayer: target.Player) == DuelError.None)))
+                yield return target;
     }
 
     private bool MatchesFilter(CardInstance card, CardFilter filter, bool inGraveyard = false) => rules.TryGetValue(card.GameCardId, out var rule) && filter switch
@@ -1189,14 +1141,8 @@ public sealed partial class DuelEngine
     /// <summary>Whether the face-up monsters matching the condition's filter on its side number within its range.</summary>
     private bool ControlsMonsters(DuelState state, PlayerId player, ControlsMonstersCondition condition)
     {
-        IEnumerable<DuelPlayerState> sides = condition.Side switch
-        {
-            TargetSide.Own => [state.GetPlayer(player)],
-            TargetSide.Opponent => [state.GetPlayer(Other(player))],
-            _ => state.Players
-        };
-        int count = sides.Sum(p => p.MonsterZones.Count(m => m is not null && (!condition.FaceUpOnly || m.Position != BattlePosition.FaceDownDefense) &&
-            MatchesFilter(m.Card, condition.Filter)));
+        int count = CardCountQueries.ControlledMonsters(state, player, condition.Side, condition.FaceUpOnly,
+            card => MatchesFilter(card, condition.Filter));
         return count >= condition.Min && count <= condition.Max;
     }
 
@@ -1668,31 +1614,9 @@ public sealed partial class DuelEngine
     }
 
     /// <summary>The current value of a public count, from the activating player's point of view.</summary>
-    private int CountFor(DuelState state, PlayerId controller, EffectCount count, CardFilter? filter = null)
-    {
-        var own = state.GetPlayer(controller);
-        var opponent = state.GetPlayer(Other(controller));
-        int Counted(IEnumerable<CardInstance> cards, bool inGraveyard = false) => filter is null ? cards.Count() : cards.Count(c => MatchesFilter(c, filter, inGraveyard));
-        IEnumerable<CardInstance> Monsters(DuelPlayerState p, bool faceUpOnly = false) =>
-            p.MonsterZones.Where(m => m is not null && (!faceUpOnly || m.Position != BattlePosition.FaceDownDefense)).Select(m => m!.Card);
-        return count switch
-        {
-            EffectCount.None => 1,
-            EffectCount.OpponentMonsters => Counted(Monsters(opponent)),
-            EffectCount.AllMonsters => Counted(Monsters(own).Concat(Monsters(opponent))),
-            EffectCount.OwnMonsters => Counted(Monsters(own)),
-            EffectCount.OwnFaceUpMonsters => Counted(Monsters(own, faceUpOnly: true)),
-            EffectCount.OpponentHand => Counted(opponent.Hand),
-            EffectCount.OpponentHandAndField => opponent.Hand.Count + Monsters(opponent).Count() +
-                opponent.SpellTrapFields.Count(f => f is not null) + opponent.PendulumZones.Count(f => f is not null) + (opponent.FieldSpell is null ? 0 : 1),
-            EffectCount.OpponentGraveyard => Counted(opponent.Graveyard, inGraveyard: true),
-            EffectCount.OpponentBanished => Counted(opponent.Banished),
-            EffectCount.DieRoll => state.Bookkeeping.LastRandom?.Die ?? 0,
-            EffectCount.Heads => state.Bookkeeping.LastRandom?.Heads ?? 0,
-            EffectCount.MilledLevel => state.Bookkeeping.LastRandom?.MilledLevel ?? 0,
-            _ => throw new ArgumentOutOfRangeException(nameof(count))
-        };
-    }
+    private int CountFor(DuelState state, PlayerId controller, EffectCount count, CardFilter? filter = null) =>
+        CardCountQueries.Effect(state, controller, count,
+            filter is null ? null : (card, inGraveyard) => MatchesFilter(card, filter, inGraveyard));
 
     /// <summary>Amount times the count, saturated to the integer range; zero when nothing is counted.</summary>
     private int Scaled(DuelState state, PlayerId controller, int amount, EffectCount count, CardFilter? filter = null) =>
