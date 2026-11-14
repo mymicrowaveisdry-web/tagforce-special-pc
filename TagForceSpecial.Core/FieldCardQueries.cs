@@ -60,4 +60,11 @@ internal static class FieldCardQueries
                 yield return new(id, zone == CardZone.Graveyard ? FieldLocation.Graveyard : FieldLocation.Banished, -1, card, 0);
         }
     }
+    internal static IEnumerable<(MonsterBinding Binding, FieldMonster Monster)> Monsters(DuelState state)
+    {
+        foreach (var player in state.Players)
+            for (int zone = 0; zone < player.MonsterZones.Count; zone++)
+                if (player.MonsterZones[zone] is { } monster)
+                    yield return (new(player.Id, zone, monster.Card, monster.PlacementId), monster);
+    }
 }

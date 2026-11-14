@@ -15,7 +15,7 @@ internal sealed class CountQueryScenario
     private readonly ITestOutputHelper? output;
 
     internal CountQueryScenario(EffectDefinition probe, PlayerId controller = PlayerId.One,
-        EffectStep[]? preparation = null, ITestOutputHelper? output = null, bool random = false, bool mixedSpells = false)
+        EffectStep[]? preparation = null, ITestOutputHelper? output = null, bool random = false, bool mixedSpells = false, bool basicBattle = false)
     {
         this.output = output;
         CardCatalog catalog = new(new(null, "synthetic-count-queries"),
@@ -28,8 +28,8 @@ internal sealed class CountQueryScenario
         catalogForTrace = catalog;
         Dictionary<uint, DuelCardRules> rules = new()
         {
-            [FirstMonster] = new(CardCategory.Monster, AllowsNormalSummon: true),
-            [SecondMonster] = new(CardCategory.Monster, AllowsNormalSummon: true, IsGemini: true),
+            [FirstMonster] = new(CardCategory.Monster, AllowsNormalSummon: true, AllowsBasicBattle: basicBattle),
+            [SecondMonster] = new(CardCategory.Monster, AllowsNormalSummon: true, AllowsBasicBattle: basicBattle, IsGemini: true),
             [Probe] = new(CardCategory.Spell, AllowsSpellTrapSet: true),
             [Preparation] = new(CardCategory.Spell, AllowsSpellTrapSet: true)
         };

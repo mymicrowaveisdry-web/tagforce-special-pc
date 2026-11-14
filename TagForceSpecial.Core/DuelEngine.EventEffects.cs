@@ -11,13 +11,8 @@ public sealed partial class DuelEngine
         _ => false
     };
 
-    private static IEnumerable<(MonsterBinding Binding, FieldMonster Monster)> FieldMonsters(DuelState state)
-    {
-        foreach (var player in state.Players)
-            for (int zone = 0; zone < player.MonsterZones.Count; zone++)
-                if (player.MonsterZones[zone] is { } monster)
-                    yield return (new(player.Id, zone, monster.Card, monster.PlacementId), monster);
-    }
+    private static IEnumerable<(MonsterBinding Binding, FieldMonster Monster)> FieldMonsters(DuelState state) =>
+        FieldCardQueries.Monsters(state);
 
     private bool CanActivateTrigger(DuelState state, TriggerActivation trigger)
     {

@@ -85,15 +85,6 @@ public sealed partial class DuelEngine
     }
 
     /// <summary>Several effects are allowed on monsters, as "choose 1" options of one kind, or as activated effects after a lasting card's own.</summary>
-    private static bool EffectGroupsValid(EffectDefinition[] effects) => effects.GroupBy(d => d.CardId).All(group =>
-    {
-        var kinds = group.Where(d => d.Origin == EffectOrigin.Field).Select(d => d.Kind).ToArray();
-        if (kinds.Length == 0) return group.All(d => d.IsMonsterEffect || d.Origin == EffectOrigin.PendulumZone);
-        if (kinds.Any(k => k is EffectKind.SpellTrapIgnition or EffectKind.SpellTrapQuick))
-            return kinds[0] is EffectKind.ContinuousSpell or EffectKind.ContinuousTrap or EffectKind.FieldSpell or EffectKind.EquipSpell && kinds.Skip(1).All(k => k is EffectKind.SpellTrapIgnition or EffectKind.SpellTrapQuick);
-        return kinds.Length == 1 || kinds.All(k => k is EffectKind.MonsterIgnition or EffectKind.MonsterQuick) ||
-            kinds.All(k => k == kinds[0] && k is EffectKind.NormalSpell or EffectKind.QuickPlaySpell or EffectKind.NormalTrap);
-    });
 
     private bool EffectAt(uint cardId, int index, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out EffectDefinition? definition)
     {
