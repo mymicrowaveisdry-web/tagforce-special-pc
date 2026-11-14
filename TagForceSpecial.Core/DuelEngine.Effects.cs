@@ -539,15 +539,14 @@ public sealed partial class DuelEngine
                 events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
                 break;
             }
-            if (step is ChooseFromOpponentHandStep fromHand)
+            if (CardSelectionSteps.Handles(step))
             {
-                var options = state.GetPlayer(Other(controller)).Hand.Where(c => fromHand.Filter is null || MatchesFilter(c, fromHand.Filter)).ToArray();
-                if (options.Length == 0) continue;
-                if (choice is not ChooseDefinitionCard taken)
-                    return (state, new PendingDefinitionCardChoice(checked(State.Revision + 1), controller, definition.EffectId, link.Number, i, options));
-                state = MoveFromOpponentHand(state, controller, options.FirstOrDefault(c => c.InstanceId == taken.CardInstanceId) ?? options[0], fromHand.To,
-                    definition.EffectId, events);
-                choice = null;
+                var selected = CardSelectionSteps.Resolve(state, controller, step,
+                    new(definition.EffectId, link.Number, i, State.Revision), choice, rules, MatchesFilter, events);
+                state = selected.State;
+                if (selected.Pause is not null) return (state, selected.Pause);
+                choice = selected.Choice;
+                if (step is AddFromDeckToHandStep or SendFromDeckToGraveyardStep && state.Outcome is not null) break;
                 continue;
             }
             if (step is StopUnlessOwnTurnStep)
@@ -581,33 +580,6 @@ public sealed partial class DuelEngine
                 events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
                 break;
             }
-            if (step is TakeExcavatedStep excavated)
-            {
-                var deck = state.GetPlayer(controller).Deck;
-                var options = (state.Bookkeeping.LastRandom?.Excavated ?? []).Where(c => deck.Contains(c) && (excavated.Filter is null || MatchesFilter(c, excavated.Filter))).ToArray();
-                if (options.Length == 0) continue;
-                if (choice is not ChooseDefinitionCard taken)
-                    return (state, new PendingDefinitionCardChoice(checked(State.Revision + 1), controller, definition.EffectId, link.Number, i, options));
-                state = TakeFromDeck(state, controller, options.FirstOrDefault(c => c.InstanceId == taken.CardInstanceId) ?? options[0], definition.EffectId, events);
-                choice = null;
-                continue;
-            }
-            if (step is OpponentSendsFromDeckStep send)
-            {
-                var options = state.GetPlayer(Other(controller)).Deck.Where(c => MatchesFilter(c, send.Filter)).ToArray();
-                if (options.Length == 0)
-                {
-                    // The activating player may look at the opponent's Deck to confirm (Vampire Lord, OCG ruling).
-                    events.Add(new CardsLookedAt(controller, Other(controller), state.GetPlayer(Other(controller)).Deck, definition.EffectId));
-                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
-                    continue;
-                }
-                if (choice is not ChooseDefinitionCard sent)
-                    return (state, new PendingDefinitionCardChoice(checked(State.Revision + 1), Other(controller), definition.EffectId, link.Number, i, options));
-                state = OpponentSendsFromDeck(state, controller, options.FirstOrDefault(c => c.InstanceId == sent.CardInstanceId) ?? options[0], definition.EffectId, events);
-                choice = null;
-                continue;
-            }
             if (step is TakeChosenControlStep takeChosen)
             {
                 (state, var pick) = TakeChosenControl(state, link, definition, i, takeChosen, choice, events);
@@ -637,74 +609,7 @@ public sealed partial class DuelEngine
                 events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
                 break;
             }
-            if (step is AddFromFaceUpExtraDeckStep extra)
-            {
-                var options = state.GetPlayer(controller).FaceUpExtraDeck.Where(c => MatchesFilter(c, extra.Filter)).ToArray();
-                if (options.Length == 0)
-                {
-                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
-                    continue;
-                }
-                if (choice is not ChooseDefinitionCard taken)
-                    return (state, new PendingDefinitionCardChoice(checked(State.Revision + 1), controller, definition.EffectId, link.Number, i, options));
-                var card = options.FirstOrDefault(c => c.InstanceId == taken.CardInstanceId) ?? options[0];
-                var holder = state.GetPlayer(controller);
-                state = state.With(player: holder.With(faceUpExtraDeck: holder.FaceUpExtraDeck.Where(c => c != card), hand: holder.Hand.Append(card)));
-                events.Add(new CardAddedFromExtraDeck(controller, card, definition.EffectId));
-                choice = null;
-                continue;
-            }
-            if (step is AddFromGraveyardToHandStep fromGraveyard)
-            {
-                var options = state.GetPlayer(controller).Graveyard.Where(c => MatchesFilter(c, fromGraveyard.Filter, inGraveyard: true)).ToArray();
-                if (options.Length == 0)
-                {
-                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
-                    continue;
-                }
-                if (choice is not ChooseDefinitionCard recovered)
-                    return (state, new PendingDefinitionCardChoice(checked(State.Revision + 1), controller, definition.EffectId, link.Number, i, options));
-                state = AddFromGraveyard(state, controller, options.FirstOrDefault(c => c.InstanceId == recovered.CardInstanceId) ?? options[0], definition.EffectId, events);
-                choice = null;
-                continue;
-            }
-            if (step is AddFromDeckOrGraveyardStep either)
-            {
-                var owned = state.GetPlayer(controller);
-                var options = DeckMatches(state, controller, either.Filter).Concat(owned.Graveyard.Where(c => MatchesFilter(c, either.Filter, inGraveyard: true))).ToArray();
-                if (options.Length == 0)
-                {
-                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
-                    continue;
-                }
-                if (choice is not ChooseDefinitionCard taken)
-                    return (state, new PendingDefinitionCardChoice(checked(State.Revision + 1), controller, definition.EffectId, link.Number, i, options));
-                var card = options.FirstOrDefault(c => c.InstanceId == taken.CardInstanceId) ?? options[0];
-                state = owned.Graveyard.Contains(card)
-                    ? MoveZoneCardToHand(state, new(controller, FieldLocation.Graveyard, -1, card, 0), definition.EffectId, events)
-                    : MoveChosenDeckCard(state, controller, card.InstanceId, toHand: true, definition.EffectId, events);
-                choice = null;
-                continue;
-            }
-            if (step is AddFromDeckToHandStep or SendFromDeckToGraveyardStep)
-            {
-                if (choice is not ChooseDefinitionCard picked)
-                {
-                    var filter = step is AddFromDeckToHandStep search ? search.Filter : ((SendFromDeckToGraveyardStep)step).Filter;
-                    var matches = DeckMatches(state, controller, filter).ToArray();
-                    if (matches.Length == 0)
-                    {
-                        events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
-                        continue;
-                    }
-                    return (state, new PendingDefinitionCardChoice(checked(State.Revision + 1), controller, definition.EffectId,
-                        link.Number, i, matches));
-                }
-                state = MoveChosenDeckCard(state, controller, picked.CardInstanceId, toHand: step is AddFromDeckToHandStep,
-                    definition.EffectId, events);
-                choice = null;
-            }
-            else if (step is AttachSourceStep attachSource)
+            if (step is AttachSourceStep attachSource)
             {
                 // The bound monster only has to still be there; it may have been turned face-down.
                 if (BoundTarget(link, attachSource.Target) is { } host && host.IsStillPresent(state)) state = AttachSourceAsMaterial(state, link, host, events);
@@ -1115,54 +1020,22 @@ public sealed partial class DuelEngine
         return rated.Where(x => x.Value == best).Select(x => x.Target).ToArray();
     }
 
-    private static DuelState RemoveFromZone(DuelState state, FieldCardTarget target)
-    {
-        var player = state.GetPlayer(target.Player);
-        return target.Location == FieldLocation.Graveyard
-            ? state.With(player: player.With(graveyard: player.Graveyard.Where(c => c != target.Card)))
-            : state.With(player: player.With(banished: player.Banished.Where(c => c != target.Card)));
-    }
+    private static DuelState RemoveFromZone(DuelState state, FieldCardTarget target) =>
+        CardZoneTransitions.RemoveFromZone(state, target);
 
     /// <summary>Adds a Graveyard or banished card to its owner's hand; Extra Deck monsters go to the Extra Deck.</summary>
-    private DuelState MoveZoneCardToHand(DuelState state, FieldCardTarget target, string effectId, List<DuelEvent> events)
-    {
-        state = RemoveFromZone(state, target);
-        var owner = state.GetPlayer(target.Card.Owner);
-        bool extra = rules.TryGetValue(target.Card.GameCardId, out var rule) && rule.AllowsExtraDeck;
-        state = state.With(player: extra ? owner.With(extraDeck: owner.ExtraDeck.Append(target.Card)) : owner.With(hand: owner.Hand.Append(target.Card)));
-        events.Add(new CardMovedToHand(owner.Id, target.Card, target.Location == FieldLocation.Graveyard ? CardZone.Graveyard : CardZone.Banished, effectId));
-        return state;
-    }
+    private DuelState MoveZoneCardToHand(DuelState state, FieldCardTarget target, string effectId, List<DuelEvent> events) =>
+        CardZoneTransitions.MoveZoneCardToHand(state, target, effectId, events, rules);
 
     /// <summary>Banishes a Graveyard card, or returns a banished card to the Graveyard.</summary>
-    private DuelState MoveZoneCard(DuelState state, FieldCardTarget target, bool toBanished, string effectId, List<DuelEvent> events)
-    {
-        if (toBanished && MoveLocked(state, LockedAction.BeBanished, target)) return state;
-        state = RemoveFromZone(state, target);
-        var owner = state.GetPlayer(target.Card.Owner);
-        state = state.With(player: toBanished ? owner.With(banished: owner.Banished.Append(target.Card))
-            : owner.With(graveyard: owner.Graveyard.Append(target.Card)));
-        events.Add(toBanished ? new CardBanishedFromGraveyard(owner.Id, target.Card, effectId) : new CardReturnedToGraveyard(owner.Id, target.Card, effectId));
-        return state;
-    }
+    private DuelState MoveZoneCard(DuelState state, FieldCardTarget target, bool toBanished, string effectId, List<DuelEvent> events) =>
+        CardZoneTransitions.MoveZoneCard(state, target, toBanished, effectId, events,
+            (current, card) => MoveLocked(current, LockedAction.BeBanished, card));
 
     /// <summary>Shuffles targets into their owners' Decks (Extra Deck monsters to the Extra Deck), then each touched Deck.</summary>
-    private DuelState ShuffleIntoDecks(DuelState state, FieldCardTarget[] targets, string effectId, List<DuelEvent> events)
-    {
-        HashSet<PlayerId> shuffled = [];
-        foreach (var target in targets)
-        {
-            if (MoveLocked(state, LockedAction.BeReturnedToDeck, target)) continue;
-            state = RemoveFromZone(state, target);
-            var owner = state.GetPlayer(target.Card.Owner);
-            bool extra = rules.TryGetValue(target.Card.GameCardId, out var rule) && rule.AllowsExtraDeck;
-            state = state.With(player: extra ? owner.With(extraDeck: owner.ExtraDeck.Append(target.Card)) : owner.With(deck: owner.Deck.Append(target.Card)));
-            if (!extra) shuffled.Add(owner.Id);
-            events.Add(new CardShuffledIntoDeck(owner.Id, target.Card, effectId));
-        }
-        foreach (var owner in shuffled.Order()) state = ShuffleDeck(state, owner, effectId, events);
-        return state;
-    }
+    private DuelState ShuffleIntoDecks(DuelState state, FieldCardTarget[] targets, string effectId, List<DuelEvent> events) =>
+        CardZoneTransitions.ShuffleIntoDecks(state, targets, effectId, events, rules,
+            (current, card) => MoveLocked(current, LockedAction.BeReturnedToDeck, card));
 
     private static DuelState RemovePlacement(DuelState state, FieldCardTarget target)
     {
@@ -1345,70 +1218,24 @@ public sealed partial class DuelEngine
         return state.With(player: player.With(monsters: zones));
     }
 
-    private static IEnumerable<PlayerId> DrawingPlayers(PlayerId controller, EffectPlayers players) => players switch
-    {
-        EffectPlayers.Self => [controller],
-        EffectPlayers.Opponent => [Other(controller)],
-        _ => [controller, Other(controller)]
-    };
+    private static IEnumerable<PlayerId> DrawingPlayers(PlayerId controller, EffectPlayers players) =>
+        CardZoneTransitions.DrawingPlayers(controller, players);
 
     /// <summary>Deck cards matching a reviewed filter, in Deck order; cards without explicit rules never match.</summary>
     private IEnumerable<CardInstance> DeckMatches(DuelState state, PlayerId playerId, CardFilter filter) =>
         state.GetPlayer(playerId).Deck.Where(c => MatchesFilter(c, filter));
 
     /// <summary>Draws one card at a time; a player who must draw from an empty Deck loses at once.</summary>
-    private DuelState DrawCards(DuelState state, PlayerId playerId, int count, List<DuelEvent> events)
-    {
-        for (int i = 0; i < count; i++)
-        {
-            if (RuleLocked(state, LockedAction.Draw, playerId, null)) break;
-            var player = state.GetPlayer(playerId);
-            if (player.Deck.Count == 0)
-            {
-                var outcome = new DuelOutcome(Other(playerId), playerId, DuelEndReason.UnableToDraw);
-                events.Add(new DuelEnded(outcome));
-                return state.With(outcome: outcome);
-            }
-            var card = player.Deck[0];
-            state = state.With(player: player.With(deck: player.Deck.Skip(1), hand: player.Hand.Append(card)));
-            events.Add(new CardDrawn(playerId, card));
-        }
-        return state;
-    }
+    private DuelState DrawCards(DuelState state, PlayerId playerId, int count, List<DuelEvent> events) =>
+        CardZoneTransitions.DrawCards(state, playerId, count, events,
+            (current, player) => RuleLocked(current, LockedAction.Draw, player, null));
 
-    private static DuelState MillTop(DuelState state, PlayerId playerId, int count, string effectId, List<DuelEvent> events)
-    {
-        var player = state.GetPlayer(playerId);
-        var sent = player.Deck.Take(count).ToArray();
-        state = state.With(player: player.With(deck: player.Deck.Skip(sent.Length)));
-        foreach (var card in sent)
-        {
-            var owner = state.GetPlayer(card.Owner);
-            state = state.With(player: owner.With(graveyard: owner.Graveyard.Append(card)));
-            events.Add(new CardSentFromDeckToGraveyard(playerId, card, effectId));
-        }
-        return state;
-    }
+    private static DuelState MillTop(DuelState state, PlayerId playerId, int count, string effectId, List<DuelEvent> events) =>
+        CardZoneTransitions.MillTop(state, playerId, count, effectId, events);
 
     /// <summary>Moves the chosen Deck card (validated by the caller) to the hand (revealed) or Graveyard, then shuffles.</summary>
-    private static DuelState MoveChosenDeckCard(DuelState state, PlayerId playerId, int instanceId, bool toHand, string effectId,
-        List<DuelEvent> events)
-    {
-        var player = state.GetPlayer(playerId);
-        var card = player.Deck.Single(c => c.InstanceId == instanceId);
-        player = player.With(deck: player.Deck.Where(c => c != card));
-        if (toHand)
-        {
-            state = state.With(player: player.With(hand: player.Hand.Append(card)));
-            events.Add(new CardSearched(playerId, card, effectId));
-        }
-        else
-        {
-            state = state.With(player: player.With(graveyard: player.Graveyard.Append(card)));
-            events.Add(new CardSentFromDeckToGraveyard(playerId, card, effectId));
-        }
-        return ShuffleDeck(state, playerId, effectId, events);
-    }
+    private static DuelState MoveChosenDeckCard(DuelState state, PlayerId playerId, int instanceId, bool toHand, string effectId, List<DuelEvent> events) =>
+        CardZoneTransitions.MoveChosenDeckCard(state, playerId, instanceId, toHand, effectId, events);
 
     private DuelActionResult FinishDefinitionCards(PendingChain chain, FinishDefinitionCardChoice command)
     {
@@ -1529,14 +1356,8 @@ public sealed partial class DuelEngine
     }
 
     /// <summary>Seeded Fisher–Yates over the whole Deck; the advanced generator state is part of the snapshot.</summary>
-    private static DuelState ShuffleDeck(DuelState state, PlayerId playerId, string effectId, List<DuelEvent> events)
-    {
-        var random = state.Random ?? throw new InvalidOperationException("Shuffle steps require a seeded engine.");
-        var player = state.GetPlayer(playerId);
-        var (deck, next) = random.Shuffle(player.Deck);
-        events.Add(new DeckShuffled(playerId, effectId));
-        return state.With(player: player.With(deck: deck)).WithBookkeeping(state.Bookkeeping with { Random = next });
-    }
+    private static DuelState ShuffleDeck(DuelState state, PlayerId playerId, string effectId, List<DuelEvent> events) =>
+        CardZoneTransitions.ShuffleDeck(state, playerId, effectId, events);
 
     /// <summary>
     /// Summons all Tokens to the lowest free zones, or none. Skipped while another card's summon lock applies.
@@ -1580,63 +1401,13 @@ public sealed partial class DuelEngine
     }
 
     /// <summary>Both players take damage at once (opponent's first), after damage rules; both at 0 LP is a draw.</summary>
-    private DuelState DamageBothPlayers(DuelState state, PlayerId controller, DamageBothPlayersStep step, string effectId,
-        List<DuelEvent> events)
-    {
-        var life = new Dictionary<PlayerId, int> { [PlayerId.One] = state.GetPlayer(PlayerId.One).LifePoints, [PlayerId.Two] = state.GetPlayer(PlayerId.Two).LifePoints };
-        foreach (var (target, amount) in new[] { (Other(controller), step.ToOpponent), (controller, step.ToSelf) })
-        {
-            var recipient = DamageRecipient(state, target, DamageKinds.Effect);
-            int before = life[recipient];
-            if (HasDamageRule(state, recipient, DamageRuleKind.BecomesGain, DamageKinds.Effect))
-            {
-                life[recipient] = (int)Math.Min(int.MaxValue, (long)before + amount);
-                events.Add(new LifePointsGained(recipient, life[recipient] - before, before, life[recipient], effectId));
-            }
-            else
-            {
-                life[recipient] = Math.Max(0, before - amount);
-                events.Add(new EffectDamageDealt(recipient, before - life[recipient], before, life[recipient], effectId));
-            }
-        }
-        var next = state.With(player: state.GetPlayer(PlayerId.One).With(lifePoints: life[PlayerId.One]))
-            .With(player: state.GetPlayer(PlayerId.Two).With(lifePoints: life[PlayerId.Two]));
-        DuelOutcome? outcome = (life[Other(controller)] == 0, life[controller] == 0) switch
-        {
-            (true, true) => new(null, null, DuelEndReason.BothLifePointsDepleted),
-            (true, false) => new(controller, Other(controller), DuelEndReason.LifePointsDepleted),
-            (false, true) => new(Other(controller), controller, DuelEndReason.LifePointsDepleted),
-            _ => null
-        };
-        if (outcome is null) return next;
-        events.Add(new DuelEnded(outcome));
-        return next.With(outcome: outcome);
-    }
+    private DuelState DamageBothPlayers(DuelState state, PlayerId controller, DamageBothPlayersStep step, string effectId, List<DuelEvent> events) =>
+        LifePointTransitions.DamageBothPlayers(state, controller, step, effectId, events, DamageRecipient, HasDamageRule);
 
-    private DuelState GainLifePoints(DuelState state, PlayerId recipient, int amount, string effectId, List<DuelEvent> events, bool converted = false)
-    {
-        // An effect's LP gain can become damage; a gain that replaced damage does not turn back.
-        if (!converted && HasDamageRule(state, recipient, DamageRuleKind.GainBecomesDamage, DamageKinds.Effect))
-            return DealEffectDamage(state, recipient, amount, effectId, events, converted: true);
-        var player = state.GetPlayer(recipient);
-        // Same bounded integer policy as existing trigger LP recovery.
-        int after = (int)Math.Min(int.MaxValue, (long)player.LifePoints + amount);
-        events.Add(new LifePointsGained(recipient, after - player.LifePoints, player.LifePoints, after, effectId));
-        return state.With(player: player.With(lifePoints: after));
-    }
+    private DuelState GainLifePoints(DuelState state, PlayerId recipient, int amount, string effectId, List<DuelEvent> events, bool converted = false) =>
+        LifePointTransitions.GainLifePoints(state, recipient, amount, effectId, events, DamageRecipient, HasDamageRule, converted);
 
-    private DuelState DealEffectDamage(DuelState state, PlayerId recipient, int amount, string effectId, List<DuelEvent> events, bool converted = false)
-    {
-        recipient = DamageRecipient(state, recipient, DamageKinds.Effect);
-        if (!converted && HasDamageRule(state, recipient, DamageRuleKind.BecomesGain, DamageKinds.Effect))
-            return GainLifePoints(state, recipient, amount, effectId, events, converted: true);
-        var player = state.GetPlayer(recipient);
-        int remaining = Math.Max(0, player.LifePoints - amount);
-        events.Add(new EffectDamageDealt(recipient, player.LifePoints - remaining, player.LifePoints, remaining, effectId));
-        var next = state.With(player: player.With(lifePoints: remaining));
-        if (remaining != 0) return next;
-        var outcome = new DuelOutcome(Other(recipient), recipient, DuelEndReason.LifePointsDepleted);
-        events.Add(new DuelEnded(outcome));
-        return next.With(outcome: outcome);
-    }
+    private DuelState DealEffectDamage(DuelState state, PlayerId recipient, int amount, string effectId, List<DuelEvent> events, bool converted = false) =>
+        LifePointTransitions.DealEffectDamage(state, recipient, amount, effectId, events, DamageRecipient, HasDamageRule, converted);
+
 }

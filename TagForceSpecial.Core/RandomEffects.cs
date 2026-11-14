@@ -161,20 +161,6 @@ public sealed partial class DuelEngine
         return state;
     }
 
-    private DuelState MoveFromOpponentHand(DuelState state, PlayerId controller, CardInstance card, HandMove move, string effectId, List<DuelEvent> events)
-    {
-        var opponent = state.GetPlayer(Other(controller));
-        if (!opponent.Hand.Contains(card)) return state;
-        if (move == HandMove.Discard)
-        {
-            events.Add(new CardDiscarded(opponent.Id, card) { EffectController = controller, EffectId = effectId });
-            return state.With(player: opponent.With(hand: opponent.Hand.Where(c => c != card), graveyard: opponent.Graveyard.Append(card)));
-        }
-        events.Add(new CardShuffledIntoDeck(opponent.Id, card, effectId));
-        state = state.With(player: opponent.With(hand: opponent.Hand.Where(c => c != card), deck: opponent.Deck.Append(card)));
-        return ShuffleDeck(state, opponent.Id, effectId, events);
-    }
-
     /// <summary>Gains go first; damage to both players lands together, so both reaching 0 is a draw.</summary>
     private DuelState EachPlayerTosses(DuelState state, PlayerId controller, EachPlayerTossesCoinStep step, string effectId, List<DuelEvent> events)
     {
@@ -242,13 +228,6 @@ public sealed partial class DuelEngine
         if (!player.Hand.Contains(card)) return state;
         events.Add(new CardDestroyedInHand(playerId, card, effectId));
         return state.With(player: player.With(hand: player.Hand.Where(c => c != card), graveyard: player.Graveyard.Append(card)));
-    }
-
-    private static DuelState TakeFromDeck(DuelState state, PlayerId playerId, CardInstance card, string effectId, List<DuelEvent> events)
-    {
-        var player = state.GetPlayer(playerId);
-        events.Add(new CardSearched(playerId, card, effectId));
-        return state.With(player: player.With(deck: player.Deck.Where(c => c != card), hand: player.Hand.Append(card)));
     }
 
     private DuelState ReturnAttacker(DuelState state, ChainLink link, string effectId, List<DuelEvent> events)

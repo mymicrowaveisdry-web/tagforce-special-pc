@@ -15,7 +15,7 @@ internal sealed class CountQueryScenario
     private readonly ITestOutputHelper? output;
 
     internal CountQueryScenario(EffectDefinition probe, PlayerId controller = PlayerId.One,
-        EffectStep[]? preparation = null, ITestOutputHelper? output = null, bool random = false)
+        EffectStep[]? preparation = null, ITestOutputHelper? output = null, bool random = false, bool mixedSpells = false)
     {
         this.output = output;
         CardCatalog catalog = new(new(null, "synthetic-count-queries"),
@@ -33,7 +33,7 @@ internal sealed class CountQueryScenario
             [Probe] = new(CardCategory.Spell, AllowsSpellTrapSet: true),
             [Preparation] = new(CardCategory.Spell, AllowsSpellTrapSet: true)
         };
-        uint[] Deck(uint monster) => random ? Enumerable.Repeat(Probe, 40).ToArray()
+        uint[] Deck(uint monster) => random ? mixedSpells ? [.. Enumerable.Range(0, 40).Select(i => i % 2 == 0 ? Probe : Preparation)] : Enumerable.Repeat(Probe, 40).ToArray()
             : [Probe, Preparation, .. Enumerable.Repeat(monster, 38)];
         Engine = new(catalog, rules, Deck(FirstMonster), Deck(SecondMonster), controller,
             effectDefinitions: [probe, new("prepare", Preparation, EffectKind.NormalSpell,
@@ -120,6 +120,7 @@ internal sealed class CountQueryScenario
                     ? new ChooseDecisionCard(cost.Player, cost.DecisionId, cost.CardOptions[0].InstanceId)
                 : Engine.State.PendingChain is not { } chain ? null
                 : chain.Declaration is { } declared ? new DeclareValue(declared.Player, declared.DecisionId, declaration)
+                : chain.DefinitionCardChoice is { } pick ? new ChooseDefinitionCard(pick.Player, pick.DecisionId, pick.Options[0].InstanceId)
                 : chain.NextLink == 0 ? new PassChainResponse(chain.Responder, chain.DecisionId)
                 : new ResolveNextChainLink(Engine.State.ActivePlayer, chain.DecisionId);
             if (command is null) return;
