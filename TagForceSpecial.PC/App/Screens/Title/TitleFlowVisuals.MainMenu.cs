@@ -153,7 +153,7 @@ public sealed partial class TitleFlowVisuals
         effect.Projection = projection;
     }
 
-    /// <summary>Authored text when no PSP font was imported; never presented as original typography.</summary>
+    /// <summary>Fallback text used only when no game font was imported.</summary>
     public void SetMainMenuFallback(int focus)
     {
         FallbackLines.Clear();

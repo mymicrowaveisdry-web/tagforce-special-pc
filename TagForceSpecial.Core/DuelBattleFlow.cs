@@ -36,15 +36,16 @@ public sealed record PendingBattleAttack
     }
 }
 public sealed record BattleState(BattleStep Step, DamageStep? DamageStep, BattleResponseWindow Window,
-    PendingBattleAttack? Attack = null);
+    PendingBattleAttack? Attack = null, PendingReplacement? Replacement = null);
 
 public sealed record AdvanceBattle(PlayerId Player, long DecisionId) : DuelCommand(Player);
 public sealed record PassBattleResponse(PlayerId Player, long DecisionId) : DuelCommand(Player);
 public sealed record ChooseAttackReplay(PlayerId Player, long DecisionId, int? TargetZone = null,
     bool Cancel = false) : DuelCommand(Player);
-/// <summary>Explicit choices for an opted-in set response; hand summoning requires a card and empty zone.</summary>
-public sealed record ActivateBattleResponse(PlayerId Player, long DecisionId, int SpellTrapZone,
-    int? SummonedCardInstanceId = null, int? MonsterZone = null) : DuelCommand(Player);
+/// <summary>A set card activated in an open battle window.</summary>
+public sealed record ActivateBattleResponse(PlayerId Player, long DecisionId, int SpellTrapZone, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] int EffectIndex = 0) : DuelCommand(Player);
+/// <summary>The turn player's Quick-Play Spell activated from the hand in an open battle window.</summary>
+public sealed record ActivateHandBattleResponse(PlayerId Player, long DecisionId, int CardInstanceId, int SpellTrapZone, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] int EffectIndex = 0) : DuelCommand(Player);
 public sealed record BattleStepChanged(BattleStep? From, BattleStep To) : DuelEvent;
 public sealed record DamageStepChanged(DamageStep? From, DamageStep To) : DuelEvent;
 public sealed record BattleResponseRequested(BattleResponseWindow Window) : DuelEvent;
@@ -57,51 +58,3 @@ public sealed record BattleDamageCalculated(long AttackId, BattleDamageCalculati
 public sealed record BattleDamageCalculationSkipped(long AttackId) : DuelEvent;
 public sealed record BattleAttackFinished(long AttackId) : DuelEvent;
 public sealed record BattleFlipEffectWindowOpened(MonsterBinding Monster) : DuelEvent;
-
-public enum BattleResponseOperation { NegateAttack, DestroyAttacker, SpecialSummonFromHand, ModifyCombatantStatistics }
-public enum BattleCombatant { Attacker, Defender }
-
-/// <summary>Trusted, default-off response legality; explicit timing is never inferred from card text.</summary>
-public sealed class BattleResponseProfile
-{
-    public string EffectId { get; }
-    public uint CardId { get; }
-    public BattleResponseOperation Operation { get; }
-    public BattleTiming Windows { get; }
-    public ChainSpellSpeed SpellSpeed { get; }
-    public IReadOnlyList<uint> SummonableCardIds { get; }
-    public BattlePosition SummonPosition { get; }
-    public BattleCombatant Combatant { get; }
-    public int AttackDelta { get; }
-    public int DefenseDelta { get; }
-
-    public BattleResponseProfile(string effectId, uint cardId, BattleResponseOperation operation,
-        BattleTiming windows, ChainSpellSpeed spellSpeed = ChainSpellSpeed.Two,
-        IEnumerable<uint>? summonableCardIds = null, BattlePosition summonPosition = BattlePosition.FaceUpDefense,
-        BattleCombatant combatant = BattleCombatant.Attacker, int attackDelta = 0, int defenseDelta = 0,
-        bool damageCalculationException = false)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(effectId);
-        if (cardId == 0) throw new ArgumentOutOfRangeException(nameof(cardId));
-        if (!Enum.IsDefined(operation) || !Enum.IsDefined(combatant) || windows == BattleTiming.None || (windows & ~BattleTiming.All) != 0 ||
-            spellSpeed is not (ChainSpellSpeed.Two or ChainSpellSpeed.Three) ||
-            summonPosition is not (BattlePosition.FaceUpAttack or BattlePosition.FaceUpDefense))
-            throw new ArgumentException("Invalid battle response metadata.");
-        if (windows.HasFlag(BattleTiming.Calculation) && !damageCalculationException)
-            throw new ArgumentException("During-calculation activation requires an explicit exception.");
-        if (operation == BattleResponseOperation.NegateAttack && (windows & ~(BattleTiming.AttackDeclaration | BattleTiming.BattleStep)) != 0)
-            throw new ArgumentException("This attack-negation primitive only supports the Battle Step.");
-        if (operation == BattleResponseOperation.ModifyCombatantStatistics &&
-            ((attackDelta == 0 && defenseDelta == 0) || (windows & ~(BattleTiming.DamageStart | BattleTiming.BeforeCalculation | BattleTiming.Calculation)) != 0 ||
-                windows.HasFlag(BattleTiming.Calculation) && !damageCalculationException) ||
-            operation != BattleResponseOperation.ModifyCombatantStatistics && (attackDelta != 0 || defenseDelta != 0))
-            throw new ArgumentException("Stat modifiers require an explicit supported damage timing/exception.");
-        var ids = (summonableCardIds ?? []).ToArray();
-        if (operation == BattleResponseOperation.SpecialSummonFromHand
-            ? ids.Length == 0 || ids.Any(id => id == 0) || ids.Distinct().Count() != ids.Length : ids.Length != 0)
-            throw new ArgumentException("Only the hand-summon operation accepts a nonempty catalog allowlist.");
-        EffectId = effectId; CardId = cardId; Operation = operation; Windows = windows; SpellSpeed = spellSpeed;
-        SummonableCardIds = Array.AsReadOnly(ids); SummonPosition = summonPosition; Combatant = combatant;
-        AttackDelta = attackDelta; DefenseDelta = defenseDelta;
-    }
-}

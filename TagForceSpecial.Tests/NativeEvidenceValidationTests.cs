@@ -4,7 +4,7 @@ using TagForceSpecial.Tools;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Synthetic metadata fixtures only. These tests never reproduce PSP bytes or award actual progress.</summary>
+/// <summary>Evidence-validation tests on metadata fixtures.</summary>
 public sealed class NativeEvidenceValidationTests
 {
     [Theory]

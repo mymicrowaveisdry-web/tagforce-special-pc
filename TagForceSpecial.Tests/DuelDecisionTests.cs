@@ -4,7 +4,7 @@ using TagForceSpecial.Core;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Managed workflow contracts only; no PSP effect/activation equivalence is claimed.</summary>
+/// <summary>Decision workflow tests.</summary>
 public sealed class DuelDecisionTests
 {
     private static DecisionSequence Flow(bool stop = false, DecisionCardSource source = DecisionCardSource.Deck) =>

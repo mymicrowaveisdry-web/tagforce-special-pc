@@ -2,8 +2,10 @@ namespace TagForceSpecial.PC.App.Screens.Title;
 
 public enum MainMenuRoute { Unavailable, NativeSave, Options }
 
-/// <summary>One row of the original Main Menu. <paramref name="OriginalBehavior"/> is what the same-build original was observed
-/// to do (config/reference/main-menu.json); <paramref name="Status"/> is what the PC offers. A row never substitutes another PC feature.</summary>
+/// <summary>
+/// One Main Menu row: its original behavior (<paramref name="OriginalBehavior"/>) and what the PC offers (<paramref
+/// name="Status"/>).
+/// </summary>
 public sealed record MainMenuDestination(string Id, string Label, MainMenuRoute Route, string Status, string OriginalBehavior, string PlannedPhase, string Notice);
 
 public static class MainMenuDestinations

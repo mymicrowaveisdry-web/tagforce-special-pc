@@ -1,10 +1,15 @@
 using System.Text.Json;
+using TagForceSpecial.Cards;
 using TagForceSpecial.Core;
 using TagForceSpecial.Effects;
 using static TagForceSpecial.Tests.ChainScenario;
 
 namespace TagForceSpecial.Tests;
 
+/// <summary>
+/// Turn-7 scenario through the Lightning Vortex, Mystical Space Typhoon and Scapegoat definitions: commitment, the
+/// Scapegoat response, resolution order and cleanup.
+/// </summary>
 public sealed class DuelChainTests
 {
     internal static DuelActionResult Commit(DuelEngine engine)
@@ -42,17 +47,6 @@ public sealed class DuelChainTests
     }
 
     [Fact]
-    public void ChainOptInPreservesCommitmentOnlyDefault()
-    {
-        var engine = Engine(5217, chains: false);
-        Commit(engine);
-        Assert.True(engine.State.ResearchSliceComplete);
-        Assert.Null(engine.State.PendingChain);
-        Assert.Single(engine.State.GetPlayer(PlayerId.One).Graveyard);
-        Assert.NotNull(engine.State.GetPlayer(PlayerId.Two).MonsterZones[2]);
-    }
-
-    [Fact]
     public void VortexRetainsCostThroughPassesThenDestroysAndCleansUpOnce()
     {
         var engine = Engine(5217);
@@ -73,7 +67,7 @@ public sealed class DuelChainTests
         Assert.Equal(new uint[] { cost.GameCardId, 5217 }, result.State.GetPlayer(PlayerId.One).Graveyard.Select(c => c.GameCardId));
         Assert.Null(result.State.GetPlayer(PlayerId.Two).MonsterZones[2]);
         Assert.Single(result.State.GetPlayer(PlayerId.Two).Graveyard, c => c.GameCardId == 4028);
-        Assert.True(result.State.ResearchSliceComplete);
+        Assert.False(result.State.ResearchSliceComplete);
         Assert.Null(result.State.PendingChain);
         Assert.Null(result.State.Outcome);
         Assert.NotNull(before.PendingDecision);
@@ -81,7 +75,7 @@ public sealed class DuelChainTests
         Assert.Contains(cost, before.GetPlayer(PlayerId.One).Hand);
         Assert.Single(paid.PendingChain.Links);
         Assert.NotNull(paid.GetPlayer(PlayerId.Two).MonsterZones[2]);
-        Reject(engine, new EndTurn(PlayerId.One), DuelError.ResearchSliceComplete);
+        Phase(engine, DuelPhase.End); // the duel continues
     }
 
     [Fact]
@@ -131,10 +125,10 @@ public sealed class DuelChainTests
         Reject(engine, new PassChainResponse(PlayerId.Two, c.DecisionId - 1), DuelError.StaleChainDecision);
         Reject(engine, new ResolveNextChainLink(PlayerId.One, c.DecisionId), DuelError.ChainPending);
         Reject(engine, new ActivateChainResponse(PlayerId.Two, c.DecisionId, -1), DuelError.InvalidSpellTrapZone);
-        Reject(engine, new ActivateChainResponse(PlayerId.Two, c.DecisionId, 2), DuelError.UnsupportedChainResponse);
+        Reject(engine, new ActivateChainResponse(PlayerId.Two, c.DecisionId, 3), DuelError.UnsupportedChainResponse); // no definition
         Ok(engine, new ActivateChainResponse(PlayerId.Two, c.DecisionId, 1));
         c = engine.State.PendingChain!;
-        Reject(engine, new ActivateChainResponse(PlayerId.One, c.DecisionId, 2), DuelError.UnsupportedChainResponse);
+        Reject(engine, new ActivateChainResponse(PlayerId.One, c.DecisionId, 2), DuelError.UnsupportedChainResponse); // already face-up
         PassBoth(engine);
         c = engine.State.PendingChain!;
         Reject(engine, new PassChainResponse(PlayerId.Two, c.DecisionId), DuelError.ChainResolving);
@@ -162,12 +156,12 @@ public sealed class DuelChainTests
     }
 
     [Fact]
-    public void UnsupportedTokenCapacityRejectsWithoutFlippingOrAddingLink()
+    public void ScapegoatNeedsFourFreeZonesAndRejectsWithoutFlippingOrAddingLink()
     {
         var engine = Engine(4909, twoMonsters: true);
         Commit(engine);
         var c = engine.State.PendingChain!;
-        Reject(engine, new ActivateChainResponse(PlayerId.Two, c.DecisionId, 1), DuelError.UnsupportedChainResponse);
+        Reject(engine, new ActivateChainResponse(PlayerId.Two, c.DecisionId, 1), DuelError.ActivationConditionNotMet);
         Assert.False(engine.State.GetPlayer(PlayerId.Two).SpellTrapFields[1]!.IsFaceUp);
     }
 
@@ -187,31 +181,30 @@ public sealed class DuelChainTests
     {
         var engine = Engine(4909);
         Reject(engine, new PassChainResponse(PlayerId.Two, 1), DuelError.NoPendingChain);
+        Reject(engine, new EndTurn(PlayerId.One), DuelError.DecisionPending);
     }
 
     [Fact]
-    public void ProfilesCopyAndValidateTokenDefinitions()
+    public void TokenStepsCopyTheirIdsAndRegistrationNeedsTokenRules()
     {
         uint[] ids = [3905, 3903, 3902, 3904];
-        var profile = new ChainEffectProfile("test", 4818, ChainOperation.SummonFourTokens, ids);
+        var step = new SummonTokensStep(ids, BattlePosition.FaceUpDefense);
         ids[0] = 1;
-        Assert.Equal(3905u, profile.TokenCardIds[0]);
-        Assert.Throws<NotSupportedException>(() => ((IList<uint>)profile.TokenCardIds).Clear());
-        Assert.Throws<ArgumentException>(() => new ChainEffectProfile("test", 4818, ChainOperation.SummonFourTokens, [1, 1, 2, 3]));
-        Assert.Throws<ArgumentException>(() => new ChainEffectProfile("test", 4818, ChainOperation.DestroyBoundSpellTrap, [1]));
-    }
-
-    [Fact]
-    public void RegistrationRejectsUnboundEffectsWrongCommitmentKindsAndNonMonsterTokens()
-    {
-        Assert.Throws<ArgumentException>(() => Engine(4909, profiles:
-            [new("wrong-id", 4909, ChainOperation.DestroyBoundSpellTrap)]));
-        Assert.Throws<ArgumentException>(() => Engine(4909, profiles:
-            [new("lightning-vortex-discard-commit-v1", 5217, ChainOperation.DestroyBoundSpellTrap)]));
-        Assert.Throws<ArgumentException>(() => Engine(4909, profiles:
-            [new("response", 4818, ChainOperation.SummonFourTokens, [4818, 3903, 3902, 3904])]));
-        Assert.Throws<ArgumentException>(() => Engine(4909, profiles:
-            [new("response", 4909, ChainOperation.SummonFourTokens, [3905, 3903, 3902, 3904])]));
+        Assert.Equal(3905u, step.TokenCardIds[0]);
+        Assert.Throws<NotSupportedException>(() => ((IList<uint>)step.TokenCardIds).Clear());
+        Assert.Throws<ArgumentOutOfRangeException>(() => new SummonTokensStep([3905], BattlePosition.FaceDownDefense));
+        var catalog = new CardCatalog(new(null, "synthetic-token-registration"),
+            new uint[] { 1, 4818, 3905 }.Select(id => new CardDefinition(id, $"{id}", "", new(0, 0, 1))));
+        var definition = new EffectDefinition("tokens", 4818, EffectKind.QuickPlaySpell, [new SummonTokensStep([3905], BattlePosition.FaceUpDefense)]);
+        uint[] deck = [.. Enumerable.Repeat(1u, 40)];
+        Dictionary<uint, DuelCardRules> Rules(bool token) => new()
+        {
+            [1] = new(CardCategory.Monster, AllowsNormalSummon: true),
+            [4818] = new(CardCategory.Spell, AllowsSpellTrapSet: true),
+            [3905] = new(CardCategory.Monster, AllowsBasicBattle: true, IsToken: token)
+        };
+        Assert.Throws<ArgumentException>(() => new DuelEngine(catalog, Rules(token: false), deck, deck, effectDefinitions: [definition]));
+        _ = new DuelEngine(catalog, Rules(token: true), deck, deck, effectDefinitions: [definition]);
     }
 
     [Fact]

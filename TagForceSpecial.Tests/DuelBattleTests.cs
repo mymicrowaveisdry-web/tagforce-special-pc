@@ -4,7 +4,7 @@ using TagForceSpecial.Core;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Synthetic rule tests, independent of the PPSSPP reference comparisons.</summary>
+/// <summary>Basic duel rule tests.</summary>
 public sealed class DuelBattleTests
 {
     private static DuelEngine Engine(int? attack = 1800, int? defense = 1000,

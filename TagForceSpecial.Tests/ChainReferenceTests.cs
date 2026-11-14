@@ -5,7 +5,7 @@ using static TagForceSpecial.Tests.DuelChainTests;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Repeated retained native success projections; not general priority/negation equivalence.</summary>
+/// <summary>Compares chain results through the shared definitions with recorded projections.</summary>
 [Trait("Category", "LocalReference")]
 public sealed class ChainReferenceTests
 {
@@ -27,7 +27,7 @@ public sealed class ChainReferenceTests
         Projection(Snapshot("paid"), engine.State);
         Assert.Equal(Snapshot("paid").GetProperty("players")[1].GetProperty("monsterCardIds").EnumerateArray().Select(c => c.GetUInt32()),
             engine.State.GetPlayer(PlayerId.Two).MonsterZones.Select(m => m?.Card.GameCardId ?? 0));
-        PassBoth(engine); // PC protocol, native UI AI passes are not recovered priority rules.
+        PassBoth(engine); // both players pass to close the window
         Resolve(engine);
         Projection(Snapshot("resolved"), engine.State);
         var opponent = engine.State.GetPlayer(PlayerId.Two);
@@ -64,7 +64,8 @@ public sealed class ChainReferenceTests
         Compare("tokensResolved");
         Resolve(engine);
         Compare("resolved");
-        Assert.True(engine.State.ResearchSliceComplete);
+        Assert.False(engine.State.ResearchSliceComplete); // the duel continues; Scapegoat locked Player Two's other summons this turn
+        Assert.Equal(PlayerId.Two, Assert.Single(engine.State.SummonLocks).Player);
         Assert.Null(engine.State.Outcome);
         Assert.Equal(initial.NormalSummonUsed, engine.State.NormalSummonUsed);
         Assert.Equal(initial.GetPlayer(PlayerId.One).LifePoints, engine.State.GetPlayer(PlayerId.One).LifePoints);

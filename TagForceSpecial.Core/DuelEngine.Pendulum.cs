@@ -6,15 +6,26 @@ public sealed partial class DuelEngine
         List<DuelEvent> events, bool activationNegated = false)
     {
         var player = next.GetPlayer(target.Player);
-        var zones = (target.IsPendulumZone ? player.PendulumZones : player.SpellTrapFields).ToArray();
-        zones[target.Zone] = null;
-        next = next.With(player: target.IsPendulumZone ? player.With(pendulumZones: zones) : player.With(spellTraps: zones));
+        if (target.IsPendulumZone)
+        {
+            var scales = player.PendulumZones.ToArray();
+            scales[target.Zone] = null;
+            next = next.With(player: player.With(pendulumZones: scales));
+        }
+        else next = next.With(player: player.WithSpellTrapAt(target.Zone, null));
         return SendFieldCardToGraveyard(next, target.Card, cause, events, activationNegated);
     }
-    // Caller removes the field placement. Destination and event semantics are chosen together, never inferred from a final GY diff.
+    // The single field-departure path; the caller removes the placement. A Token goes to no zone: its cause event is
+    // marked Removed, then TokenRemoved follows.
     private DuelState SendFieldCardToGraveyard(DuelState next, CardInstance card, DuelEvent cause,
         List<DuelEvent> events, bool activationNegated = false)
     {
+        if (IsTokenId(card.GameCardId))
+        {
+            events.Add(cause with { FieldDestination = FieldCardDestination.Removed });
+            events.Add(new TokenRemoved(card.Owner, card) { TimingGroup = cause.TimingGroup, FieldDestination = FieldCardDestination.Removed });
+            return next;
+        }
         bool extra = !activationNegated && pendulumCards.ContainsKey(card.GameCardId);
         var owner = next.GetPlayer(card.Owner);
         next = next.With(player: extra ? owner.With(faceUpExtraDeck: owner.FaceUpExtraDeck.Append(card))
@@ -39,12 +50,14 @@ public sealed partial class DuelEngine
         var card = player.Hand.SingleOrDefault(c => c.InstanceId == command.CardInstanceId);
         if (card is null) return Reject(DuelError.CardNotInHand);
         if (!pendulumCards.ContainsKey(card.GameCardId)) return Reject(DuelError.UnsupportedPendulumCard);
+        // Placing a scale is the activation of a Spell Card, so "cannot activate Spell Cards" stops it.
+        if (RuleLocked(State, LockedAction.ActivateSpell, player.Id, card, onField: false)) return Reject(DuelError.LockedByEffect);
         if (player.PendulumZones[command.PendulumZone] is not null) return Reject(DuelError.PendulumZoneOccupied);
         var zones = player.PendulumZones.ToArray(); long placement = checked(State.Revision + 1);
-        zones[command.PendulumZone] = new(card, true, placement);
+        zones[command.PendulumZone] = new(card, true, placement) { ActivatedOnTurn = State.TurnNumber };
         var receipt = new CommittedActivation(player.Id, "pendulum-scale", card, command.PendulumZone, null, null);
         var link = new ChainLink(1, receipt, placement, ChainOperation.ActivatePendulumScale, IsPendulumScale: true);
-        var chain = new PendingChain(placement, [link], Other(player.Id), freezeOnCompletion: false);
+        var chain = new PendingChain(placement, [link], Other(player.Id));
         return Accept(State.With(player: player.With(hand: player.Hand.Where(c => c != card), pendulumZones: zones))
             .WithCommittedActivation(receipt).WithChain(chain), new PendulumScaleActivated(player.Id, card, command.PendulumZone),
             new ActivationCommitted(receipt), new ChainLinkAdded(link), new ChainResponseRequested(chain.Responder, chain.DecisionId));
@@ -58,7 +71,7 @@ public sealed partial class DuelEngine
         if (player.LastPendulumSummonTurn == State.TurnNumber) return Reject(DuelError.PendulumSummonLimitReached);
         if (player.PendulumZones[0] is not { } left || player.PendulumZones[1] is not { } right)
             return Reject(DuelError.PendulumScalesUnavailable);
-        uint first = pendulumCards[left.Card.GameCardId].LeftScale, second = pendulumCards[right.Card.GameCardId].RightScale;
+        uint first = CurrentScale(State, left, left: true), second = CurrentScale(State, right, left: false);
         uint low = Math.Min(first, second), high = Math.Max(first, second);
         var choices = command.Selections;
         if (choices.Count is < 1 or > 5 || choices.Any(c => c is null) ||
@@ -76,6 +89,7 @@ public sealed partial class DuelEngine
                 return Reject(DuelError.UnsupportedPendulumCard);
             uint level = catalog[card.GameCardId].Statistics.Level;
             if (level == 0 || level <= low || level >= high) return Reject(DuelError.UnsupportedMonsterLevel);
+            if (RuleLocked(State, LockedAction.PendulumSummon, player.Id, card)) return Reject(DuelError.LockedByEffect);
             var error = CheckSpecialSummon(State, player.Id, card, choice.MonsterZone, choice.Position, choice.Source, "pendulum");
             if (error != DuelError.None) return Reject(error);
             group.Add(new(checked(State.Revision + 1), checked(State.Revision + 1), player.Id, card, choice.MonsterZone,

@@ -4,9 +4,9 @@ using TagForceSpecial.Core;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Compares only the declared projections with repeated PSP captures.
-/// Deck/LP boundaries use controlled PSP RAM inputs; C# reaches them through commands.
-/// Combat uses observed post-Dice stats, without claiming effect equivalence.</summary>
+/// <summary>
+/// Compares declared deck, LP and combat projections with recorded captures. Combat uses recorded post-Dice stats.
+/// </summary>
 [Trait("Category", "LocalReference")]
 public sealed class DuelBoundaryReferenceTests
 {
@@ -70,7 +70,7 @@ public sealed class DuelBoundaryReferenceTests
         using var document = Fixture();
         var scenario = Scenario(document.RootElement, id);
         var engine = Engine();
-        // Legal synthetic turns, never direct state hydration or a production testing hook.
+        // Reaches the state through legal turns.
         for (int guard = 0; guard < 80 && !(engine.State.ActivePlayer == PlayerId.Two &&
                  engine.State.GetPlayer(PlayerId.Two).Deck.Count == count); guard++)
         {
@@ -174,7 +174,7 @@ public sealed class DuelBoundaryReferenceTests
             Assert.Equal(expected.GetProperty("players")[i].GetProperty("monsterCardIds").EnumerateArray().Select(v => v.GetUInt32()),
                 player.MonsterZones.Select(m => m?.Card.GameCardId ?? 0));
         }
-        // Opponent's resolved Dice is deliberately outside this combat projection.
+        // The opponent's Dice result is outside this combat projection.
         Assert.Equal(expected.GetProperty("players")[0].GetProperty("graveyardCardIds").EnumerateArray().Select(v => v.GetUInt32()),
             state.GetPlayer(PlayerId.One).Graveyard.Select(c => c.GameCardId));
     }

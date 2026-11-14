@@ -5,7 +5,7 @@ using static TagForceSpecial.Tests.EventEffectScenario;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Authored ordinary-procedure tests; no PSP equivalence claim.</summary>
+/// <summary>Ordinary Tribute Summon tests.</summary>
 public sealed class TributeSummonTests
 {
     private const uint Low = uint.MaxValue - 1, High = uint.MaxValue, OtherCard = 100_000;

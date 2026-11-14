@@ -10,8 +10,7 @@ public sealed record CpjArtworkProvenance(uint CardId, string HeaderSourcePath, 
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ReferenceEvidenceId = null);
 public sealed record CpjJpeg(byte[] Bytes, int Width, int Height);
 
-/// <summary>Bounded CPJ slot reconstruction. Header bytes remain private source data.
-/// No toolkit code or original header is embedded in the application.</summary>
+/// <summary>Reconstructs CPJ artwork slots from private source header bytes.</summary>
 public static class CpjArtworkDecoder
 {
     public const string ConversionId = "cpj-rgba-v1";

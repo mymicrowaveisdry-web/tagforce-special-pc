@@ -12,7 +12,7 @@ public sealed class TriggerCommitmentTests
             TriggerOperation.DestroyTargetMonster, lifePointCost: cost, discardCardIds: discards,
             target: new(EffectRelation.Opponent), turnLimit: TriggerTurnLimit.SharedPerPlayer);
 
-    private static DuelEngine Setup(TriggerEffectProfile profile, IEnumerable<ChainResponseProfile>? responses = null)
+    private static DuelEngine Setup(TriggerEffectProfile profile, IEnumerable<EffectDefinition>? responses = null)
     {
         uint[] deck = [A, A, Filler, Trap, SummonSpell, .. Enumerable.Repeat(Filler, 35)];
         var engine = Engine(triggers: [profile], responses: responses, playerOneDeck: deck);
@@ -79,14 +79,14 @@ public sealed class TriggerCommitmentTests
     }
 
     [Theory]
-    [InlineData(ChainOperation.NegateActivation)]
-    [InlineData(ChainOperation.NegateEffect)]
-    public void NegationDoesNotRefundCommittedCostsOrOncePerTurnUse(ChainOperation operation)
+    [InlineData(ResponseNegation.Activation)]
+    [InlineData(ResponseNegation.Effect)]
+    public void NegationDoesNotRefundCommittedCostsOrOncePerTurnUse(ResponseNegation operation)
     {
         var profile = new TriggerEffectProfile("paid-gain", A, MonsterEventKind.NormalSummoned, EffectRelation.Self,
             TriggerRequirement.Mandatory, TriggerOperation.GainLifePoints, lifePointGain: 500,
             lifePointCost: 100, discardCardIds: [Filler], turnLimit: TriggerTurnLimit.SharedPerPlayer);
-        var engine = Setup(profile, [new("negate", Trap, operation, ChainSpellSpeed.Two, respondsToCategory: CardCategory.Monster)]);
+        var engine = Setup(profile, [ResponseProbe.Negate("negate", Trap, operation, ChainSpellSpeed.Two, respondsTo: CardCategory.Monster)]);
         var c = engine.State.EventEffects.PendingCommitment!;
         var cost = c.CardOptions[0];
         Ok(engine, new ChooseTriggerCostCard(c.Player, c.DecisionId, cost.InstanceId));
@@ -170,15 +170,7 @@ public sealed class TriggerCommitmentTests
         Assert.Equal(uses, engine.State.EventEffects.UsedTriggers.Count);
     }
 
-    internal static void SummonFromDeck(DuelEngine engine)
-    {
-        var actor = engine.State.ActivePlayer;
-        Ok(engine, new ActivateSpell(actor, engine.State.GetPlayer(actor).Hand.First(c => c.GameCardId == SummonSpell).InstanceId, 4));
-        var p = engine.State.PendingDecision!;
-        Ok(engine, new ChooseDecisionCard(p.Player, p.DecisionId, p.CardOptions[0].InstanceId));
-        p = engine.State.PendingDecision!; Ok(engine, new ChooseDecisionPosition(p.Player, p.DecisionId, BattlePosition.FaceUpAttack));
-        p = engine.State.PendingDecision!; Ok(engine, new ChooseDecisionZone(p.Player, p.DecisionId, 1));
-    }
+    internal static void SummonFromDeck(DuelEngine engine) => SummonWithProbe(engine, spellZone: 4);
 
     [Fact]
     public void MultipleMandatoryEffectsCompetingForOneDiscardDoNotStrandTheBatch()

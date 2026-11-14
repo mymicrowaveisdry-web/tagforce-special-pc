@@ -17,9 +17,9 @@ public sealed record PresentationResource(string AssetKey, string SourcePath, st
     string EvidenceStatus, IReadOnlyList<string> Diagnostics,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] CpjArtworkProvenance? Artwork = null);
 
-/// <summary>Content-addressed private resources with an externally supplied package identity.
-/// Immutable means no overwrite plus hash validation on open/read, not an OS write-protection guarantee.
-/// Integrity signoff never certifies PSP fidelity, pixel parity, rights or a complete game mode.</summary>
+/// <summary>
+/// Content-addressed private resources, validated by hash on open and read. Integrity covers bytes only.
+/// </summary>
 public sealed class PresentationPackage
 {
     public const int SchemaVersion = 2;
@@ -198,7 +198,7 @@ public sealed class PresentationPackage
         return data; // Caller owns a copy, never an internal mutable buffer.
     }
 
-    /// <summary>Deterministic local integrity receipt, not a digital signature or PSP-reference signoff.</summary>
+    /// <summary>Deterministic local integrity receipt; not a digital signature.</summary>
     public string SignOffIntegrity(GameBuildProfile profile)
     {
         _ = Open(privateRoot, PackageId, profile, Scope, resources.Keys); // Recheck every required file.

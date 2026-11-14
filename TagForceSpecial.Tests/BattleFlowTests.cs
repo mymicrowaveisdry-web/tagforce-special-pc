@@ -4,7 +4,7 @@ using static TagForceSpecial.Tests.BattleFlowScenario;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Synthetic staged battle contracts. Native declaration/response/replay timing is not verified.</summary>
+/// <summary>Staged battle flow tests.</summary>
 public sealed class BattleFlowTests
 {
     [Fact]

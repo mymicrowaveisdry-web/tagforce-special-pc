@@ -33,10 +33,19 @@ public sealed partial class DuelEngine
                         foreach (var (target, _) in monsters)
                             if (profile.TargetCardIds.Contains(target.Card.GameCardId) && Relates(profile.Affects, source, target))
                                 negated.Add(target);
+        if (HasMonsterNegators && ActiveCards(state).Any(e => definitions.TryGetValue(e.Field.Card.GameCardId, out var d) && d.Negation == LastingNegation.FaceUpMonsters))
+            negated.UnionWith(monsters.Select(e => e.Binding));
+        if (HasEffectLocks)
+            negated.UnionWith(monsters.Where(e => RuleLocked(state, LockedAction.ApplyEffects, e.Binding.Player, e.Monster.Card, e.Monster)).Select(e => e.Binding));
         return negated.OrderBy(n => n.Player).ThenBy(n => n.Zone).ToArray();
     }
 
-    private static bool IsSourceEffectNegated(DuelState state, TriggerActivation trigger) =>
+    private bool? effectLocks;
+    /// <summary>Some effect applies a lock that stops effects from being used.</summary>
+    private bool HasEffectLocks => effectLocks ??= allEffects.Any(d => d.Steps.Any(s => s is ApplyRuleLockStep apply && apply.Lock.Actions.HasFlag(LockedAction.ApplyEffects)));
+
+    private bool IsSourceEffectNegated(DuelState state, TriggerActivation trigger) =>
+        trigger.Profile.SourceLocation == TriggerSourceLocation.FaceUpSpellTrap ? rules[trigger.Source.Card.GameCardId].Category == CardCategory.Spell && IsSpellsNegated(state) :
         trigger.Profile.SourceLocation == TriggerSourceLocation.FaceUpMonster && trigger.Source.IsStillPresent(state) &&
         state.EventEffects.NegatedMonsters.Contains(trigger.Source);
 }

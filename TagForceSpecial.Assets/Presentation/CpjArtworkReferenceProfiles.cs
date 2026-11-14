@@ -2,8 +2,7 @@ using System.Security.Cryptography;
 
 namespace TagForceSpecial.Assets.Presentation;
 
-/// <summary>Text-only pins for independently traced original-game decoder output.
-/// Pixel bytes stay in the private evidence root. This is a captured-reference import, not a JPEG codec.</summary>
+/// <summary>Text-only pins for traced CPJ decoder output; not a JPEG codec.</summary>
 public static class CpjArtworkReferenceProfiles
 {
     public const uint CardId = 9863;

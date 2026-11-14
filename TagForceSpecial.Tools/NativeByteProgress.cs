@@ -3,8 +3,7 @@ using System.Security.Cryptography;
 
 namespace TagForceSpecial.Tools;
 
-// Only PSP compiler output with recorded comparison evidence counts towards this metric.
-// C# test passes, decompiler pseudocode and extracted asset bytes never count here.
+// Counts only compiler output with recorded comparison evidence.
 public sealed record NativeFunctionMatch(
     string Module, string Address, int Length, string Kind, string SourceSha256,
     string OriginalSha256, string RebuiltSha256, string EvidencePath, string EvidenceSha256);
@@ -52,7 +51,7 @@ public static class NativeByteProgress
         return report;
     }
 
-    // Public pure computation for deterministic unit tests. Load() additionally verifies evidence files.
+    // Pure computation for unit tests; Load() also verifies evidence files.
     public static NativeByteReport Measure(IReadOnlyList<ModuleInventory> inventories,
         IReadOnlyList<NativeFunctionMatch> matches)
     {
@@ -80,7 +79,7 @@ public static class NativeByteProgress
                 !ResearchValidation.RelativePath(match.EvidencePath) || !ValidSha(match.EvidenceSha256))
                 throw new InvalidDataException($"Unsubstantiated native match: {match.Module} {match.Address}");
 
-            // No function-body overlap or double-counting, including on intentionally overlapping Ghidra candidates.
+            // Rejects overlapping function bodies and double counting.
             ulong start = address;
             ulong end = start + (ulong)match.Length;
             var existing = ranges.GetValueOrDefault(match.Module);

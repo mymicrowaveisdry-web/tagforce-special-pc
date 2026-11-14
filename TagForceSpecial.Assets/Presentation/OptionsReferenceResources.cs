@@ -1,6 +1,6 @@
 namespace TagForceSpecial.Assets.Presentation;
 
-/// <summary>Generated pins (analysis/reconstruction/phase5_export.py): complete source pixels of Options textures compared to original GE dumps.</summary>
+/// <summary>Generated pins of the complete Options texture pixels.</summary>
 public static class OptionsReferenceResources
 {
     public static IReadOnlyList<PresentationReferenceCase> Cases { get; } = Array.AsReadOnly(new PresentationReferenceCase[]

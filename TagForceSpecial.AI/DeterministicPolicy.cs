@@ -42,12 +42,16 @@ public sealed class DeterministicPolicy(uint seed)
             ActionKind.ChooseCard => 600 + attack / 100,
             ActionKind.ChoosePosition => a.Position == BattlePosition.FaceUpAttack ? 650 : 600,
             ActionKind.ChooseZone or ActionKind.ChooseTarget => 600,
+            ActionKind.OrderTriggers => 900,
+            ActionKind.DeclineTriggers => 0,
             ActionKind.ChainResponse or ActionKind.BattleResponse => 800,
             ActionKind.ChainPass or ActionKind.BattlePass or ActionKind.ResolveChain => 700,
             ActionKind.ReplayAttack => 150,
             ActionKind.CancelReplay => 0,
             ActionKind.AdvanceBattle => 30,
-            ActionKind.ActivateSpell or ActionKind.ActivateSetSpell => 300,
+            ActionKind.ActivateSpell or ActionKind.ActivateSetSpell or ActionKind.MonsterEffect or ActionKind.CardEffect => 300,
+            ActionKind.Unequip => 25,
+            ActionKind.Upkeep => a.TargetZone == 1 ? 950 : 940,
             ActionKind.Summon => 200 + attack / 100,
             ActionKind.SetMonster => 40,
             ActionKind.SetSpellTrap => 5,
@@ -65,7 +69,7 @@ public sealed class DeterministicPolicy(uint seed)
         if (a.Zone is not { } zone || v.Self.Monsters[zone] is not { Attack: { } attack }) return -10;
         if (a.TargetZone is not { } target) return 180;
         var defender = v.Opponent.Monsters[target];
-        // Face-down statistics are deliberately absent: use a fixed unknown-card priority.
+        // Face-down cards use a fixed unknown-card priority.
         if (defender is null || defender.Hidden) return 110;
         int? strength = defender.Position == BattlePosition.FaceUpAttack ? defender.Attack : defender.Defense;
         if (strength is null) return 110;

@@ -26,9 +26,7 @@ public interface ITitleFlowHost
     void SaveProfile(string name, DuelistLevelChoice level, PlayerOptions options);
 }
 
-/// <summary>Observed Continue/New Game routes (config/reference/title-flow.json) and Main Menu/Options routes (main-menu.json, options.json).
-/// PC confirm is PSP Circle in the original and PSP Cross here; PC back is the reverse.
-/// Tag Force 6 data transfer is deliberately unsupported: New Game opens name entry directly.</summary>
+/// <summary>Title, Main Menu and Options routes. PC confirm and back swap PSP Circle and Cross.</summary>
 public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool instantTransitions = false)
 {
     public const int NameLimit = 8;
@@ -58,7 +56,7 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
     public int MenuFocus { get; private set; }
     public string Name { get; private set; } = Clip(defaultName);
     public DuelistLevelChoice Level { get; private set; }
-    /// <summary>Options values held for this session: accepted changes stay here until a save writes them, as observed.</summary>
+    /// <summary>Options values for this session, kept until a save writes them.</summary>
     public PlayerOptions SessionOptions { get; private set; } = PlayerOptions.Defaults();
     public OptionsSession? Options { get; private set; }
     public int ButtonCount => Step switch
@@ -93,7 +91,7 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
         PendingStep = next; pendingKeepsFocus = keepMenuFocus; pendingReplaysEntry = replayEntry; PendingLeadFrames = lead;
     }
 
-    /// <summary>Leaving Options or its dialogs always replays the menu's entry sequence on the Options row, as observed.</summary>
+    /// <summary>Leaving Options or its dialogs replays the menu's entry sequence on the Options row.</summary>
     private void ReturnFromOptions(int lead) => EnterFaded(TitleFlowStep.MainMenu, keepMenuFocus: true, replayEntry: true, lead: lead);
 
     public void Update(TimeSpan delta)
@@ -143,7 +141,7 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
 
     private void HandleMainMenu(PspInputFrame input)
     {
-        // Observed: presses during the entry sequence are dropped, not queued.
+        // Presses during the entry sequence are dropped, not queued.
         if (!MenuReady) return;
         // A direction only repeats if its own press started on this menu, so a key held across a screen change cannot scroll.
         int held = (input.Held & (PspAction.Up | PspAction.Down)) switch { PspAction.Up => -1, PspAction.Down => 1, _ => 0 };
@@ -168,14 +166,14 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
 
     private void HandleOptions(PspInputFrame input)
     {
-        // Observed: Options ignores input until its own entry sequence finishes, like the menu.
+        // Options ignores input until its entry sequence finishes.
         if (!MenuReady || Options is null) return;
         switch (Options.Handle(input))
         {
             case OptionsOutcome.Accepted:
                 bool changed = Options.Changed;
                 AcceptOptions(Options.Values);
-                // Observed: unchanged values return directly; changed ones fade to the save question over the bare background.
+                // Unchanged values return directly; changed ones fade to the save question.
                 if (changed) EnterFaded(TitleFlowStep.OptionsSaveQuestion, keepMenuFocus: true, lead: 0);
                 else ReturnFromOptions(lead: 0);
                 break;
@@ -214,7 +212,7 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
                 Level = ButtonFocus == 0 ? DuelistLevelChoice.BringItOn : DuelistLevelChoice.BeenThere;
                 Enter(TitleFlowStep.DuelistLevel); break;
             case TitleFlowStep.DuelistLevel: Enter(TitleFlowStep.CreateQuestion); break;
-            // No enters the Main Menu without writing data, exactly as observed.
+            // No enters the Main Menu without writing data.
             case TitleFlowStep.CreateQuestion:
                 if (ButtonFocus == 0) { saveSource = SaveSource.NewGame; Enter(TitleFlowStep.SystemSavePrompt); }
                 else EnterFaded(TitleFlowStep.MainMenu);
@@ -228,7 +226,7 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
                 }
                 else LeaveSavePrompt();
                 break;
-            // Observed: "Save completed." closes only with back; confirm does nothing.
+            // "Save completed." closes only with back.
             case TitleFlowStep.SystemSaveDone: break;
             case TitleFlowStep.QuitQuestion:
                 if (ButtonFocus == 0) EnterFaded(TitleFlowStep.ExitToTitle); else Enter(TitleFlowStep.MainMenu, keepMenuFocus: true);
@@ -245,7 +243,7 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
     {
         switch (Step)
         {
-            // Observed: back resolves these questions as No; message boxes and Cancel load ignore it.
+            // Back answers these questions with No; message boxes and Cancel load ignore it.
             case TitleFlowStep.RulesQuestion: Level = DuelistLevelChoice.FirstTimer; Enter(TitleFlowStep.DuelistLevel); break;
             case TitleFlowStep.ConfidenceQuestion: Level = DuelistLevelChoice.BeenThere; Enter(TitleFlowStep.DuelistLevel); break;
             case TitleFlowStep.CreateQuestion: EnterFaded(TitleFlowStep.MainMenu); break;
@@ -253,7 +251,7 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
             case TitleFlowStep.SystemSaveDone: LeaveSaveDone(); break;
             case TitleFlowStep.QuitQuestion: Enter(TitleFlowStep.MainMenu, keepMenuFocus: true); break;
             case TitleFlowStep.MainMenuUnavailable: Enter(TitleFlowStep.MainMenu, keepMenuFocus: true); break;
-            // Observed: back on the save question returns to the menu, keeping the accepted changes.
+            // Back on the save question returns to the menu, keeping the accepted changes.
             case TitleFlowStep.OptionsSaveQuestion: ReturnFromOptions(ScreenFade.DialogLeadFrames); break;
         }
     }
@@ -269,8 +267,9 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
         }
     }
 
-    /// <summary>Not answering Yes: New Game goes back to its question; the menu and Options routes return to the menu without saving.
-    /// The Options route's No is unobserved and follows its save question's No.</summary>
+    /// <summary>
+    /// Without Yes, New Game returns to its question and the menu and Options routes return to the menu unsaved.
+    /// </summary>
     private void LeaveSavePrompt()
     {
         switch (saveSource)
@@ -284,8 +283,8 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
     private void Enter(TitleFlowStep next, bool keepMenuFocus = false, bool replayEntry = false)
     {
         Step = next; elapsed = TimeSpan.Zero; heldDirection = 0;
-        // Observed default focus: Cancel load, the new-data save prompt and the Options save question offer Yes; other
-        // questions default to No, and so does the firmware dialog when it would overwrite an existing save.
+        // Default focus per question: Yes for Cancel load, the new-data save prompt and the Options save question;
+        // otherwise No.
         ButtonFocus = next is TitleFlowStep.RulesQuestion or TitleFlowStep.ConfidenceQuestion or TitleFlowStep.CreateQuestion or TitleFlowStep.QuitQuestion
             || next == TitleFlowStep.SystemSavePrompt && host.ProfilePresent ? 1 : 0;
         if (next == TitleFlowStep.MainMenu && !keepMenuFocus) MenuFocus = 0;

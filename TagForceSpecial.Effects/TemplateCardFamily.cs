@@ -1,0 +1,341 @@
+using TagForceSpecial.Effects.Archetypes;
+using TagForceSpecial.Core;
+using static TagForceSpecial.Effects.MonsterAttributes;
+using static TagForceSpecial.Effects.MonsterTypes;
+
+namespace TagForceSpecial.Effects;
+
+/// <summary>Cards that follow a shared template: restricted Equips, stat Field Spells, Type wipes, Deck searches and Graveyard recovery.</summary>
+public static class TemplateCardFamily
+{
+    public const string FamilyId = "template-card-definition";
+    public const string BatchId = "tfsp-family-batch-10d-01";
+
+    private const string EndsWithEndPhase = "The change ends when the End Phase begins.";
+    private const string GainedControl = "The player who gained control activates it, so its effect is written from that player's side; it does not activate if the card was face-down.";
+    private static readonly CardTable T = new("template");
+    /// <summary>"Cards with that name, and their effects, cannot be used": Summoned, Set, activated, used to attack or used as Synchro/Xyz Material.</summary>
+    private const LockedAction PsiBlocked = LockedAction.NormalSummon | LockedAction.SetMonster | LockedAction.SpecialSummon | LockedAction.FusionSummon |
+        LockedAction.ActivateSpell | LockedAction.ActivateTrap | LockedAction.ActivateMonsterEffect | LockedAction.SetSpellTrap | LockedAction.Attack |
+        LockedAction.BeSynchroMaterial | LockedAction.BeXyzMaterial | LockedAction.ApplyEffects;
+    /// <summary>"Savior" Synchro Monsters (Savior Star Dragon, Savior Demon Dragon).</summary>
+    private static readonly uint[] SaviorSynchros = [8475, 8651];
+    private static readonly FieldTarget FaceUpMonster = new(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUp);
+    /// <summary>"You cannot Special Summon monsters, except 'Qli' monsters."</summary>
+    private static readonly RuleLock QliOnly = new(LockedAction.SpecialSummon, TargetSide.Own, new NotFilter(new AllOfFilter([new AnyMonsterFilter(), ClassicArchetypes.Filter("official:qli")])));
+
+    private static MonsterTypeFilter OfType(uint type) => new([type]);
+    private static MonsterAttributeFilter OfAttribute(uint attribute) => new(attribute);
+    private static LastingStatModifier AttributeBoost(uint attribute) => new(TargetSide.Either, 500, -400, OfAttribute(attribute));
+
+    /// <summary>"FLIP: take control of 1 [Attribute] monster your opponent controls while this card is face-up", chosen at resolution or targeted.</summary>
+    private static AuthoredCard Charmer(uint id, string name, uint attribute, bool targets = false) => targets
+        ? T.Trigger(id, name, MonsterEventKind.FlippedFaceUp, [new TakeControlStep(ControlDuration.WhileSourceFaceUp)], getterKind: 24,
+            targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Opponent, FieldCardFilter.FaceUp, cardFilter: OfAttribute(attribute))], exceptions: CharmerControl)
+        : T.Trigger(id, name, MonsterEventKind.FlippedFaceUp, [new TakeChosenControlStep(OfAttribute(attribute), ControlDuration.WhileSourceFaceUp)], getterKind: 24,
+            exceptions: CharmerControl);
+
+    private const string CharmerControl = "Control returns when this card stops being face-up on the field; flipping the taken monster face-down later does not end it in this era.";
+
+    /// <summary>
+    /// D/D Magical Astronomer Kepler: when Summoned, 1 of 2 effects once per turn (return another "D/D" card or search a "Covenant" card); as a scale,
+    /// only "D/D" monsters can be Pendulum Summoned, and each of its controller's Standby Phases lowers its scale by 2 and destroys their higher-Level monsters.
+    /// </summary>
+    private static AuthoredCard Kepler()
+    {
+        var dd = ClassicArchetypes.Filter("official:dd");
+        var card = T.PendulumTrigger(T.NormalPendulum(11442, "D/D Magical Astronomer Kepler", 10,
+                scaleLock: new RuleLock(LockedAction.PendulumSummon, TargetSide.Own, new NotFilter(dd)), getterKind: 26),
+            MonsterEventKind.StandbyPhase, EffectRelation.Controller, [new ReduceSourceScaleStep(2), new DestroyAboveSourceScaleStep(dd)]);
+        MonsterEventKind[] summoned = [MonsterEventKind.NormalSummoned, MonsterEventKind.SpecialSummoned];
+        card = T.WithTrigger(card, "return", summoned, EffectRelation.Self, [new ReturnTargetsToHandStep()], TriggerRequirement.Optional,
+            targets: [new FieldTarget(FieldCardKind.Any, TargetSide.Own, cardFilter: new AllOfFilter([dd, new NotFilter(new CardIdFilter([11442]))]))],
+            timing: TriggerTiming.If, sharedLimit: "summoned");
+        return T.WithTrigger(card, "search", summoned, EffectRelation.Self, [new AddFromDeckToHandStep(ClassicArchetypes.Filter("official:covenant"))], TriggerRequirement.Optional,
+            timing: TriggerTiming.If, sharedLimit: "summoned") with
+        {
+            Exceptions = "The two Summon effects are separate triggers sharing one use per turn; \"other\" excludes every copy of this card."
+        };
+    }
+
+    private static AuthoredCard TypeWipe(uint id, string name, uint type) =>
+        T.Normal(id, name, [new DestroyAllStep(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUp, OfType(type))]);
+
+    private static AuthoredCard Search(uint id, string name, uint maxLevel, uint type) =>
+        T.Normal(id, name, [new AddFromDeckToHandStep(new MonsterLevelFilter(maxLevel, type))]);
+
+    /// <summary>"Once per turn: Special Summon 1 monster of this Type from your hand; control no monsters to activate and to resolve."</summary>
+    private static AuthoredCard OnlyWithNoMonsters(uint id, string name, uint type) => T.ContinuousWithEffects(id, name, trap: false,
+        new EffectOption([new StopUnlessNoOwnMonstersStep(), new SpecialSummonStep(SpecialSummonSources.Hand, OfType(type))], Conditions: [new ControlsNoMonstersCondition()]));
+
+    private static AuthoredCard DiscardToSearch(uint id, string name, uint target) =>
+        T.FromZone(id, name, EffectOrigin.Hand, new EffectOption([new AddFromDeckToHandStep(new CardIdFilter([target]))], new SendSelfCost(SelfDestination.Discard)));
+
+    private static EffectStep[] SearchFor(CardFilter filter) => [new AddFromDeckToHandStep(filter)];
+
+    private static AuthoredCard Recover(uint id, string name, CardFilter filter, int count = 1, CardZone zone = CardZone.Graveyard, EffectCost? cost = null) =>
+        T.Normal(id, name, [new AddTargetsToHandStep()], cost, [new ZoneTarget(zone, TargetSide.Own, filter, count, count)]);
+
+    private static readonly AuthoredCard[] Cards =
+    [
+        T.BattleMonster(5142, "Mad Sword Beast", new(Piercing: true)),
+        T.BattleMonster(6545, "Lancer Dragonute", new(Piercing: true)),
+        T.BattleMonster(4403, "Leghul", new(DirectAttack: true)),
+        T.BattleMonster(4428, "Jinzo #7", new(DirectAttack: true)),
+        T.BattleMonster(4494, "Rainbow Flower", new(DirectAttack: true)),
+        T.BattleMonster(5137, "Hayabusa Knight", new(AttacksPerBattlePhase: 2)),
+        T.BattleMonster(8098, "Jurrac Monoloph", new(AttackAll: true), getterKind: 16),
+        T.Equip(4307, "Legendary Sword", 300, 300, OfType(Warrior)),
+        T.Equip(4309, "Dark Energy", 300, 300, OfType(Fiend)),
+        T.Equip(4311, "Laser Cannon Armor", 300, 300, OfType(Insect)),
+        T.Equip(4312, "Insect Armor with Laser Cannon", 700, 0, OfType(Insect)),
+        T.Equip(4314, "Beast Fangs", 300, 300, OfType(Beast)),
+        T.Equip(4316, "Vile Germs", 300, 300, OfType(Plant)),
+        T.Equip(4318, "Silver Bow and Arrow", 300, 300, OfType(Fairy)),
+        T.Equip(4321, "Dragon Treasure", 300, 300, OfType(Dragon)),
+        T.Equip(4322, "Electro-Whip", 300, 300, OfType(Thunder)),
+        T.Equip(4325, "Mystical Moon", 300, 300, OfType(BeastWarrior)),
+        T.Equip(4328, "Violet Crystal", 300, 300, OfType(Zombie)),
+        T.Equip(4329, "Book of Secret Arts", 300, 300, OfType(Spellcaster)),
+        T.Equip(4331, "Machine Conversion Factory", 300, 300, OfType(Machine)),
+        T.Equip(4332, "Raise Body Heat", 300, 300, OfType(Dinosaur)),
+        T.Equip(4333, "Follow Wind", 300, 300, OfType(WingedBeast)),
+        T.Equip(4334, "Power of Kaishin", 300, 300, OfType(Aqua)),
+        T.Equip(4660, "Salamandra", 700, 0, OfAttribute(Fire)),
+        T.Equip(4674, "Shine Palace", 700, 0, OfAttribute(Light)),
+        T.Field(4932, "Gaia Power", AttributeBoost(Earth)),
+        T.Field(4933, "Umiiruka", AttributeBoost(Water)),
+        T.Field(4934, "Molten Destruction", AttributeBoost(Fire)),
+        T.Field(4935, "Rising Air Current", AttributeBoost(Wind)),
+        T.Field(4936, "Luminous Spark", AttributeBoost(Light)),
+        T.Field(4937, "Mystic Plasma Zone", AttributeBoost(Dark)),
+        T.Field(6823, "Jurassic World", new LastingStatModifier(TargetSide.Either, 300, 300, OfType(Dinosaur))),
+        TypeWipe(4659, "Warrior Elimination", Warrior),
+        TypeWipe(4666, "Acid Rain", Machine),
+        TypeWipe(4668, "Eradicating Aerosol", Insect),
+        TypeWipe(4669, "Breath of Light", Rock),
+        TypeWipe(4670, "Eternal Drought", Fish),
+        TypeWipe(4868, "Last Day of Witch", Spellcaster),
+        TypeWipe(4869, "Exile of the Wicked", Fiend),
+        Search(5328, "Reinforcement of the Army", 4, Warrior),
+        Search(8352, "Fossil Dig", 6, Dinosaur),
+        Recover(5330, "The Warrior Returning Alive", OfType(Warrior)),
+        Recover(7453, "Dark Eruption", new MonsterTraitFilter(MonsterStat.Attack, 1500, attributeCode: Dark)),
+        Recover(7151, "Recurring Nightmare", new MonsterTraitFilter(MonsterStat.Defense, 0, attributeCode: Dark), count: 2),
+        Recover(5908, "Salvage", new MonsterTraitFilter(MonsterStat.Attack, 1500, attributeCode: Water), count: 2),
+        Recover(7630, "Light of Redemption", OfAttribute(Light), zone: CardZone.Banished, cost: new PayLifePointsCost(800)),
+        T.Normal(6672, "E - Emergency Call", SearchFor(ClassicArchetypes.Filter("official:elemental-hero", monstersOnly: true))),
+        T.Normal(9518, "Resonator Call", SearchFor(ClassicArchetypes.Filter("official:resonator", monstersOnly: true))),
+        T.Normal(10079, "Hieratic Seal of Convocation", SearchFor(ClassicArchetypes.Filter("official:hieratic", monstersOnly: true))),
+        T.Normal(9131, "Medallion of the Ice Barrier", SearchFor(ClassicArchetypes.Filter("official:ice-barrier", monstersOnly: true))),
+        T.Trap(9364, "Gleipnir, the Fetters of Fenrir", SearchFor(ClassicArchetypes.Filter("official:nordic", monstersOnly: true))),
+        T.Trap(4992, "Enchanted Javelin", [new GainByTargetAttackStep()], targets: TrapTiming.Attacker, conditions: TrapTiming.OpponentAttacks),
+        T.WhenSummoned(5510, "Gravekeeper's Curse", [new DealDamageStep(500)]),
+        T.WhenBattleDestroyed(6506, "Scarr, Scout of Dark World", SearchFor(new AllOfFilter(new MonsterLevelFilter(4), ClassicArchetypes.Filter("official:dark-world")))),
+        T.QuickPlay(4905, "Rush Recklessly", [new ModifyTargetsUntilEndStep(700)], targets: [FaceUpMonster], exceptions: EndsWithEndPhase),
+        T.QuickPlay(5432, "Book of Moon", [new FlipTargetsFaceDownStep()], targets: [FaceUpMonster], exceptions: "Tokens and Xyz Monsters stay face-up."),
+        T.Normal(5431, "Book of Taiyou", [new FlipTargetsFaceUpStep()], targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceDown)],
+            exceptions: "Handled as a targeted flip. It counts as flipped for Flip effects; it is not a Flip Summon."),
+        T.Normal(7219, "Double Summon", [new GrantNormalSummonStep()], exceptions: "A second copy in the same turn adds nothing."),
+        T.Normal(7248, "Trade-In", [new DrawCardsStep(2)], new DiscardCost(new MonsterLevelFilter(8, minLevel: 8))),
+        T.Normal(5688, "Magical Stone Excavation", [new AddTargetsToHandStep()], new DiscardCost(Count: 2),
+            [new ZoneTarget(CardZone.Graveyard, TargetSide.Own, new CardCategoryFilter(CardCategory.Spell))]),
+        T.Trap(6709, "Icarus Attack", [new DestroyTargetsStep()], new TributeCost(OfType(WingedBeast)), [new FieldTarget(FieldCardKind.Any, count: 2)]),
+        DiscardToSearch(7108, "Destroyersaurus", 6823),
+        DiscardToSearch(7572, "Hecatrice", 7573),
+        T.FromZone(7359, "Mezuki", EffectOrigin.Graveyard, new EffectOption([new SpecialSummonTargetStep()], new SendSelfCost(SelfDestination.Banish),
+            [new ZoneTarget(CardZone.Graveyard, TargetSide.Own, OfType(Zombie), mustBeSummonable: true)])),
+        T.FromZone(10735, "Malicevorous Fork", EffectOrigin.Hand, new EffectOption([new SpecialSummonSelfStep()], new DiscardCost(OfType(Fiend)))),
+        T.ContinuousTrigger(11147, "Supply Squad", trap: false, MonsterEventKind.Destroyed, EffectRelation.Controller, [new DrawCardsStep(1)], limit: TriggerTurnLimit.PerPlacement),
+        T.ByName(T.Normal(5670, "Gather Your Mind", [new AddFromDeckToHandStep(new CardIdFilter([5670]))])),
+        T.ByName(T.QuickPlay(10591, "Silver's Cry", [new SpecialSummonTargetStep()],
+            targets: [new ZoneTarget(CardZone.Graveyard, TargetSide.Own, new AllOfFilter(new NormalMonsterFilter(TfspNormalMonsters.Ids), OfType(Dragon)), mustBeSummonable: true)])),
+        T.Normal(10182, "Overlay Regen", [new AttachSourceStep()],
+            targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUp, cardFilter: new XyzMonsterFilter())]),
+        T.Trap(9950, "Xyz Reborn", [new SpecialSummonTargetStep(Link: RevivalLink.Material)],
+            targets: [new ZoneTarget(CardZone.Graveyard, TargetSide.Own, new XyzMonsterFilter(), mustBeSummonable: true)]),
+        T.Normal(10570, "Rank-Up-Magic Limited Barian's Force", [new RankUpStep(ClassicArchetypes.Filter("official:number-c", monstersOnly: true))],
+            targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Own, FieldCardFilter.FaceUp, cardFilter: new XyzMonsterFilter(4, 4))]),
+        T.Normal(10541, "Rank-Up-Magic Barian's Force", [new RankUpStep(new AnyOfFilter(ClassicArchetypes.Filter("official:number-c", monstersOnly: true), ClassicArchetypes.Filter("official:cxyz", monstersOnly: true)), SameType: true),
+            new TakeOpponentMaterialStep()], targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Own, FieldCardFilter.FaceUp, cardFilter: new XyzMonsterFilter())]),
+        T.Normal(10726, "Overlay Capture", [new DetachAllStep(0), new AttachSourceStep(1)],
+            targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Opponent, FieldCardFilter.FaceUp, cardFilter: new XyzMonsterFilter()) { MinXyzMaterials = 1 },
+                new FieldTarget(FieldCardKind.Monster, TargetSide.Own, FieldCardFilter.FaceUp, cardFilter: new XyzMonsterFilter())]),
+        T.Trap(10802, "Numbers Overlay Boost", [new AttachFromStep(new AnyMonsterFilter()), new AttachFromStep(new AnyMonsterFilter())],
+            targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Own, FieldCardFilter.FaceUp,
+                cardFilter: new AllOfFilter(new XyzMonsterFilter(), ClassicArchetypes.Filter("official:number", monstersOnly: true))) { MaxXyzMaterials = 0 }]),
+        T.ReplacementCard(10194, "Catapult Zone", trap: false, field: true,
+            CardTable.Instead(ReplacementSubject.Monsters, new(ReplacementAction.SendFromDeckToGraveyard, OfType(Rock)), DestructionCause.Battle, oncePerTurn: true)),
+        T.MonsterReplacement(7720, "Telekinetic Shocker", CardTable.Instead(ReplacementSubject.Monsters, new(ReplacementAction.DestroySource, LifePoints: 500),
+            cards: OfType(Psychic), side: TargetSide.Either, all: true)),
+        T.MonsterReplacement(7667, "Nettles", CardTable.Instead(ReplacementSubject.Self, new(ReplacementAction.DestroyOwnMonster, OfType(Plant))), getterKind: 16),
+        T.RedirectCard(6707, "Dimensional Fissure", trap: false, new GraveyardRedirect(Cards: new AnyMonsterFilter())),
+        T.RedirectCard(5188, "Alchemic Kettle - Chaos Distill", trap: false, new GraveyardRedirect(Owner: TargetSide.Own)),
+        T.RedirectMonster(4914, "Banisher of the Light", new GraveyardRedirect()),
+        T.RedirectMonster(6695, "Banisher of the Radiance", new GraveyardRedirect()),
+        T.RedirectMonster(6039, "Grave Protector", new GraveyardRedirect(GraveyardDestination.Deck, new AnyMonsterFilter(), DestroyedByBattleOnly: true)),
+        T.Trap(9154, "Different Dimension Ground", [new ApplyGraveyardRedirectStep(new GraveyardRedirect(Cards: new AnyMonsterFilter()))]),
+        T.Trap(6448, "Dimension Wall", [new ApplyDamageRuleStep(new DamageRule(DamageRuleKind.RedirectToOpponent, DamageKinds.Battle), DamageRuleScope.ThisAttack)],
+            conditions: TrapTiming.OpponentAttacks),
+        T.Trap(7463, "Rainbow Life", [new ApplyDamageRuleStep(new DamageRule(DamageRuleKind.BecomesGain))], new DiscardCost()),
+        T.DamageRuleMonster(7352, "Nurse Reficule the Fallen One", new DamageRule(DamageRuleKind.GainBecomesDamage, DamageKinds.Effect), TargetSide.Opponent),
+        T.QuickPlay(4815, "Graceful Dice", [new RollDieStep(), new ModifyAllUntilEndStep(TargetSide.Own, 100, 100, EffectCount.DieRoll)]),
+        T.Trap(4816, "Skull Dice", [new RollDieStep(), new ModifyAllUntilEndStep(TargetSide.Opponent, -100, -100, EffectCount.DieRoll)]),
+        T.Ignition(6879, "Snipe Hunter", [new RollDieStep(), new StopUnlessRollStep(2, 3, 4, 5), new DestroyTargetsStep()], new DiscardCost(),
+            [new FieldTarget(FieldCardKind.Any)]),
+        T.Trap(6221, "Mind Haxorz", [new LookAtOpponentHandStep(IncludeSetCards: true)], new PayLifePointsCost(500)),
+        T.Trap(5446, "Trap Dustshoot", [new LookAtOpponentHandStep(), new ChooseFromOpponentHandStep(new AnyMonsterFilter(), HandMove.ShuffleIntoDeck)],
+            conditions: [new OpponentHandAtLeastCondition(4)]),
+        T.FromZone(7981, "Gallis the Star Beast", EffectOrigin.Hand, new([new MillTopOfDeckStep(1), new StopUnlessMilledStep(new AnyMonsterFilter(), DestroySourceOtherwise: true),
+            new DealDamageStep(200, PerCount: EffectCount.MilledLevel), new SpecialSummonSelfStep()], Cost: new RevealSelfCost())),
+        T.ContinuousLock(4987, "The Eye of Truth", trap: true, new RuleLock(LockedAction.HideHand, TargetSide.Opponent), EffectRelation.Opponent,
+            [new StopUnlessHandHoldsStep(TargetSide.Opponent, new CardCategoryFilter(CardCategory.Spell)), new GainLifePointsStep(1000, Players: EffectPlayers.Opponent)]),
+        T.MonsterLock(6119, "Mind on Air", new RuleLock(LockedAction.HideHand, TargetSide.Opponent)),
+        T.ByName(T.Normal(8993, "Pot of Duality", [new ExcavateStep(3), new TakeExcavatedStep(), new ShuffleDeckStep(),
+            new ApplyRuleLockStep(new RuleLock(LockedAction.SpecialSummon, TargetSide.Own))], conditions: [new NoSpecialSummonThisTurnCondition()])),
+        T.Trap(6809, "The Paths of Destiny", [new EachPlayerTossesCoinStep(2000, 2000)]),
+        T.Trigger(5424, "Dice Jar", MonsterEventKind.FlippedFaceUp, [new DiceDuelStep(500, 6000)], getterKind: 24),
+        T.ContinuousTrigger(5439, "Ordeal of a Traveler", trap: true, MonsterEventKind.AttackDeclared, EffectRelation.Opponent,
+            [new OpponentCallsRandomHandCardStep(), new ReturnAttackerToHandStep()], timing: TriggerTiming.When),
+        T.WhenSummoned(7675, "Twin-Barrel Dragon", [new TossCoinsStep(2), new StopUnlessHeadsStep(2), new DestroyTargetsStep()],
+            targets: [new FieldTarget(FieldCardKind.Any, TargetSide.Opponent)]),
+        T.Trigger(5958, "Vampire Lady", MonsterEventKind.InflictedBattleDamage, [new OpponentSendsFromDeckStep(new DeclaredFilter())],
+            declares: DeclarationKind.CardType),
+        CardTable.Declaring(T.ContinuousWithEffects(5789, "Archfiend's Oath", trap: false,
+            new EffectOption([new ExcavateStep(1), new TakeExcavatedStep(new DeclaredFilter()), new SendExcavatedToGraveyardStep()], Cost: new PayLifePointsCost(500))),
+            DeclarationKind.CardName),
+        CardTable.Declaring(T.Ignition(9644, "Gishki Diviner", [new ExcavateStep(1), new TakeExcavatedStep(new DeclaredFilter())], oncePerTurn: true),
+            DeclarationKind.CardName),
+        CardTable.Declaring(T.Ignition(5660, "Tribe-Infecting Virus",
+            [new DestroyAllStep(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUp, new DeclaredFilter(), IncludeSelf: true)], new DiscardCost()), DeclarationKind.FaceUpMonsterType),
+        CardTable.Declaring(T.Trap(6147, "Mind Crush", [new OpponentDiscardsMatchingStep(new DeclaredFilter(), RandomOwnDiscardOtherwise: true)]), DeclarationKind.CardName),
+        CardTable.Declaring(T.Normal(5480, "Dark Designator", [new OpponentAddsFromDeckStep(new DeclaredFilter())]), DeclarationKind.MonsterCardName),
+        T.Normal(4860, "Change of Heart", [new TakeControlStep(ControlDuration.UntilEndPhase)], targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Opponent)],
+            conditions: [new FreeMonsterZonesCondition(1)]),
+        T.Normal(4803, "Brain Control", [new TakeControlStep(ControlDuration.UntilEndPhase)], new PayLifePointsCost(800),
+            [new FieldTarget(FieldCardKind.Monster, TargetSide.Opponent, FieldCardFilter.FaceUp)], [new FreeMonsterZonesCondition(1)]),
+        T.EquipControl(4898, "Snatch Steal", EffectRelation.Opponent, [new GainLifePointsStep(1000, Players: EffectPlayers.Opponent)]),
+        T.Normal(5162, "Creature Swap", [new SwapChosenMonstersStep()]),
+        T.Trap(10681, "Xyz Reversal", [new SwitchControlStep()], targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Opponent, FieldCardFilter.FaceUp, cardFilter: new XyzMonsterFilter()),
+            new FieldTarget(FieldCardKind.Monster, TargetSide.Own, FieldCardFilter.FaceUp, cardFilter: new XyzMonsterFilter())]),
+        T.FromZone(6977, "Electric Virus", EffectOrigin.Hand, new([new TakeControlStep(ControlDuration.UntilEndPhase)], new SendSelfCost(SelfDestination.Graveyard),
+            [new FieldTarget(FieldCardKind.Monster, TargetSide.Opponent, cardFilter: new MonsterTypeFilter([MonsterTypes.Machine, MonsterTypes.Dragon]))],
+            [new FreeMonsterZonesCondition(1)])),
+        T.MonsterLock(5714, "Blindly Loyal Goblin", new RuleLock(LockedAction.SwitchControl, Scope: LockScope.Self)),
+        T.NormalPendulum(11353, "Qliphort Scout", 9,
+            [new([new AddFromDeckToHandStep(new AllOfFilter([ClassicArchetypes.Filter("official:qli"), new NotFilter(new CardIdFilter([11353]))]))], new PayLifePointsCost(800))],
+            new RuleLock(LockedAction.SpecialSummon, TargetSide.Own, new NotFilter(new AllOfFilter([new AnyMonsterFilter(), ClassicArchetypes.Filter("official:qli")])))),
+        T.WhenTributed(T.Qliphort(T.NormalPendulum(11354, "Qliphort Carrier", 1, scaleLock: QliOnly,
+            modifiers: [new LastingStatModifier(TargetSide.Own, 300, 0, ClassicArchetypes.Filter("official:qli"))], getterKind: 26)),
+            [new ReturnTargetsToHandStep()], new FieldTarget(FieldCardKind.Monster)),
+        T.WhenTributed(T.Qliphort(T.NormalPendulum(11355, "Qliphort Helix", 9, scaleLock: QliOnly,
+            modifiers: [new LastingStatModifier(TargetSide.Opponent, -300, 0)], getterKind: 26)),
+            [new DestroyTargetsStep()], new FieldTarget(FieldCardKind.SpellTrap)),
+        T.WhenSentFromField(T.WithReplacement(T.WithLock(CardTable.Declaring(T.ContinuousWithEffects(11299, "Marshalling Field", trap: true,
+                    new EffectOption([new SetDeclaredLevelStep(new AllOfFilter([OfType(Machine), new MonsterLevelFilter(12, minLevel: 5)]), 5, 9)])), DeclarationKind.Level),
+                new RuleLock(LockedAction.SpecialSummon, TargetSide.Own, new NotFilter(OfType(Machine)))),
+            CardTable.Instead(ReplacementSubject.Monsters, new(ReplacementAction.SendSourceToGraveyard), cards: new AllOfFilter([OfType(Machine), new XyzMonsterFilter()]), all: true)),
+            [new AddFromDeckOrGraveyardStep(new CardIdFilter([11022]))]),
+        T.WithTrigger(T.NormalPendulum(11330, "D/D Proud Chevalier", 6,
+                [new([new ModifyTargetsStep(-500)], new PayLifePointsCost(500), [new FieldTarget(FieldCardKind.Monster, TargetSide.Opponent, FieldCardFilter.FaceUp)])], getterKind: 26) with
+            {
+                Scales = [new PendulumCardProfile(11330, 6, 6) { PartnerFilter = ClassicArchetypes.Filter("official:dd"), ScaleWithoutPartner = 5 }]
+            },
+            "summoned", [MonsterEventKind.NormalSummoned], EffectRelation.Self, [new AddFromFaceUpExtraDeckStep(OfAttribute(Dark))], TriggerRequirement.Optional),
+        Kepler(),
+        T.PendulumTrigger(T.NormalPendulum(11211, "Foucault's Cannon", 2), MonsterEventKind.EndPhase, EffectRelation.Any,
+            [new StopUnlessActivatedThisTurnStep(), new DestroyTargetsStep()], TriggerRequirement.Optional,
+            [new FieldTarget(FieldCardKind.SpellTrap, TargetSide.Either, FieldCardFilter.FaceUp)]),
+        T.Trap(5448, "Reckless Greed", [new DrawCardsStep(2), new SkipPhaseStep(DuelPhase.Draw, TargetSide.Own, 2)]),
+        T.Trap(4984, "Time Seal", [new SkipPhaseStep(DuelPhase.Draw, TargetSide.Opponent)]),
+        T.Trap(4990, "Solomon's Lawbook", [new SkipPhaseStep(DuelPhase.Standby)]),
+        T.QuickPlay(5214, "Offerings to the Doomed", [new DestroyTargetsStep(), new SkipPhaseStep(DuelPhase.Draw)],
+            targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Either, FieldCardFilter.FaceUp)]),
+        T.Trap(5793, "Frozen Soul", [new SkipPhaseStep(DuelPhase.Battle, TargetSide.Opponent)], conditions: [new LifePointsBehindCondition(2000)]),
+        T.Counter(4804, "Negate Attack", [new NegateAttackStep(), new EndBattlePhaseStep()], TrapTiming.OpponentAttacks, targets: TrapTiming.Attacker),
+        T.WhenBattleDestroyed(4875, "The Unhappy Maiden", [new EndBattlePhaseStep()]),
+        T.WithLock(T.Trigger(5974, "Solar Flare Dragon", MonsterEventKind.EndPhase, [new StopUnlessOwnTurnStep(), new DealDamageStep(500)], timing: TriggerTiming.If),
+            new RuleLock(LockedAction.BeAttacked, Scope: LockScope.Self, WhileControlsOther: OfType(Pyro))),
+        T.MonsterLock(8274, "Infernity Guardian", new RuleLock(LockedAction.BeDestroyedByBattle | LockedAction.BeDestroyedByEffect, Scope: LockScope.Self, WhileHandEmpty: true)),
+        T.MonsterLock(6473, "Reborn Zombie", new RuleLock(LockedAction.BeDestroyedByBattle, Scope: LockScope.Self, Position: FieldCardFilter.AttackPosition, WhileHandEmpty: true)),
+        T.MonsterLock(8436, "Savior Dragon", new RuleLock(LockedAction.BeSynchroMaterial, Scope: LockScope.Self, ExceptSummoning: new CardIdFilter(SaviorSynchros)),
+            getterKind: 16, rules: new(CardCategory.Monster, AllowsNormalSummon: true, AllowsBasicBattle: true, AllowsTributeForSummon: true, AllowsSummonMaterial: true, IsTuner: true)),
+        T.Normal(4817, "Mind Control", [new LockTargetsUntilEndStep(LockedAction.Attack | LockedAction.BeTributed), new TakeControlStep(ControlDuration.UntilEndPhase)],
+            targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Opponent)], conditions: [new FreeMonsterZonesCondition(1)]),
+        T.ContinuousLock(9353, "Terminal World", trap: false, new RuleLock(LockedAction.EnterMainPhase2), conditions: [new PhaseCondition(DuelPhase.Main1)]),
+        T.ContinuousTrait(4951, "DNA Surgery", trap: true, DeclarationKind.MonsterType, new(IdentityTrait.Type, TraitScope.AllFaceUp)),
+        T.ContinuousTrait(3764, "Declaration of Rebirth", trap: true, DeclarationKind.MonsterType, new(IdentityTrait.Type, TraitScope.Graveyards)),
+        T.EquipTrait(5211, "Scroll of Bewitchment", DeclarationKind.Attribute, IdentityTrait.Attribute),
+        CardTable.Declaring(T.Ignition(8551, "Genex Ally Changer", [new ChangeTargetsTraitStep(IdentityTrait.Attribute)], targets: [FaceUpMonster], oncePerTurn: true),
+            DeclarationKind.Attribute),
+        CardTable.Declaring(T.ContinuousWithEffects(3784, "Attribute Chameleon", trap: true, quick: true,
+            new EffectOption([new ChangeTargetsTraitStep(IdentityTrait.Attribute)], Targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Opponent, FieldCardFilter.FaceUp)],
+                Conditions: [new TurnTimingCondition(TurnOwner.Opponent)])), DeclarationKind.Attribute),
+        CardTable.Declaring(T.Ignition(9283, "Psi-Blocker", [new ApplyRuleLockStep(new RuleLock(PsiBlocked, TargetSide.Either, new DeclaredFilter()), ThroughOpponentsNextTurn: true)],
+            oncePerTurn: true), DeclarationKind.CardName),
+        CardTable.Declaring(T.QuickPlay(11585, "Pendulum Shift", [new SetTargetScaleStep()], targets: [new FieldTarget(FieldCardKind.PendulumScale)]), DeclarationKind.PendulumScale),
+        T.Spirit(T.Trigger(5375, "Yata-Garasu", MonsterEventKind.InflictedBattleDamage, [new SkipPhaseStep(DuelPhase.Draw, TargetSide.Opponent)])),
+        T.Trigger(4490, "Ameba", MonsterEventKind.ControlChanged, [new TakeDamageStep(2000)], limit: TriggerTurnLimit.WhileFaceUp, exceptions: GainedControl),
+        T.Trigger(4553, "Griggle", MonsterEventKind.ControlChanged, [new GainLifePointsStep(3000, EffectPlayers.Opponent)], limit: TriggerTurnLimit.WhileFaceUp, exceptions: GainedControl),
+        T.Trigger(7725, "Kunoichi", MonsterEventKind.ControlChanged, [new DiscardRandomStep()], exceptions: GainedControl),
+        Charmer(6335, "Aussa the Earth Charmer", Earth),
+        Charmer(6338, "Wynn the Wind Charmer", Wind),
+        Charmer(7664, "Dharc the Dark Charmer", Dark),
+        Charmer(8800, "Lyna the Light Charmer", Light),
+        Charmer(6336, "Eria the Water Charmer", Water, targets: true),
+        Charmer(6337, "Hiita the Fire Charmer", Fire, targets: true),
+        T.Normal(5168, "Mystic Box", [new DestroyTargetAtStep(0), new GiveTargetControlStep(1)],
+            targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Opponent), new FieldTarget(FieldCardKind.Monster, TargetSide.Own)],
+            exceptions: "If the first target is not destroyed, control is not given (\"then\"; no card ruling found)."),
+        CardTable.Declaring(T.Trap(8853, "Crevice Into the Different Dimension", [new BanishTargetsStep()],
+            targets: [new ZoneTarget(CardZone.Graveyard, TargetSide.Either, new SharedTraitFilter(IdentityTrait.Attribute), 2, 2)],
+            exceptions: "The targets are chosen first and must share an Attribute; the declaration is then that Attribute."), DeclarationKind.Attribute),
+        T.DeclaredWatch(7015, "Cloak and Dagger", trap: true, DeclarationKind.MonsterCardName,
+            [MonsterEventKind.NormalSummoned, MonsterEventKind.SpecialSummoned, MonsterEventKind.FlippedFaceUp], EffectRelation.Opponent,
+            [new BanishEventMonsterStep(), new BanishSourceCardStep()], "The name is declared as the card resolves (OCG ruling)."),
+        T.HandTrigger(8617, "Battle Fader", MonsterEventKind.AttackDeclared, EffectRelation.Opponent,
+            [new SpecialSummonSelfStep(), new BanishSourceWhenItLeavesStep(), new EndBattlePhaseStep()], directAttack: true),
+        T.HandTrigger(10898, "Gorgonic Gargoyle", MonsterEventKind.NormalSummoned, EffectRelation.Controller, [new SpecialSummonSelfStep()], OfType(Rock)),
+        T.FromZone(9078, "Swift Scarecrow", EffectOrigin.Hand, new([new NegateAttackStep(), new EndBattlePhaseStep()], new SendSelfCost(SelfDestination.Graveyard),
+            TrapTiming.Attacker, [new OpponentAttackDeclaredCondition(), new DirectAttackCondition()]), quick: true),
+        T.QuickPlay(5486, "Spell of Pain", [new RedirectRespondedDamageStep()], conditions: [new RespondsToDamageCondition()]),
+        T.Counter(5543, "Barrel Behind the Door", [new RedirectRespondedDamageStep()], [new RespondsToDamageCondition(ByOpponent: false)]),
+        T.Counter(7765, "Intercept", [new TakeControlStep()], [new MonsterSummonedCondition(SummonKinds.Normal), new TributeCountCondition(1)], targets: TrapTiming.Summoned,
+            exceptions: "Offered only for the opponent's Summons; taking your own monster would do nothing."),
+        T.Trap(9941, "Splash Capture", [new TakeControlStep()], new BanishFromGraveyardCost(OfType(Fish), 2), TrapTiming.Summoned,
+            [new MonsterSummonedCondition(SummonKinds.Special), new XyzSummonedCondition()]),
+        T.ContinuousLock(5134, "Gravity Bind", trap: true, new RuleLock(LockedAction.Attack, Cards: new MonsterLevelFilter(12, minLevel: 4))),
+        T.ContinuousLock(5281, "Vengeful Bog Spirit", trap: false, new RuleLock(LockedAction.Attack, SummonedThisTurnOnly: true)),
+        T.ContinuousLock(6522, "Non-Fusion Area", trap: true, new RuleLock(LockedAction.FusionSummon)),
+        T.ContinuousLock(5106, "Mask of Restrict", trap: true, new RuleLock(LockedAction.BeTributed)),
+        T.ContinuousLock(7787, "Power Filter", trap: false, new RuleLock(LockedAction.SpecialSummon, Cards: new MonsterTraitFilter(MonsterStat.Attack, 1000))),
+        T.ContinuousLock(9953, "Royal Prison", trap: true, new RuleLock(LockedAction.SpecialSummon, From: SpecialSummonSources.Graveyard)),
+        T.EquipLock(6546, "Mist Body", LockedAction.BeDestroyedByBattle),
+        T.EquipLock(4878, "Paralyzing Potion", LockedAction.Attack, new NotFilter(OfType(Machine))),
+        T.MonsterLock(6385, "Gyroid", new RuleLock(LockedAction.BeDestroyedByBattle, Scope: LockScope.Self, UsesPerTurn: 1)),
+        T.MonsterLock(7708, "Dark Resonator", new RuleLock(LockedAction.BeDestroyedByBattle, Scope: LockScope.Self, UsesPerTurn: 1), getterKind: 16),
+        T.MonsterLock(7990, "Shield Wing", new RuleLock(LockedAction.BeDestroyedByBattle, Scope: LockScope.Self, UsesPerTurn: 2)),
+        T.MonsterLock(4747, "Lord of D.", new RuleLock(LockedAction.BeTargeted, Cards: OfType(Dragon))),
+        T.MonsterLock(6321, "Hieracosphinx", new RuleLock(LockedAction.BeAttacked, TargetSide.Own, Position: FieldCardFilter.FaceDown)),
+        T.MonsterLock(5922, "Invader of Darkness", new RuleLock(LockedAction.ActivateSpell, TargetSide.Opponent, Kind: EffectKind.QuickPlaySpell)),
+        T.MonsterLock(6195, "Pitch-Black Warwolf", new RuleLock(LockedAction.ActivateTrap, TargetSide.Opponent, Phase: DuelPhase.Battle)),
+        T.MonsterLock(6196, "Mirage Dragon", new RuleLock(LockedAction.ActivateTrap, TargetSide.Opponent, Phase: DuelPhase.Battle)),
+        T.MonsterLock(11557, "Lightning Rod Lord", new RuleLock(LockedAction.ActivateSpell, Phase: DuelPhase.Main1)),
+        T.ContinuousLock(7858, "Imperial Iron Wall", trap: true, new RuleLock(LockedAction.BeBanished)),
+        T.MonsterLock(8191, "G.B. Hunter", new RuleLock(LockedAction.BeReturnedToDeck, OnFieldOnly: true)),
+        T.MonsterLock(6027, "Protector of the Sanctuary", new RuleLock(LockedAction.Draw, TargetSide.Opponent, ExceptPhase: DuelPhase.Draw)),
+        T.MonsterLock(7686, "Sonic Chick", new RuleLock(LockedAction.BeDestroyedByBattle, Scope: LockScope.Self, Versus: new BattleOpponent(MinAttack: 1900))),
+        T.MonsterLock(5244, "Obnoxious Celtic Guard", new RuleLock(LockedAction.BeDestroyedByBattle, Scope: LockScope.Self, Versus: new BattleOpponent(MinAttack: 1900))),
+        T.MonsterLock(8107, "Pilgrim of the Ice Barrier", new RuleLock(LockedAction.BeDestroyedByBattle, Scope: LockScope.Self, Versus: new BattleOpponent(MinAttack: 1900))),
+        T.MonsterLock(7812, "Reese the Ice Mistress", new RuleLock(LockedAction.BeDestroyedByBattle, Scope: LockScope.Self, Versus: new BattleOpponent(new MonsterLevelFilter(12, minLevel: 4))), getterKind: 16),
+        T.Trigger(6697, "Guard Dog", MonsterEventKind.FlippedFaceUp, [new ApplyRuleLockStep(new RuleLock(LockedAction.SpecialSummon, TargetSide.Opponent))], getterKind: 24),
+        T.Trap(5332, "A Feint Plan", [new ApplyRuleLockStep(new RuleLock(LockedAction.BeAttacked, Position: FieldCardFilter.FaceDown))]),
+        T.Modal(5607, "Poison of the Old Man", EffectKind.QuickPlaySpell, "The option is chosen at activation.", new EffectOption([new GainLifePointsStep(1200)]), new EffectOption([new DealDamageStep(800)])),
+        OnlyWithNoMonsters(5435, "Call of the Mummy", Zombie),
+        OnlyWithNoMonsters(7573, "Valhalla, Hall of the Fallen", Fairy),
+        T.Normal(9666, "Surface", [new SpecialSummonTargetStep(BattlePosition.FaceUpDefense)], targets:
+            [new ZoneTarget(CardZone.Graveyard, TargetSide.Own, new AllOfFilter(new MonsterLevelFilter(3), new MonsterTypeFilter([Fish, SeaSerpent, Aqua])), mustBeSummonable: true)])
+    ];
+
+    public static CardFamily Family { get; } = CardTable.Family(FamilyId, BatchId, ["TemplateCardFamilyTests", "BattleAbilityTests", "CardPoolTests"], Cards);
+}

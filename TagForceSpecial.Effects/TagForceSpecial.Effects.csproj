@@ -8,5 +8,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\TagForceSpecial.Core\TagForceSpecial.Core.csproj" />
+    <EmbeddedResource Include="Archetypes\Classic\*.json" />
   </ItemGroup>
 </Project>

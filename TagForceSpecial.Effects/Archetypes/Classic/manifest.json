@@ -1,0 +1,1 @@
+{"schemaVersion":1,"packId":"tfs:classic-consumers","version":"1","kind":"native","profiles":["tfsClassic","expanded"],"dependencies":[],"evidence":{"reference":"CARD_Named.bin","sha256":"c2720b177858b706f6c2d6f3102437c4b1d75f6064483bd6368cf7fd4052b7c5","reason":"Reviewed semantic projection for existing consumers; the historical native table is retained separately."}}

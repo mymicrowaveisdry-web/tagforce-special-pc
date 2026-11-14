@@ -137,7 +137,7 @@ public sealed class SetupStore
             var resources = ResourceIndex.Create(cache);
             Storage.Write($"caches/{generation}/resources.json", resources);
             cancellation.ThrowIfCancellationRequested();
-            // The old generation is retained. Only a completely validated generation becomes active.
+            // Keeps the old generation; only a fully validated generation becomes active.
             SavePreferences(Preferences with { ActiveGeneration = generation, SourcePath = Path.GetFullPath(sourcePath) });
             Cache = result.Cache; Resources = resources; Issue = null;
             progress?.Report(new(95, "Preparing original title artwork"));

@@ -6,8 +6,7 @@ namespace TagForceSpecial.Assets.Presentation;
 public sealed record IndexedTextRecord(int Index, uint SourceOffset, string? Text, bool IsEndMarker, string? Diagnostic);
 public sealed record IndexedTextTable(IReadOnlyList<IndexedTextRecord> Records, string OffsetUnit, int TextBytes);
 
-/// <summary>Read-only source string pointers; preserves duplicates, backward references, controls and row IDs.
-/// Source suffix language labels are not translation verification. No script execution or localization.</summary>
+/// <summary>Read-only string pointer table that keeps duplicates, backward references, controls and row IDs.</summary>
 public static class IndexedTextReader
 {
     private const int MaximumBytes = 64 * 1024 * 1024;

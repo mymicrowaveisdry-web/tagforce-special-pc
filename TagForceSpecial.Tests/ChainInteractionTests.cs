@@ -6,9 +6,8 @@ using TagForceSpecial.Effects;
 namespace TagForceSpecial.Tests;
 
 /// <summary>
-/// Synthetic legal-command scenarios for the interpreted native contract.
-/// These are not original negation/interruption gameplay replays.
-/// Card 2 and card 3 are invented probes, not real-card support declarations.
+/// Legal-command chain scenarios for Mystical Space Typhoon, Lightning Vortex and Magic Jammer. Cards 2 and 3 are
+/// invented negation probes.
 /// </summary>
 public sealed class ChainInteractionTests
 {
@@ -36,18 +35,16 @@ public sealed class ChainInteractionTests
         Assert.Empty(result.Events);
     }
 
-    private static ChainResponseProfile EffectProbe(bool destroy = false) =>
-        new("synthetic-effect-negation", 2, ChainOperation.NegateEffect, ChainSpellSpeed.Two,
-            respondsToCategory: CardCategory.Spell, destroyNegatedSource: destroy);
+    private static EffectDefinition EffectProbe(bool destroy = false) =>
+        ResponseProbe.Negate("synthetic-effect-negation", 2, ResponseNegation.Effect, respondsTo: CardCategory.Spell, destroy: destroy);
 
-    private static ChainResponseProfile CounterProbe() =>
-        new("synthetic-counter-negation", 3, ChainOperation.NegateActivation, ChainSpellSpeed.Three,
-            respondsToCategory: CardCategory.Trap, destroyNegatedSource: true);
+    private static EffectDefinition CounterProbe() =>
+        ResponseProbe.Negate("synthetic-counter-negation", 3, ResponseNegation.Activation, ChainSpellSpeed.Three, respondsTo: CardCategory.Trap, destroy: true);
 
     private static DuelEngine Engine(PlayerId actor = PlayerId.One, uint initialSpell = 5217,
         bool enabled = true, bool missingResponseCost = false, bool destroyEffectSource = false,
-        IEnumerable<ChainResponseProfile>? profiles = null, bool setOwnTyphoonOnActivationTurn = false,
-        IEnumerable<DecisionSequence>? decisionSequences = null)
+        IEnumerable<EffectDefinition>? profiles = null, bool setOwnTyphoonOnActivationTurn = false,
+        IEnumerable<DecisionSequence>? decisionSequences = null, IEnumerable<EffectDefinition>? definitions = null)
     {
         uint[] ids = [1, 2, 3, 4, 4909, 5217, 4862];
         var catalog = new CardCatalog(new(new string('0', 64), "invented-chain-interaction-inputs"),
@@ -61,15 +58,13 @@ public sealed class ChainInteractionTests
         var engine = new DuelEngine(catalog, rules,
             actor == PlayerId.One ? initiatingDeck : respondingDeck,
             actor == PlayerId.Two ? initiatingDeck : respondingDeck, startingPlayer: actor, decisionSequences: decisionSequences,
-            experimentalActivationContracts: [ActivationResearch.LightningVortex([1]), ActivationResearch.MysticalSpaceTyphoon()],
-            experimentalChainEffects: [ChainResearch.LightningVortex(), ChainResearch.MysticalSpaceTyphoon()],
-            experimentalChainResponses: enabled ? profiles ??
-                [ChainResearch.MysticalSpaceTyphoonResponse(), ChainResearch.MagicJammer([1]), EffectProbe(destroyEffectSource), CounterProbe()] : []);
+            effectDefinitions: [.. definitions ?? EventEffectScenario.ChainCards(enabled ? new uint[] { 4909, 5217, 4862 } : new uint[] { 4909, 5217 }),
+                .. enabled ? profiles ?? [EffectProbe(destroyEffectSource), CounterProbe()] : []]);
         for (int turn = 1; turn <= 3; turn++)
         {
             var player = engine.State.ActivePlayer;
             Ok(engine, new ResolveDrawStep(player));
-            Ok(engine, new ChangePhase(player, DuelPhase.Main1));
+            Phase(engine, DuelPhase.Main1);
             if (turn == 3) break;
             uint[] sets = [4909, 4862, 2, 3];
             for (int zone = 0; zone < sets.Length; zone++)
@@ -80,8 +75,12 @@ public sealed class ChainInteractionTests
                 Ok(engine, new SetSpellTrap(player, card.InstanceId, zone));
             }
             if (turn == 2)
+            {
                 Ok(engine, new NormalSummon(player, engine.State.GetPlayer(player).Hand.First(c => c.GameCardId == 1).InstanceId, 2));
-            Ok(engine, new ChangePhase(player, DuelPhase.End));
+                // The responder keeps nothing in hand that could pay Magic Jammer's discard.
+                if (missingResponseCost) Ok(engine, new SetSpellTrap(player, engine.State.GetPlayer(player).Hand.Single(c => c.GameCardId == 4).InstanceId, 4));
+            }
+            Phase(engine, DuelPhase.End);
             Ok(engine, new EndTurn(player));
         }
         if (setOwnTyphoonOnActivationTurn)
@@ -93,6 +92,12 @@ public sealed class ChainInteractionTests
         return engine;
     }
 
+    /// <summary>A phase change that passes any open window offered to the non-turn player.</summary>
+    private static void Phase(DuelEngine engine, DuelPhase target)
+    {
+        Ok(engine, new ChangePhase(engine.State.ActivePlayer, target));
+        if (engine.State.OpenWindow is { } window) Ok(engine, new PassChainResponse(window.Responder, window.DecisionId));
+    }
     private static DuelActionResult Pay(DuelEngine engine)
     {
         var p = engine.State.PendingDecision!;
@@ -163,10 +168,10 @@ public sealed class ChainInteractionTests
         Assert.Equal(new uint[] { 1, 4862 }, result.State.GetPlayer(opponent).Graveyard.Select(c => c.GameCardId));
         Assert.Contains(originalCost, result.State.GetPlayer(actor).Graveyard);
         Assert.Contains(responseCost, result.State.GetPlayer(opponent).Graveyard);
-        Assert.True(result.State.ResearchSliceComplete);
+        Assert.False(result.State.ResearchSliceComplete);
         Assert.Null(result.State.Outcome);
         Assert.NotNull(paid.GetPlayer(actor).SpellTrapFields[4]);
-        Reject(engine, new EndTurn(actor), DuelError.ResearchSliceComplete);
+        Reject(engine, new EndTurn(actor), DuelError.WrongPhase); // the duel continues in Main Phase 1
     }
 
     [Theory]
@@ -236,7 +241,7 @@ public sealed class ChainInteractionTests
         Assert.Equal(new uint[] { 4909 }, final.State.GetPlayer(actor).Graveyard.Select(c => c.GameCardId));
         Assert.Equal(new uint[] { 2, 4909 }, final.State.GetPlayer(opponent).Graveyard.Select(c => c.GameCardId));
         Assert.Equal(2, final.Events.OfType<SpellSentToGraveyard>().Count());
-        Assert.True(final.State.ResearchSliceComplete);
+        Assert.False(final.State.ResearchSliceComplete);
         Assert.All(final.State.Players, p => Assert.Equal(8000, p.LifePoints));
     }
 
@@ -282,7 +287,7 @@ public sealed class ChainInteractionTests
         Pay(engine);
         var c = engine.State.PendingChain!;
         Reject(engine, new ActivateChainResponse(c.Responder, c.DecisionId, 0), DuelError.ChainResponseSpeedNotAllowed);
-        Reject(engine, new ActivateChainResponse(c.Responder, c.DecisionId, 2), DuelError.UnsupportedChainResponse);
+        Reject(engine, new ActivateChainResponse(c.Responder, c.DecisionId, 2), DuelError.ChainResponseSpeedNotAllowed);
         Assert.False(engine.State.GetPlayer(PlayerId.One).SpellTrapFields[0]!.IsFaceUp);
         Assert.False(engine.State.GetPlayer(PlayerId.One).SpellTrapFields[2]!.IsFaceUp);
         Assert.Single(engine.State.GetPlayer(PlayerId.One).Graveyard);
@@ -324,32 +329,35 @@ public sealed class ChainInteractionTests
         var engine = Engine();
         Respond(engine, 2);
         var c = engine.State.PendingChain!;
-        Reject(engine, new ActivateChainResponse(c.Responder, c.DecisionId, 1), DuelError.UnsupportedChainResponse);
+        Reject(engine, new ActivateChainResponse(c.Responder, c.DecisionId, 1), DuelError.ActivationConditionNotMet);
     }
 
     [Fact]
-    public void ResponseProfilesAreImmutableAndRejectUntrustedRegistration()
+    public void ProbesAndDefinitionsAreImmutableAndRejectUntrustedRegistration()
     {
         uint[] costs = [1];
-        var profile = ChainResearch.MagicJammer(costs);
+        var cost = new DiscardCost(new CardIdFilter(costs));
         costs[0] = 4;
-        Assert.Equal(1u, Assert.Single(profile.DiscardCardIds));
-        Assert.Throws<NotSupportedException>(() => ((IList<uint>)profile.DiscardCardIds).Clear());
-        Assert.Throws<ArgumentOutOfRangeException>(() => new ChainResponseProfile("bad", 2, ChainOperation.NegateEffect, ChainSpellSpeed.One));
-        Assert.Throws<ArgumentException>(() => ChainResearch.MagicJammer([]));
-        Assert.Throws<ArgumentNullException>(() => ChainResearch.MagicJammer(null!));
-        Assert.Throws<ArgumentException>(() => Engine(profiles: [ChainResearch.MagicJammer([999])]));
-        Assert.Throws<ArgumentException>(() => Engine(profiles:
-            [new("wrong-id", 4909, ChainOperation.DestroyBoundSpellTrap, ChainSpellSpeed.Two)]));
-        Assert.Throws<ArgumentException>(() => Engine(profiles:
-            [new("bad-cost", 1, ChainOperation.NegateEffect, ChainSpellSpeed.Two)]));
+        var filter = Assert.IsType<CardIdFilter>(cost.Filter);
+        Assert.Equal(1u, Assert.Single(filter.CardIds));
+        Assert.Throws<NotSupportedException>(() => ((IList<uint>)filter.CardIds).Clear());
+        // Negation needs a response condition, and a Normal Spell cannot respond.
+        Assert.Throws<ArgumentException>(() => new EffectDefinition("bad", 2, EffectKind.NormalTrap, [new NegateEffectStep(false)]));
+        Assert.Throws<ArgumentException>(() => new EffectDefinition("bad", 2, EffectKind.NormalSpell, [new NegateEffectStep(false)],
+            [new RespondsToActivationCondition()]));
+        Assert.Throws<ArgumentException>(() => Engine(profiles: [ResponseProbe.Negate("unknown-cost", 2, ResponseNegation.Effect, discardCardIds: [999])]));
+        Assert.Throws<ArgumentException>(() => Engine(profiles: [ResponseProbe.Negate("bad-source", 1, ResponseNegation.Effect)]));
+        // Two definitions cannot share a card.
+        Assert.Throws<ArgumentException>(() => Engine(profiles: [ResponseProbe.Negate("shadow", 4862, ResponseNegation.Activation, ChainSpellSpeed.Three)]));
         Assert.Throws<ArgumentException>(() => Engine(decisionSequences:
-            [new("chain-response:magic-jammer-static-response-v1", [DecisionStep.Card(DecisionCardSource.Hand, [1])])]));
-        var sequence = new BeginDecisionSequence(PlayerId.One, "chain-response:magic-jammer-static-response-v1");
+            [new("activation:magic-jammer-v1", [DecisionStep.Card(DecisionCardSource.Hand, [1])])]));
+        var jammer = Assert.Single(EventEffectScenario.ChainCards(4862));
+        Assert.Equal(ChainSpellSpeed.Three, jammer.SpellSpeed);
+        Assert.IsType<DiscardCost>(jammer.Cost);
+        Assert.Throws<NotSupportedException>(() => ((IList<EffectStep>)jammer.Steps).Clear());
         var engine = Engine();
-        Reject(engine, sequence, DuelError.ChainPending);
+        Reject(engine, new BeginDecisionSequence(PlayerId.One, "activation:magic-jammer-v1"), DuelError.ChainPending);
     }
-
     [Fact]
     public void NegationReplayIncludesIdenticalCostsFlagsAndEvents()
     {
@@ -370,9 +378,10 @@ public sealed class ChainInteractionTests
     [Fact]
     public void ResponseCostRemainsPaidWhileItsSeparateTargetDecisionWaits()
     {
-        var profile = new ChainResponseProfile("mystical-space-typhoon-target-commit-v1", 4909,
-            ChainOperation.DestroyBoundSpellTrap, ChainSpellSpeed.Two, [1]); // synthetic costed-target combination
-        var engine = Engine(profiles: [profile]);
+        // Costed-target Quick-Play on Typhoon's card, without probes or Magic Jammer.
+        EffectDefinition costed = new("synthetic-costed-typhoon", 4909, EffectKind.QuickPlaySpell, [new DestroyTargetStep()],
+            cost: new DiscardCost(), target: new SpellTrapOnFieldTarget());
+        var engine = Engine(profiles: [], definitions: [costed, .. EventEffectScenario.ChainCards(5217)]);
         Respond(engine, 0);
         var cost = engine.State.PendingDecision!.CardOptions[0];
         Pay(engine);
@@ -392,7 +401,6 @@ public sealed class ChainInteractionTests
         Assert.Single(engine.State.GetPlayer(PlayerId.Two).Graveyard, c => c == cost);
         Assert.Single(paid.PendingChain!.Links);
     }
-
     [Fact]
     public void AQuickPlaySetThisTurnCannotRespondEvenWhenItsOwnerGetsPriority()
     {
@@ -400,7 +408,7 @@ public sealed class ChainInteractionTests
         Pass(engine);
         var c = engine.State.PendingChain!;
         Assert.Equal(PlayerId.One, c.Responder);
-        Reject(engine, new ActivateChainResponse(PlayerId.One, c.DecisionId, 0), DuelError.UnsupportedChainResponse);
+        Reject(engine, new ActivateChainResponse(PlayerId.One, c.DecisionId, 0), DuelError.SetThisTurn);
         Assert.False(engine.State.GetPlayer(PlayerId.One).SpellTrapFields[0]!.IsFaceUp);
     }
 }

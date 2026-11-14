@@ -5,8 +5,9 @@ using TagForceSpecial.PC.Setup;
 
 namespace TagForceSpecial.PC.Import;
 
-/// <summary>Onboarding normalizes the code-pinned title and title-flow resources plus the two source files holding
-/// prompt text and embedded dialog textures; it does not import PSP saves.</summary>
+/// <summary>
+/// Normalizes the pinned title and title-flow resources plus the files holding prompt text and dialog textures.
+/// </summary>
 public static class TitlePresentationImport
 {
     public static IReadOnlyList<PresentationReferenceCase> Required { get; } = Array.AsReadOnly(

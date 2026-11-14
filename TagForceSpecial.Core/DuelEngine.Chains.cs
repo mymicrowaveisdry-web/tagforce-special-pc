@@ -7,7 +7,22 @@ public sealed partial class DuelEngine
         var chain = State.PendingChain!;
         if (chain.SummonDecision is not null)
             return command is ChooseEffectSummon summon ? AnswerEffectSummon(chain, summon) : Reject(DuelError.DecisionPending);
-        if (command is ChooseEffectSummon) return Reject(DuelError.NoPendingDecision);
+        if (chain.DefinitionSummon is not null)
+            return command switch
+            {
+                ChooseDefinitionSummon choice => AnswerDefinitionSummon(chain, choice),
+                FinishDefinitionSummon finish => FinishDefinitionSummons(chain, finish),
+                _ => Reject(DuelError.DecisionPending)
+            };
+        if (chain.DefinitionCardChoice is not null)
+            return command switch { ChooseDefinitionCard card => AnswerDefinitionCardChoice(chain, card), FinishDefinitionCardChoice finish => FinishDefinitionCards(chain, finish), _ => Reject(DuelError.DecisionPending) };
+        if (chain.DefinitionChoice is PendingDeclaration declaration)
+            return command is DeclareValue declared ? AnswerDeclaration(chain, declaration, declared) : Reject(DuelError.DecisionPending);
+        if (chain.DefinitionChoice is PendingTypeCall typeCall)
+            return command is CallCardType call ? AnswerTypeCall(chain, typeCall, call) : Reject(DuelError.DecisionPending);
+        if (chain.ReplacementChoice is { } replacement)
+            return command is ChooseDestructionReplacement answer ? AnswerChainReplacement(chain, replacement, answer) : Reject(DuelError.DecisionPending);
+        if (command is ChooseEffectSummon or ChooseDefinitionSummon or FinishDefinitionSummon or FinishDefinitionCardChoice or ChooseDefinitionCard or ChooseDestructionReplacement or CallCardType or DeclareValue) return Reject(DuelError.NoPendingDecision);
         if (State.PendingDecision is not null)
             return command is DecisionCommand answer ? AnswerDecision(answer) : Reject(DuelError.DecisionPending);
         if (command is DecisionCommand) return Reject(DuelError.NoPendingDecision);
@@ -15,6 +30,10 @@ public sealed partial class DuelEngine
         {
             PassChainResponse c => c.DecisionId,
             ActivateChainResponse c => c.DecisionId,
+            ActivateHandChainResponse c => c.DecisionId,
+            ActivateMonsterChainResponse c => c.DecisionId,
+            ActivateZoneEffectResponse c => c.DecisionId,
+            ActivateFieldEffectResponse c => c.DecisionId,
             ResolveNextChainLink c => c.DecisionId,
             _ => -1
         };
@@ -28,82 +47,108 @@ public sealed partial class DuelEngine
         }
         if (command is ResolveNextChainLink) return Reject(DuelError.ChainPending);
         if (command.Player != chain.Responder) return Reject(DuelError.NotChainResponder);
+        if (command is ActivateHandChainResponse hand) return BeginHandDefinitionResponse(chain, hand);
+        if (command is ActivateMonsterChainResponse monsterResponse) return BeginMonsterEffect(monsterResponse.Player, monsterResponse.MonsterZone, chain, detach: monsterResponse.DetachInstanceIds, effectIndex: monsterResponse.EffectIndex);
+        if (command is ActivateZoneEffectResponse zoneResponse) return BeginZoneEffect(zoneResponse.Player, zoneResponse.CardInstanceId, zoneResponse.EffectIndex, chain);
+        if (command is ActivateFieldEffectResponse fieldResponse) return BeginFieldEffect(fieldResponse.Player, fieldResponse.SpellTrapZone, fieldResponse.EffectIndex, chain);
         if (command is ActivateChainResponse response)
         {
             if (response.SpellTrapZone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
             var source = State.GetPlayer(command.Player).SpellTrapFields[response.SpellTrapZone];
-            if (source is not null && battleResponses.TryGetValue(source.Card.GameCardId, out var battleProfile))
-                return BeginBattleResponse(command.Player, response.SpellTrapZone, response.SummonedCardInstanceId, response.MonsterZone, battleProfile);
-            if (response.SummonedCardInstanceId is not null || response.MonsterZone is not null)
-                return Reject(DuelError.InvalidDecisionChoice);
-            if (source is not null && chainResponses.TryGetValue(source.Card.GameCardId, out var profile))
+            if (source is not null && EffectAt(source.Card.GameCardId, response.EffectIndex, out var definition))
             {
-                if (State.PendingSummon is not null && (rules[source.Card.GameCardId].Category != CardCategory.Trap ||
-                    profile.Operation is not (ChainOperation.NegateActivation or ChainOperation.NegateEffect)))
-                    return Reject(DuelError.UnsupportedSummonResponse);
-                if (State.Battle is { } battle && !profile.BattleWindows.HasFlag(battle.Window.Timing))
-                    return Reject(DuelError.UnsupportedBattleResponse);
-                return BeginChainResponse(chain, response.SpellTrapZone, source, profile);
+                // In a summon chain only Spell Speed 3 can follow the first Counter Trap.
+                return BeginDefinitionResponse(chain, response.SpellTrapZone, source, definition);
             }
             if (State.Battle is not null) return Reject(DuelError.UnsupportedBattleResponse);
             if (State.PendingSummon is not null) return Reject(DuelError.UnsupportedSummonResponse);
-            return AddTokenResponse(chain, response.SpellTrapZone);
+            return Reject(DuelError.UnsupportedChainResponse);
         }
         var passes = chain.ConsecutivePasses + 1;
         var next = new PendingChain(checked(State.Revision + 1), chain.Links, Other(chain.Responder),
-            passes, passes == 2 ? chain.Links.Count : 0, chain.FreezeOnCompletion);
+            passes, passes == 2 ? chain.Links.Count : 0);
         return passes == 2
             ? Accept(State.WithChain(next), new ChainResponsePassed(command.Player), new ChainResolutionStarted(chain.Links.Count))
             : Accept(State.WithChain(next), new ChainResponsePassed(command.Player),
                 new ChainResponseRequested(next.Responder, next.DecisionId));
     }
 
-    private DuelActionResult AddTokenResponse(PendingChain chain, int zone)
-    {
-        if (zone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
-        var player = State.GetPlayer(chain.Responder);
-        var source = player.SpellTrapFields[zone];
-        // The token dependency remains limited to the retained two-link scenario.
-        if (player.Id == State.ActivePlayer || chain.Links.Count != 1 ||
-            chain.Links[0].Operation != ChainOperation.DestroyBoundSpellTrap ||
-            source is null || source.IsFaceUp || source.SetOnTurn >= State.TurnNumber ||
-            !chainEffects.TryGetValue(source.Card.GameCardId, out var effect) ||
-            effect.Operation != ChainOperation.SummonFourTokens ||
-            chain.Links[0].Activation.Target is not { } target || target.Player != player.Id ||
-            target.Zone != zone || !target.IsStillPresent(source) ||
-            player.MonsterZones.Count(m => m is null) < 4 ||
-            player.MonsterZones.Any(m => m?.SummonedOnTurn == State.TurnNumber))
-            return Reject(DuelError.UnsupportedChainResponse);
-        var slots = player.SpellTrapFields.ToArray();
-        slots[zone] = source with { IsFaceUp = true }; // same uninterrupted placement
-        var receipt = new CommittedActivation(player.Id, effect.EffectId, source.Card, zone, null, null);
-        var link = new ChainLink(2, receipt, source.PlacementId, effect.Operation, ChainSpellSpeed.Two);
-        var next = new PendingChain(checked(State.Revision + 1), chain.Links.Append(link), Other(player.Id), freezeOnCompletion: chain.FreezeOnCompletion);
-        return Accept(State.With(player: player.With(spellTraps: slots)).WithChain(next),
-            new SpellActivated(player.Id, effect.EffectId, source.Card, zone), new ChainLinkAdded(link),
-            new ChainResponseRequested(next.Responder, next.DecisionId));
-    }
-
-    private DuelActionResult ResolveChainLink(PendingChain chain, ChooseEffectSummon? summonChoice = null)
+    private DuelActionResult ResolveChainLink(PendingChain chain, ChooseEffectSummon? summonChoice = null,
+        DuelCommand? definitionChoice = null)
     {
         var link = chain.Links[chain.NextLink - 1];
         var activation = link.Activation;
+        // A card that declares as it resolves asks first; resolution then goes on with the next step command.
+        if (link is { Declared: null, EffectNegated: false, Trigger: null } && effectsById.GetValueOrDefault(activation.EffectId) is { DeclaresAtResolution: true, Declares: { } kind } declaring)
+        {
+            var ask = new PendingDeclaration(checked(State.Revision + 1), activation.Player, declaring.EffectId, link.Number, kind, DeclarationOptions(kind));
+            return Accept(State.WithChain(new PendingChain(ask.DecisionId, chain.Links, chain.Responder, chain.ConsecutivePasses, chain.NextLink, definitionChoice: ask)),
+                new DeclarationRequested(ask));
+        }
         var next = State;
         var links = chain.Links.ToArray();
         List<DuelEvent> events = [];
         if (link.EffectNegated)
+        {
             events.Add(new ChainLinkSkipped(link.Number, link.ActivationNegated
                 ? ChainSkipReason.ActivationNegated : ChainSkipReason.EffectNegated));
+            if (!link.ActivationNegated) next = BindNegatedEquip(next, link);
+        }
         else if (link.Trigger is { } sourceTrigger && IsSourceEffectNegated(next, sourceTrigger))
             events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.SourceEffectsNegated));
+        else if (link.Operation == ChainOperation.MonsterEffect && next.EventEffects.NegatedMonsters.Contains(
+                new MonsterBinding(activation.Player, activation.SpellTrapZone, activation.Spell, link.SourcePlacementId)))
+            events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.SourceEffectsNegated));
+        // A Pendulum Effect is a Spell effect, so Spell negation stops it when it resolves; the scale stays (OCG rulings).
+        else if ((link.Operation == ChainOperation.ZoneEffect && LinkDefinition(link).Origin == EffectOrigin.PendulumZone ||
+                link.Trigger?.Profile.SourceLocation == TriggerSourceLocation.PendulumZone) && IsSpellsNegated(next))
+            events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.SourceEffectsNegated));
+        else if (IsLastingLink(link) && !LastingSourceInPlace(next, link))
+            events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.SourceLeftField));
+        else if (link.Operation is ChainOperation.Definition or ChainOperation.EffectSummon or ChainOperation.FieldEffect && rules[activation.Spell.GameCardId].Category == CardCategory.Spell && IsSpellsNegated(next))
+        {
+            // A negated lasting Spell still stays; it starts applying if the negation ends.
+            events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.SourceEffectsNegated));
+            next = BindNegatedEquip(next, link);
+            if (IsLastingLink(link)) next = ActivateLastingEffect(next, link);
+        }
         else switch (link.Operation)
         {
-            case ChainOperation.NormalSpell:
-                next = ResolveNormalSpell(next, link, events);
+            case ChainOperation.TriggerEffect when link.Trigger is { Profile.Definition: null } trigger:
+            {
+                next = ResolveTrigger(next, trigger, events);
+                break;
+            }
+            case ChainOperation.UnionUnequip:
+                next = ResolveUnequip(next, link, events);
+                break;
+            case ChainOperation.Definition:
+            case ChainOperation.MonsterEffect:
+            case ChainOperation.FieldEffect:
+            case ChainOperation.ZoneEffect:
+            case ChainOperation.TriggerEffect when link.Trigger is not null:
+            {
+                (next, var pause) = ResolveDefinitionSteps(next, links, link, chain.DefinitionChoice?.StepIndex ?? 0,
+                    definitionChoice, events);
                 // Defeat is terminal immediately, as in damage calculation. No later link or cleanup executes.
                 if (next.Outcome is not null) return Accept(next, events.ToArray());
+                if (pause is not null)
+                    return Accept(next.WithChain(new(pause.DecisionId, links, chain.Responder, chain.ConsecutivePasses,
+                        chain.NextLink, definitionChoice: pause)), [.. events, pause switch
+                        {
+                            PendingDefinitionSummon summon => new DefinitionSummonRequested(summon),
+                            PendingDefinitionCardChoice card => new DefinitionCardChoiceRequested(card),
+                            PendingTypeCall call => new TypeCallRequested(call),
+                            PendingReplacementChoice replacement => new DestructionReplacementRequested(replacement.Replacement),
+                            _ => throw new InvalidOperationException("Unknown definition choice.")
+                        }]);
+                if (IsLastingLink(link) && LastingSourceInPlace(next, link)) next = ActivateLastingEffect(next, link);
                 break;
-            case ChainOperation.ActivatePendulumScale: break; // Source already occupies its dedicated zone; never recreate it.
+            }
+            // Source already occupies its dedicated zone; never recreate it. Its Pendulum Effects now apply.
+            case ChainOperation.ActivatePendulumScale:
+                next = ActivateScaleEffects(next, link);
+                break;
             case ChainOperation.EffectSummon:
             {
                 var profile = summonEffects[activation.Spell.GameCardId];
@@ -119,7 +164,7 @@ public sealed partial class DuelEngine
                         .DistinctBy(m => m.Card.InstanceId);
                     var decision = new PendingEffectSummon(checked(State.Revision + 1), activation.Player, profile, targets, options);
                     return Accept(next.WithChain(new(decision.DecisionId, chain.Links, chain.Responder,
-                        chain.ConsecutivePasses, chain.NextLink, chain.FreezeOnCompletion, decision)), new EffectSummonRequested(decision));
+                        chain.ConsecutivePasses, chain.NextLink, decision)), new EffectSummonRequested(decision));
                 }
                 var target = SpecialSourceCards(next.GetPlayer(activation.Player), EffectSummonSource(profile))
                     .Single(c => c.InstanceId == summonChoice.TargetInstanceId);
@@ -129,117 +174,22 @@ public sealed partial class DuelEngine
                     EffectSummonSource(profile), events, properProcedureId: profile.ProperProcedureId, timingGroup: 1);
                 break;
             }
-            case ChainOperation.DestroyOpposingFaceUpMonsters:
-            {
-                var opponent = next.GetPlayer(Other(activation.Player));
-                for (int zone = 0; zone < 5; zone++)
-                    if (next.GetPlayer(opponent.Id).MonsterZones[zone] is { Position: not BattlePosition.FaceDownDefense } monster)
-                    {
-                        var current = next.GetPlayer(opponent.Id); var zones = current.MonsterZones.ToArray();
-                        zones[zone] = null;
-                        next = next.With(player: current.With(monsters: zones));
-                        next = SendFieldCardToGraveyard(next, monster.Card, new MonsterDestroyed(opponent.Id, zone, monster.Card), events);
-                    }
-                break;
-            }
-            case ChainOperation.DestroyBoundSpellTrap:
-            {
-                var target = activation.Target!;
-                var player = next.GetPlayer(target.Player);
-                // Native Typhoon's target validator returns without issuing
-                // destruction for an absent or different placement. No retargeting.
-                if (!target.IsStillPresent(target.Current(next)))
-                {
-                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
-                    break;
-                }
-                next = RemoveFieldSpell(next, target, new SpellTrapDestroyed(player.Id, target.Zone, target.Card, target.IsPendulumZone), events);
-                break;
-            }
-            case ChainOperation.SummonFourTokens:
-            {
-                var player = next.GetPlayer(activation.Player);
-                var zones = player.MonsterZones.ToArray();
-                var empty = Enumerable.Range(0, 5).Where(z => zones[z] is null).Take(4).ToArray();
-                if (empty.Length != 4) return Reject(DuelError.UnsupportedChainResolution);
-                var profile = chainEffects[activation.Spell.GameCardId];
-                int instance = next.Players.SelectMany(p => p.Deck.Concat(p.Hand).Concat(p.Graveyard)
-                    .Concat(p.Banished).Concat(p.ExtraDeck).Concat(p.FaceUpExtraDeck)
-                    .Concat(p.MonsterZones.OfType<FieldMonster>().SelectMany(m => m.XyzMaterials.Prepend(m.Card)))
-                    .Concat(p.SpellTrapZones.OfType<CardInstance>()).Concat(p.PendulumZones.OfType<FieldSpellTrap>().Select(s => s.Card))).Max(c => c.InstanceId);
-                for (int i = 0; i < 4; i++)
-                {
-                    var card = new CardInstance(checked(++instance), profile.TokenCardIds[i], player.Id);
-                    var token = NewSummonedMonster(next, card, BattlePosition.FaceUpDefense);
-                    zones[empty[i]] = token;
-                    events.Add(new TokenSpecialSummoned(player.Id, empty[i], token));
-                }
-                next = next.With(player: player.With(monsters: zones));
-                break;
-            }
-            case ChainOperation.SummonNegation:
-            {
-                next = ResolveSummonNegation(next, link, events);
-                break;
-            }
-            case ChainOperation.BattleResponse:
-            {
-                next = ResolveBattleResponse(next, link, events);
-                break;
-            }
-            case ChainOperation.TriggerEffect:
-            {
-                if (link.Trigger is not { } trigger) return Reject(DuelError.InvalidEffectState);
-                next = ResolveTrigger(next, trigger, events);
-                break;
-            }
-            case ChainOperation.NegateActivation:
-            case ChainOperation.NegateEffect:
-            {
-                if (link.TargetLinkNumber is not int number || number < 1 || number >= link.Number)
-                    return Reject(DuelError.InvalidEffectState);
-                var target = links[number - 1];
-                var negation = link.Operation == ChainOperation.NegateActivation || target.ActivationNegated
-                    ? ChainNegation.Activation : ChainNegation.Effect;
-                links[number - 1] = target with { Negation = negation };
-                events.Add(new ChainLinkNegated(number, link.Number, negation));
-                // This is explicit per-profile policy; negation alone never
-                // destroys a source or refunds an already committed cost.
-                if (link.DestroyNegatedSource && target.Trigger is null)
-                {
-                    var receipt = target.Activation;
-                    var player = next.GetPlayer(receipt.Player);
-                    var field = target.IsPendulumScale ? player.PendulumZones[receipt.SpellTrapZone] : player.SpellTrapFields[receipt.SpellTrapZone];
-                    if (field is not null && field.Card == receipt.Spell && field.PlacementId == target.SourcePlacementId)
-                    {
-                        var binding = new SpellTrapTarget(player.Id, receipt.SpellTrapZone, receipt.Spell, field.PlacementId, target.IsPendulumScale);
-                        next = RemoveFieldSpell(next, binding, new SpellTrapDestroyed(player.Id, receipt.SpellTrapZone, receipt.Spell, target.IsPendulumScale),
-                            events, activationNegated: target.IsPendulumScale && negation == ChainNegation.Activation);
-                    }
-                }
-                if (link.DestroyNegatedSource && target.Trigger is { } triggered && triggered.Source.IsStillPresent(next))
-                {
-                    var binding = triggered.Source;
-                    var player = next.GetPlayer(binding.Player);
-                    var monsters = player.MonsterZones.ToArray();
-                    monsters[binding.Zone] = null;
-                    next = next.With(player: player.With(monsters: monsters));
-                    next = SendFieldCardToGraveyard(next, binding.Card, new MonsterDestroyed(player.Id, binding.Zone, binding.Card), events);
-                }
-                break;
-            }
+            case ChainOperation.TriggerEffect: return Reject(DuelError.InvalidEffectState);
             default: return Reject(DuelError.UnsupportedChainResolution);
         }
+        if (link.Operation is ChainOperation.Definition or ChainOperation.EffectSummon && !link.ActivationNegated && rules[activation.Spell.GameCardId].Category == CardCategory.Spell)
+            next = AddSpellCounters(next, activation.Spell, events);
         events.Add(new ChainLinkResolved(link.Number, activation.EffectId));
         if (chain.NextLink > 1)
             return Accept(next.WithChain(new(checked(State.Revision + 1), links, chain.Responder,
-                chain.ConsecutivePasses, chain.NextLink - 1, chain.FreezeOnCompletion)), events.ToArray());
+                chain.ConsecutivePasses, chain.NextLink - 1)), events.ToArray());
 
         // Normal/Quick-Play sources remain on the field while links resolve.
         // A source already destroyed as a target must not be sent a second time.
         foreach (var entry in links.Reverse())
         {
-            if (entry.Trigger is not null) continue; // monster/graveyard effect sources are not Spell activations
+            // Monster effects, including a Union's unequip, are not Spell activations.
+            if (entry.Trigger is not null || entry.Operation is ChainOperation.MonsterEffect or ChainOperation.UnionUnequip or ChainOperation.FieldEffect or ChainOperation.ZoneEffect) continue;
             var receipt = entry.Activation;
             var player = next.GetPlayer(receipt.Player);
             if (entry.IsPendulumScale)
@@ -250,18 +200,77 @@ public sealed partial class DuelEngine
                         new SpellSentToGraveyard(player.Id, receipt.Spell, receipt.SpellTrapZone, true), events, activationNegated: true);
                 continue;
             }
-            var field = player.SpellTrapFields[receipt.SpellTrapZone];
+            var field = player.SpellTrapAt(receipt.SpellTrapZone);
             if (field is null || field.Card != receipt.Spell || field.PlacementId != entry.SourcePlacementId) continue;
-            var slots = player.SpellTrapFields.ToArray();
-            slots[receipt.SpellTrapZone] = null;
-            next = next.With(player: player.With(spellTraps: slots, graveyard: player.Graveyard.Append(receipt.Spell)));
+            // An Equip Spell that never got attached has nothing to stay on.
+            if (IsLastingLink(entry) && !entry.ActivationNegated &&
+                !(LinkDefinition(entry).Kind == EffectKind.EquipSpell && field.EquippedTo is null)) continue;
+            next = next.With(player: player.WithSpellTrapAt(receipt.SpellTrapZone, null).With(graveyard: player.Graveyard.Append(receipt.Spell)));
             events.Add(rules[receipt.Spell.GameCardId].Category == CardCategory.Trap
-                ? new ChainTrapSentToGraveyard(player.Id, receipt.Spell, receipt.SpellTrapZone)
-                : new SpellSentToGraveyard(player.Id, receipt.Spell, receipt.SpellTrapZone));
+                ? new ChainTrapSentToGraveyard(player.Id, receipt.Spell, receipt.SpellTrapZone) { ActivationNegated = entry.ActivationNegated }
+                : new SpellSentToGraveyard(player.Id, receipt.Spell, receipt.SpellTrapZone) { ActivationNegated = entry.ActivationNegated });
         }
         events.Add(new ChainCompleted());
-        next = next.WithChain(null).WithDecision(null, State.DecisionResult, researchSliceComplete: chain.FreezeOnCompletion);
+        next = next.WithChain(null).WithDecision(null, State.DecisionResult);
         if (next.PendingSummon is not null) next = CompletePendingSummon(next, events);
         return Accept(next, events.ToArray());
+    }
+
+    private bool IsLastingLink(ChainLink link) => link.Trigger is null && link.Operation == ChainOperation.Definition &&
+        LinkDefinition(link).IsLasting;
+
+    private static bool LastingSourceInPlace(DuelState state, ChainLink link) =>
+        state.GetPlayer(link.Activation.Player).SpellTrapAt(link.Activation.SpellTrapZone) is { IsFaceUp: true } field &&
+        field.Card == link.Activation.Spell && field.PlacementId == link.SourcePlacementId;
+
+    /// <summary>Starts a resolved lasting card's continuing effects.</summary>
+    private static DuelState ActivateLastingEffect(DuelState state, ChainLink link)
+    {
+        var player = state.GetPlayer(link.Activation.Player);
+        int zone = link.Activation.SpellTrapZone;
+        return state.With(player: player.WithSpellTrapAt(zone, player.SpellTrapAt(zone)! with { EffectActive = true, Declared = link.Declared }));
+    }
+
+    /// <summary>
+    /// Negates the link this one answers. Destroying the negated source is explicit per-effect policy; negation
+    /// alone never destroys a source or refunds an already committed cost.
+    /// </summary>
+    private DuelState NegateLink(DuelState next, ChainLink[] links, ChainLink link, ChainNegation negation, bool destroy,
+        List<DuelEvent> events)
+    {
+        int number = link.TargetLinkNumber ?? throw new InvalidOperationException("Negation needs a target link.");
+        var target = links[number - 1];
+        links[number - 1] = target with { Negation = negation };
+        events.Add(new ChainLinkNegated(number, link.Number, negation));
+        // A negated activation never happened, so a limit that counts activations is not spent.
+        if (negation == ChainNegation.Activation && target.Trigger is null && effectsById.TryGetValue(target.Activation.EffectId, out var negated) &&
+            negated.NameLimit is { Counts: LimitCounts.Activations } limit)
+            next = ForgetNamedUse(next, target.Activation.Player, limit);
+        // A card used from the hand or Graveyard is not on the field to be destroyed.
+        if (target.Operation == ChainOperation.ZoneEffect) return next;
+        if (destroy && target.Operation == ChainOperation.MonsterEffect)
+        {
+            var receipt = target.Activation;
+            FieldCardTarget monster = new(receipt.Player, FieldLocation.MonsterZone, receipt.SpellTrapZone, receipt.Spell, target.SourcePlacementId);
+            return monster.IsStillPresent(next) ? DestroyFieldCard(next, monster, events) : next;
+        }
+        if (destroy && (target.Trigger is null || target.Trigger.Profile.SourceLocation == TriggerSourceLocation.FaceUpSpellTrap))
+        {
+            var receipt = target.Activation;
+            var player = next.GetPlayer(receipt.Player);
+            var field = target.IsPendulumScale ? player.PendulumZones[receipt.SpellTrapZone] : player.SpellTrapAt(receipt.SpellTrapZone);
+            if (field is not null && field.Card == receipt.Spell && field.PlacementId == target.SourcePlacementId)
+            {
+                var binding = new SpellTrapTarget(player.Id, receipt.SpellTrapZone, receipt.Spell, field.PlacementId, target.IsPendulumScale);
+                next = RemoveFieldSpell(next, binding, new SpellTrapDestroyed(player.Id, receipt.SpellTrapZone, receipt.Spell, target.IsPendulumScale) { ActivationNegated = negation == ChainNegation.Activation },
+                    events, activationNegated: target.IsPendulumScale && negation == ChainNegation.Activation);
+            }
+        }
+        if (destroy && target.Trigger is { Profile.SourceLocation: not TriggerSourceLocation.FaceUpSpellTrap } triggered && triggered.Source.IsStillPresent(next))
+        {
+            var binding = triggered.Source;
+            next = DestroyFieldCard(next, new(binding.Player, FieldLocation.MonsterZone, binding.Zone, binding.Card, binding.PlacementId), events);
+        }
+        return next;
     }
 }

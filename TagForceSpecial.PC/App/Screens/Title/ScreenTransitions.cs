@@ -4,7 +4,7 @@ namespace TagForceSpecial.PC.App.Screens.Title;
 public static class MainMenuEntry
 {
     public const double GameFramesPerSecond = 29.97;
-    /// <summary>Observed: focus appears here, and only now does the menu accept input.</summary>
+    /// <summary>The step where focus appears and the menu starts accepting input.</summary>
     public const int ReadyFrame = 34;
     private const int FirstBarFrame = 18, FirstLabelFrame = 22, HeaderStartFrame = 19, HeaderFrames = 5, TitleHalfFrame = 23;
     private const float HeaderHeight = 32;
@@ -30,8 +30,9 @@ public static class MainMenuEntry
 
 public enum ScreenFadePhase { None, Lead, Out, Hold, In }
 
-/// <summary>Black fade between screens. Measured: 16 game frames out, 3 held at black, 16 frames in; input is ignored throughout.
-/// The screen change happens at black, so neither screen has to know about the other.</summary>
+/// <summary>
+/// Black fade between screens: 16 frames out, 3 at black, 16 in, ignoring input. The screen changes at black.
+/// </summary>
 public sealed class ScreenFade
 {
     public const int FadeFrames = 16, HoldFrames = 3;

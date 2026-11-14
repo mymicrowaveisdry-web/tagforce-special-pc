@@ -225,7 +225,7 @@ public sealed class UsableSetupTests
     }
 
     private static CardCatalog Catalog() => new(new(TfspCardMetadata.CardInfoSha256, "authored-setup-legality-fixture"),
-        NormalSpellTests.Catalog().Cards); // Version stamp for synthetic policy fixtures; no original-byte provenance claim.
+        NormalSpellTests.Catalog().Cards); // Version stamp for policy fixtures.
     private static DeckDraft Draft() => new(Catalog(), InitialOpponentDecks.Create(0));
     private sealed class CallbackProgress(Action<ImportProgress> callback) : IProgress<ImportProgress>
     { public void Report(ImportProgress value) => callback(value); }

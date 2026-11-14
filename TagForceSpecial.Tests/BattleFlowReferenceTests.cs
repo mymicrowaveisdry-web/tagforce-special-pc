@@ -6,9 +6,7 @@ using static TagForceSpecial.Tests.BattleFlowScenario;
 namespace TagForceSpecial.Tests;
 
 /// <summary>
-/// Retained original final-state projections only. No native window/replay equivalence claim.
-/// Monster-battle printed stats substitute observed post-Dice values; Dice is not reconstructed.
-/// Hidden hands, deck order, earlier graveyard contents and internal step timing are excluded.
+/// Compares final-state battle projections with recorded captures. Battle stats use the recorded post-Dice values.
 /// </summary>
 [Trait("Category", "LocalReference")]
 public sealed class BattleFlowReferenceTests

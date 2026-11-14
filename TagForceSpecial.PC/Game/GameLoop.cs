@@ -41,7 +41,7 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
         IsMouseVisible = true;
         IsFixedTimeStep = true;
         TargetElapsedTime = TimeSpan.FromSeconds(1d / 60);
-        // Research/application assets are not copied through Content or published with the host.
+        // Game assets are never copied through Content or published with the host.
     }
 
     protected override void LoadContent()
@@ -100,7 +100,7 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
         bool fading = screenFade.Active;
         screenFade.Tick(gameTime.ElapsedGameTime);
         if (fading) frame = default;
-        // F12 is a host utility shortcut, separate from unsupported original PSP actions.
+        // F12 is a host utility shortcut.
         if (frame.UtilityRequested && screen is ScreenId.Title or ScreenId.TitleStartMenu or ScreenId.PcTools or ScreenId.TitleFlow)
         { utilityReturn = screen; screen = ScreenId.Setup; return; }
         if (options.Smoke)

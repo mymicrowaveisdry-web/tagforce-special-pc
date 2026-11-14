@@ -3,7 +3,7 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace TagForceSpecial.PC.Rendering;
 
-/// <summary>Authored ASCII fallback, not the original PSP font. No content compiler or system font dependency.</summary>
+/// <summary>ASCII fallback font with no content compiler or system font dependency.</summary>
 internal sealed class PixelFont
 {
     private static readonly string[] Patterns =

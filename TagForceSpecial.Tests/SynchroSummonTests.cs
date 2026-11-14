@@ -117,7 +117,7 @@ public sealed class SynchroSummonTests
     [Fact]
     public void ObservedKrebonsAndGreenGadgetSummonPoweredInzektron()
     {
-        // Original capture projection: analysis/duel-reference/synchro-validation-2026-10-30.json.
+        // Recorded Synchro capture projection.
         const uint krebons = 7716, gadget = 6151, inzektron = 10991;
         uint[] ids = [krebons, gadget, inzektron];
         var catalog = new CardCatalog(new(null, "synchro-reference-projection"), ids.Select(id =>

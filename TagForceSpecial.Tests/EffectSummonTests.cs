@@ -5,13 +5,14 @@ using static TagForceSpecial.Tests.EventEffectScenario;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Synthetic, explicit recipes; no original-game card or effect verification is claimed.</summary>
+/// <summary>Fusion and Ritual effect-summon tests with explicit recipes.</summary>
 public sealed class EffectSummonTests
 {
     private const uint Low = 100_100, High = 100_101, Fusion = 100_102, Ritual = 100_103,
         FusionSpell = 100_104, RitualSpell = 100_105, Response = 100_106, Filler = 100_107;
 
-    private static DuelEngine Make(bool ritual = false, ChainOperation response = ChainOperation.NegateEffect,
+    /// <summary>A null <paramref name="response"/> makes the Response card a targeted destruction Trap definition.</summary>
+    private static DuelEngine Make(bool ritual = false, ResponseNegation? response = ResponseNegation.Effect,
         bool discard = false, bool triggers = false, bool facedown = true, bool duplicates = false,
         uint ritualLevel = 5)
     {
@@ -42,7 +43,9 @@ public sealed class EffectSummonTests
             experimentalSpecialSummonCards: [new(Fusion, SpecialSummonSources.Graveyard, "fusion-proper"), new(Ritual, SpecialSummonSources.Graveyard, "ritual-proper")],
             experimentalSpecialSummonProcedures: [new("revive", [Fusion, Ritual], DecisionCardSource.Graveyard)],
             experimentalSummonWindows: [new(Fusion), new(Ritual)], experimentalTriggerEffects: effects,
-            experimentalChainResponses: [new("response", Response, response, ChainSpellSpeed.Two, discard ? [High] : null)],
+            effectDefinitions: response is { } negation ? [ResponseProbe.Negate("response", Response, negation, ChainSpellSpeed.Two, discard ? [High] : null)]
+                : [new("response", Response, EffectKind.NormalTrap, [new DestroyTargetStep()],
+                    cost: discard ? new DiscardCost() : null, target: new SpellTrapOnFieldTarget())],
             experimentalSummonEffects: [profile]);
     }
 
@@ -97,9 +100,9 @@ public sealed class EffectSummonTests
     }
 
     [Theory]
-    [InlineData(false, ChainOperation.NegateActivation)] [InlineData(false, ChainOperation.NegateEffect)]
-    [InlineData(true, ChainOperation.NegateActivation)] [InlineData(true, ChainOperation.NegateEffect)]
-    public void NegationNeverRequestsOrSpendsResolutionMaterials(bool ritual, ChainOperation operation)
+    [InlineData(false, ResponseNegation.Activation)] [InlineData(false, ResponseNegation.Effect)]
+    [InlineData(true, ResponseNegation.Activation)] [InlineData(true, ResponseNegation.Effect)]
+    public void NegationNeverRequestsOrSpendsResolutionMaterials(bool ritual, ResponseNegation operation)
     {
         var e = Make(ritual, operation); EnterMain(e); Summon(e, Low);
         NextMain(e); Set(e, Response); NextMain(e); Activate(e, ritual);
@@ -139,7 +142,7 @@ public sealed class EffectSummonTests
     [Fact]
     public void DestroyingTheSourceSpellDoesNotNegateTheSummonEffect()
     {
-        var e = Make(response: ChainOperation.DestroyBoundSpellTrap); EnterMain(e); Summon(e, Low);
+        var e = Make(response: null); EnterMain(e); Summon(e, Low);
         NextMain(e); Set(e, Response); NextMain(e); Activate(e);
         var source = e.State.GetPlayer(PlayerId.One).SpellTrapFields[0]!.Card;
         Ok(e, new ActivateChainResponse(PlayerId.Two, e.State.PendingChain!.DecisionId, 0));
@@ -159,7 +162,7 @@ public sealed class EffectSummonTests
     [InlineData(false)] [InlineData(true)]
     public void AResponseDiscardingTheOnlyRequiredHandMaterialMakesResolutionFizzleAndComplete(bool ritual)
     {
-        var e = Make(ritual, ChainOperation.DestroyBoundSpellTrap, discard: true); EnterMain(e);
+        var e = Make(ritual, null, discard: true); EnterMain(e);
         Summon(e, Low); Set(e, Response, 1); NextMain(e); NextMain(e); Activate(e, ritual);
         var source = e.State.GetPlayer(PlayerId.One).SpellTrapFields[0]!.Card;
         Pass(e); // The controller may respond after the opponent passes.

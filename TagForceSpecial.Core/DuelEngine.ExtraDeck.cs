@@ -25,46 +25,58 @@ public sealed partial class DuelEngine
         {
             var monster = player.MonsterZones[material.Zone]!;
             if (monster.BattleDestroyed || profile.RequireFaceUp && monster.Position == BattlePosition.FaceDownDefense ||
-                !profile.MaterialCardIds.Contains(material.Card.GameCardId) ||
-                !rules.TryGetValue(material.Card.GameCardId, out var rule) || !rule.AllowsSummonMaterial ||
+                profile.OverlayFrom is null && !profile.AnyMaterial && !profile.MaterialCardIds.Contains(material.Card.GameCardId) ||
+                !rules.TryGetValue(material.Card.GameCardId, out var rule) || profile.OverlayFrom is null && !rule.AllowsSummonMaterial ||
                 State.SummonHistory.Any(h => h.Card == material.Card && h.Method == SummonMethod.Token))
                 return Reject(DuelError.SummonMaterialNotAllowed);
         }
+        // "Cannot be used as Synchro/Xyz Material (except for ...)" is checked against the monster being Summoned.
+        var materialLock = profile.Synchro is not null ? LockedAction.BeSynchroMaterial : profile.Xyz is not null ? LockedAction.BeXyzMaterial : LockedAction.None;
+        if (materialLock != LockedAction.None && selected.Any(m => RuleLocked(State, materialLock, m.Player, m.Card, player.MonsterZones[m.Zone], summoning: target)))
+            return Reject(DuelError.SummonMaterialNotAllowed);
         if (profile.Synchro is { } synchro)
         {
             var targetLevel = catalog[target.GameCardId].Statistics.Level;
-            if (IsXyzCard(target) || selected.Any(m => IsXyzCard(m.Card)) || targetLevel == 0 || selected.Count(m => synchro.TunerCardIds.Contains(m.Card.GameCardId)) != 1 ||
-                selected.Any(m => catalog[m.Card.GameCardId].Statistics.Level == 0) ||
-                selected.Sum(m => (long)catalog[m.Card.GameCardId].Statistics.Level) != targetLevel)
+            bool IsTuner(uint id) => synchro.ByTunerRule ? rules[id].IsTuner : synchro.TunerCardIds.Contains(id);
+            if (IsXyzCard(target) || selected.Any(m => IsXyzCard(m.Card)) || targetLevel == 0 || selected.Count(m => IsTuner(m.Card.GameCardId)) != 1 ||
+                selected.Any(m => CurrentLevel(m.Card) == 0) ||
+                selected.Sum(m => (long)CurrentLevel(m.Card)) != targetLevel)
                 return Reject(DuelError.InvalidSummonMaterials);
         }
-        if (profile.Xyz is { } xyz && selected.Any(m => IsXyzCard(m.Card) ||
-            catalog[m.Card.GameCardId].Statistics.Level != xyz.Rank))
+        if (profile.Xyz is { } xyz && (profile.OverlayFrom is { } overlay
+                ? selected.Any(m => !IsXyzCard(m.Card) || !MatchesFilter(m.Card, overlay))
+                : selected.Any(m => IsXyzCard(m.Card) || CurrentLevel(m.Card) != xyz.Rank)))
             return Reject(DuelError.InvalidSummonMaterials);
         if (player.MonsterZones[command.MonsterZone] is not null && !selected.Any(m => m.Zone == command.MonsterZone))
             return Reject(DuelError.MonsterZoneOccupied);
         var ordered = selected.OrderBy(m => m.Zone).ToArray();
+        if (profile.Destination == MaterialDestination.Banished &&
+            ordered.Any(m => RuleLocked(State, LockedAction.BeBanished, m.Player, m.Card, State.GetPlayer(m.Player).MonsterZones[m.Zone])))
+            return Reject(DuelError.LockedByEffect);
         List<DuelEvent> events = [];
         var next = MoveSummonMaterials(State, player.Id, ordered, profile.Destination, profile.ProcedureId, events);
-        var attachments = Array.AsReadOnly(profile.Xyz is null ? Array.Empty<CardInstance>() : ordered.Select(m => m.Card).ToArray());
+        // An Xyz Monster used for an overlay procedure brings its own materials with it.
+        var attachments = Array.AsReadOnly(profile.Xyz is null ? Array.Empty<CardInstance>()
+            : ordered.SelectMany(m => profile.OverlayFrom is null ? [m.Card] : player.MonsterZones[m.Zone]!.XyzMaterials.Prepend(m.Card)).ToArray());
         if (profile.Xyz is not null)
             foreach (var material in ordered) events.Add(new XyzMaterialAttached(target, material, profile.ProcedureId) { TimingGroup = 0 });
         var error = CheckSpecialSummon(next, player.Id, target, command.MonsterZone, command.Position,
-            DecisionCardSource.ExtraDeck, profile.ProcedureId);
+            DecisionCardSource.ExtraDeck, profile.ProperProcedureId);
         if (error != DuelError.None) return Reject(error);
-        if (summonWindows.Contains(target.GameCardId))
+        var pending = new PendingSummon(checked(State.Revision + 1), checked(State.Revision + 1), player.Id,
+            target, command.MonsterZone, Other(player.Id), IsSpecialSummon: true, Source: DecisionCardSource.ExtraDeck,
+            Position: command.Position, ProcedureId: profile.ProcedureId, ProperProcedureId: profile.ProperProcedureId)
+            { XyzMaterials = attachments };
+        var attempted = next.With(player: RemoveSpecialSource(next.GetPlayer(player.Id), target, DecisionCardSource.ExtraDeck)).WithSummon(pending);
+        if (OpensSummonWindow(attempted, target.GameCardId))
         {
-            var pending = new PendingSummon(checked(State.Revision + 1), checked(State.Revision + 1), player.Id,
-                target, command.MonsterZone, Other(player.Id), IsSpecialSummon: true, Source: DecisionCardSource.ExtraDeck,
-                Position: command.Position, ProcedureId: profile.ProcedureId, ProperProcedureId: profile.ProcedureId)
-                { XyzMaterials = attachments };
-            next = next.With(player: RemoveSpecialSource(next.GetPlayer(player.Id), target, DecisionCardSource.ExtraDeck)).WithSummon(pending);
+            next = attempted;
             events.Add(new SummonAttempted(pending) { TimingGroup = 1 });
             events.Add(new SummonResponseRequested(pending));
             return Accept(next, events.ToArray());
         }
         next = PlaceSpecialSummon(next, player.Id, target, command.MonsterZone, command.Position, DecisionCardSource.ExtraDeck,
-            events, profile.ProcedureId, properProcedureId: profile.ProcedureId, timingGroup: 1, xyzMaterials: attachments);
+            events, profile.ProcedureId, properProcedureId: profile.ProperProcedureId, timingGroup: 1, xyzMaterials: attachments);
         return Accept(next, events.ToArray());
     }
 

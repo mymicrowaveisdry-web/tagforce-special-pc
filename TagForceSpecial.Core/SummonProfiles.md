@@ -10,7 +10,6 @@ execution comparisons or complete real-card support.
 | `experimentalSummonLevelModifiers` | `SummonLevelModifierProfile` adds a signed hand-level delta for each matching live face-up, unnegated monster source, with Controller/Opponent/Any relation and explicit target IDs. |
 | `experimentalTributeProcedures` | `TributeProcedureProfile` specifies a target card, unique procedure ID, exact count 0–5, optional donor-ID allowlist, face-up requirement and Set permission. |
 | `experimentalSummonWindows` | `SummonWindowProfile` opts an eligible Normal or explicitly profiled Special Summon procedure into a pre-success face-up window. Tribute Set does not open it. |
-| `experimentalSummonNegations` | `SummonNegationProfile` registers an opposing earlier-turn set Counter Trap; Normal is the default kind, with Special/All requiring opt-in. |
 
 `AllowsNormalSummon` still gates all these hand procedures. `AllowsTributeSummon`
 and `AllowsTributeForSummon` gate targets and donors. A named procedure never

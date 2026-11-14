@@ -15,8 +15,7 @@ public sealed record ProgressConfiguration(int SchemaVersion, string InventoryDa
 public sealed record DiscoveredFunction(uint Address, int BodyBytes);
 public sealed record ModuleInventory(ProgressModule Module, IReadOnlyList<DiscoveredFunction> Functions);
 
-/// <summary>Reports analyzed function candidates, independently of native reconstruction and asset evidence.
-/// No PSP matching build exists yet, so this tool cannot certify any matched executable bytes.</summary>
+/// <summary>Reports analyzed function candidates; cannot certify matched executable bytes.</summary>
 public static class ProjectProgress
 {
     public const string StartMarker = "<!-- progress:start -->";
