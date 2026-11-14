@@ -167,7 +167,7 @@ public sealed partial class DuelEngine
         if (!opponent.Hand.Contains(card)) return state;
         if (move == HandMove.Discard)
         {
-            events.Add(new CardDiscarded(opponent.Id, card));
+            events.Add(new CardDiscarded(opponent.Id, card) { EffectController = controller, EffectId = effectId });
             return state.With(player: opponent.With(hand: opponent.Hand.Where(c => c != card), graveyard: opponent.Graveyard.Append(card)));
         }
         events.Add(new CardShuffledIntoDeck(opponent.Id, card, effectId));

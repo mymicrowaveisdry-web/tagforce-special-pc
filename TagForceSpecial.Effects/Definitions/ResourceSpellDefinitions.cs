@@ -10,6 +10,9 @@ public static class ResourceSpellDefinitions
     /// <summary>The cards, with effect IDs from the registering family's table.</summary>
     public static AuthoredCard[] Cards(CardTable t) =>
     [
+        t.Normal(4858, "The Cheerful Coffin", [new DiscardCardsStep(3, Filter: new AnyMonsterFilter(), Minimum: 1)]),
+        t.Normal(4812, "Graceful Charity", [new DrawCardsStep(3), new DiscardCardsStep(2)]),
+        t.Trap(7479, "Fine", [new DiscardCardsStep(2)]),
         t.Normal(9664, "Thunder Short", [new DealDamageStep(400, EffectCount.OpponentMonsters)]),
         t.Modal(4344, "Mooyan Curry", EffectKind.NormalSpell, "The player who gains LP is chosen at activation.",
             new EffectOption([new GainLifePointsStep(200)]), new EffectOption([new GainLifePointsStep(200, EffectPlayers.Opponent)])),

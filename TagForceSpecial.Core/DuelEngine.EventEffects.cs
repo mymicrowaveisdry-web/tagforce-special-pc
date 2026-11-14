@@ -108,7 +108,7 @@ public sealed partial class DuelEngine
             yield return new(MonsterEventKind.Tributed, subject, point, cost);
         if (kind == MonsterEventKind.SentToGraveyard && notToGraveyard) yield break;
         bool byBattle = emitted is MonsterDestroyed { ByBattle: true };
-        yield return new(kind, subject, point, cost, byBattle) { FromSpellTrapZone = spellTrapLeaving, ProcedureId = (emitted as MonsterSpecialSummoned)?.ProcedureId };
+        yield return new(kind, subject, point, cost, byBattle) { FromSpellTrapZone = spellTrapLeaving, ProcedureId = (emitted as MonsterSpecialSummoned)?.ProcedureId, DiscardEffectController = (emitted as CardDiscarded)?.EffectController };
         if (kind == MonsterEventKind.Destroyed && !notToGraveyard)
             yield return new(MonsterEventKind.SentToGraveyard, subject, point, ByBattle: byBattle) { FromSpellTrapZone = spellTrapLeaving };
         if (emitted is MonsterDestroyed { DestroyedBy: { } destroyer } && !notToGraveyard)
@@ -165,6 +165,8 @@ public sealed partial class DuelEngine
         TriggerEventCause.FromField => occurrence.Subject.Zone >= 0,
         TriggerEventCause.FromOwnField => occurrence.Subject.Zone >= 0 && occurrence.Subject.Player == occurrence.Subject.Card.Owner,
         TriggerEventCause.ByBattle => occurrence.ByBattle,
+        TriggerEventCause.ByDiscardEffect => occurrence.DiscardEffectController is not null,
+        TriggerEventCause.ByOpponentDiscardEffect => occurrence.DiscardEffectController is { } controller && controller != occurrence.Subject.Card.Owner,
         _ => true
     };
 

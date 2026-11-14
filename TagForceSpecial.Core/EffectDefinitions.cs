@@ -202,6 +202,9 @@ public sealed record AnyMonsterFilter : CardFilter;
 /// </summary>
 public sealed record DrawCardsStep(int Count, EffectPlayers Players = EffectPlayers.Self) : EffectStep;
 
+/// <summary>Each affected player chooses cards from their own hand at resolution; all chosen cards are discarded together.</summary>
+public sealed record DiscardCardsStep(int Count, EffectPlayers Players = EffectPlayers.Self, CardFilter? Filter = null, int? Minimum = null) : EffectStep;
+
 /// <summary>
 /// The activating player chooses one matching card in their Deck at resolution, reveals it and adds it to the hand,
 /// then shuffles the Deck. Activation needs a matching card; none at resolution skips the step without shuffling.
@@ -460,6 +463,7 @@ public sealed class EffectDefinition
                     // Validated by their constructors; the engine checks Token rules and the seed.
                     SummonTokensStep or ShuffleDeckStep or SpecialSummonStep => false,
                     DrawCardsStep s => s.Count is < 1 or > 10 || !Enum.IsDefined(s.Players),
+                    DiscardCardsStep s => s.Count is < 1 or > 5 || !Enum.IsDefined(s.Players) || s.Minimum is { } min && (min < 1 || min > s.Count || s.Players != EffectPlayers.Self),
                     MillTopOfDeckStep s => s.Count is < 1 or > 60,
                     AddFromDeckToHandStep s => s.Filter is null,
                     SendFromDeckToGraveyardStep s => s.Filter is null,
@@ -521,6 +525,10 @@ public sealed class EffectDefinition
                 })
                 throw new ArgumentException("Steps must be supported Core operations with positive amounts.", nameof(steps));
         // A step that reads a die roll or coin toss must follow one in the same effect, or it would read an earlier effect's result.
+        int filteredDiscard = Array.FindIndex(snapshot, s => s is DiscardCardsStep { Filter: not null });
+        if (filteredDiscard >= 0 && (cost is not null || snapshot.Count(s => s is DiscardCardsStep) != 1 ||
+            snapshot.Take(filteredDiscard).Any(s => s is DrawCardsStep or AddFromDeckToHandStep or AddFromGraveyardToHandStep or AddFromDeckOrGraveyardStep)))
+            throw new ArgumentException("Filtered discards require an unmodified hand projection and no activation cost.", nameof(steps));
         int roll = Array.FindIndex(snapshot, s => s is RollDieStep), toss = Array.FindIndex(snapshot, s => s is TossCoinsStep),
             mill = Array.FindIndex(snapshot, s => s is MillTopOfDeckStep), dig = Array.FindIndex(snapshot, s => s is ExcavateStep);
         static EffectCount CountOf(EffectStep s) => s switch
@@ -710,16 +718,24 @@ public sealed record ChosenDefinitionSummon(CardInstance Card, DecisionCardSourc
 public sealed record FinishDefinitionSummon(PlayerId Player, long DecisionId) : DuelCommand(Player);
 public sealed record DefinitionSummonRequested(PendingDefinitionSummon Decision) : DuelEvent;
 
-/// <summary>Resolution-time choice of one Deck card (search or send); options are visible only to the choosing player.</summary>
+/// <summary>A resolution-time card choice; options are visible only to the choosing player.</summary>
 public sealed class PendingDefinitionCardChoice : PendingDefinitionChoice
 {
     public IReadOnlyList<CardInstance> Options { get; }
+    /// <summary>Cards selected for one simultaneous discard; they stay in hand until every choice is complete.</summary>
+    public IReadOnlyList<CardInstance> Picks { get; }
+    public bool CanFinish { get; }
 
     internal PendingDefinitionCardChoice(long decisionId, PlayerId player, string effectId, int linkNumber, int stepIndex,
-        IEnumerable<CardInstance> options) : base(decisionId, player, effectId, linkNumber, stepIndex) =>
+        IEnumerable<CardInstance> options, IEnumerable<CardInstance>? picks = null, bool canFinish = false) : base(decisionId, player, effectId, linkNumber, stepIndex)
+    {
         Options = Array.AsReadOnly(options.ToArray());
+        Picks = Array.AsReadOnly(picks?.ToArray() ?? []);
+        CanFinish = canFinish;
+    }
 }
 public sealed record ChooseDefinitionCard(PlayerId Player, long DecisionId, int CardInstanceId) : DuelCommand(Player);
+public sealed record FinishDefinitionCardChoice(PlayerId Player, long DecisionId) : DuelCommand(Player);
 public sealed record DefinitionCardChoiceRequested(PendingDefinitionCardChoice Decision) : DuelEvent;
 /// <summary>A Deck card was revealed and added to its owner's hand by an effect.</summary>
 public sealed record CardSearched(PlayerId Player, CardInstance Card, string EffectId) : DuelEvent;

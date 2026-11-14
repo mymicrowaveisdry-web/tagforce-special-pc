@@ -209,7 +209,7 @@ public sealed partial class DuelEngine
         var matching = opponent.Hand.Where(c => MatchesFilter(c, step.Filter)).ToArray();
         if (matching.Length != 0)
         {
-            foreach (var card in matching) events.Add(new CardDiscarded(opponent.Id, card));
+            foreach (var card in matching) events.Add(new CardDiscarded(opponent.Id, card) { EffectController = controller, EffectId = effectId });
             return state.With(player: opponent.With(hand: opponent.Hand.Except(matching), graveyard: opponent.Graveyard.Concat(matching)));
         }
         // With no match, the activating player may check the opponent's hand (Mind Crush, OCG ruling).
@@ -218,7 +218,7 @@ public sealed partial class DuelEngine
         if (!step.RandomOwnDiscardOtherwise || own.Hand.Count == 0) return state;
         var (index, random) = RandomOf(state).NextBelow(own.Hand.Count);
         var discarded = own.Hand[index];
-        events.Add(new CardDiscarded(controller, discarded));
+        events.Add(new CardDiscarded(controller, discarded) { EffectController = controller, EffectId = effectId });
         return WithResults(state.With(player: own.With(hand: own.Hand.Where(c => c != discarded), graveyard: own.Graveyard.Append(discarded))), Results(state), random);
     }
 
@@ -226,6 +226,7 @@ public sealed partial class DuelEngine
     internal static IEnumerable<CardFilter> StepFilters(EffectStep step) => step switch
     {
         DestroyAllStep { Cards: { } cards } => [cards],
+        DiscardCardsStep { Filter: { } filter } => [filter],
         TakeExcavatedStep { Filter: { } filter } => [filter],
         StopUnlessMilledStep milled => [milled.Filter],
         StopUnlessHandHoldsStep holds => [holds.Filter],

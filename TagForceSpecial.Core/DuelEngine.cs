@@ -319,7 +319,7 @@ public sealed partial class DuelEngine
         if (State.PendingSummon is not null) return ExecuteSummonWindow(command);
         if (command is PassSummonResponse or ActivateSummonNegation) return Reject(DuelError.NoPendingSummon);
         if (command is PassChainResponse or ActivateChainResponse or ActivateHandChainResponse or ActivateMonsterChainResponse or ActivateZoneEffectResponse or ActivateFieldEffectResponse or ResolveNextChainLink or
-            ChooseEffectSummon or ChooseDefinitionSummon or FinishDefinitionSummon or ChooseDefinitionCard or CallCardType or DeclareValue) return Reject(DuelError.NoPendingChain);
+            ChooseEffectSummon or ChooseDefinitionSummon or FinishDefinitionSummon or FinishDefinitionCardChoice or ChooseDefinitionCard or CallCardType or DeclareValue) return Reject(DuelError.NoPendingChain);
         // A definition answering its cost/target decisions before its first link exists (hand, set or open-window
         // activation); the decision may belong to the non-turn player.
         if (State.PendingDecision is not null && State.PendingSpellActivation is { } activating &&

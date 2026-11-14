@@ -329,7 +329,11 @@ public sealed record MonsterDestroyed(PlayerId Player, int Zone, CardInstance Ca
 }
 /// <summary>Ordinary summon procedure, not destruction or an activation cost.</summary>
 public sealed record MonsterTributed(MonsterBinding Monster) : DuelEvent;
-public sealed record CardDiscarded(PlayerId Player, CardInstance Card) : DuelEvent;
+public sealed record CardDiscarded(PlayerId Player, CardInstance Card) : DuelEvent
+{
+    public PlayerId? EffectController { get; init; }
+    public string? EffectId { get; init; }
+}
 public sealed record TurnStarted(PlayerId Player, int TurnNumber) : DuelEvent;
 public sealed record DuelEnded(DuelOutcome Outcome) : DuelEvent;
 public sealed record DuelActionResult(bool Succeeded, DuelError Error, DuelState State,

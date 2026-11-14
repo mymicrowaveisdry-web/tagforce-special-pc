@@ -579,7 +579,9 @@ public sealed class CardTable(string prefix)
                 : effect.Conditions.Count == 0 ? $"Default timing for {effect.Kind}." : $"Default timing for {effect.Kind}, with {Describe(effect.Conditions)}.",
             effect.Cost is null ? "none" : $"{Describe(effect.Cost)} (never refunded).",
             targets ? Describe(effect.FieldTargets) : "none",
-            targets ? "Target at activation." : "none", "Default.",
+            card.Definitions.Any(d => d.Steps.Any(s => s is DiscardCardsStep))
+                ? (targets ? "Target at activation. " : "") + "Each affected player chooses cards from their own hand at resolution; all choices are discarded together."
+                : targets ? "Target at activation." : "none", "Default.",
             card.Definitions.Count == 0 && card.BattleAbilities.Count != 0 ? "Negation suspends continuous battle abilities."
                 : targets ? "Negation skips the effect. Targets that no longer qualify are skipped; ordinary cleanup." : "Negation skips the effect; ordinary cleanup.",
             card.Exceptions, [], []);
@@ -591,6 +593,8 @@ public sealed class CardTable(string prefix)
         null => "none",
         string text => text,
         Enum or ValueType => value.ToString()!,
+        DestroyTargetsStep { StopUnlessAnyDestroyed: false } => "DestroyTargets",
+        DiscardCardsStep { Filter: null, Minimum: null } d => $"DiscardCards(Count={d.Count}; Players={d.Players})",
         IEnumerable list => string.Join(", ", list.Cast<object?>().Select(Describe)),
         _ => DescribeRecord(value)
     };

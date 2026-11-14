@@ -111,13 +111,13 @@ public sealed partial class DuelEngine
         _ => true
     });
 
-    private DuelState DiscardRandom(DuelState state, PlayerId controller, DiscardRandomStep step, List<DuelEvent> events)
+    private DuelState DiscardRandom(DuelState state, PlayerId controller, DiscardRandomStep step, string effectId, List<DuelEvent> events)
     {
         var player = state.GetPlayer(step.Player == TargetSide.Opponent ? Other(controller) : controller);
         if (player.Hand.Count == 0) return state;
         var (index, random) = RandomOf(state).NextBelow(player.Hand.Count);
         var discarded = player.Hand[index];
-        events.Add(new CardDiscarded(player.Id, discarded));
+        events.Add(new CardDiscarded(player.Id, discarded) { EffectController = controller, EffectId = effectId });
         return WithResults(state.With(player: player.With(hand: player.Hand.Where(c => c != discarded), graveyard: player.Graveyard.Append(discarded))),
             Results(state), random);
     }

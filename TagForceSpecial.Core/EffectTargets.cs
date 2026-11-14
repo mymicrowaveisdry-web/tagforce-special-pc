@@ -66,8 +66,8 @@ public sealed record PayLifePointsCost : EffectCost
     public PayLifePointsCost(int amount) => Amount = amount > 0 ? amount : throw new ArgumentOutOfRangeException(nameof(amount));
 }
 
-/// <summary>Destroys every bound target that still qualifies.</summary>
-public sealed record DestroyTargetsStep : EffectStep;
+/// <summary>Destroys qualifying targets; an optional guard stops later steps unless at least one target is destroyed.</summary>
+public sealed record DestroyTargetsStep(bool StopUnlessAnyDestroyed = false) : EffectStep;
 
 /// <summary>Returns every bound target that still qualifies to its owner's hand (Extra Deck monsters to the Extra Deck).</summary>
 public sealed record ReturnTargetsToHandStep : EffectStep;

@@ -14,6 +14,7 @@ public sealed record MonsterEventOccurrence(MonsterEventKind Kind, MonsterBindin
     /// <summary>The subject left a Spell/Trap Zone, so it is not a monster for other cards' monster triggers.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public bool FromSpellTrapZone { get; internal init; }
+    public PlayerId? DiscardEffectController { get; internal init; }
     /// <summary>The procedure that performed this Special Summon, if any.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public string? ProcedureId { get; internal init; }

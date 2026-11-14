@@ -10,6 +10,8 @@ public static class TargetedRemovalDefinitions
     /// <summary>The cards, with effect IDs from the registering family's table.</summary>
     public static AuthoredCard[] Cards(CardTable t) =>
     [
+        t.Normal(6512, "Dark World Lightning", [new DestroyTargetsStep(StopUnlessAnyDestroyed: true), new DiscardCardsStep(1)],
+            targets: [new FieldTarget(FieldCardKind.Any, TargetSide.Either, FieldCardFilter.FaceDown)]),
         t.Trap(3695, "Twin Vortex", [new DestroyTargetsStep()], targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Own, FieldCardFilter.FaceUp, cardFilter: OfType(Machine)),
             new FieldTarget(FieldCardKind.Monster, TargetSide.Opponent)]),
         t.Trap(7476, "Offering to the Snake Deity", [new DestroyTargetsStep()], targets: [new FieldTarget(FieldCardKind.Monster, TargetSide.Own, FieldCardFilter.FaceUp,

@@ -11,6 +11,10 @@ public static class GraveyardTriggerDefinitions
     /// <summary>The cards, with effect IDs from the registering family's table.</summary>
     public static AuthoredCard[] Cards(CardTable t) =>
     [
+        t.Trigger(4469, "Electric Snake", MonsterEventKind.SentToGraveyard, [new DrawCardsStep(2)],
+            location: TriggerSourceLocation.GraveyardSelf, cause: TriggerEventCause.ByOpponentDiscardEffect),
+        t.Trigger(4540, "Minar", MonsterEventKind.SentToGraveyard, [new DealDamageStep(1000)],
+            location: TriggerSourceLocation.GraveyardSelf, cause: TriggerEventCause.ByOpponentDiscardEffect),
         t.BattleDestroyed(8812, "Key Mouse", Search(new MonsterLevelFilter(3, Beast)), optional: true, TunerKind, TunerRules),
         t.BattleDestroyed(8784, "Dread Dragon", Search(new MonsterLevelFilter(3, Dragon)), optional: true, TunerKind, TunerRules),
         t.BattleDestroyed(8082, "Rai-Mei", Search(new AllOfFilter(new MonsterLevelFilter(2), OfAttribute(Light))), optional: true),

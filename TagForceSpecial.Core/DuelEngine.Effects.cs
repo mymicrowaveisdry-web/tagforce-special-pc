@@ -181,7 +181,7 @@ public sealed partial class DuelEngine
             };
             if (unavailable) return DuelError.DecisionUnavailable;
         }
-        return DuelError.None;
+        return ChosenDiscardsAvailable(definition, playerId, card) ? DuelError.None : DuelError.DecisionUnavailable;
     }
 
     private DuelActionResult ActivateSetDefinition(int zone, int effectIndex = 0)
@@ -575,6 +575,14 @@ public sealed partial class DuelEngine
                 choice = null;
                 continue;
             }
+            if (step is DiscardCardsStep chosenDiscard)
+            {
+                var discarded = ResolveChosenDiscards(state, link, definition, chosenDiscard, i, choice, events);
+                state = discarded.State;
+                if (discarded.Pause is not null) return discarded;
+                choice = null;
+                continue;
+            }
             if (step is StopUnlessRollStep or StopUnlessHeadsStep)
             {
                 var last = state.Bookkeeping.LastRandom;
@@ -924,10 +932,26 @@ public sealed partial class DuelEngine
                     if (shuffle.StopUnlessAll && valid.Length < (link.Activation.FieldTargets?.Count ?? 0)) break;
                     continue;
                 }
+                if (step is DestroyTargetsStep destroy)
+                {
+                    bool destroyed = false;
+                    foreach (var target in valid)
+                    {
+                        int firstEvent = events.Count;
+                        state = DestroyFieldCard(state, target, events);
+                        destroyed |= events.Skip(firstEvent).Any(e => e is MonsterDestroyed m && m.Card == target.Card ||
+                            e is SpellTrapDestroyed s && s.Card == target.Card);
+                    }
+                    if (destroy.StopUnlessAnyDestroyed && !destroyed)
+                    {
+                        events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
+                        break;
+                    }
+                    continue;
+                }
                 foreach (var target in valid)
                     state = step switch
                     {
-                        DestroyTargetsStep => DestroyFieldCard(state, target, events),
                         ReturnTargetsToHandStep => ReturnFieldCardToHand(state, target, definition.EffectId, events),
                         ChangeTargetsToDefenseStep => ChangeToDefense(state, target, events),
                         ModifyTargetsUntilEndStep stats => ModifyUntilEnd(state, target, stats, definition.EffectId, events),
@@ -989,7 +1013,7 @@ public sealed partial class DuelEngine
                         ? DealEffectDamage(state, Other(controller), amount, definition.EffectId, events) : state,
                     DamageBothPlayersStep both => DamageBothPlayers(state, controller, both, definition.EffectId, events),
                     TakeDamageStep take => DealEffectDamage(state, controller, take.Amount, definition.EffectId, events),
-                    DiscardRandomStep discard => DiscardRandom(state, controller, discard, events),
+                    DiscardRandomStep discard => DiscardRandom(state, controller, discard, definition.EffectId, events),
                     BanishSourceWhenItLeavesStep => BanishSourceWhenItLeaves(state, link),
                     WeakenEventMonsterStep weaken => WeakenEventMonster(state, link, weaken, definition.EffectId, events),
                     PayDownToGainStep pay => PayDownToGain(state, controller, link, pay, definition.EffectId, events),
@@ -1490,6 +1514,15 @@ public sealed partial class DuelEngine
             events.Add(new CardSentFromDeckToGraveyard(playerId, card, effectId));
         }
         return ShuffleDeck(state, playerId, effectId, events);
+    }
+
+    private DuelActionResult FinishDefinitionCards(PendingChain chain, FinishDefinitionCardChoice command)
+    {
+        var pending = chain.DefinitionCardChoice!;
+        if (command.DecisionId != pending.DecisionId) return Reject(DuelError.StaleDecision);
+        if (command.Player != pending.Player) return Reject(DuelError.NotActivePlayer);
+        if (!pending.CanFinish) return Reject(DuelError.InvalidDecisionChoice);
+        return ResolveChainLink(chain, definitionChoice: command);
     }
 
     private DuelActionResult AnswerDefinitionCardChoice(PendingChain chain, ChooseDefinitionCard command)

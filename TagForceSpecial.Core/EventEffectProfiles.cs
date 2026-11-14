@@ -23,7 +23,7 @@ public enum MonsterEventKind { NormalSummoned, SpecialSummoned, FlipSummoned, De
 /// Narrows a Destroyed or SentToGraveyard event by where it came from or what caused it; <see cref="FromOwnField"/> is "this card you
 /// control is sent to your Graveyard", from a field zone while its owner controlled it.
 /// </summary>
-public enum TriggerEventCause { Any, FromField, ByBattle, FromOwnField }
+public enum TriggerEventCause { Any, FromField, ByBattle, FromOwnField, ByDiscardEffect, ByOpponentDiscardEffect }
 public enum EffectRelation { Self, Controller, Opponent, Any }
 public enum TriggerRequirement { Mandatory, Optional }
 public enum TriggerSourceLocation { FaceUpMonster, DestroyedSelf, GraveyardSelf, FaceUpSpellTrap, PendulumZone,

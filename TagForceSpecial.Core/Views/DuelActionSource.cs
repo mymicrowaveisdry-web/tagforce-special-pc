@@ -318,6 +318,7 @@ public sealed class DuelActionSource
         }
         if (state.PendingChain?.DefinitionCardChoice is { } pick)
         {
+            if (pick.CanFinish) yield return B(new FinishDefinitionCardChoice(player, pick.DecisionId), ActionKind.ChooseCard, "Finish choosing cards");
             foreach (var card in pick.Options)
                 yield return B(new ChooseDefinitionCard(player, pick.DecisionId, card.InstanceId), ActionKind.ChooseCard,
                     $"Choose {catalog[card.GameCardId].Name}", card.InstanceId);
