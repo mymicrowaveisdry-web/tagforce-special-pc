@@ -8,12 +8,6 @@ namespace TagForceSpecial.Core;
 /// </summary>
 public sealed partial class DuelEngine
 {
-    /// <summary>Where an activation is requested; each context has its own timing rules.</summary>
-    private enum ActivationContext { Hand, OwnSetCard, OpenWindow, ChainResponse, HandChainResponse, BattleWindow, BattleHand, SummonWindow, MonsterField, MonsterChainResponse, MonsterWindow, SpellTrapField, SpellTrapChain, SpellTrapWindow, ZoneField, ZoneChain, ZoneWindow }
-
-    private const BattleTiming DamageStepTimings = BattleTiming.DamageStart | BattleTiming.BeforeCalculation |
-        BattleTiming.Calculation | BattleTiming.AfterCalculation | BattleTiming.DamageEnd;
-
     /// <summary>
     /// The single activation legality check for definitions: timing by context, then conditions, the summon lock and
     /// answerable choices. Does not mutate state.
@@ -21,71 +15,41 @@ public sealed partial class DuelEngine
     private DuelError DefinitionActivationError(EffectDefinition definition, ActivationContext context, PlayerId player,
         CardInstance card, FieldSpellTrap? source, ChainLink? preceding = null)
     {
-        // A Pendulum Effect is used only from an active scale.
-        if (definition.Origin == EffectOrigin.PendulumZone && context is not (ActivationContext.SpellTrapField or ActivationContext.SpellTrapChain or ActivationContext.SpellTrapWindow))
-            return DuelError.UnsupportedSpellEffect;
-        // The Damage Step admits only definitions whose battle timing condition lists the current timing.
-        if (State.Battle is { } battle && (battle.Window.Timing & DamageStepTimings) != 0 &&
-            !definition.Conditions.OfType<BattleTimingCondition>().Any(c => c.Windows.HasFlag(battle.Window.Timing)))
-            return DuelError.ActivationTimingNotAllowed;
-        bool fromHand = context is ActivationContext.Hand or ActivationContext.HandChainResponse or ActivationContext.BattleHand;
-        bool setThisTurn = source is not null && source.SetOnTurn >= State.TurnNumber;
-        bool fromMonster = context is ActivationContext.MonsterField or ActivationContext.MonsterChainResponse or ActivationContext.MonsterWindow or ActivationContext.SpellTrapField or
-            ActivationContext.SpellTrapChain or ActivationContext.SpellTrapWindow or ActivationContext.ZoneField or ActivationContext.ZoneChain or ActivationContext.ZoneWindow;
-        if (!fromHand && !fromMonster && (source is null || source.IsFaceUp))
-            return context switch
-            {
-                ActivationContext.ChainResponse or ActivationContext.OpenWindow => DuelError.UnsupportedChainResponse,
-                ActivationContext.BattleWindow => DuelError.UnsupportedBattleResponse,
-                ActivationContext.SummonWindow => DuelError.UnsupportedSummonResponse,
-                _ => DuelError.UnsupportedSpellEffect
-            };
-        bool slowerThanPreceding = preceding is not null && (int)definition.SpellSpeed < (int)preceding.SpellSpeed;
-        var timing = (context, definition.Kind) switch
-        {
-            (ActivationContext.MonsterField, EffectKind.MonsterIgnition or EffectKind.MonsterQuick) => DuelError.None,
-            (ActivationContext.MonsterChainResponse, EffectKind.MonsterQuick) => slowerThanPreceding ? DuelError.ChainResponseSpeedNotAllowed : DuelError.None,
-            (ActivationContext.MonsterWindow, EffectKind.MonsterQuick) => DuelError.None,
-            (ActivationContext.SpellTrapField, EffectKind.SpellTrapIgnition or EffectKind.SpellTrapQuick) => DuelError.None,
-            (ActivationContext.SpellTrapChain, EffectKind.SpellTrapQuick) => slowerThanPreceding ? DuelError.ChainResponseSpeedNotAllowed : DuelError.None,
-            (ActivationContext.SpellTrapWindow, EffectKind.SpellTrapQuick) => DuelError.None,
-            (ActivationContext.ZoneField, EffectKind.MonsterIgnition or EffectKind.MonsterQuick or EffectKind.SpellTrapIgnition or EffectKind.SpellTrapQuick) => DuelError.None,
-            (ActivationContext.ZoneChain, EffectKind.MonsterQuick or EffectKind.SpellTrapQuick) => slowerThanPreceding ? DuelError.ChainResponseSpeedNotAllowed : DuelError.None,
-            (ActivationContext.ZoneWindow, EffectKind.MonsterQuick or EffectKind.SpellTrapQuick) => DuelError.None,
-            (ActivationContext.Hand, EffectKind.NormalSpell or EffectKind.QuickPlaySpell or EffectKind.ContinuousSpell or EffectKind.FieldSpell or EffectKind.EquipSpell) => DuelError.None,
-            (ActivationContext.Hand, _) => DuelError.ActivationTimingNotAllowed,
-            (ActivationContext.BattleHand, EffectKind.QuickPlaySpell) => DuelError.None,
-            // Only Counter Traps answer a Summon that has not happened yet.
-            (ActivationContext.SummonWindow, EffectKind.CounterTrap) => setThisTurn ? DuelError.SetThisTurn : DuelError.None,
-            (ActivationContext.OwnSetCard, EffectKind.NormalSpell or EffectKind.ContinuousSpell or EffectKind.FieldSpell or EffectKind.EquipSpell) => DuelError.None,
-            (ActivationContext.OwnSetCard or ActivationContext.OpenWindow or ActivationContext.BattleWindow, EffectKind.QuickPlaySpell or EffectKind.NormalTrap or EffectKind.ContinuousTrap)
-                => setThisTurn ? DuelError.SetThisTurn : DuelError.None,
-            // A Counter Trap that answers an attack is activated in the battle window it waits for.
-            (ActivationContext.BattleWindow, EffectKind.CounterTrap) when definition.Conditions.Any(c => c is OpponentAttackDeclaredCondition or BattleTimingCondition)
-                => setThisTurn ? DuelError.SetThisTurn : DuelError.None,
-            // So is one whose own timing is a Summon that just happened, in the window after it.
-            (ActivationContext.OpenWindow, EffectKind.CounterTrap) when definition.Conditions.Any(c => c is MonsterSummonedCondition)
-                => setThisTurn ? DuelError.SetThisTurn : DuelError.None,
-            (ActivationContext.OwnSetCard or ActivationContext.OpenWindow or ActivationContext.BattleWindow, _) => DuelError.ActivationTimingNotAllowed,
-            (ActivationContext.ChainResponse, EffectKind.NormalSpell or EffectKind.ContinuousSpell or EffectKind.FieldSpell or EffectKind.EquipSpell) => DuelError.ActivationTimingNotAllowed,
-            (ActivationContext.ChainResponse, _) => setThisTurn ? DuelError.SetThisTurn
-                : slowerThanPreceding ? DuelError.ChainResponseSpeedNotAllowed : DuelError.None,
-            (ActivationContext.HandChainResponse, EffectKind.QuickPlaySpell) =>
-                slowerThanPreceding ? DuelError.ChainResponseSpeedNotAllowed : DuelError.None,
-            _ => DuelError.ActivationTimingNotAllowed
-        };
+        var timing = ActivationTimingRules.Check(State, definition, context, source, preceding);
         return timing != DuelError.None ? timing : DefinitionRequirementsError(definition, player, card, preceding);
     }
 
     private DuelError DefinitionRequirementsError(EffectDefinition definition, PlayerId playerId, CardInstance card, ChainLink? preceding)
     {
         var player = State.GetPlayer(playerId);
+        var use = DefinitionUseRequirementsError(definition, playerId, card);
+        if (use != DuelError.None) return use;
+        if (!DefinitionConditionsMet(definition, playerId, player, preceding)) return DuelError.ActivationConditionNotMet;
+        // An attacker or defender target needs that combatant on the field and not destroyed by battle.
+        if (definition.FieldTargets is [AttackingMonsterTarget or DefendingMonsterTarget] && LiveCombatant(State, definition) is null)
+            return DuelError.ActivationConditionNotMet;
+        // A counted amount needs something to count when activated (it is read again at resolution).
+        if (definition.Counts.Any(c => c.Count is not (EffectCount.DieRoll or EffectCount.Heads or EffectCount.MilledLevel) && CountFor(State, playerId, c.Count, c.Filter) == 0))
+            return DuelError.ActivationConditionNotMet;
+        if (definition.SummonsMonsters && IsSummonLocked(State, playerId)) return DuelError.SummonLocked;
+        var choices = DefinitionCommitRequirementsError(definition, playerId, player, card);
+        if (choices != DuelError.None) return choices;
+        return DefinitionStepRequirementsError(definition, playerId, player, card);
+    }
+
+    private DuelError DefinitionUseRequirementsError(EffectDefinition definition, PlayerId playerId, CardInstance card)
+    {
         if (definition.NameLimit is { } limit && NameLimitReached(State, playerId, limit)) return DuelError.EffectAlreadyUsed;
         if (GraveyardCostBlocked(State, playerId, card, definition)) return DuelError.LockedByEffect;
         if (definition.Steps.OfType<AttachFromStep>().ToArray() is { Length: > 0 } attaches &&
             AttachCandidates(State, playerId, attaches[0], card).Count() < attaches.Length) return DuelError.DecisionUnavailable;
         if (ActivationLocked(State, playerId, card, definition)) return DuelError.LockedByEffect;
         if (definition.Cost is TributeSelfCost && RuleLocked(State, LockedAction.BeTributed, playerId, card, MonsterOf(State, card))) return DuelError.LockedByEffect;
+        return DuelError.None;
+    }
+
+    private bool DefinitionConditionsMet(EffectDefinition definition, PlayerId playerId, DuelPlayerState player, ChainLink? preceding)
+    {
         foreach (var condition in definition.Conditions)
         {
             bool met = condition switch
@@ -126,15 +90,13 @@ public sealed partial class DuelEngine
                         (preceding.IsPendulumScale || rules[preceding.Activation.Spell.GameCardId].Category is CardCategory.Spell or CardCategory.Trap),
                 _ => false
             };
-            if (!met) return DuelError.ActivationConditionNotMet;
+            if (!met) return false;
         }
-        // An attacker or defender target needs that combatant on the field and not destroyed by battle.
-        if (definition.FieldTargets is [AttackingMonsterTarget or DefendingMonsterTarget] && LiveCombatant(State, definition) is null)
-            return DuelError.ActivationConditionNotMet;
-        // A counted amount needs something to count when activated (it is read again at resolution).
-        if (definition.Counts.Any(c => c.Count is not (EffectCount.DieRoll or EffectCount.Heads or EffectCount.MilledLevel) && CountFor(State, playerId, c.Count, c.Filter) == 0))
-            return DuelError.ActivationConditionNotMet;
-        if (definition.SummonsMonsters && IsSummonLocked(State, playerId)) return DuelError.SummonLocked;
+        return true;
+    }
+
+    private DuelError DefinitionCommitRequirementsError(EffectDefinition definition, PlayerId playerId, DuelPlayerState player, CardInstance card)
+    {
         if (definition.Cost is PayLifePointsCost pay && player.LifePoints <= pay.Amount) return DuelError.InsufficientLifePoints;
         if (definition.Cost is TributeCost && !player.MonsterZones.Any(m => m is not null)) return DuelError.DecisionUnavailable;
         if (definition.Cost is DiscardCost discards && player.Hand.Count(c => c != card && DiscardQualifies(c, discards.Filter)) < discards.Count) return DuelError.DecisionUnavailable;
@@ -156,6 +118,11 @@ public sealed partial class DuelEngine
         }
         if (definition.Steps.OfType<SpecialSummonStep>().Any(s => !SpecialSummonOptions(State, playerId, s, card).Any()))
             return DuelError.DecisionUnavailable;
+        return DuelError.None;
+    }
+
+    private DuelError DefinitionStepRequirementsError(EffectDefinition definition, PlayerId playerId, DuelPlayerState player, CardInstance card)
+    {
         // Deck operations need enough cards now (counting targets shuffled in first); a choice needs a matching card.
         int incoming = definition.Steps.TakeWhile(s => s is not DrawCardsStep).Any(s => s is ShuffleTargetsIntoDeckStep)
             ? definition.FieldTargets.Sum(EffectDefinition.MinCount) : 0;
@@ -311,14 +278,8 @@ public sealed partial class DuelEngine
         return ContinueCommit(paid, head, playerId, card, zone, definition, placement, chain);
     }
 
-    private static (DuelState State, DuelEvent[] Head) PayLifePointCost(DuelState state, PlayerId playerId, EffectDefinition definition, DuelEvent[] head)
-    {
-        if (definition.Cost is not (PayLifePointsCost or PayHalfLifePointsCost)) return (state, head);
-        var payer = state.GetPlayer(playerId);
-        int amount = definition.Cost is PayLifePointsCost pay ? pay.Amount : payer.LifePoints / 2;
-        return (state.With(player: payer.With(lifePoints: payer.LifePoints - amount)),
-            [.. head, new LifePointsPaid(playerId, amount, payer.LifePoints, payer.LifePoints - amount, definition.EffectId)]);
-    }
+    private static (DuelState State, DuelEvent[] Head) PayLifePointCost(DuelState state, PlayerId playerId, EffectDefinition definition, DuelEvent[] head) =>
+        ActivationCommitment.PayLifePointCost(state, playerId, definition, head);
 
     /// <summary>A monster may Tribute itself as a cost; every other choice excludes the source.</summary>
     private static int? DecisionExclusion(EffectDefinition definition, CardInstance card, int step) =>
@@ -412,23 +373,15 @@ public sealed partial class DuelEngine
 
     /// <summary>The activating source is still in place, unless a monster paid its cost by leaving the field.</summary>
     private static bool ActivationSourceIntact(PendingSpellActivation activation, DuelPlayerState player, EffectDefinition definition) =>
-        definition.Origin != EffectOrigin.Field || (activation.IsMonsterEffect
-            ? definition.Cost is TributeSelfCost or TributeCost ||
-                player.MonsterZones[activation.SpellTrapZone] is { } monster && monster.Card == activation.Spell && monster.PlacementId == activation.SourcePlacementId
-            : player.SpellTrapAt(activation.SpellTrapZone) is { IsFaceUp: true } source && source.Card == activation.Spell && source.PlacementId == activation.SourcePlacementId);
+        ActivationCommitment.SourceIntact(activation, player, definition);
 
     private DuelActionResult CompleteDefinitionDecisions(PendingDecision pending, DecisionAnswer[] answers, DuelState next,
         PendingSpellActivation activation, List<DuelEvent> events)
     {
         var definition = effectsById[activation.EffectId];
         var result = new DecisionSequenceResult(pending, answers);
-        var target = answers.SingleOrDefault(a => a.Kind == DecisionKind.SpellTrapTarget)?.Target;
-        var receipt = new CommittedActivation(activation.Player, definition.EffectId, activation.Spell,
-            activation.SpellTrapZone, activation.DiscardedCost, target,
-            answers.Skip(definition.CostTargetSteps).Any(a => a.FieldTarget is not null)
-                ? Array.AsReadOnly(answers.Skip(definition.CostTargetSteps).Select(a => a.FieldTarget).OfType<FieldCardTarget>().ToArray())
-                // A cost was chosen but the targets are bound automatically.
-                : AutomaticTargets(next, activation.Player, definition));
+        var receipt = ActivationCommitment.CreateReceipt(activation, definition, answers,
+            () => AutomaticTargets(next, activation.Player, definition));
         events.Add(new DecisionSequenceCompleted(result));
         return AddDefinitionLink(next.WithDecision(null, result).WithActivation(null), receipt, definition,
             activation.SourcePlacementId, State.PendingChain, events);
@@ -438,12 +391,7 @@ public sealed partial class DuelEngine
     private DuelActionResult AddDefinitionLink(DuelState state, CommittedActivation receipt, EffectDefinition definition,
         long placement, PendingChain? chain, List<DuelEvent> events)
     {
-        var link = new ChainLink((chain?.Links.Count ?? 0) + 1, receipt, placement,
-            definition.Origin != EffectOrigin.Field ? ChainOperation.ZoneEffect : definition.IsMonsterEffect ? ChainOperation.MonsterEffect : definition.IsFaceUpEffect ? ChainOperation.FieldEffect : ChainOperation.Definition, definition.SpellSpeed,
-            TargetLinkNumber: definition.Steps.Any(s => s is NegateActivationStep or NegateEffectStep) || chain is not null && definition.Steps.Any(s => s is NegateSummonStep)
-                ? chain!.Links[^1].Number : null,
-            SummonAttemptId: chain is null && definition.Steps.Any(s => s is NegateSummonStep) ? State.PendingSummon?.AttemptId : null);
-        var pending = new PendingChain(checked(State.Revision + 1), (chain?.Links ?? []).Append(link), Other(receipt.Player));
+        var (link, pending) = ActivationCommitment.StartLink(State, receipt, definition, placement, chain);
         // A declaring effect declares as it is activated, before either player can respond.
         if (definition.Declares is { } declares && !definition.DeclaresAtResolution) pending = AskDeclaration(pending, link, definition, receipt.Player, DeclarationChoices(definition, receipt, declares));
         var next = state.WithCommittedActivation(receipt).WithChain(pending);

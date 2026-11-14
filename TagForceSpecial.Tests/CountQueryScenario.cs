@@ -40,10 +40,17 @@ internal sealed class CountQueryScenario
                 preparation ?? [new GainLifePointsStep(1)])], shuffleSeed: random ? 37UL : null);
     }
 
-    internal void Execute(DuelCommand command)
+    internal void Execute(DuelCommand command, DuelError expected = DuelError.None)
     {
+        var before = Engine.State;
         var result = Engine.Execute(command);
-        Assert.True(result.Succeeded, $"{command}: {result.Error}");
+        Assert.Equal(expected, result.Error);
+        Assert.Equal(expected == DuelError.None, result.Succeeded);
+        if (expected != DuelError.None)
+        {
+            Assert.Same(before, Engine.State);
+            Assert.Empty(result.Events);
+        }
         Events.AddRange(result.Events);
         if (output is null) return;
         var actions = new DuelActionSource(Engine, catalogForTrace);
@@ -109,6 +116,8 @@ internal sealed class CountQueryScenario
             DuelCommand? command = Engine.State.PendingDecision is { FieldTargetOptions: { Count: > 0 } options } decision
                 ? new ChooseDecisionFieldTarget(decision.Player, decision.DecisionId, options[0].Player,
                     options[0].Location, options[0].Zone, options[0].Card.InstanceId)
+                : Engine.State.PendingDecision is { CardOptions.Count: > 0 } cost
+                    ? new ChooseDecisionCard(cost.Player, cost.DecisionId, cost.CardOptions[0].InstanceId)
                 : Engine.State.PendingChain is not { } chain ? null
                 : chain.Declaration is { } declared ? new DeclareValue(declared.Player, declared.DecisionId, declaration)
                 : chain.NextLink == 0 ? new PassChainResponse(chain.Responder, chain.DecisionId)
