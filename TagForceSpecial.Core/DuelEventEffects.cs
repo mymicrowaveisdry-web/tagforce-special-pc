@@ -9,13 +9,27 @@ public sealed record MonsterBinding(PlayerId Player, int Zone, CardInstance Card
 }
 public sealed record EffectTimingPoint(long TransitionId, int Step);
 public sealed record MonsterEventOccurrence(MonsterEventKind Kind, MonsterBinding Subject,
-    EffectTimingPoint? TimingPoint = null, bool IsActivationCost = false);
+    EffectTimingPoint? TimingPoint = null, bool IsActivationCost = false, bool ByBattle = false)
+{
+    /// <summary>The subject left a Spell/Trap Zone, so it is not a monster for other cards' monster triggers.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool FromSpellTrapZone { get; internal init; }
+    public PlayerId? DiscardEffectController { get; internal init; }
+    /// <summary>The procedure that performed this Special Summon, if any.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? ProcedureId { get; internal init; }
+    /// <summary>The declared attack was a direct attack.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool DirectAttack { get; internal init; }
+}
 public sealed record TriggerActivation(int Id, TriggerEffectProfile Profile, MonsterBinding Source,
     MonsterEventOccurrence Occurrence, CardInstance? DiscardedCost = null, int PaidLifePoints = 0,
-    MonsterBinding? Target = null)
+    MonsterBinding? Target = null, FieldCardTarget? TargetCard = null, int? Declared = null)
 {
     public PlayerId Player => Source.Player;
     public IReadOnlyList<CardInstance> DetachedCost { get; internal init; } = Array.AsReadOnly(Array.Empty<CardInstance>());
+    /// <summary>The monster Tributed to pay this trigger's cost.</summary>
+    public MonsterBinding? TributedCost { get; internal init; }
 }
 
 /// <summary>All trigger groups are ordered before either player may add a fast response.</summary>
@@ -54,7 +68,7 @@ public sealed record EffectiveMonsterStatistics(MonsterBinding Monster, int? Att
 public sealed record TriggerUse(PlayerId Player, int Turn, string Key, int? InstanceId, long? PlacementId);
 public sealed record MonsterEffectNegation(string EffectId, MonsterBinding Source, MonsterBinding Target,
     long ResolutionId, int ExpiresOnTurn, int ActionOrdinal = 0);
-public enum TriggerCommitmentKind { DiscardCost, MonsterTarget, DetachCost }
+public enum TriggerCommitmentKind { DiscardCost, MonsterTarget, DetachCost, ZoneTarget, TributeCost, Declaration }
 public sealed class PendingTriggerCommitment
 {
     public long DecisionId { get; }
@@ -63,16 +77,25 @@ public sealed class PendingTriggerCommitment
     public TriggerCommitmentKind Kind { get; }
     public IReadOnlyList<CardInstance> CardOptions { get; }
     public IReadOnlyList<MonsterBinding> TargetOptions { get; }
+    /// <summary>Graveyard or banished cards that can be targeted.</summary>
+    public IReadOnlyList<FieldCardTarget> ZoneOptions { get; }
+    /// <summary>What a declaring trigger declares, and its values (empty for card names, where any card can be named).</summary>
+    public DeclarationKind? Declaration { get; }
+    public IReadOnlyList<int> DeclarationOptions { get; }
     internal PendingTriggerCommitment(long id, TriggerActivation trigger, TriggerCommitmentKind kind,
-        IEnumerable<CardInstance>? cards = null, IEnumerable<MonsterBinding>? targets = null)
+        IEnumerable<CardInstance>? cards = null, IEnumerable<MonsterBinding>? targets = null, IEnumerable<FieldCardTarget>? zones = null,
+        DeclarationKind? declaration = null, IEnumerable<int>? declarationOptions = null)
     {
+        Declaration = declaration;
+        DeclarationOptions = Array.AsReadOnly(declarationOptions?.ToArray() ?? []);
+        ZoneOptions = Array.AsReadOnly(zones?.ToArray() ?? []);
         DecisionId = id; Trigger = trigger; Kind = kind;
         CardOptions = Array.AsReadOnly(cards?.ToArray() ?? []);
         TargetOptions = Array.AsReadOnly(targets?.ToArray() ?? []);
     }
 }
 
-/// <summary>Immutable event-effect state retained across decisions, chains and snapshots.</summary>
+/// <summary>Event-effect state kept across decisions, chains and snapshots.</summary>
 public sealed record EventEffectState
 {
     public PendingTriggerBatch? PendingTriggers { get; private init; }
@@ -113,6 +136,8 @@ public sealed record MonsterEffectNegationEnded(MonsterEffectNegation Negation) 
 
 /// <summary>Order every mandatory option, or an ordered subset of optional options (empty declines all).</summary>
 public sealed record ChooseTriggerOrder(PlayerId Player, long DecisionId, IReadOnlyList<int> TriggerIds) : DuelCommand(Player);
+public sealed record ChooseTriggerZoneTarget(PlayerId Player, long DecisionId, PlayerId TargetPlayer, int CardInstanceId) : DuelCommand(Player);
+public sealed record TriggerZoneTargetChosen(TriggerActivation Trigger, FieldCardTarget Target) : DuelEvent;
 public sealed record TriggerOrderRequested(PendingTriggerBatch Batch) : DuelEvent;
 public sealed record TriggerOrderChosen(PlayerId Player, IReadOnlyList<int> TriggerIds) : DuelEvent;
 public sealed record TriggerActivated(TriggerActivation Trigger, int LinkNumber) : DuelEvent;

@@ -5,9 +5,7 @@ namespace TagForceSpecial.Tests;
 
 public sealed class CardGetterReferenceTests
 {
-    // These values come from runtime.v0, not the capture script's calculated
-    // "expected" fields. The packed words come from a separate asset listing.
-    // Hosted tests compare the public projection; they do not replay PPSSPP.
+    // Compares the public card-getter projection with recorded runtime values.
     [Theory]
     [InlineData(4007u)]
     [InlineData(4041u)]
@@ -27,7 +25,7 @@ public sealed class CardGetterReferenceTests
         Assert.Equal(observed, CardPropertyDecoder.Decode(cardId, word, 0).Attack);
     }
 
-    // Synthetic tests derived from the MIPS extraction, not measured PSP cases.
+    // Card-getter cases derived from the extracted routine.
     [Theory]
     [InlineData(0u, 0)]
     [InlineData(1u, 10)]

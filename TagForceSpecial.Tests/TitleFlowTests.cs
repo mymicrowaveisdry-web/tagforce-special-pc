@@ -307,7 +307,7 @@ public class TitleFlowTests
         Assert.Equal(TitleFlowStep.SystemSaveDone, flow.Step);
         Assert.Equal(("Tester", DuelistLevelChoice.FirstTimer), host.Created);
         Assert.Equal(PlayerOptions.Defaults().Values, host.SavedOptions!.Values);
-        // Observed: "Save completed." ignores confirm and closes with back.
+        // "Save completed." ignores confirm and closes with back.
         Press(flow, PspAction.Cross);
         Assert.Equal(TitleFlowStep.SystemSaveDone, flow.Step);
         Press(flow, PspAction.Circle);

@@ -25,8 +25,10 @@ public sealed class EhpReader
     public EhpIndex ReadIndex(Stream source, EhpReadMode readMode = EhpReadMode.Strict)
         => ReadCore(source, readMode, allowRejectedPayloads: false).BoundedIndex;
 
-    /// <summary>Research-only subset inspection. Invalid declared payloads are reported, never clipped.
-    /// Header/name/table corruption still rejects the inspection. Does not certify a complete archive.</summary>
+    /// <summary>
+    /// Inspects a subset of an EHP archive, reporting invalid payloads without clipping them. Header, name or table
+    /// corruption rejects the inspection.
+    /// </summary>
     public EhpInspection InspectBoundedMembers(Stream source)
         => ReadCore(source, EhpReadMode.InspectStoredRanges, allowRejectedPayloads: true);
 

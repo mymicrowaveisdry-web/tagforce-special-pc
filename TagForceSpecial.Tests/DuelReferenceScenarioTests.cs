@@ -5,9 +5,7 @@ using TagForceSpecial.Core;
 namespace TagForceSpecial.Tests;
 
 /// <summary>
-/// Compare bounded state projections with recorded PPSSPP observations. Synthetic
-/// decks reproduce the observed counts and summon card; hidden state and deck
-/// identities/order are deliberately outside this comparison.
+/// Compares duel state projections with recorded captures. Decks reproduce the recorded counts and summoned card.
 /// </summary>
 [Trait("Category", "LocalReference")]
 public sealed class DuelReferenceScenarioTests
@@ -80,8 +78,7 @@ public sealed class DuelReferenceScenarioTests
         {
             [1] = new(CardCategory.Monster, true),
             [2] = new(CardCategory.Spell, AllowsSpellTrapSet: true),
-            // This fixture only covers a direct attack with optional activations declined.
-            // Opting in here does not implement or verify this card's effects.
+            // Covers a direct attack with optional activations declined.
             [attackerId] = new(CardCategory.Monster, true, AllowsBasicBattle: true)
         };
         var firstDeck = Enumerable.Repeat(1u, 40).ToArray();

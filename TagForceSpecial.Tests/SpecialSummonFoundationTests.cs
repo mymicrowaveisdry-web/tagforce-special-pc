@@ -5,7 +5,7 @@ using static TagForceSpecial.Tests.EventEffectScenario;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Synthetic foundation scenarios reached through legal commands; no PSP summon-procedure claim.</summary>
+/// <summary>Special Summon foundation scenarios reached through legal commands.</summary>
 public sealed class SpecialSummonFoundationTests
 {
     private const uint Target = uint.MaxValue, Alternative = uint.MaxValue - 1, Low = 1, Spell = 10, Negate = 20, Counter = 21;
@@ -13,8 +13,8 @@ public sealed class SpecialSummonFoundationTests
     private static DuelEngine Engine(bool requiredProper = true, bool window = false,
         IEnumerable<SpecialSummonProcedureProfile>? procedures = null,
         IEnumerable<SpecialSummonCardProfile>? cards = null,
-        IEnumerable<TriggerEffectProfile>? triggers = null, SummonNegationKinds negateKinds = SummonNegationKinds.Special,
-        bool onlyTargetInEffect = false, bool banishAtEndPhase = false, IEnumerable<ChainResponseProfile>? responses = null)
+        IEnumerable<TriggerEffectProfile>? triggers = null, SummonKinds negateKinds = SummonKinds.Special,
+        bool onlyTargetInEffect = false, bool banishAtEndPhase = false, IEnumerable<EffectDefinition>? responses = null)
     {
         uint[] ids = [Target, Alternative, Low, Spell, Negate, Counter];
         var catalog = new CardCatalog(new(null, "synthetic-special-foundation"), ids.Select(id =>
@@ -31,9 +31,10 @@ public sealed class SpecialSummonFoundationTests
             experimentalSpecialSummonProcedures: procedures ?? [new("proper", [Target]), new("revive", [Target], DecisionCardSource.Graveyard),
                 new("banished", [Target], DecisionCardSource.Banished)],
             experimentalSummonWindows: window ? [new(Target)] : null,
-            experimentalSummonNegations: [new("negate", Negate, 500, negateKinds)],
-            experimentalSpellEffects: [new("deck", Spell, onlyTargetInEffect ? [Target] : [Target, Alternative], banishAtEndPhase)],
-            experimentalTriggerEffects: triggers, experimentalChainResponses: responses);
+            experimentalTriggerEffects: triggers,
+            effectDefinitions: [new("deck", Spell, EffectKind.NormalSpell, [new SpecialSummonStep(SpecialSummonSources.Deck,
+                onlyTargetInEffect ? [Target] : [Target, Alternative], banishAtEndPhase)]), ResponseProbe.NegateSummon("negate", Negate, 500, negateKinds), .. responses ?? []],
+            shuffleSeed: 1);
     }
 
     private static int Hand(DuelEngine e, uint id, PlayerId? player = null) =>
@@ -218,10 +219,10 @@ public sealed class SpecialSummonFoundationTests
     [Fact]
     public void NormalOnlyNegatorCannotNegateASpecialProcedure()
     {
-        var e = Engine(window: true, negateKinds: SummonNegationKinds.Normal); EnterMain(e);
+        var e = Engine(window: true, negateKinds: SummonKinds.Normal); EnterMain(e);
         NextMain(e); SetNegator(e); NextMain(e); Ok(e, Command(e));
         var p = e.State.PendingSummon!;
-        Reject(e, new ActivateSummonNegation(p.Responder, p.DecisionId, 0), DuelError.UnsupportedSummonResponse);
+        Reject(e, new ActivateSummonNegation(p.Responder, p.DecisionId, 0), DuelError.ActivationConditionNotMet);
         PassSummon(e); PassSummon(e);
         Assert.False(e.State.NormalSummonUsed);
     }
@@ -246,7 +247,7 @@ public sealed class SpecialSummonFoundationTests
     [Fact]
     public void CounterNegationPreservesContextAndGrantsProperStatusOnlyAtCompletion()
     {
-        var e = Engine(window: true, responses: [new("counter", Counter, ChainOperation.NegateActivation, ChainSpellSpeed.Three,
+        var e = Engine(window: true, responses: [ResponseProbe.Negate("counter", Counter, ResponseNegation.Activation, ChainSpellSpeed.Three,
             discardCardIds: [Low])]);
         EnterMain(e); int instance = Hand(e, Target);
         Ok(e, new SetSpellTrap(PlayerId.One, Hand(e, Counter), 0));
@@ -274,15 +275,20 @@ public sealed class SpecialSummonFoundationTests
         Assert.Equal(7500, e.State.GetPlayer(PlayerId.Two).LifePoints);
     }
 
-    private static DuelActionResult ResolveDeckSpell(DuelEngine e, uint choice, int zone = 0)
+    /// <summary>Activates the deck Spell, closes its response window and pauses at the resolution choice.</summary>
+    private static PendingDefinitionSummon ReachDeckChoice(DuelEngine e)
     {
         Ok(e, new ActivateSpell(PlayerId.One, Hand(e, Spell), 0));
-        var decision = e.State.PendingDecision!;
-        int card = decision.CardOptions.First(c => c.GameCardId == choice).InstanceId;
-        Ok(e, new ChooseDecisionCard(PlayerId.One, decision.DecisionId, card));
-        decision = e.State.PendingDecision!;
-        Ok(e, new ChooseDecisionPosition(PlayerId.One, decision.DecisionId, BattlePosition.FaceUpAttack));
-        return Ok(e, new ChooseDecisionZone(PlayerId.One, e.State.PendingDecision!.DecisionId, zone));
+        for (int i = 0; i < 2; i++) Ok(e, new PassChainResponse(e.State.PendingChain!.Responder, e.State.PendingChain.DecisionId));
+        Ok(e, new ResolveNextChainLink(PlayerId.One, e.State.PendingChain!.DecisionId));
+        return e.State.PendingChain!.DefinitionSummon!;
+    }
+
+    private static DuelActionResult ResolveDeckSpell(DuelEngine e, uint choice, int zone = 0)
+    {
+        var decision = ReachDeckChoice(e);
+        int card = decision.Options.First(o => o.Card.GameCardId == choice).Card.InstanceId;
+        return Ok(e, new ChooseDefinitionSummon(PlayerId.One, decision.DecisionId, card, zone, BattlePosition.FaceUpAttack));
     }
 
     [Fact]
@@ -292,7 +298,7 @@ public sealed class SpecialSummonFoundationTests
         var result = ResolveDeckSpell(e, Target);
         var monster = Assert.Single(result.Events.OfType<MonsterSpecialSummoned>()).Monster;
         Assert.Null(e.State.PendingSummon);
-        Assert.True(e.State.ResearchSliceComplete); // Existing research continuation limit is preserved.
+        Assert.False(e.State.ResearchSliceComplete);
         Assert.Equal(SummonMethod.SpecialEffect, Record(e, monster.Card.InstanceId).Method);
         Assert.Null(Record(e, monster.Card.InstanceId).ProperProcedureId);
         Assert.Equal(DecisionCardSource.Deck, Record(e, monster.Card.InstanceId).Source);
@@ -302,8 +308,7 @@ public sealed class SpecialSummonFoundationTests
     public void RestrictedEffectChoicesAreFilteredAndNoLegalChoiceRejectsBeforeActivation()
     {
         var e = Engine(); EnterMain(e);
-        Ok(e, new ActivateSpell(PlayerId.One, Hand(e, Spell), 0));
-        Assert.All(e.State.PendingDecision!.CardOptions, c => Assert.Equal(Alternative, c.GameCardId));
+        Assert.All(ReachDeckChoice(e).Options, o => Assert.Equal(Alternative, o.Card.GameCardId));
         var blocked = Engine(onlyTargetInEffect: true); EnterMain(blocked);
         Reject(blocked, new ActivateSpell(PlayerId.One, Hand(blocked, Spell), 0), DuelError.DecisionUnavailable);
         Assert.Empty(blocked.State.SummonHistory);
@@ -318,7 +323,7 @@ public sealed class SpecialSummonFoundationTests
     }
 
     [Fact]
-    public void HistorySurvivesTheExistingDelayedBanishmentStop()
+    public void HistorySurvivesTheDelayedBanishment()
     {
         var e = Engine(requiredProper: false, banishAtEndPhase: true); EnterMain(e);
         var result = ResolveDeckSpell(e, Target);
@@ -327,7 +332,7 @@ public sealed class SpecialSummonFoundationTests
         Ok(e, new ChangePhase(PlayerId.One, DuelPhase.End));
         Assert.Contains(e.State.GetPlayer(PlayerId.One).Banished, c => c.InstanceId == instance);
         Assert.Equal(record, Record(e, instance));
-        Assert.True(e.State.ResearchSliceComplete);
+        Assert.False(e.State.ResearchSliceComplete);
     }
 
     [Fact]
@@ -376,11 +381,11 @@ public sealed class SpecialSummonFoundationTests
         Assert.Throws<NotSupportedException>(() => ((IList<uint>)profile.CardIds).Clear());
     }
 
-    private static BattleResponseProfile BattleSummoning() => new("battle-summon", BattleFlowScenario.Summon,
-        BattleResponseOperation.SpecialSummonFromHand, BattleTiming.AttackDeclaration, summonableCardIds: [BattleFlowScenario.B]);
+    private static EffectDefinition BattleSummoning() =>
+        ResponseProbe.SummonFromHand("battle-summon", BattleFlowScenario.Summon, BattleTiming.AttackDeclaration, BattleFlowScenario.B);
 
     [Fact]
-    public void LegacyBattleResponseUsesSharedHistoryAndDoesNotOpenASummonNegationWindow()
+    public void BattleHandSummonUsesSharedHistoryAndDoesNotOpenASummonNegationWindow()
     {
         var e = BattleFlowScenario.Engine(defender: false, profiles: [BattleSummoning()],
             specialCards: [new(BattleFlowScenario.B, SpecialSummonSources.Hand)], summonWindows: [new(BattleFlowScenario.B)]);
@@ -394,37 +399,33 @@ public sealed class SpecialSummonFoundationTests
     }
 
     [Fact]
-    public void BattleResponsePreflightHonorsExplicitEffectSourceRestrictions()
+    public void BattleHandSummonPreflightHonorsExplicitEffectSourceRestrictions()
     {
         var e = BattleFlowScenario.Engine(defender: false, profiles: [BattleSummoning()],
             specialCards: [new(BattleFlowScenario.B, SpecialSummonSources.Deck)]);
         BattleFlowScenario.Ready(e); BattleFlowScenario.Declare(e, null);
         var w = e.State.Battle!.Window;
-        Reject(e, new ActivateBattleResponse(w.Responder, w.DecisionId, 2, Hand(e, BattleFlowScenario.B, PlayerId.Two), 1),
-            DuelError.UnsupportedSpecialSummon);
+        Reject(e, new ActivateBattleResponse(w.Responder, w.DecisionId, 2), DuelError.DecisionUnavailable);
     }
 
     [Fact]
-    public void BattleResponseRevalidatesTheSelectedHandInstanceWhenItsLinkResolves()
+    public void BattleHandSummonIsSkippedWhenItsOnlyCardLeavesTheHand()
     {
-        var e = BattleFlowScenario.Engine(defender: false, profiles: [BattleSummoning()],
-            chains: [new("target-other-trap", BattleFlowScenario.Counter, ChainOperation.DestroyBoundSpellTrap, ChainSpellSpeed.Two,
-                    battleWindows: BattleTiming.AttackDeclaration),
-                new("discard-selected", BattleFlowScenario.Stats, ChainOperation.NegateEffect, ChainSpellSpeed.Three,
-                    discardCardIds: [BattleFlowScenario.B], battleWindows: BattleTiming.AttackDeclaration)]);
-        BattleFlowScenario.Ready(e); BattleFlowScenario.Declare(e, null);
+        // The defender is the other copy of B, so the selected card is the only one in hand.
+        var e = BattleFlowScenario.Engine(defender: true, profiles: [BattleSummoning()],
+            chains: [ResponseProbe.Negate("negate-summon-link", BattleFlowScenario.Counter, ResponseNegation.Effect, ChainSpellSpeed.Two),
+                ResponseProbe.Negate("discard-selected", BattleFlowScenario.Stats, ResponseNegation.Effect, ChainSpellSpeed.Three,
+                    discardCardIds: [BattleFlowScenario.B])]);
+        BattleFlowScenario.Ready(e); BattleFlowScenario.Declare(e, 0);
         int selected = Hand(e, BattleFlowScenario.B, PlayerId.Two);
         BattleFlowScenario.Respond(e, 2, selected, 1);
         Ok(e, new ActivateChainResponse(PlayerId.One, e.State.PendingChain!.DecisionId, 1));
+        Ok(e, new ActivateChainResponse(PlayerId.Two, e.State.PendingChain!.DecisionId, 3)); // negates link 2, discarding the selection
         var choice = e.State.PendingDecision!;
-        int target = e.State.GetPlayer(PlayerId.Two).SpellTrapFields[1]!.Card.InstanceId;
-        Ok(e, new ChooseDecisionTarget(PlayerId.One, choice.DecisionId, PlayerId.Two, 1, target));
-        Ok(e, new ActivateChainResponse(PlayerId.Two, e.State.PendingChain!.DecisionId, 3));
-        choice = e.State.PendingDecision!;
         Ok(e, new ChooseDecisionCard(PlayerId.Two, choice.DecisionId, selected));
         Pass(e); Pass(e); Resolve(e); Resolve(e);
         var result = Resolve(e);
-        Assert.Contains(result.Events, x => x is ChainLinkSkipped { Number: 1, Reason: ChainSkipReason.TargetUnavailable });
+        Assert.Contains(result.Events, x => x is ChainLinkSkipped { Number: 1, Reason: ChainSkipReason.SummonUnavailable });
         Assert.DoesNotContain(result.Events, x => x is MonsterSpecialSummoned);
         Assert.Null(e.State.GetPlayer(PlayerId.Two).MonsterZones[1]);
         Assert.DoesNotContain(e.State.SummonHistory, r => r.Card.InstanceId == selected);

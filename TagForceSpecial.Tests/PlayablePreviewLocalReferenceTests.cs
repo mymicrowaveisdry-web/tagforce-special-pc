@@ -18,13 +18,19 @@ public sealed class PlayablePreviewLocalReferenceTests
         Assert.Equal(PlayablePreview.CardInfoSha256, catalog.Source.ContainerSha256);
         Assert.Equal(7254, catalog.Count);
         PlayablePreview.ValidateCatalog(catalog);
-        using var manifest = JsonDocument.Parse(JsonSerializer.Serialize(CardSupportInventory.Build(catalog, 7255),
+        using var manifest = JsonDocument.Parse(JsonSerializer.Serialize(CardSupportInventory.Build(ReviewedCardMetadata.ApplyReviewed(catalog), 7255),
             new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
-        var entries = manifest.RootElement.GetProperty("pspFidelity10").GetProperty("cards").EnumerateArray().ToArray();
-        Assert.Equal(7254, entries.Length);
-        Assert.Equal(14, entries.Count(c => c.GetProperty("status").GetString() == "supported"));
-        Assert.Equal(5, entries.Count(c => c.GetProperty("status").GetString() == "partial"));
-        Assert.Equal(7235, entries.Count(c => c.GetProperty("status").GetString() == "unsupported"));
+        var full = manifest.RootElement.GetProperty("pspFidelity10");
+        var entries = full.GetProperty("cards").EnumerateArray().ToArray();
+        // Denominator: 7,254 IDs minus 95 effect-generated Tokens; unobtainable cards stay included.
+        Assert.Equal(95, full.GetProperty("excludedTokens").GetArrayLength());
+        Assert.Equal(7159, entries.Length);
+        // Every Normal Monster, preview card and registered family card is supported; nothing else is.
+        int supported = NormalMonsterFamily.CardIds.Concat(PlayablePreview.Cards.Select(c => c.CardId))
+            .Concat(CardFamilies.All.SelectMany(f => f.Cards).Select(c => c.CardId)).Distinct().Count();
+        Assert.Equal(supported, entries.Count(c => c.GetProperty("status").GetString() == "supported"));
+        Assert.Equal(0, entries.Count(c => c.GetProperty("status").GetString() == "partial"));
+        Assert.Equal(7159 - supported, entries.Count(c => c.GetProperty("status").GetString() == "unsupported"));
         Assert.All(entries, c => Assert.False(c.GetProperty("pspVerified").GetBoolean()));
         var scenario = PreviewDuelScenario.Run(catalog);
         Assert.Equal(TagForceSpecial.Core.DuelEndReason.LifePointsDepleted, scenario.Outcome.Reason);
@@ -36,8 +42,10 @@ public sealed class PlayablePreviewLocalReferenceTests
             var loaded = CardCatalogPackage.Load(packagePath).Catalog;
             // Compare all fields, including source rows, descriptions, codes and immutable effect-reference snapshots.
             Assert.Equal(JsonSerializer.Serialize(catalog), JsonSerializer.Serialize(loaded));
+            // Packages carry the frozen conversion baseline; the reviewed overlay is applied when opened.
             Assert.Equal(7240, loaded.Cards.Count(c => c.Effects!.State == Cards.CardEffectState.Unknown));
             Assert.Equal(8, loaded.Cards.Count(c => c.Effects!.State == Cards.CardEffectState.None));
+            Assert.Equal(665, ReviewedCardMetadata.Overlay(loaded).Cards.Count(c => c.Effects!.State == Cards.CardEffectState.None));
             Assert.Equal(6, loaded.Cards.Count(c => c.Effects!.State == Cards.CardEffectState.Referenced));
             Assert.Equal(JsonSerializer.Serialize(scenario), JsonSerializer.Serialize(PreviewDuelScenario.Run(loaded)));
         }

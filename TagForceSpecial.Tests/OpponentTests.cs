@@ -104,7 +104,8 @@ public sealed class OpponentTests
     {
         var deck = new uint[] { 4350, 4012, 4012, 4030, 4032 }.Concat(Enumerable.Repeat(4012u, 35));
         var e = new DuelEngine(Catalog(), PlayablePreview.Rules, deck, Enumerable.Repeat(4352u, 40), startingPlayer: PlayerId.Two,
-            experimentalActivationContracts: [new("cost-target", 4350, [4012], true)]);
+            effectDefinitions: [new("cost-target", 4350, EffectKind.NormalSpell, [new DestroyTargetStep()],
+                cost: new DiscardCost(), target: new SpellTrapOnFieldTarget())]);
         EnterMain(e); Ok(e, new SetSpellTrap(PlayerId.Two, e.State.GetPlayer(PlayerId.Two).Hand[0].InstanceId, 2));
         Next(e);
         Ok(e, new ActivateSpell(PlayerId.One, e.State.GetPlayer(PlayerId.One).Hand[0].InstanceId, 0));
@@ -117,7 +118,8 @@ public sealed class OpponentTests
         Assert.Null(target.Opponent.SpellTraps[2]!.CardId);
         Assert.True(source.Execute(PlayerId.One, target.Revision, target.Actions[0].Token).Accepted);
         Assert.NotNull(e.State.CommittedActivation);
-        Assert.Equal(ActionAvailability.Unsupported, source.Observe(PlayerId.One).Availability);
+        Assert.Equal(ActionAvailability.Waiting, source.Observe(PlayerId.One).Availability); // the opponent may respond
+        Assert.Equal("Chain", source.Observe(PlayerId.Two).Decision!.Kind);
     }
 
     [Theory]
@@ -264,8 +266,7 @@ public sealed class OpponentTests
     [Fact]
     public void ReplayAdapterSelectsACurrentTargetAfterALegalDefenderChange()
     {
-        var profile = new BattleResponseProfile("synthetic-hand-summon", BattleFlowScenario.Summon,
-            BattleResponseOperation.SpecialSummonFromHand, BattleTiming.AttackDeclaration, summonableCardIds: [BattleFlowScenario.B]);
+        var profile = ResponseProbe.SummonFromHand("synthetic-hand-summon", BattleFlowScenario.Summon, BattleTiming.AttackDeclaration, BattleFlowScenario.B);
         var e = BattleFlowScenario.Engine(defender: false, profiles: [profile]);
         BattleFlowScenario.Ready(e); BattleFlowScenario.Declare(e, null);
         int card = e.State.GetPlayer(PlayerId.Two).Hand.First(c => c.GameCardId == BattleFlowScenario.B).InstanceId;

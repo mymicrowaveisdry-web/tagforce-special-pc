@@ -66,7 +66,8 @@ public sealed class DuelController
                 ActionKind.SetMonster or ActionKind.SetSpellTrap => "Opponent: set a card",
                 ActionKind.ActivateSpell or ActionKind.ActivateSetSpell or ActionKind.ChainResponse or ActionKind.BattleResponse => "Opponent: activated a card",
                 ActionKind.Attack or ActionKind.ReplayAttack => "Opponent: attacked",
-                ActionKind.ChainPass or ActionKind.BattlePass => "Opponent: passed",
+                ActionKind.OrderTriggers => "Opponent: activated an effect",
+                ActionKind.ChainPass or ActionKind.BattlePass or ActionKind.DeclineTriggers => "Opponent: passed",
                 ActionKind.ResolveChain => "Opponent: resolving the chain",
                 ActionKind.AdvanceBattle => "Opponent: continuing the battle",
                 ActionKind.Phase => "Opponent: changed phase",
@@ -102,7 +103,7 @@ public sealed class DuelController
     private DuelView Build()
     {
         var v = source.Observe(viewer);
-        string prompt = v.Outcome is { } outcome ? outcome.Winner == viewer ? "YOU WIN" : "YOU LOSE"
+        string prompt = v.Outcome is { } outcome ? outcome.IsDraw ? "DRAW" : outcome.Winner == viewer ? "YOU WIN" : "YOU LOSE"
             : v.Availability == ActionAvailability.Unsupported ? "Unsupported decision"
             : v.Decision is { } d ? $"Choose {d.Kind}"
             : v.Availability == ActionAvailability.Waiting ? "Opponent choosing" : "Choose an action";

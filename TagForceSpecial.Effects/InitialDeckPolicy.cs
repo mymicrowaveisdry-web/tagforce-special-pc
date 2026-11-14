@@ -3,7 +3,7 @@ using TagForceSpecial.Core.Decks;
 
 namespace TagForceSpecial.Effects;
 
-/// <summary>Named original-era preview regulation, with no save/DLC or story-unlock override inferred.</summary>
+/// <summary>Named preview deck regulation.</summary>
 public static class InitialDeckPolicy
 {
     public const string SourceBuild = "e99cff5774856e16329b94c9ff48f9eb0c6bc61ff1127882d0785ca4221bd707";

@@ -5,6 +5,10 @@ using TagForceSpecial.Effects;
 
 namespace TagForceSpecial.Tests;
 
+/// <summary>
+/// Turn-7 scenario where Player One activates a Spell from hand, driven through the Lightning Vortex, Mystical Space
+/// Typhoon and Scapegoat definitions. Open windows offered to Player Two are passed.
+/// </summary>
 internal static class ChainScenario
 {
     internal static DuelActionResult Ok(DuelEngine engine, DuelCommand command)
@@ -14,21 +18,20 @@ internal static class ChainScenario
         return result;
     }
 
-    internal static DuelEngine Engine(uint spell, bool chains = true, bool twoMonsters = false, IEnumerable<ChainEffectProfile>? profiles = null)
+    internal static DuelEngine Engine(uint spell, bool twoMonsters = false)
     {
         uint[] ids = [1, 9979, 7716, 6151, 7747, 9723, 5217, 4909, 4818, 4815, 4664, 4028, 3902, 3903, 3904, 3905];
         var spells = new HashSet<uint> { 7747, 5217, 4909, 4818, 4815 };
         var catalog = new CardCatalog(new(new string('0', 64), "synthetic-activation-projection-inputs"),
             ids.Select(id => new CardDefinition(id, $"Synthetic {id}", "", new(1000, 1000, 2),
                 new(0, 0, 0, 0, 0, 0, 0), new((int)id, id, 2u << 11, 0))));
-        var rules = ids.ToDictionary(id => id, id => new DuelCardRules(spells.Contains(id) ? CardCategory.Spell :
-            id == 4664 ? CardCategory.Trap : CardCategory.Monster,
-            AllowsNormalSummon: !spells.Contains(id) && id != 4664, AllowsSpellTrapSet: spells.Contains(id) || id == 4664));
+        var rules = ids.ToDictionary(id => id, id => ChainCardFamily.Rules.TryGetValue(id, out var shared) && id != 7747 ? shared
+            : new DuelCardRules(spells.Contains(id) ? CardCategory.Spell : id == 4664 ? CardCategory.Trap : CardCategory.Monster,
+                AllowsNormalSummon: !spells.Contains(id) && id != 4664, AllowsSpellTrapSet: spells.Contains(id) || id == 4664));
         uint[] p1 = [9979, 7716, 9979, 6151, 7747, 7716, 9723, spell, 1, 7716, .. Enumerable.Repeat(1u, 30)];
         uint[] p2 = [4818, 4909, 4815, 4664, 4028, .. Enumerable.Repeat(1u, 35)];
-        var engine = new DuelEngine(catalog, rules, p1, p2, experimentalActivationContracts:
-            [ActivationResearch.LightningVortex(ids), ActivationResearch.MysticalSpaceTyphoon()],
-            experimentalChainEffects: chains ? profiles ?? [ChainResearch.LightningVortex(), ChainResearch.MysticalSpaceTyphoon(), ChainResearch.Scapegoat()] : []);
+        var engine = new DuelEngine(catalog, rules, p1, p2,
+            effectDefinitions: EventEffectScenario.ChainCards(5217, 4909, 4818));
         EnterMain(engine);
         while (engine.State.TurnNumber < 7)
         {
@@ -50,7 +53,7 @@ internal static class ChainScenario
                 var monster = engine.State.GetPlayer(actor).Hand.First(c => c.GameCardId == (engine.State.TurnNumber == 2 ? 4028u : 1u));
                 Ok(engine, new NormalSummon(actor, monster.InstanceId, engine.State.TurnNumber == 2 ? 2 : 0));
             }
-            Ok(engine, new ChangePhase(actor, DuelPhase.End));
+            Phase(engine, DuelPhase.End);
             while (engine.State.GetPlayer(actor).Hand.Count > 6)
                 Ok(engine, new DiscardForHandLimit(actor, engine.State.GetPlayer(actor).Hand[^1].InstanceId));
             Ok(engine, new EndTurn(actor));
@@ -65,7 +68,15 @@ internal static class ChainScenario
     {
         var actor = engine.State.ActivePlayer;
         Ok(engine, new ResolveDrawStep(actor));
-        Ok(engine, new ChangePhase(actor, DuelPhase.Main1));
+        Phase(engine, DuelPhase.Main1);
+    }
+
+    /// <summary>A phase change that passes any open window offered to the non-turn player.</summary>
+    internal static void Phase(DuelEngine engine, DuelPhase target)
+    {
+        Ok(engine, new ChangePhase(engine.State.ActivePlayer, target));
+        if (engine.State.OpenWindow is { } window) Ok(engine, new PassChainResponse(window.Responder, window.DecisionId));
+        Assert.Equal(target, engine.State.Phase);
     }
 
     internal static void Projection(JsonElement expected, DuelState state)
@@ -83,5 +94,4 @@ internal static class ChainScenario
         Assert.Equal(Ids("spellTrapCardIds"), p.SpellTrapZones.Select(c => c?.GameCardId ?? 0));
         Assert.Equal(Ids("graveyardCardIds"), p.Graveyard.Select(c => c.GameCardId));
     }
-
 }

@@ -17,8 +17,7 @@ public sealed record AssetManifestEntry(int SchemaVersion, string BuildId, strin
     string Status, IReadOnlyList<string> EvidenceIds);
 public sealed record ResolvedSemanticAsset(AssetManifestEntry Manifest, byte[] Content);
 
-/// <summary>A pinned private v2 mapping sidecar over a validated content package.
-/// Mapping integrity grants no runtime approval or PSP-reference verification.</summary>
+/// <summary>Pinned mapping sidecar over a validated content package.</summary>
 public sealed class SemanticAssetRegistry
 {
     public const int SchemaVersion = 2;

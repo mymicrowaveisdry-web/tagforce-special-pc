@@ -6,7 +6,7 @@ namespace TagForceSpecial.Cards.CatalogStorage;
 
 public sealed record LoadedCardCatalog(CardCatalogPackageManifest Manifest, CardCatalog Catalog);
 
-/// <summary>Versioned JSON packages. No PSP reader, engine, asset importer or effect runtime dependency.</summary>
+/// <summary>Versioned JSON catalog packages.</summary>
 public static class CardCatalogPackage
 {
     public const int SchemaVersion = 1;

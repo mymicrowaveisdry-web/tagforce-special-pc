@@ -33,8 +33,8 @@ options retain `MonsterBinding`. This command is accepted only for that pending
 resolution, and cannot perform a standalone summon.
 
 Fusion selects an Extra Deck target and two to five materials matching the exact
-authored recipe, including repeated card IDs. Ritual selects a hand target and one to five Tributes with a printed-level
-sum exactly equal to the target's printed level. The Ritual target cannot also be
+authored recipe, including repeated card IDs; `WithAlternatives` lets each material be any reviewed artwork. Ritual selects a hand target and one to five Tributes with a printed-level
+sum exactly equal to the target's printed level, or, for `AnyTributes` recipes, at least that total with no Tribute to spare. The Ritual target cannot also be
 a Tribute; registered Xyz targets cannot supply Ritual levels. Field and hand cards move
 to their owners' Graveyards with distinct material/Tribute causes, never as
 destruction. Xyz attachments on a departing host use the shared cleanup path.
@@ -50,7 +50,7 @@ pages 18–19; this is separate from PSP evidence.
 ## Limits
 
 No substitutes, contact Fusion, opposing/Deck/Graveyard materials, tokens,
-Pendulum hybrid procedures, alternate destinations or replacements beyond the shared Pendulum field rule, Ritual overpayment,
+Pendulum hybrid procedures, alternate destinations or replacements beyond the shared Pendulum field rule,
 effective-level modifiers, double-value Tributes, or arbitrary Spell instructions.
 Do not register cards requiring these branches. General card legality, shuffle
 and earlier research-stop restrictions remain outside this slice.

@@ -5,8 +5,7 @@ using TagForceSpecial.PC.App.Visual;
 
 namespace TagForceSpecial.PC.App.Screens.Title;
 
-/// <summary>Separate native-size layers composed from validated source textures and measured original geometry.
-/// This freezes one reference frame; it does not infer EHF animation or intro timings.</summary>
+/// <summary>Native-size title layers composed from validated source textures.</summary>
 public sealed class OriginalTitleVisuals : IDisposable
 {
     private sealed record Draw(string Group, int Ordinal, string? AssetKey, int Primitive,
@@ -64,7 +63,7 @@ public sealed class OriginalTitleVisuals : IDisposable
         };
         using var additive = new BlendState
         {
-            // Native 0xA2 uses FIXB=0xFFFFFF: source alpha plus the complete destination color.
+            // 0xA2 blending: source alpha plus the full destination color.
             ColorSourceBlend = Blend.SourceAlpha, ColorDestinationBlend = Blend.One,
             AlphaSourceBlend = Blend.Zero, AlphaDestinationBlend = Blend.One
         };
@@ -94,7 +93,7 @@ public sealed class OriginalTitleVisuals : IDisposable
                         throw new InvalidDataException("Unsupported measured title primitive.");
                     device.BlendState = draw.WriteMask ? maskBlend : draw.Additive ? additive : alpha;
                     device.DepthStencilState = draw.WriteMask ? writeStencil : draw.Stencil ? testStencil : DepthStencilState.None;
-                    // Native GE filtering applies inside source composition; the final 480x272 viewport remains point sampled.
+                    // Filters inside source composition; the 480x272 viewport stays point sampled.
                     device.SamplerStates[0] = draw.LinearSampling ? SamplerState.LinearClamp : SamplerState.PointClamp;
                     effect.TextureEnabled = draw.AssetKey is not null;
                     effect.Texture = draw.AssetKey is { } key ? textures[key] : null;

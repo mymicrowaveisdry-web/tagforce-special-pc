@@ -4,12 +4,12 @@ using TagForceSpecial.Effects;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Synthetic command contracts using independently authored printed values, not PSP observations.</summary>
+/// <summary>Normal Spell command tests with authored printed values.</summary>
 public sealed class NormalSpellTests
 {
     internal static CardCatalog Catalog()
     {
-        // Independent authored fixture values; production definitions now come exclusively from Cards packages.
+        // Authored fixture values.
         (uint Id, string Name, int Attack, int Defense, uint Level)[] rows =
         [
             (4012, "Feral Imp", 1300, 1400, 4), (4030, "Skull Servant", 300, 200, 1),
@@ -47,14 +47,21 @@ public sealed class NormalSpellTests
     internal static void EnterMain(DuelEngine engine)
     {
         Ok(engine, new ResolveDrawStep(engine.State.ActivePlayer));
-        Ok(engine, new ChangePhase(engine.State.ActivePlayer, DuelPhase.Main1));
+        Phase(engine, DuelPhase.Main1);
+    }
+
+    /// <summary>A phase change that passes any open window offered to the non-turn player.</summary>
+    internal static void Phase(DuelEngine engine, DuelPhase target)
+    {
+        Ok(engine, new ChangePhase(engine.State.ActivePlayer, target));
+        if (engine.State.OpenWindow is { } window) Ok(engine, new PassChainResponse(window.Responder, window.DecisionId));
     }
 
     internal static void Next(DuelEngine engine)
     {
         var actor = engine.State.ActivePlayer;
-        if (engine.State.Phase == DuelPhase.Battle) Ok(engine, new ChangePhase(actor, DuelPhase.Main2));
-        Ok(engine, new ChangePhase(actor, DuelPhase.End));
+        if (engine.State.Phase == DuelPhase.Battle) Phase(engine, DuelPhase.Main2);
+        Phase(engine, DuelPhase.End);
         while (engine.State.GetPlayer(actor).Hand.Count > 6)
             Ok(engine, new DiscardForHandLimit(actor, engine.State.GetPlayer(actor).Hand[^1].InstanceId));
         Ok(engine, new EndTurn(actor));
@@ -73,14 +80,16 @@ public sealed class NormalSpellTests
         return events;
     }
 
-    private static DuelEngine Engine(uint card, ChainOperation? response = null)
+    /// <summary>The opponent's set probe 90001 is a negation probe or, with <paramref name="destroyResponse"/>, a targeted destruction Trap.</summary>
+    private static DuelEngine Engine(uint card, ResponseNegation? response = null, bool destroyResponse = false)
     {
         var rules = PlayablePreview.Rules.ToDictionary();
         rules[90001] = new(CardCategory.Trap, AllowsSpellTrapSet: true);
         var deck = new uint[] { card, 4012, 4030, 4032, 4033 }.Concat(Enumerable.Repeat(card, 35));
         return new(Catalog(), rules, deck, new uint[] { 90001, 4012, 4030, 4032, 4033 }.Concat(Enumerable.Repeat(4012u, 35)),
-            normalSpellProfiles: PlayablePreview.Cards.Select(c => c.Spell).OfType<NormalSpellProfile>(),
-            experimentalChainResponses: response is { } operation ? [new("synthetic-response", 90001, operation, ChainSpellSpeed.Three)] : []);
+            effectDefinitions: destroyResponse ? [.. PlayablePreview.Definitions, new("synthetic-destroy", 90001, EffectKind.NormalTrap,
+                [new DestroyTargetStep()], target: new SpellTrapOnFieldTarget())]
+                : [.. PlayablePreview.Definitions, .. response is { } operation ? [ResponseProbe.Negate("synthetic-response", 90001, operation, ChainSpellSpeed.Three)] : Array.Empty<EffectDefinition>()]);
     }
 
     public static IEnumerable<object[]> Spells() => new object[][]
@@ -132,7 +141,7 @@ public sealed class NormalSpellTests
     public void EachSpellHonorsBothNegationKinds(uint id, int amount, bool recovery)
     {
         _ = amount; _ = recovery;
-        foreach (var operation in new[] { ChainOperation.NegateActivation, ChainOperation.NegateEffect })
+        foreach (var operation in new[] { ResponseNegation.Activation, ResponseNegation.Effect })
         {
             var e = Engine(id, operation); EnterMain(e); Next(e);
             Ok(e, new SetSpellTrap(PlayerId.Two, e.State.GetPlayer(PlayerId.Two).Hand[0].InstanceId, 0));
@@ -156,7 +165,7 @@ public sealed class NormalSpellTests
         foreach (var row in Spells())
         {
             uint id = (uint)row[0]; int amount = (int)row[1]; bool recovery = (bool)row[2];
-            var e = Engine(id, ChainOperation.DestroyBoundSpellTrap); EnterMain(e); Next(e);
+            var e = Engine(id, destroyResponse: true); EnterMain(e); Next(e);
             Ok(e, new SetSpellTrap(PlayerId.Two, e.State.GetPlayer(PlayerId.Two).Hand[0].InstanceId, 0));
             Next(e);
             var spell = e.State.GetPlayer(PlayerId.One).Hand.First(c => c.GameCardId == id);
@@ -233,18 +242,47 @@ public sealed class NormalSpellTests
     }
 
     [Fact]
-    public void ProfilesFailClosedForBadAmountCategoryAndDuplicateBindings()
+    public void DefinitionsFailClosedForBadStepsKindsCategoriesAndDuplicateBindings()
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => new NormalSpellProfile("x", 4352, NormalSpellOperation.DamageOpponent, 0));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new NormalSpellProfile("x", 4352, (NormalSpellOperation)99, 1));
-        var p = new NormalSpellProfile("x", 4352, NormalSpellOperation.DamageOpponent, 800);
-        DuelEngine Build(IEnumerable<NormalSpellProfile> profiles, IReadOnlyDictionary<uint, DuelCardRules>? rules = null) =>
-            new(Catalog(), rules ?? PlayablePreview.Rules, Enumerable.Repeat(4012u, 40), Enumerable.Repeat(4012u, 40), normalSpellProfiles: profiles);
+        EffectDefinition Burn(string id, uint card, int amount = 800) => new(id, card, EffectKind.NormalSpell, [new DealDamageStep(amount)]);
+        Assert.Throws<ArgumentException>(() => Burn("x", 4352, 0));
+        Assert.Throws<ArgumentException>(() => new EffectDefinition("x", 4352, EffectKind.NormalSpell, [new GainLifePointsStep(-1)]));
+        Assert.Throws<ArgumentException>(() => new EffectDefinition("x", 4352, EffectKind.NormalSpell, []));
+        Assert.Throws<ArgumentException>(() => new EffectDefinition("x", 4352, EffectKind.NormalSpell, [null!]));
+        Assert.Throws<ArgumentException>(() => new EffectDefinition("x", 4352, EffectKind.NormalSpell,
+            Enumerable.Repeat<EffectStep>(new DealDamageStep(1), 33)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new EffectDefinition("x", 4352, (EffectKind)99, [new DealDamageStep(1)]));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Burn("x", 0));
+        var p = Burn("x", 4352);
+        DuelEngine Build(IEnumerable<EffectDefinition> definitions, IReadOnlyDictionary<uint, DuelCardRules>? rules = null) =>
+            new(Catalog(), rules ?? PlayablePreview.Rules, Enumerable.Repeat(4012u, 40), Enumerable.Repeat(4012u, 40), effectDefinitions: definitions);
         Assert.Throws<ArgumentException>(() => Build([p, p]));
-        Assert.Throws<ArgumentException>(() => Build([p, new("x", 4350, NormalSpellOperation.DamageOpponent, 500)]));
-        Assert.Throws<ArgumentException>(() => Build([new("x", 4012, NormalSpellOperation.DamageOpponent, 500)]));
+        Assert.Throws<ArgumentException>(() => Build([p, Burn("x", 4350, 500)]));
+        Assert.Throws<ArgumentException>(() => Build([Burn("x", 4012, 500)]));
+        // A Trap kind needs Trap card rules (4352 is a Spell); a shuffle step needs a seeded engine.
+        Assert.Throws<ArgumentException>(() => Build([new("t", 4352, EffectKind.NormalTrap, [new DealDamageStep(800)])]));
+        Assert.Throws<ArgumentException>(() => Build([new("s", 4352, EffectKind.NormalSpell, [new ShuffleDeckStep()])]));
         var bad = PlayablePreview.Rules.ToDictionary(); bad[4352] = new(CardCategory.Spell);
         Assert.Throws<ArgumentException>(() => Build([p], bad));
+    }
+
+    [Fact]
+    public void MultiStepDefinitionsResolveInOrderAndStopAtTerminalDamage()
+    {
+        // Two-step Normal Spell on the 4352 card slot: gain then burn; a second burn never runs after defeat.
+        var twoStep = new EffectDefinition("synthetic-two-step", 4352, EffectKind.NormalSpell,
+            [new GainLifePointsStep(300), new DealDamageStep(8000), new DealDamageStep(100)]);
+        var e = new DuelEngine(Catalog(), PlayablePreview.Rules, new uint[] { 4352 }.Concat(Enumerable.Repeat(4012u, 39)),
+            Enumerable.Repeat(4012u, 40), effectDefinitions: [twoStep]);
+        EnterMain(e);
+        Ok(e, new ActivateSpell(PlayerId.One, e.State.GetPlayer(PlayerId.One).Hand.First(c => c.GameCardId == 4352).InstanceId, 0));
+        var events = Resolve(e);
+        Assert.Equal(300, Assert.Single(events.OfType<LifePointsGained>()).Amount);
+        Assert.Equal(8000, Assert.Single(events.OfType<EffectDamageDealt>()).Damage);
+        Assert.IsType<DuelEnded>(events[^1]);
+        Assert.Equal(8300, e.State.GetPlayer(PlayerId.One).LifePoints);
+        Assert.Equal(0, e.State.GetPlayer(PlayerId.Two).LifePoints);
+        Assert.DoesNotContain(events, ev => ev is ChainCompleted or SpellSentToGraveyard);
     }
 }
 

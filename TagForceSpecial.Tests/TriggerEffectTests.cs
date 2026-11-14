@@ -4,7 +4,7 @@ using static TagForceSpecial.Tests.EventEffectScenario;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Synthetic command scenarios, not PSP trigger gameplay comparisons.</summary>
+/// <summary>Trigger effect command scenarios.</summary>
 public sealed class TriggerEffectTests
 {
     [Theory]
@@ -27,7 +27,6 @@ public sealed class TriggerEffectTests
         var chain = engine.State.PendingChain!;
         Assert.Equal(ChainOperation.TriggerEffect, Assert.Single(chain.Links).Operation);
         Assert.Equal(starting == PlayerId.One ? PlayerId.Two : PlayerId.One, chain.Responder);
-        Assert.False(chain.FreezeOnCompletion);
         Pass(engine); Pass(engine);
         var resolved = Resolve(engine);
         Assert.IsType<LifePointsGained>(resolved.Events[0]);
@@ -117,13 +116,13 @@ public sealed class TriggerEffectTests
     }
 
     [Theory]
-    [InlineData(ChainOperation.NegateEffect, false)]
-    [InlineData(ChainOperation.NegateActivation, true)]
-    public void NegatingAMonsterTriggerDefersItsDestructionTriggerUntilTheChainCompletes(ChainOperation operation, bool destroy)
+    [InlineData(ResponseNegation.Effect, false)]
+    [InlineData(ResponseNegation.Activation, true)]
+    public void NegatingAMonsterTriggerDefersItsDestructionTriggerUntilTheChainCompletes(ResponseNegation operation, bool destroy)
     {
         var engine = Engine(triggers: [Gain("summon", A), Gain("destroyed", A, MonsterEventKind.Destroyed,
             gain: 400, location: TriggerSourceLocation.DestroyedSelf)], responses:
-            [new("monster-negation", Trap, operation, ChainSpellSpeed.Two, respondsToCategory: CardCategory.Monster, destroyNegatedSource: destroy)]);
+            [ResponseProbe.Negate("monster-negation", Trap, operation, ChainSpellSpeed.Two, respondsTo: CardCategory.Monster, destroy: destroy)]);
         EnterMain(engine); NextMain(engine); Set(engine, Trap); NextMain(engine);
         Summon(engine, A); Order(engine);
         var chain = engine.State.PendingChain!;
@@ -153,7 +152,7 @@ public sealed class TriggerEffectTests
     public void DestroyingASharedSourceByNegatingOneTriggerDoesNotNegateItsOtherTrigger()
     {
         var engine = Engine(triggers: [Gain("a-first", A, gain: 100), Gain("b-second", A, gain: 250)], responses:
-            [new("destroy-and-negate", Trap, ChainOperation.NegateEffect, ChainSpellSpeed.Two, destroyNegatedSource: true)]);
+            [ResponseProbe.Negate("destroy-and-negate", Trap, ResponseNegation.Effect, ChainSpellSpeed.Two, destroy: true)]);
         EnterMain(engine); NextMain(engine); Set(engine, Trap); NextMain(engine);
         Summon(engine, A); Order(engine);
         var chain = engine.State.PendingChain!;
@@ -170,27 +169,24 @@ public sealed class TriggerEffectTests
     }
 
     [Fact]
-    public void SpecialSummonTriggerWaitsForDecisionCompletionAndPreservesLifecycleGate()
+    public void SpecialSummonTriggerWaitsForTheResolutionChoiceAndChainEnd()
     {
         var engine = Engine(triggers: [Gain("special", A, MonsterEventKind.SpecialSummoned)]);
         EnterMain(engine);
-        var player = engine.State.GetPlayer(PlayerId.One);
-        Ok(engine, new ActivateSpell(PlayerId.One, player.Hand.First(c => c.GameCardId == SummonSpell).InstanceId, 0));
-        var pending = engine.State.PendingDecision!;
-        Ok(engine, new ChooseDecisionCard(PlayerId.One, pending.DecisionId, pending.CardOptions[0].InstanceId));
-        pending = engine.State.PendingDecision!;
-        Ok(engine, new ChooseDecisionPosition(PlayerId.One, pending.DecisionId, BattlePosition.FaceUpAttack));
-        pending = engine.State.PendingDecision!;
-        var result = Ok(engine, new ChooseDecisionZone(PlayerId.One, pending.DecisionId, 1));
-        Assert.Null(engine.State.PendingDecision);
-        Assert.Single(result.Events.OfType<TriggerOrderRequested>());
+        var result = SummonWithProbe(engine);
+        Assert.Null(engine.State.PendingChain);
+        // The summon happens inside the link; its trigger is collected once the chain has completed.
+        Assert.True(result.Events.ToList().FindIndex(e => e is ChainCompleted) <
+            result.Events.ToList().FindIndex(e => e is TriggerOrderRequested));
         Assert.Single(engine.State.PendingEndPhaseBanishments);
+        Assert.Single(result.Events.OfType<DeckShuffled>());
         Drain(engine);
         Assert.Single(engine.State.PendingEndPhaseBanishments);
-        Ok(engine, new ChangePhase(PlayerId.One, DuelPhase.End));
-        Assert.True(engine.State.ResearchSliceComplete);
+        Phase(engine, DuelPhase.End);
+        Assert.False(engine.State.ResearchSliceComplete);
         Assert.Single(engine.State.GetPlayer(PlayerId.One).Banished);
         Assert.Equal(8100, engine.State.GetPlayer(PlayerId.One).LifePoints);
+        Ok(engine, new EndTurn(PlayerId.One)); // the duel continues past the lifecycle
     }
 
     [Fact]
@@ -246,12 +242,11 @@ public sealed class TriggerEffectTests
         Assert.Equal(4, saved.EventEffects.DeferredTriggers.Count);
         Assert.Empty(engine.State.EventEffects.DeferredTriggers);
         Order(engine, reverse: true);
-        Assert.True(engine.State.PendingChain!.FreezeOnCompletion);
         Drain(engine);
         Assert.Equal(8400, engine.State.GetPlayer(PlayerId.One).LifePoints);
-        Assert.True(engine.State.ResearchSliceComplete);
+        Assert.False(engine.State.ResearchSliceComplete);
         Assert.NotNull(engine.State.GetPlayer(PlayerId.One).MonsterZones[0]);
-        Reject(engine, new ChangePhase(PlayerId.One, DuelPhase.End), DuelError.ResearchSliceComplete);
+        Phase(engine, DuelPhase.End); // the duel continues after the Scapegoat chain
     }
 
     [Fact]

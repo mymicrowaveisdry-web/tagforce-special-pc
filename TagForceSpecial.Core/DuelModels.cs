@@ -4,31 +4,52 @@ public enum PlayerId { One, Two }
 public enum DuelPhase { Draw, Standby, Main1, Battle, Main2, End }
 public enum CardCategory { Unknown, Monster, Spell, Trap }
 public enum BattlePosition { FaceUpAttack, FaceUpDefense, FaceDownDefense }
-public enum DuelEndReason { UnableToDraw, LifePointsDepleted }
+public enum DuelEndReason { UnableToDraw, LifePointsDepleted, BothLifePointsDepleted }
 
 /// <summary>
-/// Explicit, trusted gameplay metadata; never inferred from unverified binary kind codes.
-/// AllowsBasicBattle opts into supported combat using registered effective statistics; callers must not
-/// enable it where omitted mandatory/continuous effects would change the result.
-/// AllowsSpellTrapSet opts into ordinary back-row placement, excluding Field Spells.
-/// AllowsTributeSummon opts into the ordinary high-level procedure; AllowsTributeForSummon
-/// permits a donor's ordinary departure, with authored Pendulum field-to-Extra-Deck routing.
-/// RequiresRegisteredTributeProcedure disables default procedures for this card.
-/// AllowsExtraDeck and AllowsSummonMaterial explicitly opt into the bounded material slice.
-/// AllowsPendulumSummon permits ordinary hand targets independently of Pendulum scale identity.
+/// Explicit gameplay rules for a card; each flag opts into one supported behavior. IsToken marks an effect-generated
+/// Token that ceases to exist when it leaves the field.
 /// </summary>
 public sealed record DuelCardRules(CardCategory Category, bool AllowsNormalSummon = false,
     bool AllowsBasicBattle = false, bool AllowsSpellTrapSet = false,
     bool AllowsTributeSummon = false, bool AllowsTributeForSummon = false,
     bool RequiresRegisteredTributeProcedure = false, bool AllowsExtraDeck = false,
-    bool AllowsSummonMaterial = false, bool AllowsPendulumSummon = false);
+    bool AllowsSummonMaterial = false, bool AllowsPendulumSummon = false, bool IsToken = false,
+    bool CannotBeSpecialSummoned = false, bool IsGemini = false, bool IsToon = false, bool IsToonWorld = false, bool IsTuner = false);
 public sealed record CardInstance(int InstanceId, uint GameCardId, PlayerId Owner);
 public sealed record FieldMonster(CardInstance Card, BattlePosition Position, int SummonedOnTurn = 0,
     int PositionChangedOnTurn = 0, int LastAttackTurn = 0, long PlacementId = 0, bool BattleDestroyed = false)
 {
     public IReadOnlyList<CardInstance> XyzMaterials { get; internal init; } = Array.AsReadOnly(Array.Empty<CardInstance>());
+    /// <summary>The turn this monster was last flipped face-up by battle.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int FlippedOnTurn { get; internal init; }
+    /// <summary>A Gemini monster that has been Normal Summoned again and has its effects.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool GeminiActive { get; internal init; }
+    /// <summary>How many monsters were Tributed to Normal Summon or Set it; null when it was not Normal Summoned or Set.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int? SummonTributes { get; internal init; }
+    /// <summary>A Level an effect gave it; null for its own Level.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public uint? Level { get; internal init; }
+    /// <summary>Counters on this monster; a card effect places and removes them.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int Counters { get; internal init; }
+    /// <summary>Counters removed instead of this monster being destroyed.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int ProtectionCounters { get; internal init; }
+    /// <summary>The turn this monster's own effect stopped it from attacking.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int AttackLockedTurn { get; internal init; }
 }
-public sealed record DuelOutcome(PlayerId Winner, PlayerId Loser, DuelEndReason Reason);
+/// <summary>A finished duel. A draw (both players at 0 LP at once) has no winner or loser.</summary>
+public sealed record DuelOutcome(PlayerId? Winner, PlayerId? Loser, DuelEndReason Reason)
+{
+    /// <summary>Derived; excluded from serialization so traces and replays keep their existing shape.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsDraw => Winner is null;
+}
 
 /// <summary>Immutable full-information engine snapshot. A future UI must hide private zones.</summary>
 public sealed class DuelPlayerState
@@ -47,7 +68,22 @@ public sealed class DuelPlayerState
     /// <summary>Compatibility card view; inspect SpellTrapFields for face-up versus set state.</summary>
     public IReadOnlyList<CardInstance?> SpellTrapZones { get; }
     public IReadOnlyList<FieldSpellTrap?> SpellTrapFields { get; }
-    public CardInstance? FieldZone => null;
+    /// <summary>The zone index that addresses the Field Zone in Spell/Trap commands, targets and events.</summary>
+    public const int FieldZoneIndex = 5;
+    public CardInstance? FieldZone => FieldSpell?.Card;
+    /// <summary>The card in the Field Zone, face-up or set.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public FieldSpellTrap? FieldSpell => FieldZones[0];
+    internal IReadOnlyList<FieldSpellTrap?> FieldZones { get; }
+    internal FieldSpellTrap? SpellTrapAt(int zone) => zone == FieldZoneIndex ? FieldZones[0] : SpellTrapFields[zone];
+
+    internal DuelPlayerState WithSpellTrapAt(int zone, FieldSpellTrap? card)
+    {
+        if (zone == FieldZoneIndex) return With(fieldZones: new[] { card });
+        var slots = SpellTrapFields.ToArray();
+        slots[zone] = card;
+        return With(spellTraps: slots);
+    }
     public IReadOnlyList<CardInstance> Graveyard { get; }
     public IReadOnlyList<CardInstance> Banished { get; }
 
@@ -56,8 +92,9 @@ public sealed class DuelPlayerState
         IEnumerable<FieldSpellTrap?>? spellTraps = null, int lifePoints = 8000,
         IEnumerable<CardInstance>? banished = null, IEnumerable<CardInstance>? extraDeck = null,
         IEnumerable<CardInstance>? faceUpExtraDeck = null, IEnumerable<FieldSpellTrap?>? pendulumZones = null,
-        int lastPendulumSummonTurn = 0)
+        int lastPendulumSummonTurn = 0, IEnumerable<FieldSpellTrap?>? fieldZones = null)
     {
+        FieldZones = Array.AsReadOnly(fieldZones?.ToArray() ?? new FieldSpellTrap?[1]);
         Id = id;
         LifePoints = lifePoints;
         Deck = Array.AsReadOnly(deck.ToArray());
@@ -78,10 +115,11 @@ public sealed class DuelPlayerState
         IEnumerable<FieldSpellTrap?>? spellTraps = null, int? lifePoints = null,
         IEnumerable<CardInstance>? banished = null, IEnumerable<CardInstance>? extraDeck = null,
         IEnumerable<CardInstance>? faceUpExtraDeck = null, IEnumerable<FieldSpellTrap?>? pendulumZones = null,
-        int? lastPendulumSummonTurn = null) =>
+        int? lastPendulumSummonTurn = null, IEnumerable<FieldSpellTrap?>? fieldZones = null) =>
         new(Id, deck ?? Deck, hand ?? Hand, monsters ?? MonsterZones, graveyard ?? Graveyard,
             spellTraps ?? SpellTrapFields, lifePoints ?? LifePoints, banished ?? Banished, extraDeck ?? ExtraDeck,
-            faceUpExtraDeck ?? FaceUpExtraDeck, pendulumZones ?? PendulumZones, lastPendulumSummonTurn ?? LastPendulumSummonTurn);
+            faceUpExtraDeck ?? FaceUpExtraDeck, pendulumZones ?? PendulumZones, lastPendulumSummonTurn ?? LastPendulumSummonTurn,
+            fieldZones ?? FieldZones);
 }
 
 public sealed class DuelState
@@ -95,6 +133,7 @@ public sealed class DuelState
     public long Revision { get; }
     public PendingDecision? PendingDecision { get; }
     public DecisionSequenceResult? DecisionResult { get; }
+    /// <summary>Set only when a selection-only <see cref="DecisionSequence"/> with StopAfterCompletion finishes.</summary>
     public bool ResearchSliceComplete { get; }
     public PendingSpellActivation? PendingSpellActivation { get; }
     public IReadOnlyList<PendingEndPhaseBanishment> PendingEndPhaseBanishments { get; }
@@ -104,6 +143,16 @@ public sealed class DuelState
     public BattleState? Battle { get; }
     public PendingSummon? PendingSummon { get; }
     public IReadOnlyList<SummonRecord> SummonHistory { get; }
+    internal DuelBookkeeping Bookkeeping { get; }
+    /// <summary>Next card instance ID to allocate (e.g. for a Token). Monotonic: IDs are never reused.</summary>
+    public int NextInstanceId => Bookkeeping.NextInstanceId;
+    /// <summary>Seeded shuffle generator state; null when the duel has no seed (shuffling steps are then unavailable).
+    /// Full-information engine state: client views must never expose it.</summary>
+    public DuelRandomState? Random => Bookkeeping.Random;
+    /// <summary>Non-turn-player activation window opened by a phase-change request, if any.</summary>
+    public PendingOpenWindow? OpenWindow => Bookkeeping.OpenWindow;
+    /// <summary>Summon locks applied by activations; each holds only during its own turn.</summary>
+    public IReadOnlyList<SummonLock> SummonLocks => Bookkeeping.SummonLocks;
 
     internal DuelState(IEnumerable<DuelPlayerState> players, PlayerId activePlayer, int turnNumber = 1,
         DuelPhase phase = DuelPhase.Draw, bool normalSummonUsed = false, DuelOutcome? outcome = null,
@@ -113,8 +162,10 @@ public sealed class DuelState
         IEnumerable<PendingEndPhaseBanishment>? pendingEndPhaseBanishments = null,
         CommittedActivation? committedActivation = null, PendingChain? pendingChain = null,
         EventEffectState? eventEffects = null, BattleState? battle = null, PendingSummon? pendingSummon = null,
-        IEnumerable<SummonRecord>? summonHistory = null)
+        IEnumerable<SummonRecord>? summonHistory = null, DuelBookkeeping? bookkeeping = null)
     {
+        Bookkeeping = bookkeeping ?? new();
+        if (Bookkeeping.NextInstanceId < 1) throw new ArgumentOutOfRangeException(nameof(bookkeeping));
         Players = Array.AsReadOnly(players.ToArray());
         ActivePlayer = activePlayer;
         TurnNumber = turnNumber;
@@ -146,49 +197,60 @@ public sealed class DuelState
         if (player is not null) players[(int)player.Id] = player;
         return new(players, activePlayer ?? ActivePlayer, turnNumber ?? TurnNumber, phase ?? Phase,
             normalSummonUsed ?? NormalSummonUsed, outcome ?? Outcome, revision ?? Revision,
-            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments, CommittedActivation, PendingChain, EventEffects, Battle, PendingSummon, SummonHistory);
+            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments, CommittedActivation, PendingChain, EventEffects, Battle, PendingSummon, SummonHistory, Bookkeeping);
     }
 
     internal DuelState WithDecision(PendingDecision? pending, DecisionSequenceResult? result = null,
         bool researchSliceComplete = false) => new(Players, ActivePlayer, TurnNumber, Phase,
             NormalSummonUsed, Outcome, Revision, pending, result, researchSliceComplete, PendingSpellActivation,
-            PendingEndPhaseBanishments, CommittedActivation, PendingChain, EventEffects, Battle, PendingSummon, SummonHistory);
+            PendingEndPhaseBanishments, CommittedActivation, PendingChain, EventEffects, Battle, PendingSummon, SummonHistory, Bookkeeping);
 
     internal DuelState WithActivation(PendingSpellActivation? activation) => new(Players, ActivePlayer,
         TurnNumber, Phase, NormalSummonUsed, Outcome, Revision, PendingDecision, DecisionResult,
-        ResearchSliceComplete, activation, PendingEndPhaseBanishments, CommittedActivation, PendingChain, EventEffects, Battle, PendingSummon, SummonHistory);
+        ResearchSliceComplete, activation, PendingEndPhaseBanishments, CommittedActivation, PendingChain, EventEffects, Battle, PendingSummon, SummonHistory, Bookkeeping);
 
     internal DuelState WithEndPhaseBanishments(IEnumerable<PendingEndPhaseBanishment> banishments) =>
         new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
-            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, banishments, CommittedActivation, PendingChain, EventEffects, Battle, PendingSummon, SummonHistory);
+            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, banishments, CommittedActivation, PendingChain, EventEffects, Battle, PendingSummon, SummonHistory, Bookkeeping);
 
     internal DuelState WithChain(PendingChain? chain) =>
         new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
-            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments, CommittedActivation, chain, EventEffects, Battle, PendingSummon, SummonHistory);
+            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments, CommittedActivation, chain, EventEffects, Battle, PendingSummon, SummonHistory, Bookkeeping);
 
     internal DuelState WithBattle(BattleState? battle) =>
         new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
             PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation,
-            PendingEndPhaseBanishments, CommittedActivation, PendingChain, EventEffects, battle, PendingSummon, SummonHistory);
+            PendingEndPhaseBanishments, CommittedActivation, PendingChain, EventEffects, battle, PendingSummon, SummonHistory, Bookkeeping);
 
     internal DuelState WithEventEffects(EventEffectState eventEffects) =>
         new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
             PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation,
-            PendingEndPhaseBanishments, CommittedActivation, PendingChain, eventEffects, Battle, PendingSummon, SummonHistory);
+            PendingEndPhaseBanishments, CommittedActivation, PendingChain, eventEffects, Battle, PendingSummon, SummonHistory, Bookkeeping);
 
     internal DuelState WithCommittedActivation(CommittedActivation activation) =>
         new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
-            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments, activation, PendingChain, EventEffects, Battle, PendingSummon, SummonHistory);
+            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments, activation, PendingChain, EventEffects, Battle, PendingSummon, SummonHistory, Bookkeeping);
 
     internal DuelState WithSummon(PendingSummon? summon) =>
         new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
             PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments,
-            CommittedActivation, PendingChain, EventEffects, Battle, summon, SummonHistory);
+            CommittedActivation, PendingChain, EventEffects, Battle, summon, SummonHistory, Bookkeeping);
+
+    internal DuelState WithBookkeeping(DuelBookkeeping bookkeeping) =>
+        new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
+            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments,
+            CommittedActivation, PendingChain, EventEffects, Battle, PendingSummon, SummonHistory, bookkeeping);
+
+    internal DuelState WithNextInstanceId(int next) =>
+        next <= NextInstanceId ? throw new InvalidOperationException("Instance IDs are monotonic.")
+        : new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
+            PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments,
+            CommittedActivation, PendingChain, EventEffects, Battle, PendingSummon, SummonHistory, Bookkeeping with { NextInstanceId = next });
 
     internal DuelState WithSummonHistory(IEnumerable<SummonRecord> history) =>
         new(Players, ActivePlayer, TurnNumber, Phase, NormalSummonUsed, Outcome, Revision,
             PendingDecision, DecisionResult, ResearchSliceComplete, PendingSpellActivation, PendingEndPhaseBanishments,
-            CommittedActivation, PendingChain, EventEffects, Battle, PendingSummon, history);
+            CommittedActivation, PendingChain, EventEffects, Battle, PendingSummon, history, Bookkeeping);
 }
 
 public abstract record DuelCommand(PlayerId Player);
@@ -200,6 +262,8 @@ public sealed record SetSpellTrap(PlayerId Player, int CardInstanceId, int Spell
 public sealed record ChangeMonsterPosition(PlayerId Player, int MonsterZone, BattlePosition Target) : DuelCommand(Player);
 /// <summary>Null target declares a direct attack. Commits a declaration in staged mode; otherwise resolves compatibility combat atomically.</summary>
 public sealed record DeclareAttack(PlayerId Player, int AttackerZone, int? TargetZone = null) : DuelCommand(Player);
+/// <summary>Normal Summons a face-up Gemini monster again so it gains its effects.</summary>
+public sealed record GeminiSummon(PlayerId Player, int MonsterZone) : DuelCommand(Player);
 public sealed record DiscardForHandLimit(PlayerId Player, int CardInstanceId) : DuelCommand(Player);
 public sealed record EndTurn(PlayerId Player) : DuelCommand(Player);
 
@@ -227,7 +291,10 @@ public enum DuelError
     NotSummonResponder, UnsupportedSummonResponse, InsufficientLifePoints,
     UnsupportedSpecialSummon, SpecialSummonSourceUnavailable, ProperSummonRequired, SpecialSummonConditionsNotMet,
     UnsupportedMaterialProcedure, InvalidSummonMaterials, SummonMaterialNotAllowed,
-    UnsupportedPendulumCard, InvalidPendulumZone, PendulumZoneOccupied, PendulumScalesUnavailable, PendulumSummonLimitReached
+    UnsupportedPendulumCard, InvalidPendulumZone, PendulumZoneOccupied, PendulumScalesUnavailable, PendulumSummonLimitReached,
+    ActivationTimingNotAllowed, SetThisTurn, OpenWindowPending, ActivationConditionNotMet, SummonLocked, NotGeminiMonster, GeminiAlreadyActive,
+    UnsupportedMonsterEffect, EffectAlreadyUsed, UpkeepPending, NoUpkeepDue, ToonSummonUnavailable, ToonCannotAttack, ToonMustAttackToon, AttackLocked, LockedByEffect, MustAttack, PhaseSkipped,
+    NormalSummonConditionsNotMet
 }
 
 public abstract record DuelEvent
@@ -239,7 +306,12 @@ public abstract record DuelEvent
 public sealed record CardDrawn(PlayerId Player, CardInstance Card) : DuelEvent;
 public sealed record FirstDrawSkipped(PlayerId Player) : DuelEvent;
 public sealed record PhaseChanged(DuelPhase From, DuelPhase To) : DuelEvent;
-public sealed record MonsterNormalSummoned(PlayerId Player, FieldMonster Monster, int Zone, long? AttemptId = null) : DuelEvent;
+public sealed record MonsterNormalSummoned(PlayerId Player, FieldMonster Monster, int Zone, long? AttemptId = null) : DuelEvent
+{
+    /// <summary>The monsters Tributed for this Summon.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IReadOnlyList<MonsterBinding> Tributes { get; internal init; } = Array.AsReadOnly(Array.Empty<MonsterBinding>());
+}
 public sealed record MonsterSet(PlayerId Player, FieldMonster Monster, int Zone) : DuelEvent;
 public sealed record SpellTrapSet(PlayerId Player, CardInstance Card, int Zone) : DuelEvent;
 public sealed record MonsterPositionChanged(PlayerId Player, int Zone, BattlePosition From, BattlePosition To) : DuelEvent;
@@ -247,10 +319,21 @@ public sealed record MonsterFlipSummoned(PlayerId Player, FieldMonster Monster, 
 public sealed record AttackDeclared(PlayerId Player, int AttackerZone, int? TargetZone) : DuelEvent;
 public sealed record MonsterRevealed(PlayerId Player, int Zone, CardInstance Card) : DuelEvent;
 public sealed record BattleDamageDealt(PlayerId Player, int Damage, int LifePointsBefore, int LifePointsAfter) : DuelEvent;
-public sealed record MonsterDestroyed(PlayerId Player, int Zone, CardInstance Card) : DuelEvent;
+public sealed record MonsterDestroyed(PlayerId Player, int Zone, CardInstance Card) : DuelEvent
+{
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool ByBattle { get; internal init; }
+    /// <summary>The monster that destroyed this one by battle.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public MonsterBinding? DestroyedBy { get; internal init; }
+}
 /// <summary>Ordinary summon procedure, not destruction or an activation cost.</summary>
 public sealed record MonsterTributed(MonsterBinding Monster) : DuelEvent;
-public sealed record CardDiscarded(PlayerId Player, CardInstance Card) : DuelEvent;
+public sealed record CardDiscarded(PlayerId Player, CardInstance Card) : DuelEvent
+{
+    public PlayerId? EffectController { get; init; }
+    public string? EffectId { get; init; }
+}
 public sealed record TurnStarted(PlayerId Player, int TurnNumber) : DuelEvent;
 public sealed record DuelEnded(DuelOutcome Outcome) : DuelEvent;
 public sealed record DuelActionResult(bool Succeeded, DuelError Error, DuelState State,

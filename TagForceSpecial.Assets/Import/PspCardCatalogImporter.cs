@@ -4,7 +4,7 @@ using TagForceSpecial.Cards;
 
 namespace TagForceSpecial.Assets.Import;
 
-/// <summary>Local PSP import adapter. Cards has no dependency on binary readers.</summary>
+/// <summary>Imports a card catalog from local game files.</summary>
 public static class PspCardCatalogImporter
 {
     public static CardCatalog Read(Stream source, uint minimum, uint maximum)

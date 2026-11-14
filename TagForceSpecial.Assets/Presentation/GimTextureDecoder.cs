@@ -254,8 +254,7 @@ public sealed class GimTextureDecoder
                 for (int c = 0; c < 2; c++)
                 {
                     int word = c == 0 ? a : b;
-                    // PPSSPP 1.20.4's DXT path uses left-shifted RGB565 components,
-                    // unlike direct-color PSP textures. Keep these policies separate.
+                    // The DXT path uses left-shifted RGB565 components, unlike direct-color textures.
                     colors[c * 4] = (byte)(((word >> 11) & 31) * 8);
                     colors[c * 4 + 1] = (byte)(((word >> 5) & 63) * 4);
                     colors[c * 4 + 2] = (byte)((word & 31) * 8); colors[c * 4 + 3] = 255;

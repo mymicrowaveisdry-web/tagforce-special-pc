@@ -4,11 +4,12 @@ public enum ActionKind
 {
     Draw, Summon, ActivateSpell, ActivateSetSpell, SetMonster, SetSpellTrap, Position, Attack,
     Discard, Phase, EndTurn, ChooseCard, ChoosePosition, ChooseZone, ChooseTarget,
-    ChainResponse, ChainPass, ResolveChain, BattleResponse, BattlePass, AdvanceBattle, ReplayAttack, CancelReplay
+    ChainResponse, ChainPass, ResolveChain, BattleResponse, BattlePass, AdvanceBattle, ReplayAttack, CancelReplay, FinishChoice,
+    OrderTriggers, DeclineTriggers, MonsterEffect, Unequip, Upkeep, CardEffect
 }
 public enum ActionAvailability { Ready, Waiting, Finished, Unsupported }
 
-// Tokens address commands retained inside DuelActionSource, never full-information command objects.
+// Handles that address commands kept inside DuelActionSource.
 public sealed record LegalAction(int Token, string Key, ActionKind Kind, string Label,
     int? CardInstanceId = null, int? Zone = null, int? TargetZone = null,
     BattlePosition? Position = null, DuelPhase? Phase = null);

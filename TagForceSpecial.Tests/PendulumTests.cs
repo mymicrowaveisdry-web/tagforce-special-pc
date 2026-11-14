@@ -5,14 +5,14 @@ using static TagForceSpecial.Tests.EventEffectScenario;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Synthetic original-era generic contracts; no native or real-card verification.</summary>
+/// <summary>Pendulum tests.</summary>
 public sealed class PendulumTests
 {
     private const uint Left = 200_001, Right = 200_002, Pend = 200_003, Ordinary = 200_004,
         Low = 200_005, High = 200_006, Negator = 200_007, Response = 200_008, FusionSpell = 200_009,
         RitualSpell = 200_010, Fusion = 200_011, Ritual = 200_012, Tribute = 200_013, Xyz = 200_014;
 
-    private static DuelEngine Make(IEnumerable<uint>? opening = null, ChainOperation response = ChainOperation.NegateEffect,
+    private static DuelEngine Make(IEnumerable<uint>? opening = null, ResponseNegation? response = ResponseNegation.Effect,
         bool groupNegator = true, bool triggers = false, uint leftScale = 1, uint rightScale = 8,
         MaterialDestination genericDestination = MaterialDestination.Graveyard, bool xyzDetach = false)
     {
@@ -40,8 +40,10 @@ public sealed class PendulumTests
             TriggerRequirement.Optional, TriggerOperation.GainLifePoints, lifePointGain: 100, detachMaterialCount: 1));
         return new(catalog, rules, first.Concat(Enumerable.Repeat(Ordinary, 40 - first.Length)), second,
             playerOneExtraDeck: [Fusion, Xyz], experimentalPendulumCards: [new(Left, leftScale, 99), new(Right, 99, rightScale), new(Pend, 0, 9)],
-            experimentalSummonNegations: [new("group-negator", Negator, kinds: SummonNegationKinds.Special, allowsMultipleSummons: groupNegator)],
-            experimentalChainResponses: [new("response", Response, response, ChainSpellSpeed.Three, respondsToCategory: CardCategory.Spell)],
+            // No operation: the response is a targeted destruction definition (Normal Trap) instead of a negation probe.
+            effectDefinitions: [ResponseProbe.NegateSummon("group-negator", Negator, kinds: SummonKinds.Special, group: groupNegator),
+                response is { } negation ? ResponseProbe.Negate("response", Response, negation, ChainSpellSpeed.Three, respondsTo: CardCategory.Spell)
+                : new("response-destroy", Response, EffectKind.NormalTrap, [new DestroyTargetStep()], target: new SpellTrapOnFieldTarget())],
             experimentalTriggerEffects: effects,
             experimentalSpecialSummonCards: [new(Fusion), new(Ritual, SpecialSummonSources.None, "ritual-proper"), new(Xyz)],
             experimentalMaterialProcedures: [new("generic", [Fusion], [Pend, Ordinary], 2, genericDestination),
@@ -99,6 +101,16 @@ public sealed class PendulumTests
         Summon(e, Pend, 2); Assert.True(e.State.NormalSummonUsed);
     }
 
+    /// <summary>The pool-duel checker counts each card of a pending Pendulum Summon once, though the summon also names its first card.</summary>
+    [Fact]
+    public void PoolDuelCheckerCountsAPendingPendulumGroupOnce()
+    {
+        var e = Make(triggers: true, leftScale: 1, rightScale: 8); Scales(e);
+        var command = SummonCommand(e, Ordinary, Pend); Ok(e, command);
+        var counted = TagForceSpecial.Tools.PoolDuels.PendingCards(e.State.PendingSummon!).ToArray();
+        Assert.Equal(command.Selections.Select(s => s.CardInstanceId).Order(), counted.Order());
+    }
+
     [Fact]
     public void InvalidScaleAndBatchSelectionsRejectWithoutPartialMovement()
     {
@@ -121,8 +133,8 @@ public sealed class PendulumTests
     }
 
     [Theory]
-    [InlineData(ChainOperation.NegateActivation)] [InlineData(ChainOperation.NegateEffect)] [InlineData(ChainOperation.DestroyBoundSpellTrap)]
-    public void ScaleActivationUsesSpellResponsesAndDistinctNegationDepartureRules(ChainOperation operation)
+    [InlineData(ResponseNegation.Activation)] [InlineData(ResponseNegation.Effect)] [InlineData(null)]
+    public void ScaleActivationUsesSpellResponsesAndDistinctNegationDepartureRules(ResponseNegation? operation)
     {
         var e = Make(response: operation); EnterMain(e); NextMain(e); Set(e, Response); NextMain(e);
         var card = e.State.GetPlayer(PlayerId.One).Hand.First(c => c.GameCardId == Left);
@@ -130,7 +142,7 @@ public sealed class PendulumTests
         Assert.NotNull(e.State.GetPlayer(PlayerId.One).PendulumZones[0]);
         Reject(e, SummonCommand(e, Pend), DuelError.ChainPending);
         Ok(e, new ActivateChainResponse(PlayerId.Two, e.State.PendingChain!.DecisionId, 0));
-        if (operation == ChainOperation.DestroyBoundSpellTrap)
+        if (operation is null) // targeted destruction
         {
             var p = e.State.PendingDecision!; var target = p.TargetOptions.Single(t => t.Card == card);
             Assert.True(target.IsPendulumZone);
@@ -138,8 +150,8 @@ public sealed class PendulumTests
             Ok(e, new ChooseDecisionTarget(PlayerId.Two, p.DecisionId, PlayerId.One, 0, card.InstanceId, true));
         }
         Drain(e); var player = e.State.GetPlayer(PlayerId.One);
-        if (operation == ChainOperation.NegateActivation) { Assert.Contains(card, player.Graveyard); Assert.Null(player.PendulumZones[0]); Assert.Empty(player.FaceUpExtraDeck); }
-        else if (operation == ChainOperation.NegateEffect) { Assert.Equal(card, player.PendulumZones[0]!.Card); Assert.Empty(player.Graveyard); Assert.Empty(player.FaceUpExtraDeck); }
+        if (operation == ResponseNegation.Activation) { Assert.Contains(card, player.Graveyard); Assert.Null(player.PendulumZones[0]); Assert.Empty(player.FaceUpExtraDeck); }
+        else if (operation == ResponseNegation.Effect) { Assert.Equal(card, player.PendulumZones[0]!.Card); Assert.Empty(player.Graveyard); Assert.Empty(player.FaceUpExtraDeck); }
         else { Assert.Contains(card, player.FaceUpExtraDeck); Assert.Null(player.PendulumZones[0]); Assert.Empty(player.Graveyard); }
     }
 
@@ -150,7 +162,7 @@ public sealed class PendulumTests
         var e = Make(groupNegator: multiple); Scales(e); NextMain(e); Set(e, Negator); NextMain(e);
         var command = SummonCommand(e, Pend, Ordinary); Ok(e, command); var pending = e.State.PendingSummon!;
         var negate = new ActivateSummonNegation(PlayerId.Two, pending.DecisionId, 0);
-        if (!multiple) { Reject(e, negate, DuelError.UnsupportedSummonResponse); Complete(e); return; }
+        if (!multiple) { Reject(e, negate, DuelError.ActivationConditionNotMet); Complete(e); return; }
         Ok(e, negate); Drain(e);
         var player = e.State.GetPlayer(PlayerId.One);
         Assert.Equal(2, player.Graveyard.Count); Assert.Empty(player.FaceUpExtraDeck); Assert.All(player.MonsterZones, Assert.Null);

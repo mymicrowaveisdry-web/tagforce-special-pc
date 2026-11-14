@@ -4,9 +4,9 @@ using TagForceSpecial.Core;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Compares scoped set transitions with repeated original-game captures.
-/// UI constraints do not expose native error codes. Turn-seven back-row scenes
-/// compare slot IDs and deltas, excluding earlier effects and unrelated state.</summary>
+/// <summary>
+/// Compares set transitions with recorded captures. Turn-seven back-row scenes compare slot IDs and deltas only.
+/// </summary>
 [Trait("Category", "LocalReference")]
 public sealed class DuelSetReferenceTests
 {
@@ -189,7 +189,7 @@ public sealed class DuelSetReferenceTests
             var managed = state.GetPlayer((PlayerId)i);
             if (backrowOnly)
             {
-                // Native turn-seven LP and unrelated cards come from earlier original effects.
+                // Turn-seven LP and unrelated cards come from earlier effects.
                 if (i == 0) Assert.Equal(Ids(native, "spellTrapCardIds"), managed.SpellTrapZones.Select(c => c?.GameCardId ?? 0));
                 continue;
             }

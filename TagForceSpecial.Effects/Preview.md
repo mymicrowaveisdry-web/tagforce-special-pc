@@ -38,8 +38,11 @@ without advertising their invented response cards as supported originals.
 Redirect imported manifests and scenario logs into an ignored local folder; they
 contain local card text. `card-support` records original text, IDs/provenance,
 conditions, operations, costs, choices, limits, tests and evidence separately for
-the preview and full pool. Unreviewed cards remain unsupported; named research
-profiles remain partial. Unclassified effects require later family inventory.
+the preview and full pool (the full pool also includes the 665-card Normal Monster
+family, the five chain cards, the 13 LP cards, the 10
+Deck-operation cards, the 15 removal cards, the 8 Graveyard cards, the 9 battle Traps, the 5 summon Traps, the 3 summon negators the 13 monster triggers, the 12 Flip, Spirit and Gemini monsters, the 26 lasting and activated cards, the 24 Summon procedure cards and the 189 template cards, the 6 Egyptian God cards, the 1 Apoqliphort card, the 2 Token cards and the 209 short-text cards,
+and excludes 95 Tokens).
+Unreviewed cards remain unsupported. Unclassified effects require later family inventory.
 
 The reviewed cardinfo hash is
 `6cd21aa6ca4fb82289f329400c9645da0532bf5a5092a604bef4c3e1d82d9060`.

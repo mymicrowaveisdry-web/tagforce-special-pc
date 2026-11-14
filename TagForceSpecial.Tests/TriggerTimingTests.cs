@@ -3,7 +3,7 @@ using static TagForceSpecial.Tests.EventEffectScenario;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Rules-informed action grouping. These are not PSP timing observations.</summary>
+/// <summary>Trigger timing and action grouping tests.</summary>
 public sealed class TriggerTimingTests
 {
     private static TriggerEffectProfile Grave(string id, TriggerTiming timing, TriggerRequirement requirement = TriggerRequirement.Optional,
@@ -124,7 +124,7 @@ public sealed class TriggerTimingTests
         Assert.Equal("if", Assert.Single(engine.State.EventEffects.PendingTriggers!.Options).Profile.EffectId);
         Drain(engine);
         Assert.Equal(8100, engine.State.GetPlayer(PlayerId.One).LifePoints);
-        Assert.True(engine.State.ResearchSliceComplete);
+        Assert.False(engine.State.ResearchSliceComplete);
     }
 
     [Fact]

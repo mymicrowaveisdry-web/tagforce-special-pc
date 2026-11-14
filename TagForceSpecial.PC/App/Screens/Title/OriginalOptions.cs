@@ -43,8 +43,10 @@ public enum OptionKind { Choice, Slider }
 /// <summary>One original Options row. <paramref name="PcEffect"/> says honestly what the PC does with the value today.</summary>
 public sealed record OptionRowDefinition(string Id, OptionKind Kind, int Count, int Default, bool Applied, string PcEffect);
 
-/// <summary>Observed on the same build (config/reference/options.json): 13 rows, values clamp at both ends, new-game defaults below.
-/// Only Duelist Level reaches a PC system today; every other row is stored and saved but not yet applied.</summary>
+/// <summary>
+/// 13 rows whose values clamp at both ends, with their new-game defaults. Only Duelist Level is applied; the other rows
+/// are stored and saved.
+/// </summary>
 public static class OptionsCatalog
 {
     public const int DuelistLevelRow = 12, SliderLevels = 16;
@@ -75,7 +77,7 @@ public static class OptionsCatalog
     public static bool Valid(IReadOnlyList<int> values) => values.Count == Rows.Count && values.Select((v, i) => v >= 0 && v < Rows[i].Count).All(ok => ok);
 }
 
-/// <summary>Versioned, app-owned copy of the original Options values, saved with the native profile. Duelist Level lives on the profile itself.</summary>
+/// <summary>Versioned copy of the Options values, saved with the profile.</summary>
 public sealed record PlayerOptions(int SchemaVersion, int[] Values)
 {
     public const int CurrentSchema = 1;
@@ -89,9 +91,10 @@ public sealed record PlayerOptions(int SchemaVersion, int[] Values)
 
 public enum OptionsOutcome { None, Accepted, Discarded }
 
-/// <summary>Pure Options screen state. Observed: Up/Down wrap over the 13 rows (group titles are skipped); Left/Right change the value
-/// and stop at either end; confirm leaves keeping the changes; back always asks "All changes will be canceled" with OK focused,
-/// where OK discards, CANCEL stays and back does nothing; other buttons do nothing.</summary>
+/// <summary>
+/// Options screen state: Up/Down wrap over the rows, Left/Right change the value and stop at either end. Confirm keeps
+/// the changes; back asks to cancel them.
+/// </summary>
 public sealed class OptionsSession(int[] initial)
 {
     private readonly int[] initial = initial.Length == OptionsCatalog.Rows.Count ? (int[])initial.Clone() : throw new ArgumentException("Wrong value count.");

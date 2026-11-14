@@ -94,7 +94,7 @@ public sealed partial class GameLoop
             throw new InvalidOperationException("Presentation smoke requires the validated Phase 3 title generation in --data-root.");
         if (options.TitleLayerCaptureRoot is { } layerRoot)
             (originalTitle ?? throw new InvalidOperationException("Title layer capture requires a validated title generation.")).ExportReviewLayers(layerRoot);
-        // Missing original presentation data opens a distinct native setup wizard, never a generic original title.
+        // Missing presentation data opens the setup wizard.
         if (activeScreen == ScreenId.Title && originalTitle is null) utilityReturn = ScreenId.Title;
         router.GoTo(ScreenName(activeScreen == ScreenId.Title && originalTitle is null ? ScreenId.Setup : activeScreen));
     }

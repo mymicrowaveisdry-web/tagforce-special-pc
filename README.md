@@ -37,7 +37,7 @@ new timing comparisons remain deferred. Synthetic tests do not establish full PS
 | [Assets](TagForceSpecial.Assets/README.md) | PSP resource readers |
 | [Cards](TagForceSpecial.Cards/README.md) | Immutable card catalog |
 | [Core](TagForceSpecial.Core/README.md) | Duel state, commands and experimental contracts |
-| [Effects](TagForceSpecial.Effects/README.md) | Bounded card research profiles |
+| [Effects](TagForceSpecial.Effects/README.md) | Reviewed card families and effect definitions |
 | [AI](TagForceSpecial.AI/README.md) | Seeded policy, bounded stepping and replays |
 | [PC](TagForceSpecial.PC/README.md) | MonoGame host with authorized player views |
 | [Tools](TagForceSpecial.Tools/README.md) | Demo, imports and local research commands |

@@ -14,7 +14,7 @@ public sealed record CardStatistics(int? Attack, int? Defense, uint Level);
 public sealed record CardNumericCodes(uint Attribute, uint Type, uint RawKind, uint GetterKind,
     uint Icon, uint Field23To26, uint Field27To30);
 
-/// <summary>Optional raw PSP provenance, retained without interpreting it as catalog identity.</summary>
+/// <summary>Optional raw source-row provenance; not part of catalog identity.</summary>
 public sealed record CardSourceRow(int InternalIndex, uint PropertyWord0, uint PropertyWord1,
     uint DescriptionBitOffset);
 

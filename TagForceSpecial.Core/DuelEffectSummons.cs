@@ -7,6 +7,9 @@ public sealed class FusionSummonRecipe
 {
     public uint TargetCardId { get; }
     public IReadOnlyList<uint> MaterialCardIds { get; }
+    /// <summary>One entry per material; each lists the card IDs (artworks of the named card) that can fill it.</summary>
+    public IReadOnlyList<IReadOnlyList<uint>> MaterialSlots { get; }
+
     public FusionSummonRecipe(uint targetCardId, IEnumerable<uint> materialCardIds)
     {
         ArgumentNullException.ThrowIfNull(materialCardIds);
@@ -14,15 +17,41 @@ public sealed class FusionSummonRecipe
         if (targetCardId == 0 || ids.Length is < 2 or > 5 || ids.Any(id => id == 0))
             throw new ArgumentException("Supply a target and two to five explicit materials, including multiplicities.");
         TargetCardId = targetCardId; MaterialCardIds = Array.AsReadOnly(ids);
+        MaterialSlots = Array.AsReadOnly(ids.Select(id => (IReadOnlyList<uint>)Array.AsReadOnly(new[] { id })).ToArray());
     }
+
+    private FusionSummonRecipe(uint targetCardId, IReadOnlyList<uint>[] slots)
+    {
+        if (targetCardId == 0 || slots.Length is < 2 or > 5 || slots.Any(s => s.Count == 0 || s.Any(id => id == 0)))
+            throw new ArgumentException("Supply a target and two to five material slots with explicit card IDs.");
+        TargetCardId = targetCardId; MaterialSlots = Array.AsReadOnly(slots);
+        MaterialCardIds = Array.AsReadOnly(slots.SelectMany(s => s).Distinct().ToArray());
+    }
+
+    /// <summary>A recipe whose materials can each be any of several reviewed card IDs.</summary>
+    public static FusionSummonRecipe WithAlternatives(uint targetCardId, params uint[][] slots) =>
+        new(targetCardId, (slots ?? throw new ArgumentNullException(nameof(slots))).Select(s => (IReadOnlyList<uint>)Array.AsReadOnly(s.ToArray())).ToArray());
 }
 
-/// <summary>One to five allowed Tributes with an exact positive printed-level total; overpayment is unsupported.</summary>
+/// <summary>One to five Tributes reaching a positive printed-level total, exactly or, for "or more" recipes, without a surplus Tribute.</summary>
 public sealed class RitualSummonRecipe
 {
     public uint TargetCardId { get; }
     public uint RequiredLevel { get; }
     public IReadOnlyList<uint> TributeCardIds { get; }
+    /// <summary>Any eligible monster can be Tributed and the total can exceed the requirement, if no Tribute is unnecessary.</summary>
+    public bool OrMore { get; }
+
+    /// <summary>A Ritual Spell that accepts any monsters whose Levels total the requirement or more.</summary>
+    public static RitualSummonRecipe AnyTributes(uint targetCardId, uint requiredLevel) => new(targetCardId, requiredLevel);
+
+    private RitualSummonRecipe(uint targetCardId, uint requiredLevel)
+    {
+        if (targetCardId == 0 || requiredLevel == 0) throw new ArgumentException("Supply a target and positive level total.");
+        TargetCardId = targetCardId; RequiredLevel = requiredLevel; OrMore = true;
+        TributeCardIds = Array.AsReadOnly(Array.Empty<uint>());
+    }
+
     public RitualSummonRecipe(uint targetCardId, uint requiredLevel, IEnumerable<uint> tributeCardIds)
     {
         ArgumentNullException.ThrowIfNull(tributeCardIds);

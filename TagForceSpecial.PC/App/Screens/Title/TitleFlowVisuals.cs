@@ -40,8 +40,7 @@ public static partial class TitleFlowText
     }
 }
 
-/// <summary>Draws measured frames from validated source textures plus a PGF glyph atlas into one retained layer.
-/// Frames are frozen references: no animation timing is inferred.</summary>
+/// <summary>Draws flow frames from validated source textures and a PGF glyph atlas into one retained layer.</summary>
 public sealed partial class TitleFlowVisuals : IDisposable
 {
     public const string RequiredFontSha256 = "250babd8a242d7eaaa84284c78d5e2273b29e61d0d8c01b65414e3248d7c1164";
@@ -65,7 +64,7 @@ public sealed partial class TitleFlowVisuals : IDisposable
     public RenderTarget2D Layer { get; }
     public IEnumerable<string> FrameIds => frames.Keys;
     public bool OriginalFontAvailable => font is not null;
-    /// <summary>Authored-font text used only when no PSP font was imported; never presented as original typography.</summary>
+    /// <summary>Fallback text used only when no game font was imported.</summary>
     public List<(string Text, int X, int Y, Color Color)> FallbackLines { get; } = [];
 
     public static FlowProfile LoadProfile()
@@ -165,7 +164,7 @@ public sealed partial class TitleFlowVisuals : IDisposable
             {
                 if (overMenu && IsMenuLabel(text)) continue;
                 string value = Source(text.Source, text.Offset, text.Start, text.Chars);
-                // The level sentence is measured once; the observed variants differ only in the bracketed name.
+                // Measures the level sentence once; its variants differ only in the bracketed name.
                 if (frameId == "entry.level" && value.Contains('<'))
                 {
                     var chosen = profile.LevelNames[(int)level];

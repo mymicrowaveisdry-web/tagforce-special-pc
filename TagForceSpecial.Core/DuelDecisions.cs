@@ -1,6 +1,8 @@
+using System.Text.Json.Serialization;
+
 namespace TagForceSpecial.Core;
 
-public enum DecisionKind { Card, Position, MonsterZone, SpellTrapTarget }
+public enum DecisionKind { Card, Position, MonsterZone, SpellTrapTarget, FieldTarget }
 public enum DecisionCardSource { Hand, Deck, Graveyard, Banished, ExtraDeck, FaceUpExtraDeck }
 
 /// <summary>Trusted, immutable selection policy. It does not activate or resolve a card effect.</summary>
@@ -10,14 +12,31 @@ public sealed class DecisionStep
     public DecisionCardSource? CardSource { get; }
     public IReadOnlyList<uint> AllowedCardIds { get; }
     public IReadOnlyList<BattlePosition> AllowedPositions { get; }
+    /// <summary>A card step that accepts any card of its source (the allowlist is then empty).</summary>
+    public bool AllowsAnyCard { get; }
 
-    private DecisionStep(DecisionKind kind, DecisionCardSource? source, uint[] ids, BattlePosition[] positions)
+    private DecisionStep(DecisionKind kind, DecisionCardSource? source, uint[] ids, BattlePosition[] positions, bool anyCard = false)
     {
         Kind = kind;
         CardSource = source;
         AllowedCardIds = Array.AsReadOnly(ids);
         AllowedPositions = Array.AsReadOnly(positions);
+        AllowsAnyCard = anyCard;
     }
+
+    internal bool Allows(uint cardId) => AllowsAnyCard || AllowedCardIds.Contains(cardId);
+
+    /// <summary>Any one card from the source (e.g. an activation's "discard 1 card" cost).</summary>
+    public static DecisionStep AnyCard(DecisionCardSource source) => Enum.IsDefined(source)
+        ? new(DecisionKind.Card, source, [], [], anyCard: true) : throw new ArgumentOutOfRangeException(nameof(source));
+
+    /// <summary>When set, only cards matching this filter can be chosen.</summary>
+    [JsonIgnore]
+    public CardFilter? CardMatch { get; private init; }
+
+    /// <summary>One card from the source that matches a filter.</summary>
+    public static DecisionStep FilteredCard(DecisionCardSource source, CardFilter filter) =>
+        new(DecisionKind.Card, source, [], [], anyCard: true) { CardMatch = filter ?? throw new ArgumentNullException(nameof(filter)) };
 
     public static DecisionStep Card(DecisionCardSource source, IEnumerable<uint> allowedCardIds)
     {
@@ -39,14 +58,21 @@ public sealed class DecisionStep
         return new(DecisionKind.Position, null, [], positions);
     }
 
+    /// <summary>The field, Graveyard or banished target this step chooses, distinct from earlier answers.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public EffectTarget? FieldTargetSpec { get; private init; }
+    /// <summary>An optional pick that <see cref="FinishDecision"/> may skip, ending the choices.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Optional { get; private init; }
+
+    public static DecisionStep FieldTargetChoice(EffectTarget spec, bool optional = false) => spec is null ? throw new ArgumentNullException(nameof(spec))
+        : new(DecisionKind.FieldTarget, null, [], []) { FieldTargetSpec = spec, Optional = optional };
+
     public static DecisionStep EmptyMonsterZone() => new(DecisionKind.MonsterZone, null, [], []);
     public static DecisionStep SpellTrapTarget() => new(DecisionKind.SpellTrapTarget, null, [], []);
 }
 
-/// <summary>
-/// Explicit engine configuration for a selection-only workflow, not caller-supplied command data.
-/// By default completion freezes the research slice without manufacturing a duel outcome.
-/// </summary>
+/// <summary>Engine configuration for a selection-only workflow. Completion freezes the duel by default.</summary>
 public sealed class DecisionSequence
 {
     public string Id { get; }
@@ -67,7 +93,8 @@ public sealed class DecisionSequence
 }
 
 public sealed record DecisionAnswer(DecisionKind Kind, int? CardInstanceId = null,
-    BattlePosition? Position = null, int? MonsterZone = null, SpellTrapTarget? Target = null);
+    BattlePosition? Position = null, int? MonsterZone = null, SpellTrapTarget? Target = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] FieldCardTarget? FieldTarget = null);
 
 /// <summary>Immutable full-information request; a presentation layer must restrict private card options.</summary>
 public sealed class PendingDecision
@@ -83,10 +110,16 @@ public sealed class PendingDecision
     public IReadOnlyList<int> MonsterZoneOptions { get; }
     public IReadOnlyList<DecisionAnswer> Answers { get; }
     public IReadOnlyList<SpellTrapTarget> TargetOptions { get; }
+    /// <summary>Field target options; null unless this is a field-target decision.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<FieldCardTarget>? FieldTargetOptions { get; }
+    /// <summary>The choices may end here with <see cref="FinishDecision"/>.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool CanFinish { get; }
 
     internal PendingDecision(long id, DecisionSequence sequence, PlayerId player, int index,
         IEnumerable<CardInstance> cards, IEnumerable<int> zones, IEnumerable<DecisionAnswer> answers,
-        IEnumerable<SpellTrapTarget>? targets = null)
+        IEnumerable<SpellTrapTarget>? targets = null, IEnumerable<FieldCardTarget>? fieldTargets = null)
     {
         DecisionId = id;
         SequenceId = sequence.Id;
@@ -100,6 +133,8 @@ public sealed class PendingDecision
         MonsterZoneOptions = Array.AsReadOnly(zones.ToArray());
         Answers = Array.AsReadOnly(answers.ToArray());
         TargetOptions = Array.AsReadOnly(targets?.ToArray() ?? []);
+        FieldTargetOptions = fieldTargets is null ? null : Array.AsReadOnly(fieldTargets.ToArray());
+        CanFinish = step.Optional;
     }
 }
 

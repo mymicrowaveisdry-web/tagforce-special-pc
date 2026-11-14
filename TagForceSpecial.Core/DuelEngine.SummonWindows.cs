@@ -5,27 +5,28 @@ public sealed partial class DuelEngine
     private DuelActionResult CommitSummon(DuelState next, PlayerId player, CardInstance card, int zone,
         bool faceDown, List<DuelEvent> events)
     {
-        if (!faceDown && summonWindows.Contains(card.GameCardId))
+        var tributes = Array.AsReadOnly(events.OfType<MonsterTributed>().Select(t => t.Monster).ToArray());
+        var pending = new PendingSummon(checked(State.Revision + 1), checked(State.Revision + 1), player, card, zone, Other(player)) { Tributes = tributes };
+        if (!faceDown && OpensSummonWindow(next.WithSummon(pending), card.GameCardId))
         {
-            var pending = new PendingSummon(checked(State.Revision + 1), checked(State.Revision + 1),
-                player, card, zone, Other(player));
             events.Add(new SummonAttempted(pending) { TimingGroup = 1 });
             events.Add(new SummonResponseRequested(pending));
             return Accept(next.WithSummon(pending), events.ToArray());
         }
-        next = PlaceSuccessfulSummon(next, player, card, zone, faceDown, events);
+        next = PlaceSuccessfulSummon(next, player, card, zone, faceDown, events, tributes);
         return Accept(next, events.ToArray());
     }
 
     private DuelState PlaceSuccessfulSummon(DuelState next, PlayerId playerId, CardInstance card, int zone,
-        bool faceDown, List<DuelEvent> events)
+        bool faceDown, List<DuelEvent> events, IReadOnlyList<MonsterBinding> tributes)
     {
         var player = next.GetPlayer(playerId);
         var monster = NewSummonedMonster(next, card, faceDown ? BattlePosition.FaceDownDefense : BattlePosition.FaceUpAttack);
+        monster = monster with { SummonTributes = tributes.Count };
         var monsters = player.MonsterZones.ToArray();
         monsters[zone] = monster;
         events.Add(faceDown ? new MonsterSet(playerId, monster, zone) { TimingGroup = 1 }
-            : new MonsterNormalSummoned(playerId, monster, zone, next.PendingSummon?.AttemptId) { TimingGroup = 1 });
+            : new MonsterNormalSummoned(playerId, monster, zone, next.PendingSummon?.AttemptId) { TimingGroup = 1, Tributes = tributes });
         return next.With(player: player.With(monsters: monsters));
     }
 
@@ -40,6 +41,8 @@ public sealed partial class DuelEngine
                     entry.Source, events, "pendulum", entry.AttemptId, sourceAlreadyRemoved: true, timingGroup: 1);
             return next.WithSummon(null);
         }
+        if (pending.IsGeminiSummon) return CompleteGeminiSummon(next, pending, events).WithSummon(null);
+        if (pending.IsFlipSummon) return CompleteFlipSummon(next, pending, events).WithSummon(null);
         // The supported negation chain cannot move monsters or occupy this reserved slot.
         if (next.GetPlayer(pending.Player).MonsterZones[pending.MonsterZone] is not null)
             throw new InvalidOperationException("A pending summon destination was occupied by an unsupported operation.");
@@ -47,13 +50,28 @@ public sealed partial class DuelEngine
             ? PlaceSpecialSummon(next, pending.Player, pending.Card, pending.MonsterZone, pending.Position,
                 pending.Source, events, pending.ProcedureId, pending.AttemptId, pending.ProperProcedureId, sourceAlreadyRemoved: true,
                 timingGroup: pending.Source == DecisionCardSource.ExtraDeck ? 1 : null, xyzMaterials: pending.XyzMaterials)
-            : PlaceSuccessfulSummon(next, pending.Player, pending.Card, pending.MonsterZone, false, events);
+            : PlaceSuccessfulSummon(next, pending.Player, pending.Card, pending.MonsterZone, false, events, pending.Tributes);
         return next.WithSummon(null);
+    }
+
+    /// <summary>Flips the monster face-up, if it is still the face-down one the attempt named.</summary>
+    private static DuelState CompleteFlipSummon(DuelState next, PendingSummon pending, List<DuelEvent> events)
+    {
+        var player = next.GetPlayer(pending.Player);
+        if (player.MonsterZones[pending.MonsterZone] is not { Position: BattlePosition.FaceDownDefense } monster || monster.Card != pending.Card) return next;
+        var changed = monster with { Position = pending.Position, PositionChangedOnTurn = next.TurnNumber, SummonedOnTurn = next.TurnNumber };
+        var monsters = player.MonsterZones.ToArray();
+        monsters[pending.MonsterZone] = changed;
+        events.Add(new MonsterFlipSummoned(player.Id, changed, pending.MonsterZone) { TimingGroup = 1 });
+        return next.With(player: player.With(monsters: monsters));
     }
 
     private DuelActionResult ExecuteSummonWindow(DuelCommand command)
     {
         var pending = State.PendingSummon!;
+        // A Counter Trap answering this Summon may still be choosing its cost.
+        if (State.PendingDecision is not null && State.PendingSpellActivation is { } activating && definitions.ContainsKey(activating.Spell.GameCardId))
+            return command is DecisionCommand decision ? AnswerDecision(decision) : Reject(DuelError.DecisionPending);
         long id = command switch
         {
             PassSummonResponse p => p.DecisionId,
@@ -64,7 +82,7 @@ public sealed partial class DuelEngine
         if (id != pending.DecisionId) return Reject(DuelError.StaleSummonDecision);
         if (command.Player != pending.Responder) return Reject(DuelError.NotSummonResponder);
         if (command is ActivateSummonNegation activate)
-            return BeginSummonNegation(pending, activate);
+            return BeginSummonNegation(activate);
         List<DuelEvent> events = [new SummonResponsePassed(command.Player)];
         var updated = pending with { DecisionId = checked(State.Revision + 1), Responder = Other(pending.Responder),
             ConsecutivePasses = pending.ConsecutivePasses + 1 };
@@ -74,30 +92,14 @@ public sealed partial class DuelEngine
         return Accept(next, events.ToArray());
     }
 
-    private DuelActionResult BeginSummonNegation(PendingSummon pending, ActivateSummonNegation command)
+    private DuelActionResult BeginSummonNegation(ActivateSummonNegation command)
     {
         if (command.SpellTrapZone is < 0 or >= 5) return Reject(DuelError.InvalidSpellTrapZone);
         var player = State.GetPlayer(command.Player);
         var source = player.SpellTrapFields[command.SpellTrapZone];
-        if (command.Player == pending.Player || source is null || source.IsFaceUp || source.SetOnTurn >= State.TurnNumber ||
-            !summonNegations.TryGetValue(source.Card.GameCardId, out var profile) ||
-            pending.PendulumGroup.Count > 1 && !profile.AllowsMultipleSummons ||
-            !profile.Kinds.HasFlag(pending.IsSpecialSummon ? SummonNegationKinds.Special : SummonNegationKinds.Normal))
+        if (source is null || !EffectAt(source.Card.GameCardId, command.EffectIndex, out var definition))
             return Reject(DuelError.UnsupportedSummonResponse);
-        if (player.LifePoints <= profile.LifePointCost) return Reject(DuelError.InsufficientLifePoints);
-        var slots = player.SpellTrapFields.ToArray();
-        slots[command.SpellTrapZone] = source with { IsFaceUp = true };
-        var receipt = new CommittedActivation(player.Id, profile.EffectId, source.Card, command.SpellTrapZone, null, null);
-        var link = new ChainLink(1, receipt, source.PlacementId, ChainOperation.SummonNegation, ChainSpellSpeed.Three,
-            SummonAttemptId: pending.AttemptId);
-        var chain = new PendingChain(checked(State.Revision + 1), [link], Other(player.Id), freezeOnCompletion: false);
-        var next = State.With(player: player.With(spellTraps: slots, lifePoints: player.LifePoints - profile.LifePointCost)).WithChain(chain);
-        List<DuelEvent> events = [new ChainResponseActivated(player.Id, profile.EffectId, source.Card, command.SpellTrapZone)];
-        if (profile.LifePointCost != 0) events.Add(new SummonNegationCostPaid(player.Id, profile.EffectId, profile.LifePointCost));
-        events.Add(new ActivationCommitted(receipt));
-        events.Add(new ChainLinkAdded(link));
-        events.Add(new ChainResponseRequested(chain.Responder, chain.DecisionId));
-        return Accept(next, events.ToArray());
+        return BeginSummonDefinition(player.Id, command.SpellTrapZone, source, definition);
     }
 
     private DuelState ResolveSummonNegation(DuelState next, ChainLink link, List<DuelEvent> events)
@@ -117,6 +119,13 @@ public sealed partial class DuelEngine
                 events.Add(new SummonNegated(entry) { TimingGroup = 1 });
             }
             return next.WithSummon(pending with { Negated = true });
+        }
+        if (pending.IsGeminiSummon || pending.IsFlipSummon)
+        {
+            var controller = next.GetPlayer(pending.Player);
+            var zones = controller.MonsterZones.ToArray();
+            zones[pending.MonsterZone] = null;
+            next = next.With(player: controller.With(monsters: zones));
         }
         var owner = next.GetPlayer(pending.Card.Owner);
         events.Add(new SummonNegated(pending) { TimingGroup = 1 });

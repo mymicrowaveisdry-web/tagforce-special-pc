@@ -70,7 +70,7 @@ public sealed partial class GameLoop
             {
                 diagnosticPreview = new(GraphicsDevice, data.Width, data.Height);
                 diagnosticPreview.SetData(data.Rgba);
-                // Native JPEG CSC alpha is unused/zero. Preserve source bytes and use an explicit opaque material.
+                // JPEG CSC alpha is unused, so source bytes are kept with an explicit opaque material.
                 diagnosticPreviewBlend = new()
                 {
                     ColorSourceBlend = data.Opaque ? Blend.One : Blend.SourceAlpha,
@@ -143,7 +143,7 @@ public sealed partial class GameLoop
         if (screen != ScreenId.AssetDiagnostics || options.AssetPreview is null || diagnosticTask is not null || diagnosticPreview is null) return;
         graphicsThread.Check();
         presenter.Begin(blendState: diagnosticPreviewBlend, samplerState: SamplerState.PointClamp);
-        // Authored tooling placement at native size, not reconstructed original UI geometry.
+        // Tool layout at native size.
         presenter.Draw(diagnosticPreview, new Rectangle(212, 8, diagnosticPreview.Width, diagnosticPreview.Height), Color.White);
         presenter.End();
     }

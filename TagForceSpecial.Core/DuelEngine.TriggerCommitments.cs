@@ -7,21 +7,32 @@ public sealed partial class DuelEngine
         TriggerTurnLimit.PerPlacement => new(trigger.Player, state.TurnNumber, trigger.Profile.LimitKey,
             trigger.Source.Card.InstanceId, trigger.Source.PlacementId),
         TriggerTurnLimit.SharedPerPlayer => new(trigger.Player, state.TurnNumber, trigger.Profile.LimitKey, null, null),
+        // Turn 0 marks a use that lasts the whole Duel.
+        TriggerTurnLimit.SharedPerDuel => new(trigger.Player, 0, trigger.Profile.LimitKey, null, null),
+        // Kept by the card's owner so a change of control does not reset it; a new placement does.
+        TriggerTurnLimit.WhileFaceUp => new(trigger.Source.Card.Owner, 0, trigger.Profile.LimitKey, trigger.Source.Card.InstanceId, trigger.Source.PlacementId),
         _ => null
     };
 
     private static bool IsTriggerUsed(DuelState state, TriggerActivation trigger) =>
         UseKey(state, trigger) is { } key && state.EventEffects.UsedTriggers.Contains(key);
 
-    private static IEnumerable<MonsterBinding> TriggerTargets(DuelState state, TriggerActivation trigger)
+    private IEnumerable<MonsterBinding> TriggerTargets(DuelState state, TriggerActivation trigger)
     {
         var policy = trigger.Profile.Target!;
-        return FieldMonsters(state).Where(e => e.Monster.Position != BattlePosition.FaceDownDefense && !e.Monster.BattleDestroyed &&
+        return FieldMonsters(state).Where(e => (policy.AllowFaceDown || e.Monster.Position != BattlePosition.FaceDownDefense) && !e.Monster.BattleDestroyed &&
             Relates(policy.Relation, trigger.Source, e.Binding) &&
             (!policy.ExcludeSource || e.Binding != trigger.Source) &&
-            (policy.AllowedCardIds.Count == 0 || policy.AllowedCardIds.Contains(e.Monster.Card.GameCardId)))
+            (policy.AllowedCardIds.Count == 0 || policy.AllowedCardIds.Contains(e.Monster.Card.GameCardId)) &&
+            !RuleLocked(state, LockedAction.BeTargeted, e.Binding.Player, e.Monster.Card, e.Monster, targeter: trigger.Player, byCategory: rules[trigger.Source.Card.GameCardId].Category))
             .Select(e => e.Binding);
     }
+
+    /// <summary>Field cards a trigger's own target can choose, excluding cards that cannot be targeted.</summary>
+    private IEnumerable<FieldCardTarget> TriggerFieldTargets(DuelState state, TriggerActivation trigger, FieldTarget spec) =>
+        FieldMatches(state, trigger.Player, spec.Kind, spec.Side, spec.Filter, null).Where(t => TargetPasses(state, spec, t) &&
+            !RuleLocked(state, LockedAction.BeTargeted, t.Player, t.Card, t.Location == FieldLocation.MonsterZone ? state.GetPlayer(t.Player).MonsterZones[t.Zone] : null,
+                targeter: trigger.Player, byCategory: rules[trigger.Source.Card.GameCardId].Category));
 
     private DuelActionResult OrderTriggers(ChooseTriggerOrder command)
     {
@@ -61,10 +72,24 @@ public sealed partial class DuelEngine
                 (next, trigger) = PayTriggerCost(next, trigger, null, events);
                 queue[0] = trigger;
             }
+            if (trigger.Profile.TributeCost && trigger.TributedCost is null)
+                return RequestTriggerCommitment(next, remaining, committed, queue,
+                    new(checked(State.Revision + 1), trigger, TriggerCommitmentKind.TributeCost,
+                        targets: FieldMonsters(next).Where(e => e.Binding.Player == trigger.Player && !e.Monster.BattleDestroyed && !RuleLocked(next, LockedAction.BeTributed, e.Binding.Player, e.Monster.Card, e.Monster)).Select(e => e.Binding)), events);
             if (trigger.Profile.Target is not null && trigger.Target is null)
                 return RequestTriggerCommitment(next, remaining, committed, queue,
                     new(checked(State.Revision + 1), trigger, TriggerCommitmentKind.MonsterTarget,
                         targets: TriggerTargets(next, trigger)), events);
+            if (trigger is { TargetCard: null, Profile.Definition.FieldTargets: [ZoneTarget zone] })
+                return RequestTriggerCommitment(next, remaining, committed, queue,
+                    new(checked(State.Revision + 1), trigger, TriggerCommitmentKind.ZoneTarget, zones: ZoneMatches(next, trigger.Player, zone)), events);
+            if (trigger is { TargetCard: null, Profile.Definition.FieldTargets: [FieldTarget field] })
+                return RequestTriggerCommitment(next, remaining, committed, queue,
+                    new(checked(State.Revision + 1), trigger, TriggerCommitmentKind.ZoneTarget, zones: TriggerFieldTargets(next, trigger, field)), events);
+            if (trigger.Profile.Definition?.Declares is { } declares && trigger.Declared is null)
+                return RequestTriggerCommitment(next, remaining, committed, queue,
+                    new(checked(State.Revision + 1), trigger, TriggerCommitmentKind.Declaration, declaration: declares,
+                        declarationOptions: DeclarationOptions(declares)), events);
             if (trigger.Profile.DetachMaterialCount != 0 && trigger.DetachedCost.Count == 0)
                 return RequestTriggerCommitment(next, remaining, committed, queue,
                     new(checked(State.Revision + 1), trigger, TriggerCommitmentKind.DetachCost,
@@ -91,15 +116,23 @@ public sealed partial class DuelEngine
         next = next.WithEventEffects(next.EventEffects.WithTriggers(null));
         if (committed.Count == 0) return Accept(next, events.ToArray());
         var links = committed.Select((t, i) => TriggerLink(i + 1, t)).ToArray();
-        var chain = new PendingChain(checked(State.Revision + 1), links, Other(committed[^1].Player),
-            freezeOnCompletion: State.ResearchSliceComplete);
+        var chain = new PendingChain(checked(State.Revision + 1), links, Other(committed[^1].Player));
         events.Add(new ChainResponseRequested(chain.Responder, chain.DecisionId));
         return Accept(next.WithChain(chain), events.ToArray());
     }
 
-    private static ChainLink TriggerLink(int number, TriggerActivation trigger) => new(number,
-        new(trigger.Player, trigger.Profile.EffectId, trigger.Source.Card, trigger.Source.Zone, trigger.DiscardedCost, null),
-        trigger.Source.PlacementId, ChainOperation.TriggerEffect, Trigger: trigger);
+    private static ChainLink TriggerLink(int number, TriggerActivation trigger)
+    {
+        IReadOnlyList<FieldCardTarget>? bound = trigger.Profile.Definition?.FieldTargets switch
+        {
+            [TriggerTargetedMonster] when trigger.Target is { } target => [new(target.Player, FieldLocation.MonsterZone, target.Zone, target.Card, target.PlacementId)],
+            [TriggerSourceMonster] => [new(trigger.Source.Player, FieldLocation.MonsterZone, trigger.Source.Zone, trigger.Source.Card, trigger.Source.PlacementId)],
+            [ZoneTarget or FieldTarget] when trigger.TargetCard is { } card => [card],
+            _ => null
+        };
+        return new(number, new(trigger.Player, trigger.Profile.EffectId, trigger.Source.Card, trigger.Source.Zone, trigger.DiscardedCost, null, bound),
+            trigger.Source.PlacementId, ChainOperation.TriggerEffect, Trigger: trigger, Declared: trigger.Declared);
+    }
 
     private DuelActionResult RequestTriggerCommitment(DuelState next, TriggerActivation[] remaining,
         IEnumerable<TriggerActivation> committed, IEnumerable<TriggerActivation> queue,
@@ -127,7 +160,7 @@ public sealed partial class DuelEngine
         var pending = State.EventEffects.PendingCommitment!;
         var batch = State.EventEffects.PendingTriggers!;
         var id = command switch { ChooseTriggerCostCard c => c.DecisionId, ChooseTriggerMonsterTarget t => t.DecisionId,
-            ChooseTriggerXyzMaterials x => x.DecisionId, _ => -1 };
+            ChooseTriggerXyzMaterials x => x.DecisionId, ChooseTriggerZoneTarget z => z.DecisionId, DeclareValue d => d.DecisionId, _ => -1 };
         if (id == -1) return Reject(DuelError.TriggerCommitmentPending);
         if (id != pending.DecisionId) return Reject(DuelError.StaleTriggerDecision);
         if (command.Player != pending.Player) return Reject(DuelError.NotTriggerPlayer);
@@ -162,6 +195,32 @@ public sealed partial class DuelEngine
                 if (card is null || !player.Hand.Contains(card) || player.LifePoints <= trigger.Profile.LifePointCost)
                     return Reject(DuelError.InvalidTriggerCommitment);
                 (next, trigger) = PayTriggerCost(next, trigger, card, events);
+                break;
+            }
+            case DeclareValue declared:
+            {
+                if (pending.Kind != TriggerCommitmentKind.Declaration) return Reject(DuelError.WrongTriggerCommitment);
+                if (!DeclarationValid(pending.Declaration!.Value, declared.Value)) return Reject(DuelError.InvalidTriggerCommitment);
+                trigger = trigger with { Declared = declared.Value };
+                events.Add(new DeclarationMade(command.Player, pending.Declaration.Value, declared.Value, trigger.Profile.EffectId));
+                break;
+            }
+            case ChooseTriggerZoneTarget zone:
+            {
+                if (pending.Kind != TriggerCommitmentKind.ZoneTarget) return Reject(DuelError.WrongTriggerCommitment);
+                var chosen = pending.ZoneOptions.SingleOrDefault(o => o.Player == zone.TargetPlayer && o.Card.InstanceId == zone.CardInstanceId);
+                if (chosen is null || !chosen.IsStillPresent(State)) return Reject(DuelError.InvalidTriggerCommitment);
+                trigger = trigger with { TargetCard = chosen };
+                events.Add(new TriggerZoneTargetChosen(trigger, chosen));
+                break;
+            }
+            case ChooseTriggerMonsterTarget tribute when pending.Kind == TriggerCommitmentKind.TributeCost:
+            {
+                var paid = pending.TargetOptions.SingleOrDefault(t => t.Player == tribute.TargetPlayer && t.Zone == tribute.MonsterZone && t.Card.InstanceId == tribute.CardInstanceId);
+                if (paid is null || !paid.IsStillPresent(State)) return Reject(DuelError.InvalidTriggerCommitment);
+                next = SendFieldCardToGraveyard(RemovePlacement(next, new(paid.Player, FieldLocation.MonsterZone, paid.Zone, paid.Card, paid.PlacementId)),
+                    paid.Card, new MonsterTributed(paid), events);
+                trigger = trigger with { TributedCost = paid };
                 break;
             }
             case ChooseTriggerMonsterTarget target:

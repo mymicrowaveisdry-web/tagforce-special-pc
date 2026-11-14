@@ -29,7 +29,8 @@ internal static class DuelScreen
             .Concat(view.Self.Graveyard).Concat(view.Self.FaceUpExtraDeck)
             .Concat(view.Opponent.Monsters.OfType<CardView>()).Concat(view.Opponent.SpellTraps.OfType<CardView>())
             .Concat(view.Opponent.Pendulum.OfType<CardView>()).Concat(view.Opponent.Graveyard)
-            .Concat(view.Opponent.FaceUpExtraDeck).Where(c => !c.Hidden).ToArray();
+            .Concat(view.Opponent.FaceUpExtraDeck).Concat(new[] { view.Self.FieldSpell, view.Opponent.FieldSpell }.OfType<CardView>())
+            .Where(c => !c.Hidden).ToArray();
         var detail = inspectedCard >= 0 && knownCards.Length > 0 ? knownCards[inspectedCard % knownCards.Length]
             : knownCards.FirstOrDefault(c => c.InstanceId == focus);
         DrawHand(view.Opponent, 38);
@@ -48,6 +49,8 @@ internal static class DuelScreen
         DrawCard(view.Opponent.Pendulum[1], new(298, 33, 30, 25));
         DrawCard(view.Self.Pendulum[0], new(12, 201, 30, 25));
         DrawCard(view.Self.Pendulum[1], new(298, 201, 30, 25));
+        DrawCard(view.Opponent.FieldSpell, new(298, 63, 30, 25));
+        DrawCard(view.Self.FieldSpell, new(298, 166, 30, 25));
         r.Text("P", 23, 229, Muted); r.Text("P", 309, 229, Muted);
         r.Fill(new(344, 31, 130, 219), new(22, 29, 44));
         r.Text("CARD DETAILS", 350, 37, Gold);
