@@ -400,7 +400,7 @@ public sealed partial class TitleFlowVisuals : IDisposable
     {
         foreach (var texture in owned) texture.Dispose();
         owned.Clear();
-        MainMenuBackground.Dispose(); MainMenuLabels.Dispose(); DeckMenuLabels.Dispose(); DeckEditLayer.Dispose();
+        MainMenuBackground.Dispose(); MainMenuLabels.Dispose(); DeckMenuLabels.Dispose(); DeckEditLayer.Dispose(); RecipeLayer?.Dispose();
         OptionsBackground.Dispose(); OptionsStatic.Dispose(); OptionsText.Dispose(); OptionsPieces.Dispose();
         DialogText?.Dispose(); DialogPieces?.Dispose();
         foreach (var back in dialogBacks.Values) back.Dispose();

@@ -21,7 +21,7 @@ public sealed class GumPresentation : IDisposable
             ?? throw new InvalidDataException("Gum project did not load.");
         gum.CanvasWidth = 480; gum.CanvasHeight = 272;
         // Root order is draw order: the Deck Menu submenu sits over the Main Menu.
-        foreach (string name in new[] { "OriginalTitle", "OriginalTitleStartMenu", "OriginalTitleFlow", "OriginalMainMenu", "OriginalDeckMenu", "OriginalDeckEdit", "OriginalOptions", "NativeToolsMenu", "NativePreferences" })
+        foreach (string name in new[] { "OriginalTitle", "OriginalTitleStartMenu", "OriginalTitleFlow", "OriginalMainMenu", "OriginalDeckMenu", "OriginalDeckEdit", "OriginalRecipeViewer", "OriginalOptions", "NativeToolsMenu", "NativePreferences" })
         {
             var root = project.Screens.Single(s => s.Name == name).ToGraphicalUiElement();
             root.Visible = false;
@@ -151,6 +151,21 @@ public sealed class GumPresentation : IDisposable
         {
             var component = root.GetGraphicalUiElementByName(instance) ?? throw new InvalidDataException("Missing Deck Edit component " + instance + ".");
             Bind(MainMenuSprite(component, "View"), layer, region, true);
+        }
+    }
+
+    public void BindRecipes(RenderTarget2D layer)
+    {
+        var root = roots["OriginalRecipeViewer"];
+        Bind(MainMenuSprite(root, "Layer"), layer, new Rectangle(0, 0, 480, 272), true);
+        foreach (var (instance, region) in new (string, Rectangle)[] {
+            ("Info", new(0, 0, 147, 272)), ("List", new(147, 36, 148, 236)),
+            ("Tabs", new(147, 18, 148, 18)), ("Counts", new(296, 0, 184, 272)) })
+        {
+            var component = root.GetGraphicalUiElementByName(instance)!;
+            var view = MainMenuSprite(component, "View");
+            view.Width = region.Width; view.Height = region.Height;
+            Bind(view, layer, region, true);
         }
     }
 

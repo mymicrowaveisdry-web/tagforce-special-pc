@@ -13,7 +13,7 @@ public sealed partial class GameLoop
     // Every observed Continue/New Game branch, in PC keys: Enter = confirm, Escape = back, F1 = Start.
     // Built on first use, after setup: Deck Edit is only reachable when the data root holds a card cache.
     private (Keys? Key, string Expected)[]? presentationSteps;
-    private (Keys? Key, string Expected)[] PresentationSteps => presentationSteps ??= BuildPresentationSteps(setup?.Cache is not null);
+    private (Keys? Key, string Expected)[] PresentationSteps => presentationSteps ??= BuildPresentationSteps(setup?.Cache is not null, options.RecipeReferenceRoot is not null);
     private readonly Dictionary<int, string> presentationHashes = [];
     private byte[]? presentationPixels;
     private int? presentationTextureCount;
@@ -21,7 +21,7 @@ public sealed partial class GameLoop
     private PspInputFrame presentationInput;
     private int presentationInputFrame = -1;
 
-    private static (Keys?, string)[] BuildPresentationSteps(bool deckEdit)
+    private static (Keys?, string)[] BuildPresentationSteps(bool deckEdit, bool recipes)
     {
         var steps = new List<(Keys?, string)> { (null, "title") };
         void Press(Keys key, string expected, string? settled = null)
@@ -61,7 +61,7 @@ public sealed partial class GameLoop
         {
             Press(Keys.Up, $"MainMenu/0/{row}");
             if (MainMenuDestinations.All[row].Route == MainMenuRoute.Options) { OptionsRoute(Press); continue; }
-            if (MainMenuDestinations.All[row].Route == MainMenuRoute.DeckMenu) { DeckMenuRoute(Press, Hold, row, deckEdit); continue; }
+            if (MainMenuDestinations.All[row].Route == MainMenuRoute.DeckMenu) { DeckMenuRoute(Press, Hold, row, deckEdit, recipes); continue; }
             Press(Keys.Enter, $"MainMenuUnavailable/0/{row}"); Press(Keys.Escape, $"MainMenu/0/{row}");
             Press(Keys.Enter, $"MainMenuUnavailable/0/{row}"); Press(Keys.Enter, $"MainMenu/0/{row}");
         }
@@ -115,7 +115,7 @@ public sealed partial class GameLoop
 
     /// <summary>Deck Menu over the dimmed Main Menu: every row, press wrap both ways, ignored buttons, each destination's PC notice with
     /// both exits keeping focus, back to the menu row, focus reset on reopening, and hold-to-clamp both ways.</summary>
-    private static void DeckMenuRoute(Action<Keys, string, string?> press, Action<Keys, int, string> hold, int menuRow, bool deckEdit)
+    private static void DeckMenuRoute(Action<Keys, string, string?> press, Action<Keys, int, string> hold, int menuRow, bool deckEdit, bool recipes)
     {
         void Press(Keys key, string expected) => press(key, expected, null);
         string Open(int focus) => $"DeckMenu/L/{focus}/{menuRow}";
@@ -126,6 +126,7 @@ public sealed partial class GameLoop
         {
             if (focus < DeckMenuDestinations.All.Count - 1) Press(Keys.Up, Open(focus));
             if (focus == 0 && deckEdit) { DeckEditRoute(Press, menuRow); continue; }
+            if (focus == 2 && recipes) { RecipeRoute(Press, menuRow); continue; }
             Press(Keys.Enter, $"DeckMenu/N/{focus}/{menuRow}"); Press(Keys.Escape, Open(focus));
             Press(Keys.Enter, $"DeckMenu/N/{focus}/{menuRow}"); Press(Keys.Enter, Open(focus));
         }
@@ -138,6 +139,28 @@ public sealed partial class GameLoop
 
     /// <summary>Deck Edit core screen from the Deck Menu: cursor and wrap, every tab, a move both ways, a cancelled move, the exit question
     /// both ways and the save question answered NO, back on the submenu. Counts depend on the built-in deck, so states are matched by prefix.</summary>
+    private static void RecipeRoute(Action<Keys, string> press, int menuRow)
+    {
+        press(Keys.Enter, "Recipe/User/0/None/Id/False");
+        press(Keys.Down, "Recipe/User/1/None/Id/False");
+        press(Keys.Enter, "Recipe/User/1/Manage/Id/False");
+        press(Keys.Escape, "Recipe/User/1/None/Id/False");
+        press(Keys.Tab, "Recipe/User/1/Sort/Id/False");
+        press(Keys.Down, "Recipe/User/1/Sort/Id/False");
+        press(Keys.Enter, "Recipe/User/0/None/Name/False");
+        press(Keys.Tab, "Recipe/User/0/Sort/Name/False");
+        press(Keys.Right, "Recipe/User/0/Sort/Name/False");
+        press(Keys.Down, "Recipe/User/0/Sort/Name/False");
+        press(Keys.Enter, "Recipe/User/0/None/Name/True");
+        press(Keys.Space, "Recipe/Character/0/None/Name/True");
+        press(Keys.Enter, "Recipe/Character/0/None/Name/True");
+        press(Keys.Down, "Recipe/Character/1/None/Name/True");
+        press(Keys.Down, "Recipe/Character/2/None/Name/True");
+        press(Keys.Up, "Recipe/Character/1/None/Name/True");
+        press(Keys.Space, "Recipe/User/0/None/Name/True");
+        press(Keys.Escape, $"DeckMenu/L/2/{menuRow}");
+    }
+
     private static void DeckEditRoute(Action<Keys, string> press, int menuRow)
     {
         // The built-in deck uses most supported cards, so cursor and wrap are exercised on the 40-card Deck tab.
@@ -177,6 +200,8 @@ public sealed partial class GameLoop
         ScreenId.TitleStartMenu => "start:" + titleState.Choice,
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.Options, Options: { } session } =>
             $"Options/{(session.CancelQuestion ? "Q" + session.CancelFocus : "L")}/{session.Focus}/{session.Values[session.Focus]}",
+        ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.RecipeViewer, Recipes: { } recipes } =>
+            $"Recipe/{recipes.Kind}/{recipes.Cursor}/{recipes.Modal}/{recipes.Sort}/{recipes.Inverse}",
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.DeckEdit, DeckEdit: { } edit } =>
             $"DeckEdit/{edit.Tab}/{edit.Cursor}/{edit.Prompt}/{edit.PromptFocus}/{edit.Count(DeckEditTab.Deck)}/{edit.Count(DeckEditTab.Trunk)}",
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.DeckMenu, DeckMenu: { } deck } flow =>
@@ -195,7 +220,7 @@ public sealed partial class GameLoop
             throw new InvalidOperationException($"Presentation route/focus mismatch at frame {frames}, step {step}: expected {expected}, got {label}.");
         if (duel is not null || smokeCommands != 0 || router!.ModalDepth != 0)
             throw new InvalidOperationException("Presentation navigation changed gameplay or modal ownership.");
-        if (gum.RootCount != 9 || gum.AttachedRootCount != 9 || originalTitle?.Layers.Count != 11)
+        if (gum.RootCount != 10 || gum.AttachedRootCount != 10 || originalTitle?.Layers.Count != 11)
             throw new InvalidOperationException("Presentation root/layer count changed.");
         presentationTextureCount ??= gum.CachedTextureCount;
         if (gum.CachedTextureCount != presentationTextureCount)
@@ -212,7 +237,11 @@ public sealed partial class GameLoop
         if (frames < PresentationSteps.Length)
         {
             presentationTrace.Add(new { frame = frames, pressed = presentationInput.Pressed.ToString(), held = presentationInput.Held.ToString(),
-                screen = router.CurrentScreenId, state = label, rgbaSha256 = hash, gameplayCommands = smokeCommands });
+                screen = router.CurrentScreenId, state = label, rgbaSha256 = hash, gameplayCommands = smokeCommands,
+                recipe = titleFlow?.Recipes?.Focused is { } r ? new { kind = r.Kind.ToString(), slot = r.Slot, name = r.Name,
+                    main = r.Main.Length, extra = r.Extra.Length, side = r.Side.Length, firstMain = r.Main.FirstOrDefault(),
+                    recordSha256 = r.RecordSha256, verification = "unverified" } : null,
+                returnedRecipe = lastRecipeSelection });
             if (asserted && options.FlowCaptureRoot is { } root) CaptureFlowFrame(root, label);
         }
         if (frames + 1 == SmokeCycles * PresentationSteps.Length)

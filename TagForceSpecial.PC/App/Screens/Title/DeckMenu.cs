@@ -60,9 +60,9 @@ public static class DeckMenuDestinations
         new("partner-deck-edit", "Partner Deck Edit", MainMenuDestinations.SurfaceOnly,
             "Partner selection, grouped by series tabs (DM, GX, 5D's, ZEXAL, ARC-V)",
             "Back returns here with Partner Deck Edit focused", "not scheduled", NotBuilt),
-        new("recipe-viewer", "Recipe Viewer", MainMenuDestinations.SurfaceOnly,
+        new("recipe-viewer", "Recipe Viewer", "read-only source recipes; returned deck selection unverified",
             "Recipe Viewer with User and Character tabs and numbered recipe slots",
-            "Back asks whether to save; NO or back returns here with Recipe Viewer focused", "Phase 6, section 10.3", NotBuilt)
+            "An unchanged viewer returns here with Recipe Viewer focused; recipe changes can ask to save", "Phase 6, section 10.3", "Recipe data has not been imported for this game source.")
     });
 }
 
@@ -90,6 +90,7 @@ public sealed class DeckMenuSession(DeckMenuProfile profile)
     public DeckMenuDestination Focused => DeckMenuDestinations.All[Focus];
     /// <summary>Closes the PC notice without input, when a recreated destination opens instead.</summary>
     public void CloseNotice() => NoticeOpen = false;
+    public void SetFocus(int row) => Focus = row >= 0 && row < Rows ? row : throw new ArgumentOutOfRangeException(nameof(row));
 
     public void Update(TimeSpan delta)
     {

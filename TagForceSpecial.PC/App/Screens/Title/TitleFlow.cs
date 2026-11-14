@@ -9,7 +9,7 @@ public enum TitleFlowStep
     RulesQuestion, ConfidenceQuestion, DuelistLevel, CreateQuestion, SystemSavePrompt, SystemSaveDone,
     MainMenu, MainMenuUnavailable, QuitQuestion, ExitToTitle,
     Options, OptionsSaveQuestion,
-    DeckMenu, DeckEdit
+    DeckMenu, DeckEdit, RecipeViewer
 }
 
 public enum DuelistLevelChoice { FirstTimer, BeenThere, BringItOn }
@@ -29,6 +29,8 @@ public interface ITitleFlowHost
     DeckEditSession? OpenDeckEdit() => null;
     /// <summary>Saves the session's deck as a new native revision (Deck Edit's YES to "Save all contents acquired so far?").</summary>
     void SaveDeckEdit(DeckEditSession session) { }
+    RecipeViewerSession? OpenRecipeViewer() => null;
+    void CloseRecipeViewer(RecipeSelection? selection) { }
 }
 
 /// <summary>Observed Continue/New Game routes (config/reference/title-flow.json) and Main Menu/Options/Deck Menu routes (main-menu.json,
@@ -39,6 +41,8 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
     private readonly DeckMenuProfile deckMenuProfile = deckMenuProfile ?? DeckMenuProfile.LoadEmbedded();
     private TimeSpan? sinceSubmenuClosed;
     private DeckEditSession? pendingDeckEdit;
+    private RecipeViewerSession? pendingRecipes;
+    private int returnDeckMenuFocus;
     private bool deckMenuSettled;
     public const int NameLimit = 8;
     /// <summary>Measured from the first panel appearing to black. The original shows two panels here; the PC shows only the first.</summary>
@@ -75,6 +79,7 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
     public DeckMenuProfile DeckMenuProfile => deckMenuProfile;
     /// <summary>The Deck Edit core screen while <see cref="TitleFlowStep.DeckEdit"/> is active.</summary>
     public DeckEditSession? DeckEdit { get; private set; }
+    public RecipeViewerSession? Recipes { get; private set; }
     /// <summary>Measured: the Main Menu is dimmed, without focus, for as long as the submenu is drawn, including its close frames.</summary>
     public bool MainMenuDimmed => Step == TitleFlowStep.DeckMenu;
     /// <summary>Game frames since the Main Menu focus reappeared after the submenu closed; measured, its pulse restarts there.
@@ -164,6 +169,16 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
         if (Step == TitleFlowStep.Options) { HandleOptions(input); return; }
         if (Step == TitleFlowStep.DeckMenu) { HandleDeckMenu(input); return; }
         if (Step == TitleFlowStep.DeckEdit) { HandleDeckEdit(input); return; }
+        if (Step == TitleFlowStep.RecipeViewer)
+        {
+            if (Recipes!.Handle(input))
+            {
+                host.CloseRecipeViewer(Recipes.Selection);
+                deckMenuSettled = true; returnDeckMenuFocus = 2;
+                EnterFaded(TitleFlowStep.DeckMenu, keepMenuFocus: true, lead: 0);
+            }
+            return;
+        }
         if (ButtonCount == 2 && (input.IsPressed(PspAction.Left) || input.IsPressed(PspAction.Right))) ButtonFocus = 1 - ButtonFocus;
         if (input.IsPressed(PspAction.Cross)) Confirm();
         else if (input.IsPressed(PspAction.Circle)) Back();
@@ -207,6 +222,11 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
             DeckMenu.CloseNotice();
             pendingDeckEdit = session;
             EnterFaded(TitleFlowStep.DeckEdit, keepMenuFocus: true, lead: 0);
+        }
+        else if (outcome == DeckMenuOutcome.Notice && DeckMenu.Focused.Id == "recipe-viewer" && host.OpenRecipeViewer() is { } recipes)
+        {
+            DeckMenu.CloseNotice(); pendingRecipes = recipes;
+            EnterFaded(TitleFlowStep.RecipeViewer, keepMenuFocus: true, lead: 0);
         }
     }
 
@@ -357,9 +377,13 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
         // Observed: every opening starts on Deck Edit with its fade-in; exact runs show the settled submenu.
         DeckMenu = next == TitleFlowStep.DeckMenu ? new DeckMenuSession(deckMenuProfile) : null;
         if (DeckMenu is not null && (instantTransitions || deckMenuSettled)) DeckMenu.SkipTo(deckMenuProfile.ReadyFrame);
+        if (DeckMenu is not null) DeckMenu.SetFocus(returnDeckMenuFocus);
+        returnDeckMenuFocus = 0;
         deckMenuSettled = false;
         DeckEdit = next == TitleFlowStep.DeckEdit ? pendingDeckEdit : null;
         pendingDeckEdit = null;
+        Recipes = next == TitleFlowStep.RecipeViewer ? pendingRecipes : null;
+        pendingRecipes = null;
         sinceSubmenuClosed = null;
     }
 

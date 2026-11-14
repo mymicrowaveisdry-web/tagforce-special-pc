@@ -5,7 +5,7 @@ public sealed record HostOptions(string? CachePath = null, bool PixelExact = fal
     string? DataRoot = null, string? SetupSource = null, string? EditorCapture = null, bool SeedSpecified = false,
     bool AssetDiagnostics = false, string DiagnosticScreen = "title", string? AssetPreview = null, bool PresentationSmoke = false,
     string? PresentationTracePath = null, string? TitleLayerCaptureRoot = null, string? PspFontPath = null, string? FlowCaptureRoot = null,
-    IReadOnlyDictionary<int, int>? MainMenuFrameByRow = null, int? MainMenuEntryFrame = null, string? RealtimeWalkRoot = null, int? DeckMenuFrame = null)
+    IReadOnlyDictionary<int, int>? MainMenuFrameByRow = null, int? MainMenuEntryFrame = null, string? RealtimeWalkRoot = null, int? DeckMenuFrame = null, string? RecipeReferenceRoot = null)
 {
     /// <summary>Pixel-exact game frame per focused Main Menu row, for same-instant comparisons with GE dumps.</summary>
     public IReadOnlyDictionary<int, int> MainMenuFrames => MainMenuFrameByRow ?? new Dictionary<int, int>();
@@ -20,13 +20,14 @@ public sealed record HostOptions(string? CachePath = null, bool PixelExact = fal
         string? assetPreview = null, presentationTrace = null, titleLayers = null, pspFont = null, flowCapture = null;
         Dictionary<int, int>? menuFrames = null;
         int? menuEntryFrame = null, deckMenuFrame = null;
-        string? realtimeWalk = null;
+        string? realtimeWalk = null, recipeReference = null;
         bool seedSpecified = false;
         bool pixel = false, smoke = false, assetDiagnostics = false, presentationSmoke = false;
         for (int i = 0; i < args.Length; i++)
         {
             switch (args[i])
             {
+                case "--recipe-reference" when i + 1 < args.Length: recipeReference = Path.GetFullPath(args[++i]); break;
                 case "--cache" when i + 1 < args.Length: cache = Path.GetFullPath(args[++i]); break;
                 case "--capture" when i + 1 < args.Length: capture = Path.GetFullPath(args[++i]); break;
                 case "--pixel-exact": pixel = true; break;
@@ -62,7 +63,7 @@ public sealed record HostOptions(string? CachePath = null, bool PixelExact = fal
                 case "--data-root" when i + 1 < args.Length: dataRoot = Path.GetFullPath(args[++i]); break;
                 case "--setup-smoke" when i + 1 < args.Length: setupSource = Path.GetFullPath(args[++i]); break;
                 case "--capture-editor" when i + 1 < args.Length: editorCapture = Path.GetFullPath(args[++i]); break;
-                default: throw new ArgumentException("Usage: PC [--cache <cache>] [--pixel-exact] [--capture <new.png>] [--smoke] [--deck <0|1|2>] [--seed <uint>] [--replay <new.json>] [--capture-result <new.png>] [--asset-diagnostics] [--asset-screen <screen>] [--data-root <private-root>]");
+                default: throw new ArgumentException("Usage: PC [--cache <cache>] [--pixel-exact] [--capture <new.png>] [--smoke] [--deck <0|1|2>] [--seed <uint>] [--replay <new.json>] [--capture-result <new.png>] [--asset-diagnostics] [--asset-screen <screen>] [--data-root <private-root>] [--recipe-reference <private-root>]");
             }
         }
         if (setupSource is not null && !smoke) throw new ArgumentException("--setup-smoke requires --smoke.");
@@ -77,6 +78,6 @@ public sealed record HostOptions(string? CachePath = null, bool PixelExact = fal
         if (presentationTrace is not null && !presentationSmoke) throw new ArgumentException("--presentation-trace requires --presentation-smoke.");
         if (titleLayers is not null && (capture is null || presentationSmoke || smoke || assetDiagnostics))
             throw new ArgumentException("--capture-title-layers requires a title --capture launch.");
-        return new(cache, pixel, capture, smoke, seed, replay, resultCapture, deckVariant, dataRoot, setupSource, editorCapture, seedSpecified, assetDiagnostics, diagnosticScreen, assetPreview, presentationSmoke, presentationTrace, titleLayers, pspFont, flowCapture, menuFrames, menuEntryFrame, realtimeWalk, deckMenuFrame);
+        return new(cache, pixel, capture, smoke, seed, replay, resultCapture, deckVariant, dataRoot, setupSource, editorCapture, seedSpecified, assetDiagnostics, diagnosticScreen, assetPreview, presentationSmoke, presentationTrace, titleLayers, pspFont, flowCapture, menuFrames, menuEntryFrame, realtimeWalk, deckMenuFrame, recipeReference);
     }
 }

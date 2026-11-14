@@ -19,6 +19,9 @@ public sealed partial class GameLoop
     private string? renderedFlowKey;
     private int renderedMenuFrame = -1, renderedOptionsFrame = -1;
     private string? renderedDeckEditKey;
+    private int renderedRecipeRevision = -1;
+    private RecipeViewerSession? renderedRecipeSession;
+    private RecipeSelection? lastRecipeSelection;
     private readonly ScreenFade screenFade = new();
 
     /// <summary>The flow is presented only when every source texture and text reference validates.</summary>
@@ -195,6 +198,18 @@ public sealed partial class GameLoop
         gum.Show("OriginalMainMenu", menu);
         gum.Show("OriginalDeckMenu", titleFlow.DeckMenu is not null);
         gum.Show("OriginalDeckEdit", false);
+        gum.Show("OriginalRecipeViewer", false);
+        if (titleFlow.Step == TitleFlowStep.RecipeViewer && titleFlow.Recipes is { } recipes && setup?.Cache is { } recipeCache)
+        {
+            if (!ReferenceEquals(renderedRecipeSession, recipes) || renderedRecipeRevision != recipes.Revision)
+            {
+                flowVisuals.RenderRecipes(recipes, recipeCache.Catalog.Catalog);
+                gum.BindRecipes(flowVisuals.RecipeLayer!);
+                renderedRecipeSession = recipes; renderedRecipeRevision = recipes.Revision;
+            }
+            gum.Show("OriginalRecipeViewer", true);
+            return;
+        }
         if (titleFlow.Step == TitleFlowStep.DeckEdit && titleFlow.DeckEdit is { } edit) { RefreshDeckEdit(titleFlow, flowVisuals, edit); return; }
         gum.Show("OriginalOptions", optionsScreen);
         string? frame = FrameFor(titleFlow.Step);
@@ -289,6 +304,18 @@ public sealed partial class GameLoop
             else { owner.EnsureDraft(); draft = owner.draft!; }
             return new DeckEditSession(draft, PlayablePreview.Cards.Select(c => catalog[c.CardId]), owner.flowVisuals.DeckEditProfile.VisibleRows);
         }
+        public RecipeViewerSession? OpenRecipeViewer()
+        {
+            if (owner.setup?.Cache?.Catalog.Catalog is not { } catalog) return null;
+            try
+            {
+                var storage = owner.options.RecipeReferenceRoot is { } path ? new PrivateStorage(path) : owner.setup.Storage;
+                return Recipes.RecipeCatalog.Open(storage, catalog) is { } source ? new RecipeViewerSession(source) : null;
+            }
+            catch (Exception e) when (SetupStore.Recoverable(e))
+            { Console.Error.WriteLine("RECIPE_SOURCE_PENDING " + e.Message); return null; }
+        }
+        public void CloseRecipeViewer(RecipeSelection? selection) => owner.lastRecipeSelection = selection;
         public void SaveDeckEdit(DeckEditSession session)
         {
             if (!owner.options.PresentationSmoke && ReferenceEquals(session.Draft, owner.draft)) owner.SaveDraft();
@@ -340,6 +367,7 @@ public sealed partial class GameLoop
             owner.gum.Show("OriginalMainMenu", false);
             owner.gum.Show("OriginalDeckMenu", false);
             owner.gum.Show("OriginalDeckEdit", false);
+            owner.gum.Show("OriginalRecipeViewer", false);
             owner.renderedMenuFrame = -1;
         }
     }

@@ -137,7 +137,7 @@ public class DeckMenuTests
         Assert.All(DeckMenuDestinations.All, d =>
         {
             // Deck Edit's core screen is recreated (Phase 6.2a); the other two remain surface only.
-            Assert.Equal(d.Id == "deck-edit" ? DeckMenuDestinations.DeckEditCore : MainMenuDestinations.SurfaceOnly, d.Status);
+            Assert.Equal(d.Id switch { "deck-edit" => DeckMenuDestinations.DeckEditCore, "recipe-viewer" => "read-only source recipes; returned deck selection unverified", _ => MainMenuDestinations.SurfaceOnly }, d.Status);
             Assert.False(string.IsNullOrWhiteSpace(d.Notice));
             Assert.False(string.IsNullOrWhiteSpace(d.OriginalBehavior));
             Assert.False(string.IsNullOrWhiteSpace(d.OriginalReturn));
