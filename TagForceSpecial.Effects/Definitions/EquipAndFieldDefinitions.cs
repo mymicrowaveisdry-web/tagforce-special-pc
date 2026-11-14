@@ -11,6 +11,11 @@ public static class EquipAndFieldDefinitions
     /// <summary>The cards, with effect IDs from the registering family's table.</summary>
     public static AuthoredCard[] Cards(CardTable t) =>
     [
+        t.Continuous(5161, "Yellow Luster Shield", trap: false, new LastingStatModifier(TargetSide.Own, 0, 300)),
+        t.Field(4899, "Chorus of Sanctuary", new LastingStatModifier(TargetSide.Either, 0, 500, new NotFilter(new FaceUpAttackFilter()))),
+        t.Field(7457, "Acidic Downpour", new LastingStatModifier(TargetSide.Either, -500, 400, OfAttribute(Earth))),
+        t.Field(7627, "Wetlands", new LastingStatModifier(TargetSide.Either, 1200, 0, new AllOfFilter(OfType(Aqua), OfAttribute(Water), new MonsterLevelFilter(2)))),
+        t.Field(4337, "Wasteland", new LastingStatModifier(TargetSide.Either, 200, 200, OfType(Dinosaur, Zombie, Rock))),
         t.AttributeEquip(4308, "Sword of Dark Destruction", Dark),
         t.AttributeEquip(4330, "Invigoration", Earth),
         t.AttributeEquip(4313, "Elf's Light", Light),
