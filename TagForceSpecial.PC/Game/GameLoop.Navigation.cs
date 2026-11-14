@@ -96,7 +96,10 @@ public sealed partial class GameLoop
             (originalTitle ?? throw new InvalidOperationException("Title layer capture requires a validated title generation.")).ExportReviewLayers(layerRoot);
         // Missing presentation data opens the setup wizard.
         if (activeScreen == ScreenId.Title && originalTitle is null) utilityReturn = ScreenId.Title;
-        router.GoTo(ScreenName(activeScreen == ScreenId.Title && originalTitle is null ? ScreenId.Setup : activeScreen));
+        var initial = options.OpenImporterOnLaunch ? ScreenId.Setup :
+            activeScreen == ScreenId.Title && originalTitle is null ? ScreenId.Setup : activeScreen;
+        if (options.OpenImporterOnLaunch) menuIndex = setup?.Preferences.ActiveGeneration is null ? 1 : 0;
+        router.GoTo(ScreenName(initial));
     }
     private void TryActivateImportedTitle()
     {

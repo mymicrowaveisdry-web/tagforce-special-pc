@@ -310,7 +310,9 @@ public sealed partial class GameLoop
             try
             {
                 var storage = owner.options.RecipeReferenceRoot is { } path ? new PrivateStorage(path) : owner.setup.Storage;
-                return Recipes.RecipeCatalog.Open(storage, catalog) is { } source ? new RecipeViewerSession(source) : null;
+                var source = owner.options.RecipeReferenceRoot is not null ? Recipes.RecipeCatalog.Open(storage, catalog) :
+                    new Recipes.RecipeLibraryStore(storage).OpenActive(catalog);
+                return source is null ? null : new RecipeViewerSession(source);
             }
             catch (Exception e) when (SetupStore.Recoverable(e))
             { Console.Error.WriteLine("RECIPE_SOURCE_PENDING " + e.Message); return null; }

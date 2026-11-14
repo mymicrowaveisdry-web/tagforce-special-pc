@@ -151,6 +151,7 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
         DrawFlowOverlay();
         DrawTransitionOverlay();
         if (options.PresentationSmoke) CheckPresentationSmokeFrame();
+        if (options.SetupFlowSmokeRoot is not null) CheckSetupFlowFrame();
         if (options.RealtimeWalkRoot is not null) CheckRealtimeWalkFrame(gameTime);
         GraphicsDevice.SetRenderTarget(null);
         GraphicsDevice.Clear(Color.Black);

@@ -21,11 +21,13 @@ public sealed partial class GameLoop
     private ImportProgress progress = new(0, "Select your original ISO to begin");
     private int cardIndex, editorMenuIndex, setupSmokeStage, editorFrame;
     private bool editorMenu;
+    private string? setupSuccessMessage;
+    private bool CanContinueToGame => setupTask is null && setup?.Cache is not null && originalTitle is not null;
     private string? editingText;
     private bool editingName;
     private string editorNotice = "Right: add  Left: remove  Tab: section  Enter: menu";
     private string preferencesNotice = "Changes are saved locally.";
-    private static readonly string[] SetupActions = ["SELECT ORIGINAL ISO", "RESUME IMPORT", "VERIFY CURRENT CACHE", "REBUILD FROM ORIGINAL ISO", "RESTART INTERRUPTED WORK", "PREFERENCES", "RESTORE SETTINGS BACKUP", "RESOURCE STATUS", "PC DUEL TOOLS"];
+    private static readonly string[] SetupActions = ["CONTINUE TO GAME", "SELECT ORIGINAL ISO", "IMPORT RECIPE LIBRARY", "RESUME IMPORT", "VERIFY CURRENT CACHE", "REBUILD FROM ORIGINAL ISO", "RESTART INTERRUPTED WORK", "PREFERENCES", "RESTORE SETTINGS BACKUP", "RESOURCE STATUS", "PC DUEL TOOLS"];
     private static readonly string[] EditorActions = ["SAVE NEW REVISION", "NAME DECK", "SEARCH CARDS", "CHANGE FILTER", "LOAD SAVED REVISION", "NEW EMPTY DECK", "INITIAL SUPPORTED DECK", "PLAY THIS DECK", "BACK"];
 
     private void InitializeSetup()
@@ -53,6 +55,7 @@ public sealed partial class GameLoop
         if (setup is null || setupTask is { IsCompleted: false }) return;
         importCancellation?.Dispose(); importCancellation = new();
         var token = importCancellation.Token;
+        setupSuccessMessage = null;
         progress = new(0, "Checking original image"); setupMessage = "Importing local game data";
         setupTask = Task.Run(() => setup.Import(source, new QueuedProgress(importProgress), token));
         screen = ScreenId.Setup;
@@ -66,7 +69,7 @@ public sealed partial class GameLoop
         try
         {
             var result = setupTask.GetAwaiter().GetResult();
-            setupMessage = result.Success ? "Local game data is ready. Open Decks to prepare and play." : result.Issue!.Message;
+            setupMessage = result.Success ? setupSuccessMessage ?? "Local game data is ready. Choose Continue to Game." : result.Issue!.Message;
             if (result.Success)
             {
                 if (setup?.PresentationNotice is { } notice) setupMessage = notice;
@@ -74,7 +77,28 @@ public sealed partial class GameLoop
             }
         }
         catch (Exception e) when (SetupStore.Recoverable(e)) { setupMessage = "Setup could not finish. Retry or select your ISO again."; }
-        setupTask = null;
+        setupTask = null; setupSuccessMessage = null;
+    }
+    private void ContinueToGame()
+    {
+        if (!CanContinueToGame) { setupMessage = "Import or verify your game data before continuing."; return; }
+        screen = ScreenId.Title;
+    }
+    private void BeginRecipeImport(string file)
+    {
+        if (setup?.Cache is not { } cache || setupTask is not null)
+        { setupMessage = "Import or verify game data before importing a recipe library."; return; }
+        importCancellation?.Dispose(); importCancellation = new();
+        var token = importCancellation.Token;
+        setupSuccessMessage = "Recipe library imported. Continue to Game to open Recipe Viewer.";
+        setupMessage = "Importing recipe library"; progress = new(0, "Copying and checking recipe data");
+        setupTask = Task.Run(() =>
+        {
+            try { _ = new Recipes.RecipeLibraryStore(setup.Storage).Import(file, cache.Catalog.Catalog, token, new QueuedProgress(importProgress)); return new SetupResult(true); }
+            catch (OperationCanceledException) { return new SetupResult(false, new("RecipeImportCanceled", "Recipe import canceled; the previous library is unchanged.")); }
+            catch (Exception e) when (SetupStore.Recoverable(e))
+            { Console.Error.WriteLine("RECIPE_IMPORT_FAILED " + e.Message); return new SetupResult(false, new("RecipeImportFailed", "Recipe import failed. Select a prepared recipes/viewer.json library.")); }
+        });
     }
     private void OpenEditor()
     {
@@ -116,25 +140,37 @@ public sealed partial class GameLoop
     {
         if (setupTask is not null)
         { if (buttons.Back) { importCancellation?.Cancel(); setupMessage = "Stopping safely..."; } return; }
-        if (buttons.Back) { screen = utilityReturn; return; }
+        if (buttons.Back)
+        {
+            if (utilityReturn == ScreenId.Title) ContinueToGame();
+            else screen = utilityReturn;
+            return;
+        }
         MoveMenu(buttons, SetupActions.Length);
         if (!buttons.Confirm || setup is null) return;
         try
         {
             switch (menuIndex)
             {
-                case 0: case 3:
+                case 0: ContinueToGame(); break;
+                case 1: case 5:
                     string? file = WindowsFilePicker.ChooseIso(); if (file is not null) BeginImport(file); break;
-                case 1:
+                case 2:
+                    if (setup.Cache is null) { setupMessage = "Import or verify game data before importing recipes."; break; }
+                    string? recipes = options.SetupFlowSmokeRoot is not null && options.RecipeReferenceRoot is { } reference
+                        ? Path.Combine(reference, "recipes", "viewer.json") : WindowsFilePicker.ChooseRecipeLibrary();
+                    if (recipes is not null) BeginRecipeImport(recipes);
+                    break;
+                case 3:
                     if (setup.ResumeSource() is { } source) BeginImport(source);
                     else setupMessage = "No previous source is available. Select your original ISO.";
                     break;
-                case 2: setupTask = Task.Run(setup.ValidateActive); setupMessage = "Checking local game data"; break;
-                case 4: setup.RestartWork(); setupMessage = "Interrupted work retained separately. Select your ISO or resume to restart."; break;
-                case 5: screen = ScreenId.Preferences; menuIndex = 0; break;
-                case 6: setupMessage = setup.RestorePreferences().Issue?.Message ?? "Previous preferences restored."; draft = null; break;
-                case 7: OpenAssetDiagnostics(); break;
-                case 8: screen = ScreenId.PcTools; break;
+                case 4: setupTask = Task.Run(setup.ValidateActive); setupMessage = "Checking local game data"; break;
+                case 6: setup.RestartWork(); setupMessage = "Interrupted work retained separately. Select your ISO or resume to restart."; break;
+                case 7: screen = ScreenId.Preferences; menuIndex = 0; break;
+                case 8: setupMessage = setup.RestorePreferences().Issue?.Message ?? "Previous preferences restored."; draft = null; break;
+                case 9: OpenAssetDiagnostics(); break;
+                case 10: screen = ScreenId.PcTools; break;
             }
         }
         catch (Exception e) when (SetupStore.Recoverable(e)) { setupMessage = "The operation could not finish. Check local storage and retry."; }
@@ -227,7 +263,8 @@ public sealed partial class GameLoop
         }
         else
             for (int i = 0; i < SetupActions.Length; i++)
-                renderer.Text((menuIndex == i ? "> " : "  ") + SetupActions[i], 12, 82 + i * 19, menuIndex == i ? gold : Color.White);
+                renderer.Text((menuIndex == i ? "> " : "  ") + SetupActions[i] + (i == 0 && !CanContinueToGame ? " (IMPORT REQUIRED)" : ""),
+                    12, 77 + i * 15, i == 0 && !CanContinueToGame ? muted : menuIndex == i ? gold : Color.White);
         renderer.Text("ESC/B: BACK   ORIGINALS READ-ONLY. ASSETS LOCAL.", 12, 251, muted);
     }
     private void DrawEditor()
