@@ -22,84 +22,37 @@ public sealed partial class DuelEngine
     private bool HasFieldLinks => fieldLinks ??= rules.Values.Any(r => r.IsToon) || allEffects.Any(d => d.Kind == EffectKind.EquipSpell ||
         d.Steps.Any(s => s is UnionEquipStep || s is SpecialSummonTargetStep { Link: RevivalLink.Haunted or RevivalLink.Equip }));
 
-    internal bool IsToonCard(uint cardId) => rules.TryGetValue(cardId, out var rule) && rule.IsToon;
-
-    /// <summary>The materials a monster's activated effect detaches as its cost; 0 when it has no such cost.</summary>
-    internal int DetachCostFor(uint cardId, int effectIndex = 0) => EffectAt(cardId, effectIndex, out var d) && d.Cost is DetachCost detach ? detach.Count : 0;
+    internal bool IsToonCard(uint cardId) => actionEffects.IsToonCard(cardId);
+    internal int DetachCostFor(uint cardId, int effectIndex = 0) => actionEffects.DetachCostFor(cardId, effectIndex);
 
     private static IEnumerable<(PlayerId Player, int Zone, FieldSpellTrap Field)> ActiveCards(DuelState state) =>
-        state.Players.SelectMany(p => Enumerable.Range(0, DuelPlayerState.FieldZoneIndex + 1).Select(zone => (Player: p.Id, Zone: zone, Field: p.SpellTrapAt(zone))))
-            .Where(e => e.Field is { IsFaceUp: true, EffectActive: true }).Select(e => (e.Player, e.Zone, e.Field!));
+        LastingEffectQueries.ActiveCards(state);
 
-    private bool IsSpellsNegated(DuelState state) => HasSpellNegators && ActiveCards(state)
-        .Any(e => definitions.TryGetValue(e.Field.Card.GameCardId, out var d) && d.Negation == LastingNegation.Spells);
+    private bool IsSpellsNegated(DuelState state) => LastingEffectQueries.IsSpellsNegated(state, definitions, HasSpellNegators);
 
-    private bool IsSpellCard(FieldSpellTrap field) => field.IsUnion || rules[field.Card.GameCardId].Category == CardCategory.Spell;
+    private bool IsSpellCard(FieldSpellTrap field) => LastingEffectQueries.IsSpellCard(field, rules);
 
     /// <summary>Adds the stat changes of every active lasting card and of counters, in player and zone order.</summary>
-    private void AddLastingModifiers(DuelState state, (MonsterBinding Binding, FieldMonster Monster)[] monsters, IReadOnlyList<MonsterBinding> negated, List<StatModifier> result)
-    {
-        bool spellsNegated = IsSpellsNegated(state);
-        foreach (var (player, zone, field) in ActiveCards(state))
-        {
-            if (spellsNegated && IsSpellCard(field) || !definitions.TryGetValue(field.Card.GameCardId, out var definition)) continue;
-            foreach (var lasting in definition.LastingModifiers)
-            {
-                int multiplier = LastingMultiplier(state, player, lasting.PerCount, lasting.CountFilter);
-                foreach (var (target, monster) in monsters)
-                    if (lasting.EquippedOnly ? target == field.EquippedTo
-                        : (lasting.Side == TargetSide.Either || lasting.Side == TargetSide.Own == (target.Player == player)) &&
-                          (lasting.Filter is null || MatchesFilter(monster.Card, lasting.Filter)))
-                        result.Add(new(definition.EffectId, null, target, checked(lasting.Attack * multiplier), checked(lasting.Defense * multiplier),
-                            SpellTrapSource: new(player, zone, field.Card, field.PlacementId)));
-            }
-        }
-        foreach (var (target, monster) in monsters)
-            if (monster.Counters > 0 && definitions.TryGetValue(monster.Card.GameCardId, out var definition) && definition.AttackPerCounter != 0 && !negated.Contains(target))
-                result.Add(new(definition.EffectId, target, target, checked(definition.AttackPerCounter * monster.Counters), 0));
-    }
+    private void AddLastingModifiers(DuelState state, (MonsterBinding Binding, FieldMonster Monster)[] monsters, IReadOnlyList<MonsterBinding> negated, List<StatModifier> result) =>
+        LastingEffectQueries.AddLastingModifiers(state, monsters, negated, result, definitions, rules, IsSpellsNegated(state),
+            (card, filter) => MatchesFilter(card, filter));
 
-    private int LastingMultiplier(DuelState state, PlayerId controller, LastingCount count, CardFilter? filter = null)
-    {
-        var player = state.GetPlayer(controller);
-        return count switch
-        {
-            LastingCount.None => 1,
-            LastingCount.OwnFaceUpMonsters => player.MonsterZones.Count(m => m is not null && m.Position != BattlePosition.FaceDownDefense &&
-                (filter is null || MatchesFilter(m.Card, filter))),
-            LastingCount.OwnSpellTraps => player.SpellTrapFields.Count(f => f is not null) + player.PendulumZones.Count(f => f is not null) + (player.FieldSpell is null ? 0 : 1),
-            _ => throw new ArgumentOutOfRangeException(nameof(count))
-        };
-    }
+    private int LastingMultiplier(DuelState state, PlayerId controller, LastingCount count, CardFilter? filter = null) =>
+        CardCountQueries.Lasting(state, controller, count, filter is null ? null : card => MatchesFilter(card, filter));
 
     private bool TargetPasses(DuelState state, FieldTarget spec, FieldCardTarget target) =>
-        (spec.CardFilter is null || MatchesFilter(target.Card, spec.CardFilter)) &&
-        (spec.MinXyzMaterials == 0 && spec.MaxXyzMaterials == int.MaxValue || target.Location == FieldLocation.MonsterZone &&
-            state.GetPlayer(target.Player).MonsterZones[target.Zone] is { } holder &&
-            holder.XyzMaterials.Count >= spec.MinXyzMaterials && holder.XyzMaterials.Count <= spec.MaxXyzMaterials) &&
-        (!spec.NoUnionEquipped || target.Location != FieldLocation.MonsterZone || !HasUnionEquipped(state, new(target.Player, target.Zone, target.Card, target.PlacementId)));
+        LastingEffectQueries.TargetPasses(state, spec, target, (card, filter) => MatchesFilter(card, filter));
 
-    private static bool HasUnionEquipped(DuelState state, MonsterBinding monster) =>
-        state.GetPlayer(monster.Player).SpellTrapFields.Any(f => f is { IsUnion: true } && f.EquippedTo == monster);
+    private static bool HasUnionEquipped(DuelState state, MonsterBinding monster) => LastingEffectQueries.HasUnionEquipped(state, monster);
 
-    private static DuelState UpdateSource(DuelState state, ChainLink link, Func<FieldSpellTrap, FieldSpellTrap> change)
-    {
-        var player = state.GetPlayer(link.Activation.Player);
-        int zone = link.Activation.SpellTrapZone;
-        return state.With(player: player.WithSpellTrapAt(zone, change(player.SpellTrapAt(zone)!)));
-    }
+    private static DuelState UpdateSource(DuelState state, ChainLink link, Func<FieldSpellTrap, FieldSpellTrap> change) =>
+        LastingEffectTransitions.UpdateSource(state, link, change);
 
     private static DuelState AttachEquip(DuelState state, ChainLink link, FieldCardTarget target) =>
-        UpdateSource(state, link, f => f with { EquippedTo = new(target.Player, target.Zone, target.Card, target.PlacementId) });
+        LastingEffectTransitions.AttachEquip(state, link, target);
 
-    /// <summary>Ties a monster just revived in that zone to its resolving source.</summary>
-    private static DuelState AttachRevival(DuelState state, ChainLink link, int monsterZone, RevivalLink kind)
-    {
-        var monster = state.GetPlayer(link.Activation.Player).MonsterZones[monsterZone]!;
-        MonsterBinding binding = new(link.Activation.Player, monsterZone, monster.Card, monster.PlacementId);
-        return UpdateSource(state, link, f => kind == RevivalLink.Equip
-            ? f with { EquippedTo = binding, Revival = kind } : f with { LinkedMonster = binding, Revival = kind });
-    }
+    private static DuelState AttachRevival(DuelState state, ChainLink link, int monsterZone, RevivalLink kind) =>
+        LastingEffectTransitions.AttachRevival(state, link, monsterZone, kind);
 
     /// <summary>A negated effect leaves an Equip Spell equipped; only its effects stop applying.</summary>
     private DuelState BindNegatedEquip(DuelState state, ChainLink link)
@@ -151,27 +104,8 @@ public sealed partial class DuelEngine
     }
 
     /// <summary>Places counters on a face-up card; counters cannot go on a face-down card.</summary>
-    private static DuelState PlaceCounters(DuelState state, FieldCardTarget target, PlaceCounterStep step, List<DuelEvent> events)
-    {
-        var player = state.GetPlayer(target.Player);
-        if (target.Location == FieldLocation.SpellTrapZone)
-        {
-            if (player.SpellTrapAt(target.Zone) is not { IsFaceUp: true } field) return state;
-            int held = step.Protective ? field.ProtectionCounters : field.Counters;
-            if (held >= step.Max) return state;
-            int sum = Math.Min(step.Max, held + step.Count);
-            events.Add(new SpellTrapCountersPlaced(player.Id, target.Zone, field.Card, sum - held, sum));
-            return state.With(player: player.WithSpellTrapAt(target.Zone, step.Protective ? field with { ProtectionCounters = sum } : field with { Counters = sum }));
-        }
-        if (player.MonsterZones[target.Zone] is not { Position: not BattlePosition.FaceDownDefense } monster) return state;
-        int current = step.Protective ? monster.ProtectionCounters : monster.Counters;
-        if (current >= step.Max) return state;
-        int total = Math.Min(step.Max, current + step.Count);
-        var monsters = player.MonsterZones.ToArray();
-        monsters[target.Zone] = step.Protective ? monster with { ProtectionCounters = total } : monster with { Counters = total };
-        events.Add(new CountersPlaced(new(target.Player, target.Zone, target.Card, target.PlacementId), total - current, total));
-        return state.With(player: player.With(monsters: monsters));
-    }
+    private static DuelState PlaceCounters(DuelState state, FieldCardTarget target, PlaceCounterStep step, List<DuelEvent> events) =>
+        LastingEffectTransitions.PlaceCounters(state, target, step, events);
 
     private bool? spellCounterGain;
     private bool HasSpellCounterGain => spellCounterGain ??= allEffects.Any(d => d.SpellCounterMax != 0);
@@ -180,16 +114,7 @@ public sealed partial class DuelEngine
     private DuelState AddSpellCounters(DuelState state, CardInstance resolved, List<DuelEvent> events)
     {
         if (!HasSpellCounterGain) return state;
-        bool spellsNegated = IsSpellsNegated(state);
-        foreach (var (player, zone, field) in ActiveCards(state).ToArray())
-            if (field.Card != resolved && !(spellsNegated && IsSpellCard(field)) && definitions.TryGetValue(field.Card.GameCardId, out var definition) &&
-                definition.SpellCounterMax > field.Counters)
-                state = PlaceCounters(state, new(player, FieldLocation.SpellTrapZone, zone, field.Card, field.PlacementId), new(1, definition.SpellCounterMax), events);
-        foreach (var (binding, monster) in FieldMonsters(state).ToArray())
-            if (monster.Position != BattlePosition.FaceDownDefense && !monster.BattleDestroyed && !state.EventEffects.NegatedMonsters.Contains(binding) &&
-                definitions.TryGetValue(monster.Card.GameCardId, out var definition) && definition.SpellCounterMax > monster.Counters)
-                state = PlaceCounters(state, new(binding.Player, FieldLocation.MonsterZone, binding.Zone, binding.Card, binding.PlacementId), new(1, definition.SpellCounterMax), events);
-        return state;
+        return LastingEffectTransitions.AddSpellCounters(state, resolved, events, definitions, rules, IsSpellsNegated(state));
     }
 
     /// <summary>Places the source on top of its owner's Deck, provided it is still in their Graveyard.</summary>
@@ -219,10 +144,7 @@ public sealed partial class DuelEngine
         return state.With(player: player.WithSpellTrapAt(target.Zone, field with { ProtectionCounters = field.ProtectionCounters - 1 }));
     }
 
-    private static IEnumerable<(PlayerId Player, int Zone, FieldSpellTrap Field)> LinkedCards(DuelState state) =>
-        state.Players.SelectMany(p => p.SpellTrapFields.Select((field, zone) => (Player: p.Id, Zone: zone, Field: field)))
-            .Where(e => e.Field is not null && (e.Field.EquippedTo is not null || e.Field.LinkedMonster is not null))
-            .Select(e => (e.Player, e.Zone, e.Field!));
+    private static IEnumerable<(PlayerId Player, int Zone, FieldSpellTrap Field)> LinkedCards(DuelState state) => LastingEffectQueries.LinkedCards(state);
 
     /// <summary>
     /// Applies the destructions that follow from this transition: Equip Cards whose monster is gone or face-down, both
@@ -241,34 +163,8 @@ public sealed partial class DuelEngine
         return next;
     }
 
-    private FieldCardTarget? NextLinkedDestruction(IEnumerable<(PlayerId Player, int Zone, FieldSpellTrap Field)> linked, DuelState next, List<DuelEvent> events)
-    {
-        static FieldCardTarget MonsterTarget(MonsterBinding b) => new(b.Player, FieldLocation.MonsterZone, b.Zone, b.Card, b.PlacementId);
-        foreach (var (player, zone, field) in linked)
-        {
-            FieldCardTarget source = new(player, FieldLocation.SpellTrapZone, zone, field.Card, field.PlacementId);
-            if (source.IsStillPresent(next))
-            {
-                if (field.EquippedTo is { } equipped && (!equipped.IsStillPresent(next) ||
-                        next.GetPlayer(equipped.Player).MonsterZones[equipped.Zone]!.Position == BattlePosition.FaceDownDefense))
-                    return source;
-                if (field.Revival == RevivalLink.Haunted && field.LinkedMonster is { } revived &&
-                    events.OfType<MonsterDestroyed>().Any(e => e.Card == revived.Card && e.Zone == revived.Zone))
-                    return source;
-            }
-            else
-            {
-                if (field.Revival == RevivalLink.Haunted && field.LinkedMonster is { } left && left.IsStillPresent(next)) return MonsterTarget(left);
-                if (field.Revival == RevivalLink.Equip && field.EquippedTo is { } held && held.IsStillPresent(next) &&
-                    events.OfType<SpellTrapDestroyed>().Any(e => e.Card == field.Card))
-                    return MonsterTarget(held);
-            }
-        }
-        if (events.OfType<SpellTrapDestroyed>().Any(e => rules.TryGetValue(e.Card.GameCardId, out var rule) && rule.IsToonWorld))
-            foreach (var (binding, monster) in FieldMonsters(next))
-                if (IsToonCard(monster.Card.GameCardId)) return MonsterTarget(binding);
-        return null;
-    }
+    private FieldCardTarget? NextLinkedDestruction(IEnumerable<(PlayerId Player, int Zone, FieldSpellTrap Field)> linked, DuelState next, List<DuelEvent> events) =>
+        LastingEffectQueries.NextLinkedDestruction(linked, next, events, rules);
 
     /// <summary>
     /// A protective counter, or the monster's Union equip, is lost instead of the monster, which is then not treated
@@ -375,12 +271,10 @@ public sealed partial class DuelEngine
 
     /// <summary>A plain once-per-turn limit belongs to this copy where it is now; a card that left the field and returned is a new card.</summary>
     private bool UsedThisTurn(CardInstance card, EffectDefinition effect, long? placement = null) =>
-        State.Bookkeeping.ActivatedUses.Any(u => u.InstanceId == card.InstanceId && u.TurnNumber == State.TurnNumber && u.Key == effect.OncePerTurnKey && u.PlacementId == placement);
+        LastingEffectQueries.UsedThisTurn(State, card, effect, placement);
 
-    private DuelState RecordUse(DuelState state, CardInstance card, EffectDefinition effect, long? placement = null) => state.WithBookkeeping(state.Bookkeeping with
-    {
-        ActivatedUses = Array.AsReadOnly(state.Bookkeeping.ActivatedUses.Where(u => u.TurnNumber == State.TurnNumber).Append(new(card.InstanceId, State.TurnNumber, effect.OncePerTurnKey, placement)).ToArray())
-    });
+    private DuelState RecordUse(DuelState state, CardInstance card, EffectDefinition effect, long? placement = null) =>
+        LastingEffectTransitions.RecordUse(state, card, effect, State.TurnNumber, placement);
 
     private DuelActionResult ExecuteUnequip(PlayerId playerId, int zone)
     {

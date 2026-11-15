@@ -154,7 +154,7 @@ public sealed partial class GameLoop
         try { action(); }
         catch (Exception e) when (Setup.SetupStore.Recoverable(e))
         {
-            editorNotice = "The operation could not finish. Check storage and retry.";
+            if (editor is not null) editor.Notice = "The operation could not finish. Check storage and retry.";
             if (screen == ScreenId.Preferences) preferencesNotice = "Preferences were not saved. Check access and free space.";
             if (screen == ScreenId.SavedDecks) screen = ScreenId.DeckEditor;
         }

@@ -179,9 +179,6 @@ public sealed partial class DuelEngine
             new ChainResponseRequested(next.Responder, next.DecisionId));
     }
 
-    private DuelState OpponentSendsFromDeck(DuelState state, PlayerId controller, CardInstance card, string effectId, List<DuelEvent> events) =>
-        MoveChosenDeckCard(state, Other(controller), card.InstanceId, toHand: false, effectId, events);
-
     private DuelState OpponentAddsFromDeck(DuelState state, PlayerId controller, OpponentAddsFromDeckStep step, string effectId, List<DuelEvent> events)
     {
         var opponent = Other(controller);
