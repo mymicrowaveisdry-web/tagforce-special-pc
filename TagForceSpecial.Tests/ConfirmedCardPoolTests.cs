@@ -9,12 +9,13 @@ namespace TagForceSpecial.Tests;
 public sealed class ConfirmedCardPoolTests
 {
     /// <summary>Probe stats for every pool card, stamped with the reviewed source build the pool policy requires.</summary>
-    private static CardCatalog Catalog()
+    private static CardCatalog Catalog(IReadOnlyDictionary<uint, string>? names = null)
     {
         var ritualLevels = CardFamilies.All.SelectMany(f => f.SummonEffects).SelectMany(s => s.RitualRecipes).ToDictionary(r => r.TargetCardId, r => r.RequiredLevel);
         return new(new(TfspCardMetadata.CardInfoSha256, "synthetic-confirmed-pool"),
             CardPool.Rules.Keys.Concat(CardFamilies.All.SelectMany(f => f.RequiredCardIds)).Distinct().Order()
-                .Select(id => new CardDefinition(id, $"Probe {id}", "", new(1000, 1000, ritualLevels.GetValueOrDefault(id, 4u)), new(1, 1, 1, 1, 0, 0, 0))));
+                .Select(id => new CardDefinition(id, names?.GetValueOrDefault(id) ?? $"Probe {id}", "",
+                    new(1000, 1000, ritualLevels.GetValueOrDefault(id, 4u)), new(1, 1, 1, 1, 0, 0, 0))));
     }
 
     private static DeckDefinition PoolDeck(IEnumerable<uint> main, IEnumerable<uint>? extra = null)
@@ -25,7 +26,7 @@ public sealed class ConfirmedCardPoolTests
     }
 
     private static DeckValidation Validate(DeckDefinition deck, CardCatalog catalog) =>
-        DeckValidator.Validate(deck, catalog, ConfirmedCardPool.PolicyFor(deck), ConfirmedCardPool.CollectionFor(deck));
+        DeckValidator.Validate(deck, catalog, ConfirmedCardPool.PolicyFor(deck, catalog), ConfirmedCardPool.CollectionFor(deck));
 
     [Fact]
     public void BuiltInRestrictionTableMatchesTheDecodedSeed()
@@ -43,7 +44,7 @@ public sealed class ConfirmedCardPoolTests
     public void PolicyCoversEveryConfirmedCardWithItsPlacementAndOriginalLimit()
     {
         Assert.Equal(CardPool.Rules.Where(e => !e.Value.IsToken).Select(e => e.Key).Order(), ConfirmedCardPool.CardIds);
-        var policy = ConfirmedCardPool.Policy;
+        var policy = ConfirmedCardPool.Policy(Catalog());
         Assert.Equal(ConfirmedCardPool.CardIds.Count, policy.Cards.Count);
         Assert.All(ConfirmedCardPool.CardIds, id =>
         {
@@ -51,7 +52,7 @@ public sealed class ConfirmedCardPoolTests
             var home = CardPool.Rules[id].AllowsExtraDeck ? DeckPlacements.Extra : DeckPlacements.Main;
             Assert.Equal(home | DeckPlacements.Side, rule.Placements);
             Assert.Equal(BuiltInRestrictions.CopiesAllowed(id), rule.BanlistLimit);
-            Assert.Equal($"card:{id}", rule.CopyGroup);
+            Assert.Equal($"name:Probe {id}", rule.CopyGroup);
         });
         Assert.All(PlayablePreview.Cards, c => Assert.True(ConfirmedCardPool.Contains(c.CardId)));
     }
@@ -96,5 +97,22 @@ public sealed class ConfirmedCardPoolTests
         var engine = ConfirmedCardPool.CreateEngine(catalog, deck, InitialOpponentDecks.Create(0, "local-opponent"), 7);
         Assert.Contains(engine.State.GetPlayer(PlayerId.One).ExtraDeck, c => c.GameCardId == extra);
         Assert.Throws<ArgumentException>(() => ConfirmedCardPool.CreateEngine(catalog, PoolDeck(main.Take(39).Append(90001u)), deck, 7));
+    }
+
+    [Fact]
+    public void AltStylesShareThreeCopiesAndTheStrictestLimit()
+    {
+        uint restricted = ConfirmedCardPool.CardIds.First(id => BuiltInRestrictions.CopiesAllowed(id) == 1 && !ConfirmedCardPool.IsExtraDeck(id));
+        var free = ConfirmedCardPool.CardIds.Where(id => BuiltInRestrictions.CopiesAllowed(id) == 3 && !ConfirmedCardPool.IsExtraDeck(id) &&
+            !PlayablePreview.Rules.ContainsKey(id)).Take(2).ToArray();
+        var catalog = Catalog(new Dictionary<uint, string> { [free[0]] = "Alt style", [free[1]] = "Alt style", [restricted] = "Limited style" });
+        var main = InitialOpponentDecks.Create(0).Main;
+        Assert.True(Validate(PoolDeck(main.Concat([free[0], free[0], free[1]])), catalog).CanPlay);
+        var four = Validate(PoolDeck(main.Concat([free[0], free[0], free[1], free[1]])), catalog);
+        Assert.Contains(four.Diagnostics, d => d.Code == "AliasGroupLimitExceeded");
+        // An unlisted alt style of a Limited card is still that Limited card.
+        var limitedCatalog = Catalog(new Dictionary<uint, string> { [free[0]] = "Limited style", [restricted] = "Limited style" });
+        Assert.Equal(1, ConfirmedCardPool.Policy(limitedCatalog).Cards[free[0]].BanlistLimit);
+        Assert.False(Validate(PoolDeck(main.Concat([free[0], restricted])), limitedCatalog).CanPlay);
     }
 }

@@ -58,6 +58,6 @@ public sealed class DeckDraft
     public DeckValidation Validate()
     {
         var deck = Snapshot();
-        return DeckValidator.Validate(deck, Catalog, ConfirmedCardPool.PolicyFor(deck), ConfirmedCardPool.CollectionFor(deck));
+        return DeckValidator.Validate(deck, Catalog, ConfirmedCardPool.PolicyFor(deck, Catalog), ConfirmedCardPool.CollectionFor(deck));
     }
 }

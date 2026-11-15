@@ -25,8 +25,9 @@
 The pool is `ConfirmedCardPool`: every card of a registered effect family except
 Tokens. Main requires 40-60 cards, Extra up to 15 and Side up to 15, with Extra
 Deck monsters placed in Extra or Side. Copy limits come from the built-in EBOOT
-Forbidden/Limited seed; unlisted cards allow three. Each card ID is its own copy
-group; same-name artwork variants, save/DLC overrides and other regulations are
+Forbidden/Limited seed; unlisted cards allow three. Alt styles (catalog records
+with the same card name) are one card: at most three copies in total, under the
+strictest limit any of them carries. Save/DLC overrides and other regulations are
 not inferred. The collection grants three of every pool card until progression
 exists; it is not an imported save or unlock claim. Decks saved under the earlier
 14-card preview policy still validate and move to the pool policy when re-saved.

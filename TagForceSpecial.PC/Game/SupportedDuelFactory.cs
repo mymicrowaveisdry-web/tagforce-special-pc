@@ -15,8 +15,9 @@ public static class SupportedDuelFactory
     public static DuelController Create(ValidatedGameCache cache, DeckDefinition deck, uint seed)
     {
         var opponent = InitialOpponentDecks.Create(0, "local-opponent");
-        var selected = SelectedDecks.Validate(cache, ConfirmedCardPool.PolicyFor(deck), deck, ConfirmedCardPool.CollectionFor(deck),
-            ConfirmedCardPool.PolicyFor(opponent), opponent, ConfirmedCardPool.CollectionFor(opponent));
+        var catalog = cache.Catalog.Catalog;
+        var selected = SelectedDecks.Validate(cache, ConfirmedCardPool.PolicyFor(deck, catalog), deck, ConfirmedCardPool.CollectionFor(deck),
+            ConfirmedCardPool.PolicyFor(opponent, catalog), opponent, ConfirmedCardPool.CollectionFor(opponent));
         if (selected.Selection is not { } decks)
             throw new InvalidDataException("The selected deck or collection does not match this cache and regulation.");
         var engine = ConfirmedCardPool.CreateEngine(cache.Catalog.Catalog, decks.First, decks.Second, seed);
