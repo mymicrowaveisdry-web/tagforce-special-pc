@@ -6,12 +6,8 @@ public static class DeckEditResources
 {
     public const string ArchiveKey = "deck.source.all-ehp";
 
-    /// <summary>(asset key, member, frame, palette level, reason). Frames 2 and 3 hold the row images of pool cards 5644 and 6960;
-    /// frame.gim palette 0 is the Normal-monster frame by its colour, never observed in a dump.</summary>
-    public static IReadOnlyList<(string AssetKey, string Member, int? Frame, int? PaletteLevel, string Reason)> Supplements { get; } = Array.AsReadOnly(new (string, string, int?, int?, string)[]
-    {
-        ("deck.all.cis-all.f02", "cis_all.gim", 2, null, "row images of supported cards; frame not yet drawn in a recorded screen"),
-        ("deck.all.cis-all.f03", "cis_all.gim", 3, null, "row images of supported cards; frame not yet drawn in a recorded screen"),
-        ("deck.all.frame.p00", "frame.gim", null, 0, "Normal-monster preview frame inferred from its colour; not yet drawn in a recorded screen")
-    });
+    /// <summary>(asset key, member, frame, palette level, reason). Empty since the Card Frame captures recorded every previously unverified
+    /// member (row-image sheets 2 and 3, the Normal-monster frame); kept for members a future screen needs before it is recorded.</summary>
+    public static IReadOnlyList<(string AssetKey, string Member, int? Frame, int? PaletteLevel, string Reason)> Supplements { get; } =
+        Array.AsReadOnly(Array.Empty<(string, string, int?, int?, string)>());
 }

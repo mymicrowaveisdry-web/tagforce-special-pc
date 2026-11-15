@@ -11,19 +11,22 @@ public class DeckEditAssetTests
     public void PinsAreWellFormedAndCoverOneArchive()
     {
         var cases = DeckEditReferenceResources.Cases;
-        // 33 single-image members, eight cis_all.gim frames and five extra palette levels (frame.gim 1/3/4/10, panel.gim 1) seen in the dumps.
-        Assert.Equal(47, cases.Count);
+        // Single-image members, all ten cis_all.gim frames and the palette levels seen in the dumps, including the preview frame of every
+        // card frame the original's Card Frame filter offers (frame.gim 0-5/10/11, frame_p.gim 0/1, frame_xyz.gim).
+        Assert.Equal(56, cases.Count);
         Assert.Equal(cases.Count, cases.Select(c => c.AssetKey).Distinct(StringComparer.Ordinal).Count());
         Assert.Equal(cases.Count, cases.Select(c => c.EvidenceId).Distinct(StringComparer.Ordinal).Count());
         Assert.Equal(cases.Count, cases.Select(c => (c.Member, c.Frame, c.PaletteLevel)).Distinct().Count());
-        Assert.Equal(new[] { 1, 3, 4, 10 }, cases.Where(c => c.Member == "frame.gim").Select(c => c.PaletteLevel).Order());
+        Assert.Equal(new[] { 0, 1, 2, 3, 4, 5, 10, 11 }, cases.Where(c => c.Member == "frame.gim").Select(c => c.PaletteLevel).Order());
+        Assert.Equal(new[] { 0, 1 }, cases.Where(c => c.Member == "frame_p.gim").Select(c => c.PaletteLevel).Order());
+        Assert.Single(cases, c => c.Member == "frame_xyz.gim");
         Assert.All(cases.Where(c => c.Frame is not null), c => Assert.Equal(0, c.PaletteLevel));
-        Assert.Equal(new int?[] { 0, 1, 4, 5, 6, 7, 8, 9 }, cases.Where(c => c.Member == "cis_all.gim").Select(c => c.Frame).Order());
+        Assert.Equal(Enumerable.Range(0, 10).Select(f => (int?)f), cases.Where(c => c.Member == "cis_all.gim").Select(c => c.Frame).Order());
         Assert.All(cases.Where(c => c.Member != "cis_all.gim"), c => Assert.Null(c.Frame));
         Assert.All(cases, c =>
         {
             Assert.Equal("deck-editor", c.Screen);
-            Assert.Matches(new Regex("^deck\\.all\\.[a-z0-9-]+$"), c.AssetKey);
+            Assert.Matches(new Regex("^deck\\.all\\.[a-z0-9-]+(\\.[fp][0-9]{2})?$"), c.AssetKey);
             Assert.StartsWith("phase62.deck-edit.", c.EvidenceId, StringComparison.Ordinal);
             Assert.Equal(DeckEditReferenceResources.Archive, c.SourcePath);
             Assert.Equal(DeckEditReferenceResources.ArchiveSha256, c.SourceSha256);

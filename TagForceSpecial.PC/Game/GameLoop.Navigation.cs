@@ -56,7 +56,7 @@ public sealed partial class GameLoop
         // OpenActive validates the generation; absent/corrupt optional presentation data keeps the authored UI usable.
         TagForceSpecial.Assets.Presentation.SemanticAssetRegistry? registry = null;
         try { if (setup is not null) registry = new PresentationCacheStore(setup.Storage).OpenActive(); }
-        catch (Exception e) when (Setup.SetupStore.Recoverable(e)) { }
+        catch (Exception e) when (Setup.SetupStore.Recoverable(e)) { Console.Error.WriteLine("TITLE_PRESENTATION_PENDING " + e.Message); }
         screenAssets = new(GraphicsDevice, registry);
         if (registry is not null)
         {

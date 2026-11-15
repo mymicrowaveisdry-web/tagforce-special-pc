@@ -29,7 +29,12 @@ public sealed partial class TitleFlowVisuals
         foreach (string key in DeckEditProfile.AssetKeys().Where(k => !textures.ContainsKey(k)))
             textures.AddBorrowed(key, (supplements.Contains(key) ? assets.ResolveUnverified(key) : assets.Resolve(key)).Texture);
         DeckEditLayer = new(device, 480, 272, false, SurfaceFormat.Color, DepthFormat.Depth24Stencil8, 0, RenderTargetUsage.PreserveContents);
+        cardLayer = new(device, DeckEditProfile.Card.BufferWidth, DeckEditProfile.Card.BufferHeight, false, SurfaceFormat.Color,
+            DepthFormat.Depth24Stencil8, 0, RenderTargetUsage.PreserveContents);
     }
+
+    /// <summary>Offscreen buffer the preview card is composed in, as the original does (0x1e8000, stride 128).</summary>
+    private RenderTarget2D cardLayer = null!;
 
     private string DeckText(DeckEditTextSource source) => DeckText(source, 0, null);
     private string DeckText(DeckEditTextSource source, int start, int? chars)
@@ -147,19 +152,11 @@ public sealed partial class TitleFlowVisuals
     private void DrawPreview(CardDefinition card)
     {
         var p = DeckEditProfile;
-        uint kind = card.Codes?.RawKind ?? 0;
-        if (p.FramePalette(kind) is { } palette)
-        {
-            if (palette.Inferred) Infer($"preview frame palette for kind {kind}");
-            string key = $"deck.all.frame.p{palette.Value:00}";
-            if (textures.ContainsKey(key)) DrawMeasured(p.Preview.Frame with { AssetKey = key });
-        }
-        if (Thumbnail(card.GameCardId) is not null)
-        {
-            string key = CardArtworkProvider.ThumbnailKey(card.GameCardId);
-            DrawMeasured(p.Preview.Art with { AssetKey = key });
-            DrawMeasured(p.Preview.Name with { AssetKey = key });
-        }
+        var c = p.Card;
+        ComposeCard(card);
+        // The composed card is shown unscaled at the recorded composite box.
+        DrawQuad(cardLayer, new(c.Composite[0], c.Composite[1], c.Composite[2], c.Composite[3], 0, 0,
+            (c.Composite[2] - c.Composite[0]) / c.BufferWidth, (c.Composite[3] - c.Composite[1]) / c.BufferHeight, [255, 255, 255, 255], false), 0, 0, false);
         foreach (var draw in p.Preview.Statics) DrawMeasured(draw);
         var f = p.Fields;
         if (card.Codes?.RawKind is not (13 or 14) && card.Statistics is { } stats)
@@ -177,6 +174,110 @@ public sealed partial class TitleFlowVisuals
         int fit = (int)((272 - lines.FirstY) / lines.LineHeight);
         for (int i = 0; i < Math.Min(fit, wrapped.Count); i++)
             DrawLine(wrapped[i].l, lines.X, lines.FirstY + i * lines.LineHeight, lines.ScaleX, lines.ScaleY, wrapped[i].Item2, lines.ShadowAlpha);
+    }
+
+    /// <summary>Draws the preview card into its offscreen buffer in card coordinates, as the original does before showing it.</summary>
+    private void ComposeCard(CardDefinition card)
+    {
+        var p = DeckEditProfile;
+        var c = p.Card;
+        var projection = effect.Projection;
+        WithTarget(cardLayer, () =>
+        {
+            try
+            {
+                device.Clear(ClearOptions.Target | ClearOptions.Stencil, Color.Black, 1, 0);
+                effect.Projection = Matrix.CreateOrthographicOffCenter(0, c.BufferWidth, c.BufferHeight, 0, 0, 1);
+                uint kind = card.Codes?.RawKind ?? 0;
+                bool pendulum = false;
+                if (p.FrameKey(kind) is { } frame)
+                {
+                    if (frame.Inferred) Infer($"preview frame for kind {kind}");
+                    pendulum = DeckEditProfile.IsPendulumFrame(frame.Value);
+                    if (textures.ContainsKey(frame.Value)) DrawMeasured((pendulum ? p.Preview.PendulumFrame : p.Preview.Frame) with { AssetKey = frame.Value });
+                }
+                if (Thumbnail(card.GameCardId) is not null)
+                {
+                    string key = CardArtworkProvider.ThumbnailKey(card.GameCardId);
+                    DrawMeasured((pendulum ? p.Preview.PendulumArt : p.Preview.Art) with { AssetKey = key });
+                    DrawMeasured(p.Preview.Name with { AssetKey = key });
+                }
+                DrawCardFace(card);
+            }
+            finally { effect.Projection = projection; }
+        });
+    }
+
+    /// <summary>Attribute icon, then the Spell/Trap label, or the level stars, separator, ATK/DEF labels and stat digits of a monster.</summary>
+    private void DrawCardFace(CardDefinition card)
+    {
+        var c = DeckEditProfile.Card;
+        uint kind = card.Codes?.RawKind ?? 0;
+        if (card.Codes is { } codes)
+        {
+            if (c.AttributeUv.TryGetValue(codes.Attribute.ToString(CultureInfo.InvariantCulture), out var attribute))
+                DrawMeasured(WithUv(c.Attribute, attribute));
+            else if (codes.Attribute is >= 1 and <= 6)
+            {
+                // Monster attribute icons sit side by side in attribute order (1, 2 and 6 recorded); the others take that grid.
+                Infer($"preview attribute icon {codes.Attribute}");
+                var first = c.AttributeUv["1"];
+                float w = first[2] - first[0];
+                DrawMeasured(WithUv(c.Attribute, [(codes.Attribute - 1) * w, first[1], codes.Attribute * w, first[3]]));
+            }
+        }
+        if (kind is 13 or 14) { DrawMeasured(kind == 13 ? c.SpellLabel : c.TrapLabel); return; }
+        DrawStars(card, kind);
+        DrawMeasured(c.Separator);
+        DrawMeasured(c.Labels);
+        if (card.Statistics is { } stats)
+        {
+            DrawCardNumber(stats.Attack, c.AttackOnesX);
+            DrawCardNumber(stats.Defense, c.DefenseOnesX);
+        }
+    }
+
+    private void DrawCardNumber(int? value, float onesX)
+    {
+        var c = DeckEditProfile.Card;
+        if (value is not { } number) { Infer("preview '?' stat sprite (never recorded)"); return; }
+        float templateX = c.Digit.Points.Min(q => q[0]);
+        float v0 = c.Digit.Uv.Min(u => u[1]), v1 = c.Digit.Uv.Max(u => u[1]);
+        string digits = number.ToString(CultureInfo.InvariantCulture);
+        for (int i = 0; i < digits.Length; i++)
+        {
+            int d = digits[digits.Length - 1 - i] - '0';
+            DrawMeasured(WithUv(Shifted(c.Digit, onesX - i * c.DigitPitch - templateX, 0), [d * c.DigitCell, v0, (d + 1) * c.DigitCell, v1]));
+        }
+    }
+
+    /// <summary>One sprite per level. Recorded strips: Levels up to 10 are 8 px stars ending at x 96, Levels 11-12 share 85 px ending at 98;
+    /// Rank (Xyz) and Dark Synchro stars start at the left. Counts without a recorded strip follow that pattern and are reported as inferred.</summary>
+    private void DrawStars(CardDefinition card, uint kind)
+    {
+        var c = DeckEditProfile.Card;
+        int count = (int)(card.Statistics?.Level ?? 0);
+        if (count <= 0) return;
+        string mode = kind is 22 or 23 ? "rank" : kind is 21 ? "dark" : "level";
+        if (!c.Stars.TryGetValue(mode, out var stars)) return;
+        float left, right;
+        float Width(int n) => n <= 10 ? 8f * n : 85f / 12 * n;
+        if (stars.Spans.TryGetValue(count.ToString(CultureInfo.InvariantCulture), out var span)) (left, right) = (span[0], span[1]);
+        else
+        {
+            Infer($"{mode} star strip for {count}");
+            if (mode == "level") { right = count <= 10 ? 96 : 98; left = right - Width(count); }
+            else { left = mode == "rank" && count >= 11 ? 14 : 12; right = left + Width(count); }
+        }
+        var sprite = c.Star with { Points = c.Star.Points[..6], Uv = c.Star.Uv[..6] };
+        float x0 = sprite.Points.Min(q => q[0]), x1 = sprite.Points.Max(q => q[0]);
+        float step = (right - left) / count;
+        for (int i = 0; i < count; i++)
+        {
+            float a = left + i * step, b = a + step;
+            var placed = sprite with { Points = Array.ConvertAll(sprite.Points, q => new[] { q[0] == x0 ? a : q[0] == x1 ? b : q[0], q[1] }) };
+            DrawMeasured(WithUv(placed, stars.Cell));
+        }
     }
 
     private void DrawTabs(DeckEditSession session, DeckEditTab active)

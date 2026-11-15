@@ -30,13 +30,25 @@ public class DeckEditTests
         var profile = DeckEditProfile.LoadEmbedded();
         Assert.Equal(7, profile.VisibleRows);
         Assert.Equal(30f, profile.RowPitch);
-        // Spells were seen on recorded rows; Normal monsters were not, so their pieces come from the labelled inferred section.
+        // Spells and Normal monsters were seen on recorded rows and previews (Card Frame captures); unobserved kinds stay labelled inferred.
         Assert.False(profile.Uv("cardFrameByKind", 13u)!.Value.Inferred);
-        Assert.True(profile.Uv("cardFrameByKind", 0u)!.Value.Inferred);
-        Assert.False(profile.FramePalette(13)!.Value.Inferred);
-        Assert.Equal(4, profile.FramePalette(13)!.Value.Value);
-        Assert.True(profile.FramePalette(0)!.Value.Inferred);
-        Assert.Null(profile.FramePalette(99));
+        Assert.False(profile.Uv("cardFrameByKind", 0u)!.Value.Inferred);
+        Assert.Equal(new DeckEditLookup<string>("deck.all.frame.p04", false), profile.FrameKey(13));
+        Assert.Equal(new DeckEditLookup<string>("deck.all.frame.p00", false), profile.FrameKey(0));
+        Assert.Equal(new DeckEditLookup<string>("deck.all.frame.p05", false), profile.FrameKey(14));
+        Assert.Equal(new DeckEditLookup<string>("deck.all.frame-xyz", false), profile.FrameKey(23));
+        Assert.True(DeckEditProfile.IsPendulumFrame(profile.FrameKey(26)!.Value.Value));
+        Assert.True(profile.FrameKey(2)!.Value.Inferred);
+        Assert.Null(profile.FrameKey(99));
+        // The preview card is composed offscreen and shown unscaled at the composite box; its pieces were recorded per card frame.
+        var card = profile.Card;
+        Assert.Equal(new[] { 5f, 4f, 113f, 158f }, card.Composite);
+        Assert.Equal(7 / 128f, card.DigitCell, 4);
+        Assert.Equal(new[] { "1", "2", "6", "8", "9" }, card.AttributeUv.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(new[] { 32f, 96f }, card.Stars["level"].Spans["8"]);
+        Assert.Equal(new[] { 14f, 92f }, card.Stars["rank"].Spans["11"]);
+        Assert.Equal("deck.all.spelltrap", card.SpellLabel.AssetKey);
+        Assert.Contains("deck.all.spelltrap", profile.AssetKeys());
         // Measured on every recorded row: cell = internal index - 95 (Yubel - The Ultimate Nightmare is index 3394, sheet 4, cell 163).
         var mini = profile.GetMiniImage(3394)!.Value;
         Assert.Equal("deck.all.cis-all.f04", mini.AssetKey);

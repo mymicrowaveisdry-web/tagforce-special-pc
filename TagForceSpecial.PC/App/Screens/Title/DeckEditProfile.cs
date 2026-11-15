@@ -25,7 +25,18 @@ public sealed record DeckEditTabLabel(float X, DeckEditTextSource Source);
 public sealed record DeckEditTabText(DeckEditTabLabel[] Labels, float[] CountRight, float Pitch, float ActiveY, float InactiveY,
     int ActiveColor, int InactiveColor, float ScaleX, float ScaleY, int ShadowAlpha);
 public sealed record DeckEditMiniImage(int Base, int Sheet, int Grid, int Cell);
-public sealed record DeckEditPreview(FlowDraw Frame, FlowDraw Art, FlowDraw Name, float[] Composite, FlowDraw[] Statics);
+/// <summary>Preview card draws. Pendulum frames (frame_p.gim) cut a wider, shorter art window recorded as <see cref="PendulumFrame"/> and <see cref="PendulumArt"/>.</summary>
+public sealed record DeckEditPreview(FlowDraw Frame, FlowDraw Art, FlowDraw Name, float[] Composite, FlowDraw[] Statics, FlowDraw PendulumFrame, FlowDraw PendulumArt);
+
+/// <summary>Recorded star strips: the sprite cell and, per star count, the measured left and right edge of the strip.</summary>
+public sealed record DeckEditStars(float[] Cell, Dictionary<string, float[]> Spans);
+
+/// <summary>The preview card as the original composes it: drawn into an offscreen <see cref="BufferWidth"/> x <see cref="BufferHeight"/>
+/// buffer in card coordinates, then shown unscaled at <see cref="Composite"/>. Digits are 7 px sprites 0-9 side by side from u 0,
+/// right-aligned at the ones position and stepping <see cref="DigitPitch"/> px left, without leading zeros.</summary>
+public sealed record DeckEditCard(float[] Composite, int BufferWidth, int BufferHeight, FlowDraw Separator, FlowDraw Labels,
+    FlowDraw Digit, float DigitCell, float DigitPitch, float AttackOnesX, float DefenseOnesX, FlowDraw Attribute,
+    Dictionary<string, float[]> AttributeUv, FlowDraw Star, Dictionary<string, DeckEditStars> Stars, FlowDraw SpellLabel, FlowDraw TrapLabel);
 
 /// <summary>A lookup result: <see cref="Inferred"/> is true when the value was never seen on a recorded original row.</summary>
 public readonly record struct DeckEditLookup<T>(T Value, bool Inferred);
@@ -36,8 +47,8 @@ public readonly record struct DeckEditLookup<T>(T Value, bool Inferred);
 public sealed record DeckEditProfile(int SchemaVersion, string BuildId, string Scope, float RowTop, float RowPitch, int VisibleRows,
     DeckEditMiniImage MiniImage, FlowDraw[] Background, FlowDraw[] Window, Dictionary<string, FlowDraw[]> Tabs, Dictionary<string, FlowDraw> Row,
     Dictionary<string, Dictionary<string, JsonElement>> Tables, FlowDraw[] Cursor, DeckEditPreview Preview, DeckEditFields Fields,
-    DeckEditTabText TabText, DeckEditTextSource MovePrompt, DeckEditTextSource ExitQuestion, Dictionary<string, int> FramePaletteByKind,
-    Dictionary<string, int> InferredFramePaletteByKind, Dictionary<string, Dictionary<string, JsonElement>> Inferred,
+    DeckEditTabText TabText, DeckEditTextSource MovePrompt, DeckEditTextSource ExitQuestion, Dictionary<string, string> FrameByKind,
+    Dictionary<string, string> FrameEvidence, Dictionary<string, string> InferredFrameByKind, DeckEditCard Card, Dictionary<string, Dictionary<string, JsonElement>> Inferred,
     DeckEditMoveOverlay MoveOverlay, DeckEditExitDialog ExitDialog)
 {
     /// <summary>Tab order as the original cycles them with Square, starting on the Trunk.</summary>
@@ -76,13 +87,22 @@ public sealed record DeckEditProfile(int SchemaVersion, string BuildId, string S
     public DeckEditLookup<string>? PanelKey(uint rawKind) =>
         Find("panelByKind", rawKind.ToString(System.Globalization.CultureInfo.InvariantCulture)) is { } found ? new(found.Value.GetString()!, found.Inferred) : null;
 
-    public DeckEditLookup<int>? FramePalette(uint rawKind)
+    /// <summary>The preview card frame texture for a raw kind: recorded on an original preview (or listed by the original's Card Frame
+    /// filter whose preview drew it), else inferred from the printed frame family.</summary>
+    public DeckEditLookup<string>? FrameKey(uint rawKind)
     {
         string key = rawKind.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        if (FramePaletteByKind.TryGetValue(key, out int level)) return new(level, false);
-        if (InferredFramePaletteByKind.TryGetValue(key, out int guess)) return new(guess, true);
+        if (FrameByKind.TryGetValue(key, out var measured)) return new(measured, false);
+        if (InferredFrameByKind.TryGetValue(key, out var guess)) return new(guess, true);
         return null;
     }
+
+    public static bool IsPendulumFrame(string frameKey) => frameKey.StartsWith("deck.all.frame-p", StringComparison.Ordinal);
+
+    /// <summary>The frame.gim palette of a frame key ("deck.all.frame.pNN"); null for the separate Pendulum and Xyz frame members.</summary>
+    public static int? FrameGimPalette(string frameKey) =>
+        frameKey.StartsWith("deck.all.frame.p", StringComparison.Ordinal) &&
+        int.TryParse(frameKey.AsSpan("deck.all.frame.p".Length), System.Globalization.CultureInfo.InvariantCulture, out int palette) ? palette : null;
 
     /// <summary>Row image: cis_all.gim frame and cell. Measured on every recorded row: cell = internal index - <see cref="DeckEditMiniImage.Base"/>.</summary>
     public (string AssetKey, float[] Uv)? GetMiniImage(int internalIndex)
@@ -119,6 +139,7 @@ public sealed record DeckEditProfile(int SchemaVersion, string BuildId, string S
             .Concat(Preview.Statics)
             .Concat([MoveOverlay.Shade, MoveOverlay.Mask, MoveOverlay.Box, MoveOverlay.CardFrame, ExitDialog.Mask, ExitDialog.Panel, ExitDialog.Plain])
             .Concat(ExitDialog.Focus)
+            .Concat([Card.Separator, Card.Labels, Card.Digit, Card.Attribute, Card.Star, Card.SpellLabel, Card.TrapLabel])
             .Select(d => d.AssetKey)
             .OfType<string>()
             .Where(k => !k.StartsWith(
@@ -135,9 +156,7 @@ public sealed record DeckEditProfile(int SchemaVersion, string BuildId, string S
             .Concat(inferredPanels)
             .Select(v => v.GetString()!);
 
-        var frames = FramePaletteByKind.Values
-            .Concat(InferredFramePaletteByKind.Values)
-            .Select(p => $"deck.all.frame.p{p:00}");
+        var frames = FrameByKind.Values.Concat(InferredFrameByKind.Values);
 
         var miniFrames = Enumerable.Range(0, 10)
             .Select(sheet => $"deck.all.cis-all.f{sheet:00}");

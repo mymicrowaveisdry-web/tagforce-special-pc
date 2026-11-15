@@ -92,8 +92,9 @@ public sealed partial class TitleFlowVisuals
             float pitch = Math.Min(30, available / rows);
             float x = 300 + i % columns * 17.5f, y = top + i / columns * pitch;
             float height = Math.Min(28, pitch - 1);
-            if (DeckEditProfile.FramePalette(catalog[cards[i]].Codes?.RawKind ?? 0) is { } palette &&
-                RecipeTexture(session.Catalog, $"recipe.frame.{palette.Value:00}") is { } frameKey)
+            if (DeckEditProfile.FrameKey(catalog[cards[i]].Codes?.RawKind ?? 0) is { } frameLookup &&
+                DeckEditProfile.FrameGimPalette(frameLookup.Value) is { } palette &&
+                RecipeTexture(session.Catalog, $"recipe.frame.{palette:00}") is { } frameKey)
             {
                 var frame = DeckEditProfile.Preview.Frame;
                 float minX = frame.Points.Min(p => p[0]), minY = frame.Points.Min(p => p[1]);
