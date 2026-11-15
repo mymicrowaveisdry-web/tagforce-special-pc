@@ -197,4 +197,55 @@ public sealed partial class DuelEngine
         }
         return next.WithBookkeeping(next.Bookkeeping with { ControlGrants = Array.AsReadOnly(kept.ToArray()) });
     }
+
+    /// <summary>Control steps that choose their monsters at resolution, and steps on one bound target.</summary>
+    private StepResult ControlStep(DuelState state, ChainLink link, EffectDefinition definition, int index, EffectStep step,
+        DuelCommand? choice, List<DuelEvent> events)
+    {
+        var controller = link.Activation.Player;
+        switch (step)
+        {
+            case TakeChosenControlStep takeChosen:
+            {
+                var (taken, pick) = TakeChosenControl(state, link, definition, index, takeChosen, choice, events);
+                return pick is not null ? StepResult.Paused(taken, pick) : new(taken, StepFlow.Next, null);
+            }
+            case SwapChosenMonstersStep:
+            {
+                var (swapped, swap, none) = SwapChosen(state, link, definition, index, choice, events);
+                return swap is not null ? StepResult.Paused(swapped, swap) : new(swapped, none ? StepFlow.Stop : StepFlow.Next, null);
+            }
+            case DestroyTargetAtStep destroyAt:
+                if (BoundTarget(link, destroyAt.Target) is not { } doomed || !QualifyingTargets(state, link, definition).Contains(doomed))
+                    return StepResult.Skip(state, link, ChainSkipReason.TargetUnavailable, events);
+                state = DestroyFieldCard(state, doomed, events);
+                // "Then": the next part happens only if this one did.
+                return new(state, doomed.IsStillPresent(state) ? StepFlow.Stop : StepFlow.Checked, choice);
+            default:
+                if (BoundTarget(link, ((GiveTargetControlStep)step).Target) is { } given && given.Player == controller &&
+                    QualifyingTargets(state, link, definition).Contains(given))
+                    state = ChangeControl(state, link, given, Other(controller), ControlDuration.Permanent, definition.EffectId, events);
+                return new(state, StepFlow.Checked, choice);
+        }
+    }
+
+    /// <summary>Takes or gives the bound monsters still in place, or switches one monster each way only if both remain.</summary>
+    private DuelState ControlTargetsStep(DuelState state, ChainLink link, EffectDefinition definition, EffectStep step, FieldCardTarget[] valid,
+        List<DuelEvent> events)
+    {
+        var controller = link.Activation.Player;
+        if (step is SwitchControlStep)
+        {
+            // Both monsters must still be there, or neither switches.
+            if (valid.Length == 2 && valid[0].Player != valid[1].Player)
+                return SwitchControl(state, Bound(valid[0]), Bound(valid[1]), definition.EffectId, events);
+            events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
+            return state;
+        }
+        var receiver = step is TakeControlStep ? controller : Other(controller);
+        var duration = step is TakeControlStep take ? take.Duration : ((GiveControlStep)step).Duration;
+        foreach (var target in valid.Where(t => t.Location == FieldLocation.MonsterZone).ToArray())
+            state = ChangeControl(state, link, target, receiver, duration, definition.EffectId, events);
+        return state;
+    }
 }

@@ -507,423 +507,208 @@ public sealed partial class DuelEngine
                     return (state, new PendingReplacementChoice(new(checked(State.Revision + 1), offers, []), definition.EffectId, link.Number, i));
                 else replacementContext = new(batch, []);
             }
-            if (step is SpecialSummonSelfStep self)
-            {
-                var card = link.Activation.Spell;
-                var from = definition.Origin == EffectOrigin.Hand ? DecisionCardSource.Hand : DecisionCardSource.Graveyard;
-                if (!SpecialSourceCards(state.GetPlayer(controller), from).Contains(card))
-                {
-                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.SummonUnavailable));
-                    break;
-                }
-                if (choice is not ChooseDefinitionSummon place)
-                    return (state, new PendingDefinitionSummon(checked(State.Revision + 1), controller, definition.EffectId, link.Number, i,
-                        [new(card, from, controller)], Enumerable.Range(0, 5).Where(z => state.GetPlayer(controller).MonsterZones[z] is null), self.Position));
-                state = PlaceSpecialSummon(state, controller, card, place.MonsterZone, place.Position, from, events);
-                choice = null;
-                continue;
-            }
-            if (step is DiscardCardsStep chosenDiscard)
-            {
-                var discarded = ResolveChosenDiscards(state, link, definition, chosenDiscard, i, choice, events);
-                state = discarded.State;
-                if (discarded.Pause is not null) return discarded;
-                choice = null;
-                continue;
-            }
-            if (step is StopUnlessRollStep or StopUnlessHeadsStep)
-            {
-                var last = state.Bookkeeping.LastRandom;
-                if (step is StopUnlessRollStep roll ? last is not null && roll.Values.Contains(last.Die) : last is not null && last.Heads >= ((StopUnlessHeadsStep)step).Minimum)
-                    continue;
-                events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
-                break;
-            }
-            if (CardSelectionSteps.Handles(step))
-            {
-                var selected = CardSelectionSteps.Resolve(state, controller, step,
-                    new(definition.EffectId, link.Number, i, State.Revision), choice, rules, MatchesFilter, events);
-                state = selected.State;
-                if (selected.Pause is not null) return (state, selected.Pause);
-                choice = selected.Choice;
-                if (step is AddFromDeckToHandStep or SendFromDeckToGraveyardStep && state.Outcome is not null) break;
-                continue;
-            }
-            if (step is StopUnlessOwnTurnStep)
-            {
-                if (state.ActivePlayer == controller) continue;
-                events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
-                break;
-            }
-            if (step is StopUnlessSpecialSummonedStep)
-            {
-                if (link.Trigger?.Source is { } summonedSource && WasSpecialSummoned(state, summonedSource)) continue;
-                events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
-                break;
-            }
-            if (step is StopUnlessActivatedThisTurnStep)
-            {
-                if (ScaleActivatedThisTurn(state, controller, link.Activation.SpellTrapZone, link.Activation.Spell, link.SourcePlacementId)) continue;
-                events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
-                break;
-            }
-            if (step is StopUnlessHandHoldsStep holds)
-            {
-                if (HandHolds(state, controller, holds)) continue;
-                events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
-                break;
-            }
-            if (step is StopUnlessMilledStep milled)
-            {
-                if (state.Bookkeeping.LastRandom?.Milled is { } top && MatchesFilter(top, milled.Filter)) continue;
-                if (milled.DestroySourceOtherwise) state = DestroyInHand(state, controller, link.Activation.Spell, definition.EffectId, events);
-                events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
-                break;
-            }
-            if (step is TakeChosenControlStep takeChosen)
-            {
-                (state, var pick) = TakeChosenControl(state, link, definition, i, takeChosen, choice, events);
-                if (pick is not null) return (state, pick);
-                choice = null;
-                continue;
-            }
-            if (step is SwapChosenMonstersStep)
-            {
-                (state, var swap, bool none) = SwapChosen(state, link, definition, i, choice, events);
-                if (swap is not null) return (state, swap);
-                choice = null;
-                if (none) break;
-                continue;
-            }
-            if (step is OpponentCallsRandomHandCardStep)
-            {
-                (state, var call, bool stop) = CallRandomHandCard(state, link, definition, i, choice, events);
-                if (call is not null) return (state, call);
-                choice = null;
-                if (stop) break;
-                continue;
-            }
-            if (step is StopUnlessNoOwnMonstersStep)
-            {
-                if (state.GetPlayer(controller).MonsterZones.All(m => m is null)) continue;
-                events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
-                break;
-            }
-            if (step is AttachSourceStep attachSource)
-            {
-                // The bound monster only has to still be there; it may have been turned face-down.
-                if (BoundTarget(link, attachSource.Target) is { } host && host.IsStillPresent(state)) state = AttachSourceAsMaterial(state, link, host, events);
-                else events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
-            }
-            else if (step is DestroyTargetAtStep destroyAt)
-            {
-                if (BoundTarget(link, destroyAt.Target) is not { } doomed || !QualifyingTargets(state, link, definition).Contains(doomed))
-                {
-                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
-                    break;
-                }
-                state = DestroyFieldCard(state, doomed, events);
-                // "Then": the next part happens only if this one did.
-                if (doomed.IsStillPresent(state)) break;
-            }
-            else if (step is GiveTargetControlStep giveAt)
-            {
-                if (BoundTarget(link, giveAt.Target) is { } given && given.Player == controller && QualifyingTargets(state, link, definition).Contains(given))
-                    state = ChangeControl(state, link, given, Other(controller), ControlDuration.Permanent, definition.EffectId, events);
-            }
-            else if (step is DetachAllStep detachAll)
-            {
-                if (BoundTarget(link, detachAll.Target) is not { } bound || !bound.IsStillPresent(state) ||
-                    state.GetPlayer(bound.Player).MonsterZones[bound.Zone] is not { XyzMaterials.Count: > 0 })
-                {
-                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
-                    break;
-                }
-                state = DetachAll(state, bound, events);
-            }
-            else if (step is RankUpStep rankUp)
-            {
-                if (BoundTarget(link, 0) is not { } bound || !bound.IsStillPresent(state) ||
-                    state.GetPlayer(bound.Player).MonsterZones[bound.Zone]!.Position == BattlePosition.FaceDownDefense)
-                {
-                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
-                    break;
-                }
-                var options = RankUpOptions(state, bound, rankUp).ToArray();
-                var picked = choice is ChooseDefinitionSummon place ? options.FirstOrDefault(c => c.InstanceId == place.CardInstanceId) : null;
-                if (options.Length == 0 || choice is ChooseDefinitionSummon && picked is null)
-                {
-                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.SummonUnavailable));
-                    break;
-                }
-                if (picked is null)
-                    return (state, new PendingDefinitionSummon(checked(State.Revision + 1), controller, definition.EffectId, link.Number, i,
-                        options.Select(c => new DefinitionSummonOption(c, DecisionCardSource.ExtraDeck, controller)), [bound.Zone]));
-                state = RankUpSummon(state, bound, picked, ((ChooseDefinitionSummon)choice!).Position, definition.EffectId, events);
-                choice = null;
-            }
-            else if (step is TakeOpponentMaterialStep)
-            {
-                var pool = state.GetPlayer(Other(controller)).MonsterZones.Where(m => m is not null).SelectMany(m => m!.XyzMaterials).ToArray();
-                if (BoundTarget(link, 0) is not { } summonedAt || state.GetPlayer(controller).MonsterZones[summonedAt.Zone] is not { } summoned || pool.Length == 0) continue;
-                if (pool.Length > 1 && choice is not ChooseDefinitionCard)
-                    return (state, new PendingDefinitionCardChoice(checked(State.Revision + 1), controller, definition.EffectId, link.Number, i, pool));
-                var taken = choice is ChooseDefinitionCard take ? pool.FirstOrDefault(c => c.InstanceId == take.CardInstanceId) ?? pool[0] : pool[0];
-                state = MoveXyzMaterial(state, Other(controller), taken, new(controller, FieldLocation.MonsterZone, summonedAt.Zone, summoned.Card, summoned.PlacementId),
-                    definition.EffectId, events);
-                choice = null;
-            }
-            else if (step is AttachFromStep attachFrom)
-            {
-                var host = attachFrom.ToTarget ? BoundTarget(link, 0) : ActivatingMonster(state, link);
-                if (host is null || !host.IsStillPresent(state))
-                {
-                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
-                    break;
-                }
-                var candidates = AttachCandidates(state, controller, attachFrom, link.Activation.Spell).ToArray();
-                if (candidates.Length == 0)
-                {
-                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
-                    continue;
-                }
-                if (choice is not ChooseDefinitionCard chosen)
-                    return (state, new PendingDefinitionCardChoice(checked(State.Revision + 1), controller, definition.EffectId, link.Number, i, candidates));
-                state = AttachFromZone(state, controller, candidates.FirstOrDefault(c => c.InstanceId == chosen.CardInstanceId) ?? candidates[0], host, definition.EffectId, events);
-                choice = null;
-            }
-            else if (EffectDefinition.IsFieldTargetStep(step) || EffectDefinition.IsZoneTargetStep(step))
-            {
-                var valid = QualifyingTargets(state, link, definition).ToArray();
-                if (valid.Length == 0)
-                {
-                    // With every target gone, the rest of the effect does not resolve.
-                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
-                    break;
-                }
-                if (step is SpecialSummonTargetStep revive)
-                {
-                    if (choice is not ChooseDefinitionSummon place)
-                        return (state, new PendingDefinitionSummon(checked(State.Revision + 1), controller, definition.EffectId, link.Number, i,
-                            [new(valid[0].Card, DecisionCardSource.Graveyard, valid[0].Player)],
-                            Enumerable.Range(0, 5).Where(z => state.GetPlayer(controller).MonsterZones[z] is null), revive.Position));
-                    state = PlaceSpecialSummon(RemoveFromZone(state, valid[0]), controller, valid[0].Card, place.MonsterZone, place.Position,
-                        DecisionCardSource.Graveyard, events, sourceAlreadyRemoved: true);
-                    if (revive.Link == RevivalLink.Material)
-                    {
-                        var revived = state.GetPlayer(controller).MonsterZones[place.MonsterZone]!;
-                        state = AttachSourceAsMaterial(state, link, new(controller, FieldLocation.MonsterZone, place.MonsterZone, revived.Card, revived.PlacementId), events);
-                    }
-                    else if (revive.Link != RevivalLink.None) state = AttachRevival(state, link, place.MonsterZone, revive.Link);
-                    choice = null;
-                    continue;
-                }
-                if (step is EquipTargetStep)
-                {
-                    state = AttachEquip(state, link, valid[0]);
-                    continue;
-                }
-                if (step is TakeControlStep or GiveControlStep)
-                {
-                    var receiver = step is TakeControlStep ? controller : Other(controller);
-                    var duration = step is TakeControlStep take ? take.Duration : ((GiveControlStep)step).Duration;
-                    foreach (var target in valid.Where(t => t.Location == FieldLocation.MonsterZone).ToArray())
-                        state = ChangeControl(state, link, target, receiver, duration, definition.EffectId, events);
-                    continue;
-                }
-                if (step is ChangeTargetsTraitStep or SetTargetScaleStep)
-                {
-                    if (link.Declared is int declared)
-                        foreach (var target in valid)
-                            state = step is ChangeTargetsTraitStep trait ? ChangeTrait(state, target, trait, declared, definition.EffectId, events)
-                                : SetScale(state, target, declared, definition.EffectId, events);
-                    continue;
-                }
-                if (step is ChangeTargetsNameStep nameChange)
-                {
-                    foreach (var target in valid) state = ChangeName(state, target, nameChange, definition.EffectId, events);
-                    continue;
-                }
-                if (step is LockTargetsUntilEndStep lockTargets)
-                {
-                    foreach (var target in valid.Where(t => t.Location == FieldLocation.MonsterZone))
-                        state = AddBoundLock(state, controller, lockTargets.Actions, target, definition.EffectId, events);
-                    continue;
-                }
-                if (step is SwitchControlStep)
-                {
-                    // Both monsters must still be there, or neither switches.
-                    if (valid.Length == 2 && valid[0].Player != valid[1].Player)
-                        state = SwitchControl(state, Bound(valid[0]), Bound(valid[1]), definition.EffectId, events);
-                    else events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
-                    continue;
-                }
-                if (step is UnionEquipStep)
-                {
-                    state = EquipUnion(state, link, valid[0], events);
-                    continue;
-                }
-                if (step is PlaceCounterStep counters)
-                {
-                    state = PlaceCounters(state, valid[0], counters, events);
-                    continue;
-                }
-                if (step is NegateAttackStep)
-                {
-                    if (state.Battle is not { Attack: { Cancellation: null } attack } battle || attack.Attacker.Card != valid[0].Card)
-                    {
-                        events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
-                        break;
-                    }
-                    events.Add(new AttackCancelled(attack.Id, BattleAttackCancellation.Negated));
-                    state = state.WithBattle(battle with { Attack = attack with { Cancellation = BattleAttackCancellation.Negated } });
-                    continue;
-                }
-                if (step is ShuffleTargetsIntoDeckStep shuffle)
-                {
-                    state = ShuffleIntoDecks(state, valid, definition.EffectId, events);
-                    if (shuffle.StopUnlessAll && valid.Length < (link.Activation.FieldTargets?.Count ?? 0)) break;
-                    continue;
-                }
-                if (step is DestroyTargetsStep destroy)
-                {
-                    bool destroyed = false;
-                    foreach (var target in valid)
-                    {
-                        int firstEvent = events.Count;
-                        state = DestroyFieldCard(state, target, events);
-                        destroyed |= events.Skip(firstEvent).Any(e => e is MonsterDestroyed m && m.Card == target.Card ||
-                            e is SpellTrapDestroyed s && s.Card == target.Card);
-                    }
-                    if (destroy.StopUnlessAnyDestroyed && !destroyed)
-                    {
-                        events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
-                        break;
-                    }
-                    continue;
-                }
-                foreach (var target in valid)
-                    state = step switch
-                    {
-                        ReturnTargetsToHandStep => ReturnFieldCardToHand(state, target, definition.EffectId, events),
-                        ChangeTargetsToDefenseStep => ChangeToDefense(state, target, events),
-                        ModifyTargetsUntilEndStep stats => ModifyUntilEnd(state, target, stats, definition.EffectId, events),
-                        ModifyTargetsStep lasting => target.Location == FieldLocation.MonsterZone
-                            ? ModifyLasting(state, new(target.Player, target.Zone, target.Card, target.PlacementId), lasting.Attack, lasting.Defense, definition.EffectId, events) : state,
-                        FlipTargetsFaceDownStep => FlipFaceDown(state, target, events),
-                        FlipTargetsFaceUpStep flip => FlipFaceUp(state, target, flip, events),
-                        AttachTargetsToSelfStep => AttachMonsterAsMaterial(state, link, target, definition.EffectId, events),
-                        BanishFieldTargetsStep => BanishFieldCard(state, target, definition.EffectId, events),
-                        DestroyAndBanishTargetsStep => DestroyAndBanishFieldCard(state, target, definition.EffectId, events),
-                        ModifyCombatantStatsStep stats => ModifyCombatant(state, link, target, stats, definition.EffectId, events),
-                        DamageByTargetAttackStep => GetMonsterStatistics(state, target.Player, target.Zone)?.Attack is int damage and > 0
-                            ? DealEffectDamage(state, Other(controller), damage, definition.EffectId, events) : state,
-                        GainByTargetAttackStep => GetMonsterStatistics(state, target.Player, target.Zone)?.Attack is int gain and > 0
-                            ? GainLifePoints(state, controller, gain, definition.EffectId, events) : state,
-                        AddTargetsToHandStep => MoveZoneCardToHand(state, target, definition.EffectId, events),
-                        BanishTargetsStep => MoveZoneCard(state, target, toBanished: true, definition.EffectId, events),
-                        _ => MoveZoneCard(state, target, toBanished: false, definition.EffectId, events)
-                    };
-            }
-            else if (step is DestroyExtremeMonsterStep extreme)
-            {
-                var tied = ExtremeCandidates(state, controller, extreme);
-                if (tied.Length == 0)
-                {
-                    events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.NoMatchingCard));
-                    continue;
-                }
-                var chosen = tied.Length == 1 ? tied[0]
-                    : choice is ChooseDefinitionCard pick ? tied.FirstOrDefault(t => t.Card.InstanceId == pick.CardInstanceId) : null;
-                if (chosen is null)
-                    return (state, new PendingDefinitionCardChoice(checked(State.Revision + 1), controller, definition.EffectId,
-                        link.Number, i, tied.Select(t => t.Card)));
-                state = DestroyFieldCard(state, chosen, events);
-                choice = null;
-            }
-            else if (step is SpecialSummonStep summon)
-            {
-                if (choice is not (ChooseDefinitionSummon or FinishDefinitionSummon))
-                {
-                    var options = SpecialSummonOptions(state, controller, summon, link.Activation.Spell).ToArray();
-                    if (options.Length == 0)
-                    {
-                        events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.SummonUnavailable));
-                        continue;
-                    }
-                    var zones = Enumerable.Range(0, 5).Where(z => state.GetPlayer(controller).MonsterZones[z] is null);
-                    return (state, new PendingDefinitionSummon(checked(State.Revision + 1), controller, definition.EffectId,
-                        link.Number, i, options, zones, summon.Position, canFinish: summon.AnyNumber && summon.MinCount == 0));
-                }
-                state = ApplySpecialSummons(state, link, summon, FinalSummonPicks(state, choice), definition.EffectId, events);
-                choice = null;
-            }
-            else
-                state = step switch
-                {
-                    GainLifePointsStep gain => GainForPlayers(state, controller, gain, definition.EffectId, events),
-                    DealDamageStep damage => Scaled(state, controller, damage.Amount, damage.PerCount, damage.CountFilter) is int amount and > 0
-                        ? DealEffectDamage(state, Other(controller), amount, definition.EffectId, events) : state,
-                    DamageBothPlayersStep both => DamageBothPlayers(state, controller, both, definition.EffectId, events),
-                    TakeDamageStep take => DealEffectDamage(state, controller, take.Amount, definition.EffectId, events),
-                    DiscardRandomStep discard => DiscardRandom(state, controller, discard, definition.EffectId, events),
-                    BanishSourceWhenItLeavesStep => BanishSourceWhenItLeaves(state, link),
-                    WeakenEventMonsterStep weaken => WeakenEventMonster(state, link, weaken, definition.EffectId, events),
-                    PayDownToGainStep pay => PayDownToGain(state, controller, link, pay, definition.EffectId, events),
-                    SetDeclaredLevelStep level => SetDeclaredLevel(state, controller, link, level),
-                    ReduceSourceScaleStep reduce => ReduceSourceScale(state, link, reduce, definition.EffectId, events),
-                    DestroyAboveSourceScaleStep above => DestroyAboveSourceScale(state, controller, link, above, events),
-                    BanishEventMonsterStep => BanishEventMonster(state, link, definition.EffectId, events),
-                    BanishSourceCardStep => BanishSourceCard(state, link, definition.EffectId, events),
-                    RedirectRespondedDamageStep => RedirectRespondedDamage(state, controller, link),
-                    SummonTokensStep tokens => SummonTokens(state, link, tokens, events),
-                    ShuffleDeckStep => ShuffleDeck(state, controller, definition.EffectId, events),
-                    GrantNormalSummonStep => GrantNormalSummon(state, definition.EffectId, events),
-                    // A declared name is fixed when the lock is applied; "until the End of your opponent's next turn" counts from whose turn it is.
-                    ApplyRuleLockStep apply => ApplyTimedLock(state, controller, apply.Lock with { Cards = apply.Lock.Cards is { } locked ? ConcreteDeclared(locked) : null },
-                        definition.EffectId, events, apply.ThroughOpponentsNextTurn ? state.TurnNumber + (state.ActivePlayer == controller ? 1 : 2) : null),
-                    EachPlayerTossesCoinStep coins => EachPlayerTosses(state, controller, coins, definition.EffectId, events),
-                    DiceDuelStep dice => DiceDuel(state, controller, dice, definition.EffectId, events),
-                    ExcavateStep excavate => Excavate(state, controller, excavate.Count, definition.EffectId, events),
-                    ReturnAttackerToHandStep => ReturnAttacker(state, link, definition.EffectId, events),
-                    // "Draw ... and skip": if the draw was stopped, nothing is skipped either (Reckless Greed ruling).
-                    SkipPhaseStep when definition.Steps.Any(s => s is DrawCardsStep) && RuleLocked(state, LockedAction.Draw, controller, null) => state,
-                    SkipPhaseStep skip => AddPhaseSkips(state, controller, skip),
-                    EndBattlePhaseStep => EndBattlePhase(state, events),
-                    SendSourceToGraveyardStep => SendSourceToGraveyard(state, link, events),
-                    OpponentAddsFromDeckStep add => OpponentAddsFromDeck(state, controller, add, definition.EffectId, events),
-                    SendExcavatedToGraveyardStep => SendExcavatedToGraveyard(state, controller, definition.EffectId, events),
-                    OpponentDiscardsMatchingStep discard => OpponentDiscardsMatching(state, controller, discard, definition.EffectId, events),
-                    ApplyGraveyardRedirectStep redirect => AddTimedRedirect(state, controller, redirect.Rule),
-                    RollDieStep => RollDie(state, controller, definition.EffectId, events),
-                    TossCoinsStep coins => TossCoins(state, controller, coins.Count, definition.EffectId, events),
-                    ModifyAllUntilEndStep all => ModifyAllUntilEnd(state, controller, all, definition.EffectId, events),
-                    LookAtOpponentHandStep look => LookAtOpponentHand(state, controller, look.IncludeSetCards, definition.EffectId, events),
-                    ApplyDamageRuleStep damageRule => AddTimedDamageRule(state, controller, damageRule),
-                    ReturnSourceToDeckTopStep => ReturnSourceToDeckTop(state, link, definition.EffectId, events),
-                    DestroyTargetStep => DestroyTarget(state, link, events),
-                    DestroyOpponentFaceUpMonstersStep => DestroyOpponentFaceUpMonsters(state, Other(controller), events),
-                    NegateActivationStep negate => NegateLink(state, links, link, ChainNegation.Activation, negate.DestroySource, events),
-                    NegateEffectStep negate => NegateLink(state, links, link,
-                        links[link.TargetLinkNumber!.Value - 1].ActivationNegated ? ChainNegation.Activation : ChainNegation.Effect, negate.DestroySource, events),
-                    NegateSummonStep => link.TargetLinkNumber is not null
-                        ? NegateLink(state, links, link, ChainNegation.Activation, true, events) : ResolveSummonNegation(state, link, events),
-                    DrawCardsStep draw => DrawingPlayers(controller, draw.Players)
-                        .Aggregate(state, (s, p) => s.Outcome is null ? DrawCards(s, p, draw.Count, events) : s),
-                    MillTopOfDeckStep mill => MillAndRecord(state, controller, mill.Count, definition.EffectId, events),
-                    DestroyAllStep all => FieldMatches(state, controller, all.Kind, all.Side, all.Filter, all.IncludeSelf ? null : link.Activation.Spell.InstanceId)
-                        .Where(t => (all.Cards is null || MatchesFilter(t.Card, all.Cards)) && Affects(state, link, t)).ToArray().Aggregate(state, (s, t) => DestroyFieldCard(s, t, events)),
-                    ReturnAllToHandStep all => FieldMatches(state, controller, all.Kind, all.Side, FieldCardFilter.Any, link.Activation.Spell.InstanceId)
-                        .Where(t => Affects(state, link, t)).ToArray().Aggregate(state, (s, t) => ReturnFieldCardToHand(s, t, definition.EffectId, events)),
-                    BanishAllStep all => FieldMatches(state, controller, FieldCardKind.Monster, all.Side, all.Filter, null)
-                        .Where(t => Affects(state, link, t)).ToArray().Aggregate(state, (s, t) => BanishFieldCard(s, t, definition.EffectId, events)),
-                    ChangeAllToDefenseStep all => FieldMatches(state, controller, FieldCardKind.Monster, all.Side, FieldCardFilter.AttackPosition, null)
-                        .Where(t => Affects(state, link, t)).ToArray().Aggregate(state, (s, t) => ChangeToDefense(s, t, events)),
-                    _ => throw new InvalidOperationException("Unsupported effect step.")
-                };
-            if (state.Outcome is not null) break;
+            var result = ResolveDefinitionStep(state, links, link, definition, i, step, choice, events);
+            state = result.State;
+            if (result.Pause is not null) return (state, result.Pause);
+            choice = result.Choice;
+            if (result.Flow == StepFlow.Stop || result.Flow == StepFlow.Checked && state.Outcome is not null) break;
         }
         return (state, null);
+    }
+
+    /// <summary>One definition step, by family; steps on one bound target come before the general target steps.</summary>
+    private StepResult ResolveDefinitionStep(DuelState state, ChainLink[] links, ChainLink link, EffectDefinition definition, int index,
+        EffectStep step, DuelCommand? choice, List<DuelEvent> events)
+    {
+        if (step is SpecialSummonSelfStep self) return SummonSelfStep(state, link, definition, index, self, choice, events);
+        if (step is DiscardCardsStep discard)
+        {
+            var discarded = ResolveChosenDiscards(state, link, definition, discard, index, choice, events);
+            return discarded.Pause is { } paused ? StepResult.Paused(discarded.State, paused) : new(discarded.State, StepFlow.Next, null);
+        }
+        if (IsGuardStep(step)) return GuardStep(state, link, definition, step, choice, events);
+        if (CardSelectionSteps.Handles(step))
+        {
+            var selected = CardSelectionSteps.Resolve(state, link.Activation.Player, step,
+                new(definition.EffectId, link.Number, index, State.Revision), choice, rules, MatchesFilter, events);
+            if (selected.Pause is { } pause) return StepResult.Paused(selected.State, pause);
+            bool ended = step is AddFromDeckToHandStep or SendFromDeckToGraveyardStep && selected.State.Outcome is not null;
+            return new(selected.State, ended ? StepFlow.Stop : StepFlow.Next, selected.Choice);
+        }
+        if (step is TakeChosenControlStep or SwapChosenMonstersStep or DestroyTargetAtStep or GiveTargetControlStep)
+            return ControlStep(state, link, definition, index, step, choice, events);
+        if (step is OpponentCallsRandomHandCardStep)
+        {
+            var (called, call, stop) = CallRandomHandCard(state, link, definition, index, choice, events);
+            return call is not null ? StepResult.Paused(called, call) : new(called, stop ? StepFlow.Stop : StepFlow.Next, null);
+        }
+        if (IsXyzStep(step)) return XyzStep(state, link, definition, index, step, choice, events);
+        if (EffectDefinition.IsFieldTargetStep(step) || EffectDefinition.IsZoneTargetStep(step))
+            return TargetedStep(state, link, definition, index, step, choice, events);
+        if (step is DestroyExtremeMonsterStep extreme) return DestroyExtremeStep(state, link, definition, index, extreme, choice, events);
+        if (step is SpecialSummonStep summon) return SpecialSummonFromStep(state, link, definition, index, summon, choice, events);
+        return new(ImmediateStep(state, links, link, definition, step, events), StepFlow.Checked, choice);
+    }
+
+    /// <summary>Steps on the link's bound targets; with every target gone, the rest of the effect does not resolve.</summary>
+    private StepResult TargetedStep(DuelState state, ChainLink link, EffectDefinition definition, int index, EffectStep step,
+        DuelCommand? choice, List<DuelEvent> events)
+    {
+        var controller = link.Activation.Player;
+        var valid = QualifyingTargets(state, link, definition).ToArray();
+        if (valid.Length == 0) return StepResult.Skip(state, link, ChainSkipReason.TargetUnavailable, events);
+        switch (step)
+        {
+            case SpecialSummonTargetStep revive:
+                return ReviveTargetStep(state, link, definition, index, revive, valid[0], choice, events);
+            case TakeControlStep or GiveControlStep or SwitchControlStep:
+                return new(ControlTargetsStep(state, link, definition, step, valid, events), StepFlow.Next, choice);
+            case EquipTargetStep:
+                return new(AttachEquip(state, link, valid[0]), StepFlow.Next, choice);
+            case UnionEquipStep:
+                return new(EquipUnion(state, link, valid[0], events), StepFlow.Next, choice);
+            case PlaceCounterStep counters:
+                return new(PlaceCounters(state, valid[0], counters, events), StepFlow.Next, choice);
+            case ChangeTargetsTraitStep or SetTargetScaleStep:
+                if (link.Declared is int declared)
+                    foreach (var target in valid)
+                        state = step is ChangeTargetsTraitStep trait ? ChangeTrait(state, target, trait, declared, definition.EffectId, events)
+                            : SetScale(state, target, declared, definition.EffectId, events);
+                return new(state, StepFlow.Next, choice);
+            case ChangeTargetsNameStep nameChange:
+                foreach (var target in valid) state = ChangeName(state, target, nameChange, definition.EffectId, events);
+                return new(state, StepFlow.Next, choice);
+            case LockTargetsUntilEndStep lockTargets:
+                foreach (var target in valid.Where(t => t.Location == FieldLocation.MonsterZone))
+                    state = AddBoundLock(state, controller, lockTargets.Actions, target, definition.EffectId, events);
+                return new(state, StepFlow.Next, choice);
+            case NegateAttackStep:
+                if (state.Battle is not { Attack: { Cancellation: null } attack } battle || attack.Attacker.Card != valid[0].Card)
+                    return StepResult.Skip(state, link, ChainSkipReason.TargetUnavailable, events);
+                events.Add(new AttackCancelled(attack.Id, BattleAttackCancellation.Negated));
+                return new(state.WithBattle(battle with { Attack = attack with { Cancellation = BattleAttackCancellation.Negated } }), StepFlow.Next, choice);
+            case ShuffleTargetsIntoDeckStep shuffle:
+                state = ShuffleIntoDecks(state, valid, definition.EffectId, events);
+                return new(state, shuffle.StopUnlessAll && valid.Length < (link.Activation.FieldTargets?.Count ?? 0) ? StepFlow.Stop : StepFlow.Next, choice);
+            case DestroyTargetsStep destroy:
+            {
+                bool destroyed = false;
+                foreach (var target in valid)
+                {
+                    int firstEvent = events.Count;
+                    state = DestroyFieldCard(state, target, events);
+                    destroyed |= events.Skip(firstEvent).Any(e => e is MonsterDestroyed m && m.Card == target.Card ||
+                        e is SpellTrapDestroyed s && s.Card == target.Card);
+                }
+                return destroy.StopUnlessAnyDestroyed && !destroyed ? StepResult.Skip(state, link, ChainSkipReason.NoMatchingCard, events)
+                    : new(state, StepFlow.Next, choice);
+            }
+        }
+        foreach (var target in valid)
+            state = step switch
+            {
+                ReturnTargetsToHandStep => ReturnFieldCardToHand(state, target, definition.EffectId, events),
+                ChangeTargetsToDefenseStep => ChangeToDefense(state, target, events),
+                ModifyTargetsUntilEndStep stats => ModifyUntilEnd(state, target, stats, definition.EffectId, events),
+                ModifyTargetsStep lasting => target.Location == FieldLocation.MonsterZone
+                    ? ModifyLasting(state, new(target.Player, target.Zone, target.Card, target.PlacementId), lasting.Attack, lasting.Defense, definition.EffectId, events) : state,
+                FlipTargetsFaceDownStep => FlipFaceDown(state, target, events),
+                FlipTargetsFaceUpStep flip => FlipFaceUp(state, target, flip, events),
+                AttachTargetsToSelfStep => AttachMonsterAsMaterial(state, link, target, definition.EffectId, events),
+                BanishFieldTargetsStep => BanishFieldCard(state, target, definition.EffectId, events),
+                DestroyAndBanishTargetsStep => DestroyAndBanishFieldCard(state, target, definition.EffectId, events),
+                ModifyCombatantStatsStep stats => ModifyCombatant(state, link, target, stats, definition.EffectId, events),
+                DamageByTargetAttackStep => GetMonsterStatistics(state, target.Player, target.Zone)?.Attack is int damage and > 0
+                    ? DealEffectDamage(state, Other(controller), damage, definition.EffectId, events) : state,
+                GainByTargetAttackStep => GetMonsterStatistics(state, target.Player, target.Zone)?.Attack is int gain and > 0
+                    ? GainLifePoints(state, controller, gain, definition.EffectId, events) : state,
+                AddTargetsToHandStep => MoveZoneCardToHand(state, target, definition.EffectId, events),
+                BanishTargetsStep => MoveZoneCard(state, target, toBanished: true, definition.EffectId, events),
+                _ => MoveZoneCard(state, target, toBanished: false, definition.EffectId, events)
+            };
+        return new(state, StepFlow.Checked, choice);
+    }
+
+    /// <summary>Destroys the face-up monster with the lowest or highest stat; its controller chooses among ties.</summary>
+    private StepResult DestroyExtremeStep(DuelState state, ChainLink link, EffectDefinition definition, int index, DestroyExtremeMonsterStep extreme,
+        DuelCommand? choice, List<DuelEvent> events)
+    {
+        var tied = ExtremeCandidates(state, link.Activation.Player, extreme);
+        if (tied.Length == 0) return StepResult.SkipAndContinue(state, link, ChainSkipReason.NoMatchingCard, events, choice);
+        var chosen = tied.Length == 1 ? tied[0]
+            : choice is ChooseDefinitionCard pick ? tied.FirstOrDefault(t => t.Card.InstanceId == pick.CardInstanceId) : null;
+        if (chosen is null)
+            return StepResult.Paused(state, new PendingDefinitionCardChoice(checked(State.Revision + 1), link.Activation.Player, definition.EffectId,
+                link.Number, index, tied.Select(t => t.Card)));
+        return new(DestroyFieldCard(state, chosen, events), StepFlow.Checked, null);
+    }
+
+    /// <summary>Steps that resolve at once, without a choice or a bound target.</summary>
+    private DuelState ImmediateStep(DuelState state, ChainLink[] links, ChainLink link, EffectDefinition definition, EffectStep step, List<DuelEvent> events)
+    {
+        var controller = link.Activation.Player;
+        return step switch
+        {
+            GainLifePointsStep gain => GainForPlayers(state, controller, gain, definition.EffectId, events),
+            DealDamageStep damage => Scaled(state, controller, damage.Amount, damage.PerCount, damage.CountFilter) is int amount and > 0
+                ? DealEffectDamage(state, Other(controller), amount, definition.EffectId, events) : state,
+            DamageBothPlayersStep both => DamageBothPlayers(state, controller, both, definition.EffectId, events),
+            TakeDamageStep take => DealEffectDamage(state, controller, take.Amount, definition.EffectId, events),
+            DiscardRandomStep discard => DiscardRandom(state, controller, discard, definition.EffectId, events),
+            BanishSourceWhenItLeavesStep => BanishSourceWhenItLeaves(state, link),
+            WeakenEventMonsterStep weaken => WeakenEventMonster(state, link, weaken, definition.EffectId, events),
+            PayDownToGainStep pay => PayDownToGain(state, controller, link, pay, definition.EffectId, events),
+            SetDeclaredLevelStep level => SetDeclaredLevel(state, controller, link, level),
+            ReduceSourceScaleStep reduce => ReduceSourceScale(state, link, reduce, definition.EffectId, events),
+            DestroyAboveSourceScaleStep above => DestroyAboveSourceScale(state, controller, link, above, events),
+            BanishEventMonsterStep => BanishEventMonster(state, link, definition.EffectId, events),
+            BanishSourceCardStep => BanishSourceCard(state, link, definition.EffectId, events),
+            RedirectRespondedDamageStep => RedirectRespondedDamage(state, controller, link),
+            SummonTokensStep tokens => SummonTokens(state, link, tokens, events),
+            ShuffleDeckStep => ShuffleDeck(state, controller, definition.EffectId, events),
+            GrantNormalSummonStep => GrantNormalSummon(state, definition.EffectId, events),
+            // A declared name is fixed when the lock is applied; "until the End of your opponent's next turn" counts from whose turn it is.
+            ApplyRuleLockStep apply => ApplyTimedLock(state, controller, apply.Lock with { Cards = apply.Lock.Cards is { } locked ? ConcreteDeclared(locked) : null },
+                definition.EffectId, events, apply.ThroughOpponentsNextTurn ? state.TurnNumber + (state.ActivePlayer == controller ? 1 : 2) : null),
+            EachPlayerTossesCoinStep coins => EachPlayerTosses(state, controller, coins, definition.EffectId, events),
+            DiceDuelStep dice => DiceDuel(state, controller, dice, definition.EffectId, events),
+            ExcavateStep excavate => Excavate(state, controller, excavate.Count, definition.EffectId, events),
+            ReturnAttackerToHandStep => ReturnAttacker(state, link, definition.EffectId, events),
+            // "Draw ... and skip": if the draw was stopped, nothing is skipped either (Reckless Greed ruling).
+            SkipPhaseStep when definition.Steps.Any(s => s is DrawCardsStep) && RuleLocked(state, LockedAction.Draw, controller, null) => state,
+            SkipPhaseStep skip => AddPhaseSkips(state, controller, skip),
+            EndBattlePhaseStep => EndBattlePhase(state, events),
+            SendSourceToGraveyardStep => SendSourceToGraveyard(state, link, events),
+            OpponentAddsFromDeckStep add => OpponentAddsFromDeck(state, controller, add, definition.EffectId, events),
+            SendExcavatedToGraveyardStep => SendExcavatedToGraveyard(state, controller, definition.EffectId, events),
+            OpponentDiscardsMatchingStep discard => OpponentDiscardsMatching(state, controller, discard, definition.EffectId, events),
+            ApplyGraveyardRedirectStep redirect => AddTimedRedirect(state, controller, redirect.Rule),
+            RollDieStep => RollDie(state, controller, definition.EffectId, events),
+            TossCoinsStep coins => TossCoins(state, controller, coins.Count, definition.EffectId, events),
+            ModifyAllUntilEndStep all => ModifyAllUntilEnd(state, controller, all, definition.EffectId, events),
+            LookAtOpponentHandStep look => LookAtOpponentHand(state, controller, look.IncludeSetCards, definition.EffectId, events),
+            ApplyDamageRuleStep damageRule => AddTimedDamageRule(state, controller, damageRule),
+            ReturnSourceToDeckTopStep => ReturnSourceToDeckTop(state, link, definition.EffectId, events),
+            DestroyTargetStep => DestroyTarget(state, link, events),
+            DestroyOpponentFaceUpMonstersStep => DestroyOpponentFaceUpMonsters(state, Other(controller), events),
+            NegateActivationStep negate => NegateLink(state, links, link, ChainNegation.Activation, negate.DestroySource, events),
+            NegateEffectStep negate => NegateLink(state, links, link,
+                links[link.TargetLinkNumber!.Value - 1].ActivationNegated ? ChainNegation.Activation : ChainNegation.Effect, negate.DestroySource, events),
+            NegateSummonStep => link.TargetLinkNumber is not null
+                ? NegateLink(state, links, link, ChainNegation.Activation, true, events) : ResolveSummonNegation(state, link, events),
+            DrawCardsStep draw => DrawingPlayers(controller, draw.Players)
+                .Aggregate(state, (s, p) => s.Outcome is null ? DrawCards(s, p, draw.Count, events) : s),
+            MillTopOfDeckStep mill => MillAndRecord(state, controller, mill.Count, definition.EffectId, events),
+            DestroyAllStep all => FieldMatches(state, controller, all.Kind, all.Side, all.Filter, all.IncludeSelf ? null : link.Activation.Spell.InstanceId)
+                .Where(t => (all.Cards is null || MatchesFilter(t.Card, all.Cards)) && Affects(state, link, t)).ToArray().Aggregate(state, (s, t) => DestroyFieldCard(s, t, events)),
+            ReturnAllToHandStep all => FieldMatches(state, controller, all.Kind, all.Side, FieldCardFilter.Any, link.Activation.Spell.InstanceId)
+                .Where(t => Affects(state, link, t)).ToArray().Aggregate(state, (s, t) => ReturnFieldCardToHand(s, t, definition.EffectId, events)),
+            BanishAllStep all => FieldMatches(state, controller, FieldCardKind.Monster, all.Side, all.Filter, null)
+                .Where(t => Affects(state, link, t)).ToArray().Aggregate(state, (s, t) => BanishFieldCard(s, t, definition.EffectId, events)),
+            ChangeAllToDefenseStep all => FieldMatches(state, controller, FieldCardKind.Monster, all.Side, FieldCardFilter.AttackPosition, null)
+                .Where(t => Affects(state, link, t)).ToArray().Aggregate(state, (s, t) => ChangeToDefense(s, t, events)),
+            _ => throw new InvalidOperationException("Unsupported effect step.")
+        };
     }
 
     /// <summary>Matching field cards, the activating player's side first: monsters, then Spell/Trap and Pendulum zones.</summary>
@@ -1253,84 +1038,6 @@ public sealed partial class DuelEngine
         if (command.Player != pending.Player) return Reject(DuelError.NotActivePlayer);
         if (!pending.Options.Any(c => c.InstanceId == command.CardInstanceId)) return Reject(DuelError.InvalidDecisionChoice);
         return ResolveChainLink(chain, definitionChoice: command);
-    }
-
-    /// <summary>Eligible hand, Deck, then Graveyard cards, each with at least one legal zone.</summary>
-    private IEnumerable<DefinitionSummonOption> SpecialSummonOptions(DuelState state, PlayerId playerId, SpecialSummonStep step,
-        CardInstance source)
-    {
-        var player = state.GetPlayer(playerId);
-        foreach (var (flag, from) in new[] { (SpecialSummonSources.Hand, DecisionCardSource.Hand), (SpecialSummonSources.Deck, DecisionCardSource.Deck),
-                     (SpecialSummonSources.Graveyard, DecisionCardSource.Graveyard) })
-        {
-            if (!step.Sources.HasFlag(flag)) continue;
-            foreach (var card in SpecialSourceCards(player, from).Where(c => step.Filter is { } filter ? MatchesFilter(c, filter) : step.EligibleCardIds.Contains(c.GameCardId)))
-                if (Enumerable.Range(0, 5).Any(z => CheckSpecialSummon(state, playerId, card, z, BattlePosition.FaceUpAttack, from,
-                        lockExemptSource: source) == DuelError.None))
-                    yield return new(card, from);
-        }
-    }
-
-    private DuelActionResult AnswerDefinitionSummon(PendingChain chain, ChooseDefinitionSummon command)
-    {
-        var pending = chain.DefinitionSummon!;
-        if (command.DecisionId != pending.DecisionId) return Reject(DuelError.StaleDecision);
-        if (command.Player != pending.Player) return Reject(DuelError.NotActivePlayer);
-        if (!pending.PositionOptions.Contains(command.Position)) return Reject(DuelError.InvalidBattlePosition);
-        if (!pending.MonsterZoneOptions.Contains(command.MonsterZone)) return Reject(DuelError.InvalidMonsterZone);
-        var option = pending.Options.SingleOrDefault(o => o.Card.InstanceId == command.CardInstanceId);
-        if (option is null) return Reject(DuelError.InvalidDecisionChoice);
-        var link = chain.Links[pending.LinkNumber - 1];
-        var definition = LinkDefinition(link);
-        // A Rank-Up goes into the zone its material frees; its options were already checked against that zone.
-        if (definition.Steps[pending.StepIndex] is not RankUpStep &&
-            CheckSpecialSummon(State, pending.Player, option.Card, command.MonsterZone, command.Position, option.Source,
-                lockExemptSource: link.Activation.Spell, sourcePlayer: option.From, allowFaceDown: true) is not DuelError.None and var error)
-            return Reject(error);
-        var remaining = pending.Options.Where(o => o != option).ToArray();
-        var zones = pending.MonsterZoneOptions.Where(z => z != command.MonsterZone).ToArray();
-        if (definition.Steps[pending.StepIndex] is not SpecialSummonStep { AnyNumber: true } || remaining.Length == 0 || zones.Length == 0)
-            return ResolveChainLink(chain, definitionChoice: command);
-        var next = new PendingDefinitionSummon(checked(State.Revision + 1), pending.Player, pending.EffectId, pending.LinkNumber, pending.StepIndex,
-            remaining, zones, pending.PositionOptions.Count == 1 ? pending.PositionOptions[0] : null,
-            pending.Picks.Append(new(option.Card, option.Source, command.MonsterZone, command.Position)), canFinish: true);
-        return Accept(State.WithChain(new(next.DecisionId, chain.Links, chain.Responder, chain.ConsecutivePasses, chain.NextLink, definitionChoice: next)),
-            new DefinitionSummonRequested(next));
-    }
-
-    private DuelActionResult FinishDefinitionSummons(PendingChain chain, FinishDefinitionSummon command)
-    {
-        var pending = chain.DefinitionSummon!;
-        if (command.DecisionId != pending.DecisionId) return Reject(DuelError.StaleDecision);
-        if (command.Player != pending.Player) return Reject(DuelError.NotActivePlayer);
-        return pending.CanFinish ? ResolveChainLink(chain, definitionChoice: command) : Reject(DuelError.InvalidDecisionChoice);
-    }
-
-    /// <summary>The monsters chosen across a pending Summon, including the answer that ended it.</summary>
-    private static ChosenDefinitionSummon[] FinalSummonPicks(DuelState state, DuelCommand? answer)
-    {
-        var pending = state.PendingChain!.DefinitionSummon!;
-        if (answer is not ChooseDefinitionSummon last) return [.. pending.Picks];
-        var option = pending.Options.Single(o => o.Card.InstanceId == last.CardInstanceId);
-        return [.. pending.Picks, new(option.Card, option.Source, last.MonsterZone, last.Position)];
-    }
-
-    /// <summary>Places the chosen monsters together, schedules any End Phase banishment, then shuffles once after a Deck summon.</summary>
-    private DuelState ApplySpecialSummons(DuelState state, ChainLink link, SpecialSummonStep step, ChosenDefinitionSummon[] picks,
-        string effectId, List<DuelEvent> events)
-    {
-        var controller = link.Activation.Player;
-        foreach (var pick in picks)
-        {
-            state = PlaceSpecialSummon(state, controller, pick.Card, pick.MonsterZone, pick.Position, pick.Source, events);
-            if (!step.BanishAtEndPhase) continue;
-            var placed = state.GetPlayer(controller).MonsterZones[pick.MonsterZone]!;
-            var delayed = new PendingEndPhaseBanishment(controller, effectId, link.Activation.Spell, pick.Card, pick.MonsterZone,
-                state.TurnNumber, placed.PlacementId);
-            state = state.WithEndPhaseBanishments(state.PendingEndPhaseBanishments.Append(delayed));
-            events.Add(new EndPhaseBanishmentScheduled(delayed));
-        }
-        return picks.Any(p => p.Source == DecisionCardSource.Deck) ? ShuffleDeck(state, controller, effectId, events) : state;
     }
 
     /// <summary>An absent or replaced target is neither destroyed nor retargeted.</summary>

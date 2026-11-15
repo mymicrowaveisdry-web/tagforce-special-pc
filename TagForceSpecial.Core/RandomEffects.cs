@@ -276,4 +276,30 @@ public sealed partial class DuelEngine
 
     /// <summary>True when a face-up effect makes this player keep their hand revealed.</summary>
     public bool HandRevealed(PlayerId player) => RuleLocked(State, LockedAction.HideHand, player, null);
+
+    private static bool IsGuardStep(EffectStep step) => step is StopUnlessRollStep or StopUnlessHeadsStep or StopUnlessOwnTurnStep or
+        StopUnlessSpecialSummonedStep or StopUnlessActivatedThisTurnStep or StopUnlessHandHoldsStep or StopUnlessMilledStep or StopUnlessNoOwnMonstersStep;
+
+    /// <summary>A "stop unless" step passes, or ends the link; a failed mill check can also destroy the source in the hand.</summary>
+    private StepResult GuardStep(DuelState state, ChainLink link, EffectDefinition definition, EffectStep step, DuelCommand? choice, List<DuelEvent> events)
+    {
+        var controller = link.Activation.Player;
+        var last = state.Bookkeeping.LastRandom;
+        bool passes = step switch
+        {
+            StopUnlessRollStep roll => last is not null && roll.Values.Contains(last.Die),
+            StopUnlessHeadsStep heads => last is not null && last.Heads >= heads.Minimum,
+            StopUnlessOwnTurnStep => state.ActivePlayer == controller,
+            StopUnlessSpecialSummonedStep => link.Trigger?.Source is { } summonedSource && WasSpecialSummoned(state, summonedSource),
+            StopUnlessActivatedThisTurnStep => ScaleActivatedThisTurn(state, controller, link.Activation.SpellTrapZone, link.Activation.Spell, link.SourcePlacementId),
+            StopUnlessHandHoldsStep holds => HandHolds(state, controller, holds),
+            StopUnlessMilledStep milled => last?.Milled is { } top && MatchesFilter(top, milled.Filter),
+            StopUnlessNoOwnMonstersStep => state.GetPlayer(controller).MonsterZones.All(m => m is null),
+            _ => throw new ArgumentOutOfRangeException(nameof(step))
+        };
+        if (passes) return new(state, StepFlow.Next, choice);
+        if (step is StopUnlessMilledStep { DestroySourceOtherwise: true })
+            state = DestroyInHand(state, controller, link.Activation.Spell, definition.EffectId, events);
+        return StepResult.Skip(state, link, ChainSkipReason.NoMatchingCard, events);
+    }
 }
