@@ -194,7 +194,7 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
     protected override void UnloadContent()
     {
         graphicsThread.Check();
-        importCancellation?.Cancel();
+        setupOperation?.Dispose();
         diagnosticPreview?.Dispose();
         diagnosticPreviewBlend?.Dispose();
         router?.Dispose();

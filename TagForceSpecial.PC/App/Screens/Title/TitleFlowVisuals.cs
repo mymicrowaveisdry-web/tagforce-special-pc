@@ -43,29 +43,21 @@ public static partial class TitleFlowText
 /// <summary>Draws flow frames from validated source textures and a PGF glyph atlas into one retained layer.</summary>
 public sealed partial class TitleFlowVisuals : IDisposable
 {
-    public const string RequiredFontSha256 = "250babd8a242d7eaaa84284c78d5e2273b29e61d0d8c01b65414e3248d7c1164";
-    private const int CellSize = 30, CellPitch = 32, BaselineRow = 24, GlyphLeft = 7;
-    private const char Bullet = '\u25CF';
+    public const string RequiredFontSha256 = PgfTextRenderer.RequiredFontSha256;
     private readonly GraphicsDevice device;
     private readonly FlowProfile profile;
     private readonly Dictionary<string, FlowFrame> frames = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, Texture2D> textures = new(StringComparer.Ordinal);
-    private readonly List<Texture2D> owned = [];
-    private readonly Dictionary<string, Texture2D> baked = new(StringComparer.Ordinal);
+    private readonly FlowTextureCache textures;
+    private readonly PgfTextRenderer textRenderer;
     private readonly byte[] eboot, titleMenu;
-    private readonly PgfFont? font;
-    private readonly Texture2D? atlas;
-    private readonly Dictionary<char, (int X, int Y)> cells = [];
-    private readonly Color[] atlasPixels = new Color[512 * 512];
-    private bool atlasDirty;
     private readonly BasicEffect effect;
     private readonly BlendState alpha, additive, maskBlend;
     private readonly DepthStencilState writeStencil, testStencil;
     public RenderTarget2D Layer { get; }
     public IEnumerable<string> FrameIds => frames.Keys;
-    public bool OriginalFontAvailable => font is not null;
+    public bool OriginalFontAvailable => textRenderer.OriginalFontAvailable;
     /// <summary>Fallback text used only when no game font was imported.</summary>
-    public List<(string Text, int X, int Y, Color Color)> FallbackLines { get; } = [];
+    public List<(string Text, int X, int Y, Color Color)> FallbackLines => textRenderer.FallbackLines;
 
     public static FlowProfile LoadProfile()
     {
@@ -84,19 +76,13 @@ public sealed partial class TitleFlowVisuals : IDisposable
         foreach (var frame in profile.Frames) frames.Add(frame.Id, frame);
         eboot = assets.ResolveBytes(TitleFlowReferenceResources.EbootKey);
         titleMenu = assets.ResolveBytes(TitleFlowReferenceResources.TitleMenuKey);
-        foreach (var embedded in profile.EbootTextures) textures.Add(embedded.Key, DecodeEboot(embedded));
+        textures = new(device, eboot);
+        foreach (var embedded in profile.EbootTextures) textures.AddEmbedded(embedded);
         foreach (var key in profile.Frames.SelectMany(f => f.Draws).Select(d => d.AssetKey).OfType<string>().Distinct(StringComparer.Ordinal))
-            if (!textures.ContainsKey(key)) textures.Add(key, assets.Resolve(key).Texture);
+            if (!textures.ContainsKey(key)) textures.AddBorrowed(key, assets.Resolve(key).Texture);
         // Menu bars come from the panel atlas referenced by the Main Menu/start menu profile.
-        textures.TryAdd("title.flow.m-menu-panel01", assets.Resolve("title.flow.m-menu-panel01").Texture);
-        if (fontFile is not null)
-        {
-            var parsed = new PgfFont(fontFile);
-            if (parsed.Sha256 != RequiredFontSha256) throw new InvalidDataException("PSP font file differs from the pinned system font.");
-            font = parsed;
-            atlas = new(device, 512, 512);
-            owned.Add(atlas);
-        }
+        textures.AddBorrowed("title.flow.m-menu-panel01", assets.Resolve("title.flow.m-menu-panel01").Texture);
+        textRenderer = new(device, fontFile, (texture, quad, color) => DrawQuad(texture, quad, 0, 0, true, color));
         Layer = new(device, 480, 272, false, SurfaceFormat.Color, DepthFormat.Depth24Stencil8);
         InitializeMainMenu();
         InitializeDeckMenu();
@@ -194,7 +180,7 @@ public sealed partial class TitleFlowVisuals : IDisposable
         device.DepthStencilState = draw.WriteMask ? writeStencil : draw.Stencil ? testStencil : DepthStencilState.None;
         device.SamplerStates[0] = draw.LinearSampling ? SamplerState.LinearClamp : SamplerState.PointClamp;
         effect.TextureEnabled = draw.AssetKey is not null;
-        effect.Texture = draw.AssetKey is { } key ? (draw.Add is { } add ? Specular(key, draw.Color, add) : textures[key]) : null;
+        effect.Texture = draw.AssetKey is { } key ? (draw.Add is { } add ? textures.Specular(key, draw.Color, add) : textures[key]) : null;
         // A baked specular texture already holds tex x colour + specular; only alpha still modulates.
         var material = draw.Add is not null && draw.AssetKey is not null
             ? new Color(255, 255, 255, draw.Color[3]) : new Color(draw.Color[0], draw.Color[1], draw.Color[2], draw.Color[3]);
@@ -212,27 +198,6 @@ public sealed partial class TitleFlowVisuals : IDisposable
             pass.Apply();
             device.DrawUserPrimitives(PrimitiveType.TriangleList, triangles, 0, triangles.Length / 3);
         }
-    }
-
-    /// <summary>GE separate specular: colour = texture x primary + specular, clamped, with texture alpha unchanged.
-    /// BasicEffect has no post-texture add, so the same result is baked per texture and colour.</summary>
-    private Texture2D Specular(string key, int[] primary, int[] add)
-    {
-        string id = $"{key}|{primary[0]},{primary[1]},{primary[2]}|{add[0]},{add[1]},{add[2]}";
-        if (baked.TryGetValue(id, out var existing)) return existing;
-        var source = textures[key];
-        var pixels = new Color[source.Width * source.Height];
-        source.GetData(pixels);
-        for (int i = 0; i < pixels.Length; i++)
-        {
-            var p = pixels[i];
-            pixels[i] = new Color(Math.Min(255, p.R * primary[0] / 255 + add[0]), Math.Min(255, p.G * primary[1] / 255 + add[1]),
-                Math.Min(255, p.B * primary[2] / 255 + add[2]), (int)p.A);
-        }
-        var texture = new Texture2D(device, source.Width, source.Height);
-        texture.SetData(pixels);
-        owned.Add(texture); baked.Add(id, texture);
-        return texture;
     }
 
     private static VertexPositionColorTexture[] Expand(VertexPositionColorTexture[] input, int primitive)
@@ -298,109 +263,13 @@ public sealed partial class TitleFlowVisuals : IDisposable
         run.X.Length == value.Length ? run.X : null);
     private void DrawAdvanced(string value, FlowText run) => DrawLine(value, run.X[0], run.Y, run.ScaleX, run.ScaleY, run.Color, run.ShadowAlpha);
 
-    private void DrawLine(string value, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha, float[]? measuredX = null)
-    {
-        if (font is null || atlas is null)
-        {
-            FallbackLines.Add((value.ToUpperInvariant(), (int)x, (int)y + 3, new Color(color & 255, (color >> 8) & 255, (color >> 16) & 255)));
-            return;
-        }
-        foreach (char c in value) EnsureGlyph(c);
-        if (atlasDirty) { atlas.SetData(atlasPixels); atlasDirty = false; }
-        var main = new Color((color) & 255, (color >> 8) & 255, (color >> 16) & 255, 255);
-        // Measured shadow: two copies at (+0,+1) and (+1,+1) beneath the opaque text.
-        if (shadowAlpha > 0)
-        {
-            var shadow = new Color(0, 0, 0, shadowAlpha);
-            Glyphs(value, x, y + 1, scaleX, scaleY, shadow, measuredX, 0);
-            Glyphs(value, x + 1, y + 1, scaleX, scaleY, shadow, measuredX, 1);
-        }
-        Glyphs(value, x, y, scaleX, scaleY, main, measuredX, 0);
-    }
-
-    private void Glyphs(string value, float x, float y, float scaleX, float scaleY, Color color, float[]? measuredX, float measuredOffset)
-    {
-        float pen = x;
-        float cellW = CellSize * scaleX, cellH = CellSize * scaleY;
-        for (int i = 0; i < value.Length; i++)
-        {
-            char c = value[i];
-            float at = measuredX is not null ? measuredX[i] + measuredOffset : pen;
-            var (cx, cy) = cells[c];
-            var quad = new FlowQuad(at, y, at + cellW, y + cellH, cx / 512f, cy / 512f, (cx + CellSize) / 512f, (cy + CellSize) / 512f, [255, 255, 255, 255], false);
-            DrawQuad(atlas!, quad, 0, 0, true, color);
-            pen += font!.Glyph(c)?.AdvanceH26_6 / 64f * scaleX ?? cellW / 2;
-        }
-    }
-
-    private void EnsureGlyph(char c)
-    {
-        if (cells.ContainsKey(c)) return;
-        int index = cells.Count;
-        int cx = 1 + index % 16 * CellPitch, cy = 1 + index / 16 * CellPitch;
-        if (cy + CellSize > 512) throw new InvalidOperationException("Glyph atlas budget exhausted.");
-        cells[c] = (cx, cy);
-        var glyph = font!.Glyph(c);
-        if (glyph is null && c == Bullet) { DrawBullet(cx, cy); atlasDirty = true; return; }
-        if (glyph is null || glyph.Width == 0) return;
-        for (int y = 0; y < glyph.Height; y++)
-            for (int x = 0; x < glyph.Width; x++)
-            {
-                int ax = cx + GlyphLeft + glyph.Left + x, ay = cy + BaselineRow - glyph.Top + y;
-                if (ax < cx || ay < cy || ax >= cx + CellSize || ay >= cy + CellSize) continue;
-                int coverage = glyph.Coverage4[y * glyph.Width + x] * 17;
-                atlasPixels[ay * 512 + ax] = new Color(255, 255, 255, coverage);
-            }
-        atlasDirty = true;
-    }
-
-    /// <summary>The Latin font has no bullet. This disc is authored and recorded as a known mismatch, not original typography.</summary>
-    private void DrawBullet(int cx, int cy)
-    {
-        const float centerX = GlyphLeft + 7.5f, centerY = BaselineRow - 7.5f, radius = 6.5f;
-        for (int y = 0; y < CellSize; y++)
-            for (int x = 0; x < CellSize; x++)
-            {
-                float distance = MathF.Sqrt((x + .5f - centerX) * (x + .5f - centerX) + (y + .5f - centerY) * (y + .5f - centerY));
-                int coverage = (int)(Math.Clamp(radius + .5f - distance, 0, 1) * 255);
-                atlasPixels[(cy + y) * 512 + cx + x] = new Color(255, 255, 255, coverage);
-            }
-    }
-
-    private Texture2D DecodeEboot(FlowEbootTexture source)
-    {
-        if (source.Width is <= 0 or > 512 || source.Height is <= 0 or > 512 || source.Bpp is not (4 or 8) || source.Offset < 0 ||
-            source.ClutOffset < 0 || source.Offset + source.Length > eboot.Length || source.ClutOffset + source.ClutBytes > eboot.Length)
-            throw new InvalidDataException("Invalid embedded texture reference.");
-        int pitch = source.Stride * source.Bpp / 8, rowsPerBlock = Math.Max(1, pitch / 16);
-        var pixels = new Color[source.Width * source.Height];
-        for (int y = 0; y < source.Height; y++)
-            for (int x = 0; x < source.Width; x++)
-            {
-                int byteX = x * source.Bpp / 8;
-                int at = source.Offset + y / 8 * rowsPerBlock * 128 + byteX / 16 * 128 + y % 8 * 16 + byteX % 16;
-                if (at >= eboot.Length) throw new InvalidDataException("Embedded texture exceeds source.");
-                int index = eboot[at];
-                if (source.Bpp == 4) index = index >> 4 * (x % 2) & 15;
-                int clut = source.ClutOffset + index * 4;
-                if (clut + 4 > source.ClutOffset + source.ClutBytes) throw new InvalidDataException("Embedded palette index out of range.");
-                pixels[y * source.Width + x] = new Color(eboot[clut], eboot[clut + 1], eboot[clut + 2], eboot[clut + 3]);
-            }
-        byte[] rgba = new byte[pixels.Length * 4];
-        Buffer.BlockCopy(Array.ConvertAll(pixels, p => p.PackedValue), 0, rgba, 0, rgba.Length);
-        if (Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(rgba)) != source.RgbaSha256)
-            throw new InvalidDataException("Embedded texture pixels differ from the measured original: " + source.Key);
-        var texture = new Texture2D(device, source.Width, source.Height);
-        texture.SetData(pixels);
-        owned.Add(texture);
-        return texture;
-    }
+    private void DrawLine(string value, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha, float[]? measuredX = null) =>
+        textRenderer.DrawLine(value, x, y, scaleX, scaleY, color, shadowAlpha, measuredX);
 
     public void Dispose()
     {
-        foreach (var texture in owned) texture.Dispose();
-        owned.Clear();
-        MainMenuBackground.Dispose(); MainMenuLabels.Dispose(); DeckMenuLabels.Dispose(); DeckEditLayer.Dispose(); RecipeLayer?.Dispose();
+        textures.Dispose(); textRenderer.Dispose();
+        MainMenuBackground.Dispose(); MainMenuLabels.Dispose();
         OptionsBackground.Dispose(); OptionsStatic.Dispose(); OptionsText.Dispose(); OptionsPieces.Dispose();
         DialogText?.Dispose(); DialogPieces?.Dispose();
         foreach (var back in dialogBacks.Values) back.Dispose();

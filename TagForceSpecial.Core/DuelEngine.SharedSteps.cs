@@ -85,15 +85,6 @@ public sealed partial class DuelEngine
     }
 
     /// <summary>Several effects are allowed on monsters, as "choose 1" options of one kind, or as activated effects after a lasting card's own.</summary>
-    private static bool EffectGroupsValid(EffectDefinition[] effects) => effects.GroupBy(d => d.CardId).All(group =>
-    {
-        var kinds = group.Where(d => d.Origin == EffectOrigin.Field).Select(d => d.Kind).ToArray();
-        if (kinds.Length == 0) return group.All(d => d.IsMonsterEffect || d.Origin == EffectOrigin.PendulumZone);
-        if (kinds.Any(k => k is EffectKind.SpellTrapIgnition or EffectKind.SpellTrapQuick))
-            return kinds[0] is EffectKind.ContinuousSpell or EffectKind.ContinuousTrap or EffectKind.FieldSpell or EffectKind.EquipSpell && kinds.Skip(1).All(k => k is EffectKind.SpellTrapIgnition or EffectKind.SpellTrapQuick);
-        return kinds.Length == 1 || kinds.All(k => k is EffectKind.MonsterIgnition or EffectKind.MonsterQuick) ||
-            kinds.All(k => k == kinds[0] && k is EffectKind.NormalSpell or EffectKind.QuickPlaySpell or EffectKind.NormalTrap);
-    });
 
     private bool EffectAt(uint cardId, int index, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out EffectDefinition? definition)
     {
@@ -102,7 +93,7 @@ public sealed partial class DuelEngine
     }
 
     /// <summary>How many separately chosen effects this card has; 1 when it has none registered.</summary>
-    internal int EffectTotal(uint cardId) => effectsByCard.TryGetValue(cardId, out var effects) ? effects.Length : 1;
+    internal int EffectTotal(uint cardId) => actionEffects.EffectTotal(cardId);
 
     private EffectDefinition LinkDefinition(ChainLink link) => link.Trigger?.Profile.Definition ?? effectsById[link.Activation.EffectId];
 
@@ -124,12 +115,8 @@ public sealed partial class DuelEngine
     }
 
     /// <summary>The effects of this card used from the hand or Graveyard.</summary>
-    internal IEnumerable<int> ZoneEffectIndexes(uint cardId) => effectsByCard.TryGetValue(cardId, out var effects)
-        ? Enumerable.Range(0, effects.Length).Where(i => effects[i].Origin is EffectOrigin.Hand or EffectOrigin.Graveyard) : [];
-
-    /// <summary>The Quick Effects of this card used while it is face-up.</summary>
-    internal IEnumerable<int> FaceUpEffectIndexes(uint cardId) => effectsByCard.TryGetValue(cardId, out var effects)
-        ? Enumerable.Range(0, effects.Length).Where(i => effects[i].IsFaceUpEffect && effects[i].Origin == EffectOrigin.Field) : [];
+    internal IEnumerable<int> ZoneEffectIndexes(uint cardId) => actionEffects.ZoneEffectIndexes(cardId);
+    internal IEnumerable<int> FaceUpEffectIndexes(uint cardId) => actionEffects.FaceUpEffectIndexes(cardId);
 
     private bool? zoneQuicks;
     private bool HasZoneOrFaceUpQuicks => zoneQuicks ??= allEffects.Any(d => d.Kind is EffectKind.MonsterQuick or EffectKind.SpellTrapQuick && (d.Origin != EffectOrigin.Field || d.IsFaceUpEffect));

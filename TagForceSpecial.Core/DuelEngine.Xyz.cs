@@ -151,4 +151,64 @@ public sealed partial class DuelEngine
             }
         return next;
     }
+
+    private static bool IsXyzStep(EffectStep step) => step is AttachSourceStep or DetachAllStep or RankUpStep or TakeOpponentMaterialStep or AttachFromStep;
+
+    /// <summary>Xyz material steps: attach the source or chosen cards, detach all, Rank-Up, and take the opponent's material.</summary>
+    private StepResult XyzStep(DuelState state, ChainLink link, EffectDefinition definition, int index, EffectStep step,
+        DuelCommand? choice, List<DuelEvent> events)
+    {
+        var controller = link.Activation.Player;
+        switch (step)
+        {
+            case AttachSourceStep attachSource:
+                // The bound monster only has to still be there; it may have been turned face-down.
+                if (BoundTarget(link, attachSource.Target) is { } host && host.IsStillPresent(state)) state = AttachSourceAsMaterial(state, link, host, events);
+                else events.Add(new ChainLinkSkipped(link.Number, ChainSkipReason.TargetUnavailable));
+                return new(state, StepFlow.Checked, choice);
+            case DetachAllStep detachAll:
+                if (BoundTarget(link, detachAll.Target) is not { } detached || !detached.IsStillPresent(state) ||
+                    state.GetPlayer(detached.Player).MonsterZones[detached.Zone] is not { XyzMaterials.Count: > 0 })
+                    return StepResult.Skip(state, link, ChainSkipReason.TargetUnavailable, events);
+                return new(DetachAll(state, detached, events), StepFlow.Checked, choice);
+            case RankUpStep rankUp:
+            {
+                if (BoundTarget(link, 0) is not { } bound || !bound.IsStillPresent(state) ||
+                    state.GetPlayer(bound.Player).MonsterZones[bound.Zone]!.Position == BattlePosition.FaceDownDefense)
+                    return StepResult.Skip(state, link, ChainSkipReason.TargetUnavailable, events);
+                var options = RankUpOptions(state, bound, rankUp).ToArray();
+                var picked = choice is ChooseDefinitionSummon place ? options.FirstOrDefault(c => c.InstanceId == place.CardInstanceId) : null;
+                if (options.Length == 0 || choice is ChooseDefinitionSummon && picked is null)
+                    return StepResult.Skip(state, link, ChainSkipReason.SummonUnavailable, events);
+                if (picked is null)
+                    return StepResult.Paused(state, new PendingDefinitionSummon(checked(State.Revision + 1), controller, definition.EffectId, link.Number, index,
+                        options.Select(c => new DefinitionSummonOption(c, DecisionCardSource.ExtraDeck, controller)), [bound.Zone]));
+                return new(RankUpSummon(state, bound, picked, ((ChooseDefinitionSummon)choice!).Position, definition.EffectId, events), StepFlow.Checked, null);
+            }
+            case TakeOpponentMaterialStep:
+            {
+                var pool = state.GetPlayer(Other(controller)).MonsterZones.Where(m => m is not null).SelectMany(m => m!.XyzMaterials).ToArray();
+                if (BoundTarget(link, 0) is not { } summonedAt || state.GetPlayer(controller).MonsterZones[summonedAt.Zone] is not { } summoned || pool.Length == 0)
+                    return new(state, StepFlow.Next, choice);
+                if (pool.Length > 1 && choice is not ChooseDefinitionCard)
+                    return StepResult.Paused(state, new PendingDefinitionCardChoice(checked(State.Revision + 1), controller, definition.EffectId, link.Number, index, pool));
+                var taken = choice is ChooseDefinitionCard take ? pool.FirstOrDefault(c => c.InstanceId == take.CardInstanceId) ?? pool[0] : pool[0];
+                state = MoveXyzMaterial(state, Other(controller), taken, new(controller, FieldLocation.MonsterZone, summonedAt.Zone, summoned.Card, summoned.PlacementId),
+                    definition.EffectId, events);
+                return new(state, StepFlow.Checked, null);
+            }
+            default:
+            {
+                var attachFrom = (AttachFromStep)step;
+                var receiver = attachFrom.ToTarget ? BoundTarget(link, 0) : ActivatingMonster(state, link);
+                if (receiver is null || !receiver.IsStillPresent(state)) return StepResult.Skip(state, link, ChainSkipReason.TargetUnavailable, events);
+                var candidates = AttachCandidates(state, controller, attachFrom, link.Activation.Spell).ToArray();
+                if (candidates.Length == 0) return StepResult.SkipAndContinue(state, link, ChainSkipReason.NoMatchingCard, events, choice);
+                if (choice is not ChooseDefinitionCard chosen)
+                    return StepResult.Paused(state, new PendingDefinitionCardChoice(checked(State.Revision + 1), controller, definition.EffectId, link.Number, index, candidates));
+                state = AttachFromZone(state, controller, candidates.FirstOrDefault(c => c.InstanceId == chosen.CardInstanceId) ?? candidates[0], receiver, definition.EffectId, events);
+                return new(state, StepFlow.Checked, null);
+            }
+        }
+    }
 }

@@ -23,7 +23,7 @@ public sealed partial class TitleFlowVisuals
 
     private void InitializeOptions(OriginalScreenAssetResolver assets)
     {
-        textures.TryAdd(OptionsProfile.AtlasKey, assets.Resolve(OptionsProfile.AtlasKey).Texture);
+        textures.AddBorrowed(OptionsProfile.AtlasKey, assets.Resolve(OptionsProfile.AtlasKey).Texture);
         foreach (var dialog in OptionsProfile.Dialogs) frames.Add(dialog.Id, dialog);
         OptionsBackground = new(device, 480, 272, false, SurfaceFormat.Color, DepthFormat.Depth24Stencil8, 0, RenderTargetUsage.PreserveContents);
         OptionsStatic = new(device, 480, 272, false, SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);

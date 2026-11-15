@@ -209,4 +209,132 @@ public sealed partial class DuelEngine
         for (int size = 1; size <= Math.Min(limit, items.Count); size++)
             foreach (var subset in Pick(0, size)) yield return subset;
     }
+
+    private static IEnumerable<int> FreeMonsterZones(DuelState state, PlayerId player) =>
+        Enumerable.Range(0, 5).Where(z => state.GetPlayer(player).MonsterZones[z] is null);
+
+    /// <summary>The source Special Summons itself from the hand or Graveyard it is used from.</summary>
+    private StepResult SummonSelfStep(DuelState state, ChainLink link, EffectDefinition definition, int index, SpecialSummonSelfStep self,
+        DuelCommand? choice, List<DuelEvent> events)
+    {
+        var controller = link.Activation.Player;
+        var card = link.Activation.Spell;
+        var from = definition.Origin == EffectOrigin.Hand ? DecisionCardSource.Hand : DecisionCardSource.Graveyard;
+        if (!SpecialSourceCards(state.GetPlayer(controller), from).Contains(card))
+            return StepResult.Skip(state, link, ChainSkipReason.SummonUnavailable, events);
+        if (choice is not ChooseDefinitionSummon place)
+            return StepResult.Paused(state, new PendingDefinitionSummon(checked(State.Revision + 1), controller, definition.EffectId, link.Number, index,
+                [new(card, from, controller)], FreeMonsterZones(state, controller), self.Position));
+        return new(PlaceSpecialSummon(state, controller, card, place.MonsterZone, place.Position, from, events), StepFlow.Next, null);
+    }
+
+    /// <summary>Special Summons the bound Graveyard monster, then links it to the source as its revival requires.</summary>
+    private StepResult ReviveTargetStep(DuelState state, ChainLink link, EffectDefinition definition, int index, SpecialSummonTargetStep revive,
+        FieldCardTarget target, DuelCommand? choice, List<DuelEvent> events)
+    {
+        var controller = link.Activation.Player;
+        if (choice is not ChooseDefinitionSummon place)
+            return StepResult.Paused(state, new PendingDefinitionSummon(checked(State.Revision + 1), controller, definition.EffectId, link.Number, index,
+                [new(target.Card, DecisionCardSource.Graveyard, target.Player)], FreeMonsterZones(state, controller), revive.Position));
+        state = PlaceSpecialSummon(RemoveFromZone(state, target), controller, target.Card, place.MonsterZone, place.Position,
+            DecisionCardSource.Graveyard, events, sourceAlreadyRemoved: true);
+        if (revive.Link == RevivalLink.Material)
+        {
+            var revived = state.GetPlayer(controller).MonsterZones[place.MonsterZone]!;
+            state = AttachSourceAsMaterial(state, link, new(controller, FieldLocation.MonsterZone, place.MonsterZone, revived.Card, revived.PlacementId), events);
+        }
+        else if (revive.Link != RevivalLink.None) state = AttachRevival(state, link, place.MonsterZone, revive.Link);
+        return new(state, StepFlow.Next, null);
+    }
+
+    /// <summary>Offers the eligible monsters, then places the chosen ones together.</summary>
+    private StepResult SpecialSummonFromStep(DuelState state, ChainLink link, EffectDefinition definition, int index, SpecialSummonStep summon,
+        DuelCommand? choice, List<DuelEvent> events)
+    {
+        var controller = link.Activation.Player;
+        if (choice is ChooseDefinitionSummon or FinishDefinitionSummon)
+            return new(ApplySpecialSummons(state, link, summon, FinalSummonPicks(state, choice), definition.EffectId, events), StepFlow.Checked, null);
+        var options = SpecialSummonOptions(state, controller, summon, link.Activation.Spell).ToArray();
+        if (options.Length == 0) return StepResult.SkipAndContinue(state, link, ChainSkipReason.SummonUnavailable, events, choice);
+        return StepResult.Paused(state, new PendingDefinitionSummon(checked(State.Revision + 1), controller, definition.EffectId,
+            link.Number, index, options, FreeMonsterZones(state, controller), summon.Position, canFinish: summon.AnyNumber && summon.MinCount == 0));
+    }
+
+    /// <summary>Eligible hand, Deck, then Graveyard cards, each with at least one legal zone.</summary>
+    private IEnumerable<DefinitionSummonOption> SpecialSummonOptions(DuelState state, PlayerId playerId, SpecialSummonStep step,
+        CardInstance source)
+    {
+        var player = state.GetPlayer(playerId);
+        foreach (var (flag, from) in new[] { (SpecialSummonSources.Hand, DecisionCardSource.Hand), (SpecialSummonSources.Deck, DecisionCardSource.Deck),
+                     (SpecialSummonSources.Graveyard, DecisionCardSource.Graveyard) })
+        {
+            if (!step.Sources.HasFlag(flag)) continue;
+            foreach (var card in SpecialSourceCards(player, from).Where(c => step.Filter is { } filter ? MatchesFilter(c, filter) : step.EligibleCardIds.Contains(c.GameCardId)))
+                if (Enumerable.Range(0, 5).Any(z => CheckSpecialSummon(state, playerId, card, z, BattlePosition.FaceUpAttack, from,
+                        lockExemptSource: source) == DuelError.None))
+                    yield return new(card, from);
+        }
+    }
+
+    private DuelActionResult AnswerDefinitionSummon(PendingChain chain, ChooseDefinitionSummon command)
+    {
+        var pending = chain.DefinitionSummon!;
+        if (command.DecisionId != pending.DecisionId) return Reject(DuelError.StaleDecision);
+        if (command.Player != pending.Player) return Reject(DuelError.NotActivePlayer);
+        if (!pending.PositionOptions.Contains(command.Position)) return Reject(DuelError.InvalidBattlePosition);
+        if (!pending.MonsterZoneOptions.Contains(command.MonsterZone)) return Reject(DuelError.InvalidMonsterZone);
+        var option = pending.Options.SingleOrDefault(o => o.Card.InstanceId == command.CardInstanceId);
+        if (option is null) return Reject(DuelError.InvalidDecisionChoice);
+        var link = chain.Links[pending.LinkNumber - 1];
+        var definition = LinkDefinition(link);
+        // A Rank-Up goes into the zone its material frees; its options were already checked against that zone.
+        if (definition.Steps[pending.StepIndex] is not RankUpStep &&
+            CheckSpecialSummon(State, pending.Player, option.Card, command.MonsterZone, command.Position, option.Source,
+                lockExemptSource: link.Activation.Spell, sourcePlayer: option.From, allowFaceDown: true) is not DuelError.None and var error)
+            return Reject(error);
+        var remaining = pending.Options.Where(o => o != option).ToArray();
+        var zones = pending.MonsterZoneOptions.Where(z => z != command.MonsterZone).ToArray();
+        if (definition.Steps[pending.StepIndex] is not SpecialSummonStep { AnyNumber: true } || remaining.Length == 0 || zones.Length == 0)
+            return ResolveChainLink(chain, definitionChoice: command);
+        var next = new PendingDefinitionSummon(checked(State.Revision + 1), pending.Player, pending.EffectId, pending.LinkNumber, pending.StepIndex,
+            remaining, zones, pending.PositionOptions.Count == 1 ? pending.PositionOptions[0] : null,
+            pending.Picks.Append(new(option.Card, option.Source, command.MonsterZone, command.Position)), canFinish: true);
+        return Accept(State.WithChain(new(next.DecisionId, chain.Links, chain.Responder, chain.ConsecutivePasses, chain.NextLink, definitionChoice: next)),
+            new DefinitionSummonRequested(next));
+    }
+
+    private DuelActionResult FinishDefinitionSummons(PendingChain chain, FinishDefinitionSummon command)
+    {
+        var pending = chain.DefinitionSummon!;
+        if (command.DecisionId != pending.DecisionId) return Reject(DuelError.StaleDecision);
+        if (command.Player != pending.Player) return Reject(DuelError.NotActivePlayer);
+        return pending.CanFinish ? ResolveChainLink(chain, definitionChoice: command) : Reject(DuelError.InvalidDecisionChoice);
+    }
+
+    /// <summary>The monsters chosen across a pending Summon, including the answer that ended it.</summary>
+    private static ChosenDefinitionSummon[] FinalSummonPicks(DuelState state, DuelCommand? answer)
+    {
+        var pending = state.PendingChain!.DefinitionSummon!;
+        if (answer is not ChooseDefinitionSummon last) return [.. pending.Picks];
+        var option = pending.Options.Single(o => o.Card.InstanceId == last.CardInstanceId);
+        return [.. pending.Picks, new(option.Card, option.Source, last.MonsterZone, last.Position)];
+    }
+
+    /// <summary>Places the chosen monsters together, schedules any End Phase banishment, then shuffles once after a Deck summon.</summary>
+    private DuelState ApplySpecialSummons(DuelState state, ChainLink link, SpecialSummonStep step, ChosenDefinitionSummon[] picks,
+        string effectId, List<DuelEvent> events)
+    {
+        var controller = link.Activation.Player;
+        foreach (var pick in picks)
+        {
+            state = PlaceSpecialSummon(state, controller, pick.Card, pick.MonsterZone, pick.Position, pick.Source, events);
+            if (!step.BanishAtEndPhase) continue;
+            var placed = state.GetPlayer(controller).MonsterZones[pick.MonsterZone]!;
+            var delayed = new PendingEndPhaseBanishment(controller, effectId, link.Activation.Spell, pick.Card, pick.MonsterZone,
+                state.TurnNumber, placed.PlacementId);
+            state = state.WithEndPhaseBanishments(state.PendingEndPhaseBanishments.Append(delayed));
+            events.Add(new EndPhaseBanishmentScheduled(delayed));
+        }
+        return picks.Any(p => p.Source == DecisionCardSource.Deck) ? ShuffleDeck(state, controller, effectId, events) : state;
+    }
 }
