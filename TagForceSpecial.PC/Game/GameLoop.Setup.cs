@@ -13,7 +13,8 @@ public sealed partial class GameLoop
     private SetupOperation? setupOperation;
     private int setupSmokeStage, editorFrame;
     private string preferencesNotice = "Changes are saved locally.";
-    private static readonly string[] SetupActions = ["SELECT ORIGINAL ISO", "RESUME IMPORT", "VERIFY CURRENT CACHE", "REBUILD FROM ORIGINAL ISO", "RESTART INTERRUPTED WORK", "PREFERENCES", "RESTORE SETTINGS BACKUP", "RESOURCE STATUS", "PC DUEL TOOLS"];
+    private static readonly string[] SetupActions = ["CONTINUE TO GAME", "SELECT ORIGINAL ISO", "IMPORT RECIPE LIBRARY", "RESUME IMPORT", "VERIFY CURRENT CACHE", "REBUILD FROM ORIGINAL ISO", "RESTART INTERRUPTED WORK", "PREFERENCES", "RESTORE SETTINGS BACKUP", "RESOURCE STATUS", "PC DUEL TOOLS"];
+    private bool CanContinueToGame => setupOperation?.Busy != true && setup?.Cache is not null && originalTitle is not null;
     private void InitializeSetup()
     {
         if (options.Smoke && !SetupAutomation) return;
@@ -45,6 +46,17 @@ public sealed partial class GameLoop
         setupMessage = result.Message;
         if (result.Success) TryActivateImportedTitle();
     }
+    private void ContinueToGame()
+    {
+        if (!CanContinueToGame) { setupMessage = "Import or verify your game data before continuing."; return; }
+        screen = ScreenId.Title;
+    }
+    private void BeginRecipeImport(string file)
+    {
+        if (setup?.Cache is not { } cache || setupOperation?.ImportRecipes(file, cache.Catalog.Catalog) != true)
+        { setupMessage = "Import or verify game data before importing a recipe library."; return; }
+        setupMessage = "Importing recipe library";
+    }
     private void OpenEditor()
     {
         if (setup?.Cache is null) { screen = ScreenId.Setup; menuIndex = 0; return; }
@@ -68,7 +80,12 @@ public sealed partial class GameLoop
     {
         if (setupOperation?.Busy == true)
         { if (buttons.Back) { setupOperation?.Cancel(); setupMessage = "Stopping safely..."; } return; }
-        if (buttons.Back) { screen = utilityReturn; return; }
+        if (buttons.Back)
+        {
+            if (utilityReturn == ScreenId.Title) ContinueToGame();
+            else screen = utilityReturn;
+            return;
+        }
         MoveMenu(buttons, SetupActions.Length);
         if (!buttons.Confirm || setup is null) return;
         try
@@ -88,12 +105,12 @@ public sealed partial class GameLoop
                     if (setup.ResumeSource() is { } source) BeginImport(source);
                     else setupMessage = "No previous source is available. Select your original ISO.";
                     break;
-                case 2: setupOperation!.Validate(); setupMessage = "Checking local game data"; break;
-                case 4: setup.RestartWork(); setupMessage = "Interrupted work retained separately. Select your ISO or resume to restart."; break;
-                case 5: screen = ScreenId.Preferences; menuIndex = 0; break;
-                case 6: setupMessage = setup.RestorePreferences().Issue?.Message ?? "Previous preferences restored."; editor!.ResetDraft(); break;
-                case 7: OpenAssetDiagnostics(); break;
-                case 8: screen = ScreenId.PcTools; break;
+                case 4: setupOperation!.Validate(); setupMessage = "Checking local game data"; break;
+                case 6: setup.RestartWork(); setupMessage = "Interrupted work retained separately. Select your ISO or resume to restart."; break;
+                case 7: screen = ScreenId.Preferences; menuIndex = 0; break;
+                case 8: setupMessage = setup.RestorePreferences().Issue?.Message ?? "Previous preferences restored."; editor!.ResetDraft(); break;
+                case 9: OpenAssetDiagnostics(); break;
+                case 10: screen = ScreenId.PcTools; break;
             }
         }
         catch (Exception e) when (SetupStore.Recoverable(e)) { setupMessage = "The operation could not finish. Check local storage and retry."; }

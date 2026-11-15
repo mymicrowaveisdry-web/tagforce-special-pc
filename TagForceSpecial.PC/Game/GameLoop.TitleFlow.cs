@@ -156,18 +156,6 @@ public sealed partial class GameLoop
         visuals.SetOptionsFallback(session.Values, session.Focus);
     }
 
-    /// <summary>The native draft, as the PC deck editor opens it: the selected saved revision, else the built-in deck.</summary>
-    private void EnsureDraft()
-    {
-        if (draft is not null || setup?.Cache is null) return;
-        if (setup.Preferences.SelectedDeck is { } key)
-        {
-            try { draft = new(setup.Cache.Catalog.Catalog, library!.Load(key)); draftKey = key; }
-            catch (Exception e) when (SetupStore.Recoverable(e)) { editorNotice = "Saved revision is unreadable. Load an earlier revision or use a new deck."; }
-        }
-        draft ??= new(setup.Cache.Catalog.Catalog, InitialOpponentDecks.Create(0));
-    }
-
     private void RefreshDeckEdit(TitleFlow flow, TitleFlowVisuals visuals, DeckEditSession edit)
     {
         gum.Show("OriginalMainMenu", false); gum.Show("OriginalDeckMenu", false); gum.Show("OriginalTitleFlow", false);
@@ -301,7 +289,8 @@ public sealed partial class GameLoop
             if (owner.setup?.Cache?.Catalog.Catalog is not { } catalog || owner.flowVisuals is null) return null;
             DeckDraft draft;
             if (owner.options.PresentationSmoke) draft = new(catalog, InitialOpponentDecks.Create(0));
-            else { owner.EnsureDraft(); draft = owner.draft!; }
+            else if (owner.editor is { } editor) { editor.EnsureDraft(); draft = editor.Draft!; }
+            else return null;
             return new DeckEditSession(draft, PlayablePreview.Cards.Select(c => catalog[c.CardId]), owner.flowVisuals.DeckEditProfile.VisibleRows);
         }
         public RecipeViewerSession? OpenRecipeViewer()
@@ -320,7 +309,7 @@ public sealed partial class GameLoop
         public void CloseRecipeViewer(RecipeSelection? selection) => owner.lastRecipeSelection = selection;
         public void SaveDeckEdit(DeckEditSession session)
         {
-            if (!owner.options.PresentationSmoke && ReferenceEquals(session.Draft, owner.draft)) owner.SaveDraft();
+            if (!owner.options.PresentationSmoke && owner.editor is { } editor && ReferenceEquals(session.Draft, editor.Draft)) editor.Save();
         }
     }
 

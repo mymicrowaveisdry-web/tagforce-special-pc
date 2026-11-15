@@ -31,17 +31,21 @@ public sealed class DeckEditorSession(SetupStore store)
 
     public void Open()
     {
-        if (Draft is null)
-        {
-            if (store.Preferences.SelectedDeck is { } key)
-            {
-                try { Draft = new(store.Cache!.Catalog.Catalog, library.Load(key)); DraftKey = key; }
-                catch (Exception e) when (SetupStore.Recoverable(e))
-                { Notice = "Saved revision is unreadable. Load an earlier revision or use a new deck."; }
-            }
-            Draft ??= new(store.Cache!.Catalog.Catalog, InitialOpponentDecks.Create(0));
-        }
+        EnsureDraft();
         CardIndex = 0; MenuOpen = false;
+    }
+
+    /// <summary>Loads the selected saved revision, else the built-in deck, once per session; the native Deck Edit shares this draft.</summary>
+    public void EnsureDraft()
+    {
+        if (Draft is not null || store.Cache is null) return;
+        if (store.Preferences.SelectedDeck is { } key)
+        {
+            try { Draft = new(store.Cache.Catalog.Catalog, library.Load(key)); DraftKey = key; }
+            catch (Exception e) when (SetupStore.Recoverable(e))
+            { Notice = "Saved revision is unreadable. Load an earlier revision or use a new deck."; }
+        }
+        Draft ??= new(store.Cache.Catalog.Catalog, InitialOpponentDecks.Create(0));
     }
 
     public void ResetDraft() => Draft = null;

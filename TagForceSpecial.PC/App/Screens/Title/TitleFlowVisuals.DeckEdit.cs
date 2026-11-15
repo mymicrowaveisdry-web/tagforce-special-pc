@@ -27,7 +27,7 @@ public sealed partial class TitleFlowVisuals
         var supplements = DeckEditResources.Supplements.Select(s => s.AssetKey).ToHashSet(StringComparer.Ordinal);
         // EBOOT dialog textures are already decoded from the stored EBOOT by the title flow.
         foreach (string key in DeckEditProfile.AssetKeys().Where(k => !textures.ContainsKey(k)))
-            textures.Add(key, (supplements.Contains(key) ? assets.ResolveUnverified(key) : assets.Resolve(key)).Texture);
+            textures.AddBorrowed(key, (supplements.Contains(key) ? assets.ResolveUnverified(key) : assets.Resolve(key)).Texture);
         DeckEditLayer = new(device, 480, 272, false, SurfaceFormat.Color, DepthFormat.Depth24Stencil8, 0, RenderTargetUsage.PreserveContents);
     }
 
@@ -48,7 +48,7 @@ public sealed partial class TitleFlowVisuals
         string key = CardArtworkProvider.ThumbnailKey(cardId);
         if (textures.TryGetValue(key, out var existing)) return existing;
         // Thumbnails are decoded from the disc slot but not pixel-verified; a card without one shows no art.
-        try { var texture = deckAssets!.ResolveUnverified(key).Texture; textures[key] = texture; return texture; }
+        try { var texture = deckAssets!.ResolveUnverified(key).Texture; textures.AddBorrowed(key, texture); return texture; }
         catch (Exception e) when (e is KeyNotFoundException or InvalidDataException) { return null; }
     }
 
@@ -72,11 +72,7 @@ public sealed partial class TitleFlowVisuals
         DrawLine(value, positions?[0] ?? field.X, field.Y + dy, field.ScaleX, field.ScaleY, field.Color, field.ShadowAlpha, positions);
     }
 
-    private float TextWidth(string value, float scaleX)
-    {
-        if (font is null) return value.Length * CellSize * scaleX / 2;
-        return value.Sum(c => font.Glyph(c)?.AdvanceH26_6 / 64f * scaleX ?? CellSize * scaleX / 2);
-    }
+    private float TextWidth(string value, float scaleX) => textRenderer.TextWidth(value, scaleX);
 
     /// <summary>Greedy word wrap at the measured panel width, using the PSP font's own advances.</summary>
     private List<string> Wrap(string text, float width, float scaleX)

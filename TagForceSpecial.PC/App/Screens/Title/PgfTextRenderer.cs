@@ -31,6 +31,13 @@ internal sealed class PgfTextRenderer : IDisposable
         }
     }
 
+    /// <summary>Width of a line using the PSP font's own advances; without the font, half a glyph cell per character.</summary>
+    internal float TextWidth(string value, float scaleX)
+    {
+        if (font is null) return value.Length * CellSize * scaleX / 2;
+        return value.Sum(c => font.Glyph(c)?.AdvanceH26_6 / 64f * scaleX ?? CellSize * scaleX / 2);
+    }
+
     internal void DrawLine(string value, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha, float[]? measuredX = null)
     {
         if (font is null || atlas is null)

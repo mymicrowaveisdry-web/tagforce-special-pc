@@ -9,6 +9,7 @@ public sealed class SetupOperation(SetupStore store) : IDisposable
 {
     private Task<SetupResult>? task;
     private CancellationTokenSource? cancellation;
+    private string? successMessage;
     private readonly ConcurrentQueue<ImportProgress> updates = new();
     public bool Busy => task is not null;
     public ImportProgress Progress { get; private set; } = new(0, "Select your original ISO to begin");
@@ -29,6 +30,27 @@ public sealed class SetupOperation(SetupStore store) : IDisposable
         return true;
     }
 
+    /// <summary>Copies and checks a prepared recipe library against the active catalog; a failure leaves the previous library.</summary>
+    public bool ImportRecipes(string file, TagForceSpecial.Cards.CardCatalog catalog)
+    {
+        if (task is not null) return false;
+        cancellation?.Dispose(); cancellation = new();
+        var token = cancellation.Token;
+        successMessage = "Recipe library imported. Continue to Game to open Recipe Viewer.";
+        Progress = new(0, "Copying and checking recipe data");
+        task = Task.Run(() =>
+        {
+            try { _ = new Recipes.RecipeLibraryStore(store.Storage).Import(file, catalog, token, new QueuedProgress(updates)); return new SetupResult(true); }
+            catch (OperationCanceledException) { return new SetupResult(false, new("RecipeImportCanceled", "Recipe import canceled; the previous library is unchanged.")); }
+            catch (Exception e) when (SetupStore.Recoverable(e))
+            {
+                Console.Error.WriteLine("RECIPE_IMPORT_FAILED " + e.Message);
+                return new SetupResult(false, new("RecipeImportFailed", "Recipe import failed. Select a prepared recipes/viewer.json library."));
+            }
+        });
+        return true;
+    }
+
     public void Cancel() => cancellation?.Cancel();
 
     public SetupCompletion? Poll()
@@ -40,12 +62,12 @@ public sealed class SetupOperation(SetupStore store) : IDisposable
         {
             var result = task.GetAwaiter().GetResult();
             completion = new(result.Success, result.Success
-                ? store.PresentationNotice ?? "Local game data is ready. Open Decks to prepare and play."
+                ? store.PresentationNotice ?? successMessage ?? "Local game data is ready. Choose Continue to Game."
                 : result.Issue!.Message);
         }
         catch (Exception e) when (SetupStore.Recoverable(e))
         { completion = new(false, "Setup could not finish. Retry or select your ISO again."); }
-        task = null;
+        task = null; successMessage = null;
         return completion;
     }
 

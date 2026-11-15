@@ -119,7 +119,10 @@ public sealed partial class GameLoop
             previousAssets.Dispose(); originalTitle = nextTitle;
         }
         catch (Exception e) when (Setup.SetupStore.Recoverable(e) || e is KeyNotFoundException)
-        { nextTitle?.Dispose(); nextAssets?.Dispose(); setupMessage = "Game data is ready; original title artwork still needs a validated import."; }
+        {
+            Console.Error.WriteLine("TITLE_ACTIVATION_FAILED " + e.Message);
+            nextTitle?.Dispose(); nextAssets?.Dispose(); setupMessage = "Game data is ready; original title artwork still needs a validated import.";
+        }
     }
     private void RegisterTitle(ScreenId id, bool choices)
     {

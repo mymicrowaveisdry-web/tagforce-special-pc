@@ -17,7 +17,7 @@ public sealed partial class TitleFlowVisuals
         if (source.ReadTexture(key) is not { } item) return null;
         var texture = new Texture2D(device, item.Width, item.Height);
         texture.SetData(item.Pixels);
-        owned.Add(texture); textures.Add(local, texture);
+        textures.AddOwned(local, texture);
         return local;
     }
 
@@ -62,7 +62,7 @@ public sealed partial class TitleFlowVisuals
                 if (session.FocusedCard is { } id)
                 {
                     string key = TagForceSpecial.Assets.Presentation.CardArtworkProvider.ThumbnailKey(id);
-                    if (RecipeTexture(session.Catalog, key) is { } imported) textures[key] = textures[imported];
+                    if (RecipeTexture(session.Catalog, key) is { } imported) textures.Alias(key, imported);
                     DrawPreview(catalog[id]);
                     bool supported = selected.Main.Concat(selected.Extra).Concat(selected.Side).All(PlayablePreview.Rules.ContainsKey);
                     DrawLine(supported ? "Preview pool" : "Unsupported for PC duels", 1, 146, .32f, .36f, 0xffff00, 128);

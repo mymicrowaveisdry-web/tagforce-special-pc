@@ -16,7 +16,7 @@ public sealed partial class GameLoop
     {
         if (options.SetupFlowSmokeRoot is not { } root) return;
         if (navigationTime.TotalGameTime.TotalSeconds > 120) throw new InvalidOperationException("Startup flow did not complete.");
-        if (setupTask is not null) return;
+        if (setupOperation?.Busy == true) return;
         Directory.CreateDirectory(root);
         void Capture(string name)
         {
