@@ -291,7 +291,9 @@ public sealed partial class GameLoop
             if (owner.options.PresentationSmoke) draft = new(catalog, InitialOpponentDecks.Create(0));
             else if (owner.editor is { } editor) { editor.EnsureDraft(); draft = editor.Draft!; }
             else return null;
-            return new DeckEditSession(draft, PlayablePreview.Cards.Select(c => catalog[c.CardId]), owner.flowVisuals.DeckEditProfile.VisibleRows);
+            var known = catalog.Cards.ToDictionary(c => c.GameCardId);
+            return new DeckEditSession(draft, ConfirmedCardPool.CardIds.Where(known.ContainsKey).Select(id => known[id]),
+                owner.flowVisuals.DeckEditProfile.VisibleRows);
         }
         public RecipeViewerSession? OpenRecipeViewer()
         {

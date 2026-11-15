@@ -23,7 +23,7 @@ public static class TitlePresentationImport
     ];
     public const string SupplementEvidenceId = "phase62.deck-edit.supplement-unverified-v1";
     /// <summary>Thumbnails for the cards the PC can use. Decoded from the disc slot with the measured zero tail; not pixel-verified.</summary>
-    public static IReadOnlyList<uint> ThumbnailCards { get; } = Array.AsReadOnly(PlayablePreview.Cards.Select(c => c.CardId).Order().ToArray());
+    public static IReadOnlyList<uint> ThumbnailCards => ConfirmedCardPool.CardIds;
     public const string ThumbnailEvidenceId = "phase62.cardh.gpu-input-bytes-v1";
     public const string Scope = "phase3-title-flow-v1";
 

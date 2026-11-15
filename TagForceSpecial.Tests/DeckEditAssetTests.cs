@@ -43,7 +43,7 @@ public class DeckEditAssetTests
             Assert.Contains(c.AssetKey, required);
             Assert.Contains(c.AssetKey, verifiable);
         });
-        // The PC's supported pool gets thumbnails; their keys are the ones CardArtworkProvider reads.
-        Assert.Equal(TagForceSpecial.Effects.PlayablePreview.Cards.Select(c => c.CardId).Order(), TitlePresentationImport.ThumbnailCards);
+        // The PC's confirmed pool gets thumbnails; their keys are the ones CardArtworkProvider reads.
+        Assert.Equal(TagForceSpecial.Effects.ConfirmedCardPool.CardIds, TitlePresentationImport.ThumbnailCards);
     }
 }

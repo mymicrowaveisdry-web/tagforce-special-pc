@@ -20,12 +20,17 @@ public sealed record DeckSelectionValidation(ValidatedDeckSelection? Selection, 
 public static class SelectedDecks
 {
     public static DeckSelectionValidation Validate(ValidatedGameCache cache, DeckLegalityPolicy policy,
-        DeckDefinition first, PlayerCollection? firstCollection, DeckDefinition second, PlayerCollection? secondCollection)
+        DeckDefinition first, PlayerCollection? firstCollection, DeckDefinition second, PlayerCollection? secondCollection) =>
+        Validate(cache, policy, first, firstCollection, policy, second, secondCollection);
+
+    /// <summary>Each deck is checked against its own regulation, so decks of different reviewed policies can meet.</summary>
+    public static DeckSelectionValidation Validate(ValidatedGameCache cache, DeckLegalityPolicy firstPolicy, DeckDefinition first,
+        PlayerCollection? firstCollection, DeckLegalityPolicy secondPolicy, DeckDefinition second, PlayerCollection? secondCollection)
     {
-        var a = Check(first, firstCollection); var b = Check(second, secondCollection);
+        var a = Check(first, firstPolicy, firstCollection); var b = Check(second, secondPolicy, secondCollection);
         return new(a.CanPlay && b.CanPlay ? new(cache, first, second) : null, a, b);
 
-        DeckValidation Check(DeckDefinition deck, PlayerCollection? collection)
+        DeckValidation Check(DeckDefinition deck, DeckLegalityPolicy policy, PlayerCollection? collection)
         {
             var result = DeckValidator.Validate(deck, cache.Catalog.Catalog, policy, collection);
             var identity = cache.Catalog.Manifest.Identity;

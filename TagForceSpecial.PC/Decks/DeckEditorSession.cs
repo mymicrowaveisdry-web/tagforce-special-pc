@@ -115,7 +115,7 @@ public sealed class DeckEditorSession(SetupStore store)
                 case 0: Save(); break;
                 case 1: EditingName = true; EditingText = Draft.Name; break;
                 case 2: EditingName = false; EditingText = Draft.Search; break;
-                case 3: Draft.Filter = (DeckFilter)(((int)Draft.Filter + 1) % 3); CardIndex = 0; break;
+                case 3: Draft.Filter = (DeckFilter)(((int)Draft.Filter + 1) % Enum.GetValues<DeckFilter>().Length); CardIndex = 0; break;
                 case 4: SavedDecks = library.List(); return DeckEditorRequest.SavedDecks;
                 case 5: Draft = new(Draft.Catalog, InitialOpponentDecks.Create(0)); Draft.Clear(); Draft.Name = "New deck"; DraftKey = null; break;
                 case 6: Draft = new(Draft.Catalog, InitialOpponentDecks.Create(0)); DraftKey = null; break;

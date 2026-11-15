@@ -64,8 +64,8 @@ public sealed partial class TitleFlowVisuals
                     string key = TagForceSpecial.Assets.Presentation.CardArtworkProvider.ThumbnailKey(id);
                     if (RecipeTexture(session.Catalog, key) is { } imported) textures.Alias(key, imported);
                     DrawPreview(catalog[id]);
-                    bool supported = selected.Main.Concat(selected.Extra).Concat(selected.Side).All(PlayablePreview.Rules.ContainsKey);
-                    DrawLine(supported ? "Preview pool" : "Unsupported for PC duels", 1, 146, .32f, .36f, 0xffff00, 128);
+                    bool supported = selected.Main.Concat(selected.Extra).Concat(selected.Side).All(ConfirmedCardPool.Contains);
+                    DrawLine(supported ? "Confirmed card pool" : "Unsupported for PC duels", 1, 146, .32f, .36f, 0xffff00, 128);
                 }
             }
             else

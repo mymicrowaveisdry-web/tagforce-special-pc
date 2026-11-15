@@ -65,8 +65,10 @@ not active save/DLC or story-unlock regulation. EBOOT SHA-256 is
 `8087681f81f87a87471591752b3c0c9bc3cec48ffff15a115a1e2525f670c975`.
 The 152-entry candidate at file `0xd27e0` has table SHA-256
 `ea2aa9fa9c493a82374d0b64ed7628f7e5906f69178d3533c5e0c45afba09009`;
-none of the selected 14 IDs occurs. This is bounded policy evidence, not new
-runtime PSP verification. Unknown overrides and other card restrictions remain
+none of the selected 14 IDs occurs. `tfsp-confirmed-card-pool/1` applies that
+table (63 Forbidden, 68 Limited, 21 Semi-Limited) to every confirmed pool card;
+see `BuiltInRestrictions`. This is bounded policy evidence, not new runtime PSP
+verification. Unknown overrides and other card restrictions remain
 unresolved rather than inferred from names or packed kind codes.
 
 Results are `Legal`, `Illegal` or `Indeterminate`; only `Legal` passes. Unknown

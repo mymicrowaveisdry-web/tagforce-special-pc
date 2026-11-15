@@ -22,12 +22,14 @@
 6. Preferences controls the opponent seed and integer scaling. Reset restores
    those preferences while retaining the active cache and selected deck.
 
-The initial pool is the 14 reviewed IDs from `PlayablePreview`. Main requires
-40-60 cards under the bounded original-era policy, with combined Main/Extra/Side
-copy/ownership limits and reviewed placement. With this three-copy pool, at most
-42 reviewed cards are available. Extra placements are unsupported for these IDs;
-other card rules, aliases, save/DLC overrides and regulations are not inferred.
-The collection remains explicitly authored, not an imported save or unlock claim.
+The pool is `ConfirmedCardPool`: every card of a registered effect family except
+Tokens. Main requires 40-60 cards, Extra up to 15 and Side up to 15, with Extra
+Deck monsters placed in Extra or Side. Copy limits come from the built-in EBOOT
+Forbidden/Limited seed; unlisted cards allow three. Each card ID is its own copy
+group; same-name artwork variants, save/DLC overrides and other regulations are
+not inferred. The collection grants three of every pool card until progression
+exists; it is not an imported save or unlock claim. Decks saved under the earlier
+14-card preview policy still validate and move to the pool policy when re-saved.
 
 ## Private storage and manifests
 

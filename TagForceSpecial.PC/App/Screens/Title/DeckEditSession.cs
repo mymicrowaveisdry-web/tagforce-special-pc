@@ -1,5 +1,6 @@
 using TagForceSpecial.Cards;
 using TagForceSpecial.Core.Decks;
+using TagForceSpecial.Effects;
 using TagForceSpecial.PC.App.Input;
 using TagForceSpecial.PC.Decks;
 
@@ -48,8 +49,9 @@ public sealed class DeckEditSession
         DeckEditTab.Extra => DeckSection.Extra, DeckEditTab.Side => DeckSection.Side, _ => DeckSection.Main
     };
 
-    /// <summary>Fusion and Synchro kinds belong in the Extra Deck (the original shows them on the EX tab).</summary>
-    public static bool IsExtra(CardDefinition card) => card.Codes?.RawKind is 3 or 18;
+    /// <summary>Extra Deck monsters by their confirmed rules; otherwise Fusion and Synchro kinds (the original shows them on the EX tab).</summary>
+    public static bool IsExtra(CardDefinition card) => ConfirmedCardPool.Contains(card.GameCardId)
+        ? ConfirmedCardPool.IsExtraDeck(card.GameCardId) : card.Codes?.RawKind is 3 or 18;
 
     private DeckEditEntry Entry(CardDefinition card)
     {
