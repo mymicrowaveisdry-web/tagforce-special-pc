@@ -93,7 +93,7 @@ public sealed partial class DuelEngine
     }
 
     /// <summary>How many separately chosen effects this card has; 1 when it has none registered.</summary>
-    internal int EffectTotal(uint cardId) => effectsByCard.TryGetValue(cardId, out var effects) ? effects.Length : 1;
+    internal int EffectTotal(uint cardId) => actionEffects.EffectTotal(cardId);
 
     private EffectDefinition LinkDefinition(ChainLink link) => link.Trigger?.Profile.Definition ?? effectsById[link.Activation.EffectId];
 
@@ -115,12 +115,8 @@ public sealed partial class DuelEngine
     }
 
     /// <summary>The effects of this card used from the hand or Graveyard.</summary>
-    internal IEnumerable<int> ZoneEffectIndexes(uint cardId) => effectsByCard.TryGetValue(cardId, out var effects)
-        ? Enumerable.Range(0, effects.Length).Where(i => effects[i].Origin is EffectOrigin.Hand or EffectOrigin.Graveyard) : [];
-
-    /// <summary>The Quick Effects of this card used while it is face-up.</summary>
-    internal IEnumerable<int> FaceUpEffectIndexes(uint cardId) => effectsByCard.TryGetValue(cardId, out var effects)
-        ? Enumerable.Range(0, effects.Length).Where(i => effects[i].IsFaceUpEffect && effects[i].Origin == EffectOrigin.Field) : [];
+    internal IEnumerable<int> ZoneEffectIndexes(uint cardId) => actionEffects.ZoneEffectIndexes(cardId);
+    internal IEnumerable<int> FaceUpEffectIndexes(uint cardId) => actionEffects.FaceUpEffectIndexes(cardId);
 
     private bool? zoneQuicks;
     private bool HasZoneOrFaceUpQuicks => zoneQuicks ??= allEffects.Any(d => d.Kind is EffectKind.MonsterQuick or EffectKind.SpellTrapQuick && (d.Origin != EffectOrigin.Field || d.IsFaceUpEffect));

@@ -33,6 +33,8 @@ public sealed partial class DuelEngine
     private readonly FrozenDictionary<uint, EffectDefinition[]> effectsByCard;
     private readonly FrozenDictionary<string, EffectDefinition> effectsById;
     private readonly EffectDefinition[] allEffects;
+    private readonly ActionEffectCatalog actionEffects;
+    internal ActionEffectCatalog ActionEffects => actionEffects;
     private readonly FrozenDictionary<uint, RuleLockProfile[]> ruleLockProfiles;
     private readonly FrozenDictionary<uint, BattleAbilityProfile[]> battleAbilityProfiles;
     private readonly FrozenDictionary<uint, DestructionReplacementProfile[]> replacementProfiles;
@@ -126,6 +128,7 @@ public sealed partial class DuelEngine
         effectsByCard = definitionList.GroupBy(d => d.CardId).ToFrozenDictionary(g => g.Key, g => g.ToArray());
         effectsById = definitionList.ToFrozenDictionary(d => d.EffectId, StringComparer.Ordinal);
         allEffects = definitionList;
+        actionEffects = new(effectsByCard, this.rules);
         ruleLockProfiles = DuelProfileRegistration.Locks(ruleLocks, this.rules);
         battleAbilityProfiles = DuelProfileRegistration.Battle(battleAbilities, this.rules);
         replacementProfiles = DuelProfileRegistration.Replacements(destructionReplacements, this.rules);

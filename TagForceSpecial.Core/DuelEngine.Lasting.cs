@@ -22,10 +22,8 @@ public sealed partial class DuelEngine
     private bool HasFieldLinks => fieldLinks ??= rules.Values.Any(r => r.IsToon) || allEffects.Any(d => d.Kind == EffectKind.EquipSpell ||
         d.Steps.Any(s => s is UnionEquipStep || s is SpecialSummonTargetStep { Link: RevivalLink.Haunted or RevivalLink.Equip }));
 
-    internal bool IsToonCard(uint cardId) => rules.TryGetValue(cardId, out var rule) && rule.IsToon;
-
-    /// <summary>The materials a monster's activated effect detaches as its cost; 0 when it has no such cost.</summary>
-    internal int DetachCostFor(uint cardId, int effectIndex = 0) => EffectAt(cardId, effectIndex, out var d) && d.Cost is DetachCost detach ? detach.Count : 0;
+    internal bool IsToonCard(uint cardId) => actionEffects.IsToonCard(cardId);
+    internal int DetachCostFor(uint cardId, int effectIndex = 0) => actionEffects.DetachCostFor(cardId, effectIndex);
 
     private static IEnumerable<(PlayerId Player, int Zone, FieldSpellTrap Field)> ActiveCards(DuelState state) =>
         LastingEffectQueries.ActiveCards(state);

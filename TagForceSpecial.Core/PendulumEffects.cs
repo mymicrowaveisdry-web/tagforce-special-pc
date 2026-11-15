@@ -36,8 +36,7 @@ public sealed partial class DuelEngine
     }
 
     /// <summary>The activated Pendulum Effects of this card.</summary>
-    internal IEnumerable<int> PendulumEffectIndexes(uint cardId) => effectsByCard.TryGetValue(cardId, out var effects)
-        ? Enumerable.Range(0, effects.Length).Where(i => effects[i].Origin == EffectOrigin.PendulumZone && effects[i].IsFaceUpEffect) : [];
+    internal IEnumerable<int> PendulumEffectIndexes(uint cardId) => actionEffects.PendulumEffectIndexes(cardId);
 
     private DuelActionResult BeginPendulumEffect(PlayerId playerId, int zone, int effectIndex)
     {

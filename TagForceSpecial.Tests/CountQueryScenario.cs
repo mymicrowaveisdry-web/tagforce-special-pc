@@ -77,6 +77,8 @@ internal sealed class CountQueryScenario
 
     private readonly CardCatalog catalogForTrace;
 
+    internal DuelActionSource Actions() => new(Engine, catalogForTrace);
+
     internal void EnterMain()
     {
         Execute(new ResolveDrawStep(Engine.State.ActivePlayer));
