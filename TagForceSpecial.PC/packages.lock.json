@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "Gum.MonoGame": {
+        "type": "Direct",
+        "requested": "[2026.11.2.1, )",
+        "resolved": "2026.11.2.1",
+        "contentHash": "qSgaYL805klXDh0zlNCjsbJAsEoB/Ijd0MUZ2FEAJP2GMRmf25mf/aZYyZCwio71zWO3pNQG7NyNRTF5CNyo1Q==",
+        "dependencies": {
+          "FlatRedBall.GumCommon": "2026.11.2.1",
+          "TextCopy": "6.2.1"
+        }
+      },
+      "MonoGame.Framework.DesktopGL": {
+        "type": "Direct",
+        "requested": "[3.8.6, )",
+        "resolved": "3.8.6",
+        "contentHash": "pVAwFo+wNCco7881v8VAkPcls/jYVyfzxx/eSBMuT45ZqZcTFqptsZxd8KwBEE5PQc5UxbX5erGh0rwtFGsKVg==",
+        "dependencies": {
+          "MonoGame.Library.OpenAL": "1.24.3.4",
+          "MonoGame.Library.SDL": "2.32.10.2",
+          "NVorbis": "0.10.4"
+        }
+      },
+      "BrotliSharpLib": {
+        "type": "Transitive",
+        "resolved": "0.3.3",
+        "contentHash": "/z74VNg6etlQK/N1mSD5Tz2qQUZqc3RMiuv2F8Q/MOfvg4l7a6lDYhQQTPd9s9saSokh1GqUD7JTuunOiQid8w=="
+      },
+      "CsvHelper": {
+        "type": "Transitive",
+        "resolved": "33.1.0",
+        "contentHash": "kqfTOZGrn7NarNeXgjh86JcpTHUoeQDMB8t9NVa/ZtlSYiV1rxfRnQ49WaJsob4AiGrbK0XDzpyKkBwai4F8eg=="
+      },
+      "FlatRedBall.GumCommon": {
+        "type": "Transitive",
+        "resolved": "2026.11.2.1",
+        "contentHash": "F3AyaQbGn4usCcW6oQG3RIF9xyY2R/R6hGBL2eeaj6wgAN998LiL+/dLeICKFOWNGpsZ6iNOwcWavBSiRD7ojA==",
+        "dependencies": {
+          "BrotliSharpLib": "0.3.3",
+          "CsvHelper": "33.1.0",
+          "FlatRedBall.InterpolationCore": "2025.4.22.1",
+          "SharpCompress": "0.48.0"
+        }
+      },
+      "FlatRedBall.InterpolationCore": {
+        "type": "Transitive",
+        "resolved": "2025.4.22.1",
+        "contentHash": "x95teSPBlV88KKbivY+peQ8AjqfXFgmGFnHw4Adds8UaO81zJKZAZZrXeetp5K+5mgd4t2hdtW4ItBFJ7ZwWig==",
+        "dependencies": {
+          "System.Data.DataSetExtensions": "4.5.0"
+        }
+      },
+      "Microsoft.Extensions.DependencyInjection.Abstractions": {
+        "type": "Transitive",
+        "resolved": "7.0.0",
+        "contentHash": "h3j/QfmFN4S0w4C2A6X7arXij/M/OVw3uQHSOFxnND4DyAzO1F9eMX7Eti7lU/OkSthEE0WzRsfT/Dmx86jzCw=="
+      },
+      "MonoGame.Library.OpenAL": {
+        "type": "Transitive",
+        "resolved": "1.24.3.4",
+        "contentHash": "/FhE0hblY9owGPvIHnMbH+6kXtjfl+/t3Cm776RQiZnGyxGy2Qd9pTAzclLuMO8pvtjiGLYkkRwjRciUA4XFyQ=="
+      },
+      "MonoGame.Library.SDL": {
+        "type": "Transitive",
+        "resolved": "2.32.10.2",
+        "contentHash": "mtnmWr50KgH2Ui9fPscHPMI3sXgb5NBRnPS7igi4ViJ23ROdP+MLi/j9CmLWX47KuXvI3Bp5BElCDVwRUlswgg=="
+      },
+      "NVorbis": {
+        "type": "Transitive",
+        "resolved": "0.10.4",
+        "contentHash": "WYnil3DhQHzjCY0dM9I2B3r1vWip90AOuQd25KE4NrjPQBg0tBJFluRLm5YPnO5ZLDmwrfosY8jCQGQRmWI/Pg=="
+      },
+      "SharpCompress": {
+        "type": "Transitive",
+        "resolved": "0.48.0",
+        "contentHash": "6k0Sa9gf85Sz9Npy7jnn5UPerejrAa3FxU9Gq5T6PwFWHUhUIdF903TjPiJtrYjXFJsXbnccaWSNMHzEg27DwQ=="
+      },
+      "System.Data.DataSetExtensions": {
+        "type": "Transitive",
+        "resolved": "4.5.0",
+        "contentHash": "221clPs1445HkTBZPL+K9sDBdJRB8UN8rgjO3ztB0CQ26z//fmJXtlsr6whGatscsKGBrhJl5bwJuKSA8mwFOw=="
+      },
+      "TextCopy": {
+        "type": "Transitive",
+        "resolved": "6.2.1",
+        "contentHash": "ryejViUBmHQ2XMie2AiRBn7KVKu2Gh/hqrctGSAUf1BufwfPjr+MWuACNBaiG+40TMbWRDJZgV73Tpl9hggeRw==",
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "7.0.0"
+        }
+      },
+      "tagforcespecial.ai": {
+        "type": "Project",
+        "dependencies": {
+          "TagForceSpecial.Core": "[1.0.0, )"
+        }
+      },
+      "tagforcespecial.assets": {
+        "type": "Project",
+        "dependencies": {
+          "TagForceSpecial.Cards": "[1.0.0, )"
+        }
+      },
+      "tagforcespecial.cards": {
+        "type": "Project"
+      },
+      "tagforcespecial.core": {
+        "type": "Project",
+        "dependencies": {
+          "TagForceSpecial.Cards": "[1.0.0, )"
+        }
+      },
+      "tagforcespecial.effects": {
+        "type": "Project",
+        "dependencies": {
+          "TagForceSpecial.Core": "[1.0.0, )"
+        }
+      }
+    }
+  }
+}

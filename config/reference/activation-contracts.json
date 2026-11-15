@@ -1,0 +1,3238 @@
+{
+  "schemaVersion": 1,
+  "sourceIsoSha256": "e99cff5774856e16329b94c9ff48f9eb0c6bc61ff1127882d0785ca4221bd707",
+  "moduleSha256": "ee0e50c12d78e28ebb9f91625e556d131a84a1729e06359ca5c045bf911085c0",
+  "repeatCount": 2,
+  "costPairs": [
+    {
+      "before": "costs-004-cost-prompt",
+      "paid": "costs-005-discard-options",
+      "resolved": "costs-007-pass"
+    },
+    {
+      "before": "costs-010-before-discard",
+      "paid": "costs-012-repeat-paid",
+      "resolved": "costs-013-repeat-resolved"
+    }
+  ],
+  "targetPairs": [
+    {
+      "before": "targets-020-repeat-picker",
+      "committed": "targets-021-repeat-selected",
+      "resolved": "targets-028-resolved"
+    },
+    {
+      "before": "targets-030-picker",
+      "committed": "targets-031-selected",
+      "resolved": "targets-038-resolved"
+    }
+  ],
+  "snapshots": {
+    "costs-001-baseline": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 6,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723,
+              5217
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "39c6936b808806408dbfd1c0057a34d7751a94e064ee4897bee889ce6571c4a2",
+        "vram.bin": "be9ef9ba75851804cb4c3fd5a71dc1278de72f66c04b0ac41d3b752782760d10",
+        "observation.json": "bb6f200e8a5ca7372312c948a263cf28057b170fe9f9351cc46d1ee3da85ccb5",
+        "transcript.json": "c4a60bf4868d510885052c40f3c544f912fa77f21c37bc1471af097c9530abb5",
+        "frame-0.png": "1011b3a5a0b8b93af7d7a6e88740a38d285a2f9d38264df4f49b8d116ae198af",
+        "frame-88000.png": "a76395c9b7d5eee6f6f6af9cd7ea6f887d13d8d2fe3ee8041fd4e11d2eb2feae"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "costs-002-vortex-menu": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 6,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723,
+              5217
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "504045e532335ebeb0ac41b8c24e29d07aecf8f7474a53c32b0c8b7182fcf1ca",
+        "vram.bin": "0179c5c46928d6df1886a32c5bacd1b144f02553c7ddb54ac34b10305830a2b1",
+        "observation.json": "c8c3c6d5fb538f534e46a1ed8d3f6f4d40e06f4d01f0d3d1fb8534cf5417f6c4",
+        "transcript.json": "e0ad1f12c52ebfa0523fb8d3bbe3a0b35ad76231a6e4b013adce051103438a92",
+        "frame-0.png": "98799d7bd77bf06ea24802b68a22b32a1ec7fa5954bb79e244c1c1e8981ab4a2",
+        "frame-88000.png": "85860cf41bcfade022a6cd19e0fe9f4eb1de73294495f6ffc1b1e4ad3e3d8b70"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "costs-003-placement": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 6,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723,
+              5217
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "4d21f5acf8cf9d8402b236aef2968a2e96a88ae540888997f514e1cff8808d45",
+        "vram.bin": "8bffd67e28961f3b9bb6dc108936584d5a332c1a3bc07761affe7d13cd22ff7f",
+        "observation.json": "492b007574daae1a7d6c392c7bf6cee28c0a30d1cb7172d8f81c402239f9785c",
+        "transcript.json": "01c3feff2c57324964d92f478e53e9b09b9ff6feaa2604a42d19e1e085b4e6a1",
+        "frame-0.png": "015087d15586e61867263b0fa9ec27cff9581283b188377953c5dc3017fba1a0",
+        "frame-88000.png": "c45434f4449262f12b85634ede0bd0318470d86c6cf7a7bb7effad4d1ee91288"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "costs-004-cost-prompt": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              5217,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "761d517b2d6900232b1703cfc604efeaf34ca5a5f893b33c90834ac46f8b1517",
+        "vram.bin": "d490a7d78bf56cf7e80bdb55dfc09e5a2dd3606645d1c3709dbce2d2ed4db2de",
+        "observation.json": "a482e7ec5d8f39452e68d996482ddc6df53bcd27193e51be74270f5e38d43fb4",
+        "transcript.json": "0664d0e2518e4f88b97aed7d970f13153dbef91faaad9c5e3ea0953b3332e617",
+        "frame-0.png": "266cefdd0f85751e1d58c50e6c2e26940673dba9733acc4857e42d2009aa4012",
+        "frame-88000.png": "445329d457366893417e409339ac9eb2d4bd9cc8927e57bc4eae493c1e1b1c60"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "costs-005-discard-options": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 4,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [
+              9979
+            ],
+            "handCardIds": [
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              5217,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "4ac0a15048a8de2cb3e42e31c585c29d0721a75616018c8d1cff210137ccadca",
+        "vram.bin": "7e154e3d90e7c126f3bb6bed5a13c6d009c7dcd6a6c0c5120ab83275d0a2835d",
+        "observation.json": "af801cc9870d7e500936c8d26e44824ee20be5b690a09233fd7e42c6ed990eef",
+        "transcript.json": "59dca9ab01ca4fa19bb2f94d60cf4e9fb7f729f8bb52aabd0f82b8038fddc317",
+        "frame-0.png": "018934727b267b29d28494d8655b1a1ef92ec4b6d2e73f470b5076d1ddcb7405",
+        "frame-88000.png": "01d4140af2272b517c1ba4537008d20d4f6500354549d7b615f4e8f373183e76"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "costs-006-discard-confirm": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 4,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [
+              9979
+            ],
+            "handCardIds": [
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              5217,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "f3670dd66b652e7103ea344dacb6618a6b67db4c4b61774e5f86bd707c06c3af",
+        "vram.bin": "29a599561f0ea74e0e9d8574c91895ee2c4820bebded184f639a72df422beba3",
+        "observation.json": "86ca7763e937be9f0f1f4f4591731a2fd6a1d6c786e84a4faa7d9c06d52ade8b",
+        "transcript.json": "21cdb59fc1187692c53b809dfcae280d974b64ec2d1bc479b60040e23fd23048",
+        "frame-0.png": "51f2fa63a7ff9b79cb15557eb02260ea677dba9a56a5d7b3d247143ba3371532",
+        "frame-88000.png": "1c57d4d0aba8f49386864a872df4b35a482ba4ebed415049674bd045089d07bd"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "costs-007-pass": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 4,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [
+              9979,
+              5217
+            ],
+            "handCardIds": [
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109,
+              4028
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "c4a9ae8dcd710c79de5fa64609df4800becae68b2f9c141e22bfb336e3c086bd",
+        "vram.bin": "2dc664b8d50ed6103fa9c889dd802a709efd0e3b2c88ebf49f7953b9ee69c961",
+        "observation.json": "85a986819db620c796b22fddd5ee7f7e2d9bea91f43bda655229c38efea782b2",
+        "transcript.json": "ffa3aa02988e9fc8d11268bc6f52a9c34b8d3127413f493866ff767c850e6383",
+        "frame-0.png": "cfe0796ca6ee86786a5ae3ad9cdfdef320b00489d29d712ca8743647e3548cf3",
+        "frame-88000.png": "de54def0c875367abfada77a1b018fbbd364aacadd553ceeed6b4b9e093f8146"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    "costs-010-before-discard": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              5217,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "d2602963a034e2550e280002491cff0b7e29a75f0ffc98fd85e5fd2e01a6fa66",
+        "vram.bin": "e5fbe16332c0eb493074eea172870a7f7f4c2c32482d1d074d4cfc46549a0524",
+        "observation.json": "1e71813bc55988f806726e0035dcea11caf5306738de4239851e32e5739af5b4",
+        "transcript.json": "da0bccd6b9472564c25b79c11466a21cb44dcceaa88e3f9b67be687d62051c57",
+        "frame-0.png": "e10bdabe9d16c01d42d3cb71a55493cafe6626edcb4f2e7e168707f049f18131",
+        "frame-88000.png": "e821a105a36a20fb16c2cdfb9d753ce56b6b2b52043baaf9d9522f03d9c1439b"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "costs-011-cancel-before-payment": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              5217,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "6cc0513320f0867fb622251dfd505c53d44f6bd408ba0da1e313640f04dd5276",
+        "vram.bin": "639b5edb953000a61289986dc6849428982d6c42abb0377eeae2ec856e9948ad",
+        "observation.json": "c1a220a1c2f61e28e032e02367a65d3254943df99974c23fceeb62baef0ace44",
+        "transcript.json": "8f284d790fd04a7656b7bdf427bb8c27a7946ddbcba7d4215d81054d26e096aa",
+        "frame-0.png": "99c21c2cef73a1b6afeb5ef03fd333ac1d9a738c48a5d41013eafda0155ea7fb",
+        "frame-88000.png": "83d8837e3448ffcd888c72b1d7b0fbd5cd6445015a6269864460d8d715668cfd"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "costs-012-repeat-paid": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 4,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [
+              9979
+            ],
+            "handCardIds": [
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              5217,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "257afb30cee133834b3163fae0b2b42730299e5fd5aeacf8292162f474c2e350",
+        "vram.bin": "81e31e18fd6fe03e8938a500d8e325f3a04dcc14c44d483838a1c3b22e63615a",
+        "observation.json": "82f3194b25464e1401f5d575ec7d6a798b2a66283d97321f66ffa1766dbb9009",
+        "transcript.json": "33cde3bc6d105cc546bc0ddc872dc8326b64ebe54ad0caa47678c732c6c55449",
+        "frame-0.png": "5adde7597b1dad48a62be5bb3b55c1866a5ddcfba80978c461e58c2632eebd8e",
+        "frame-88000.png": "77ce7ca05d92bb6c4c89f84de0f89a59f8fdc163331323b4e9470628669f7440"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "costs-013-repeat-resolved": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 4,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [
+              9979,
+              5217
+            ],
+            "handCardIds": [
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109,
+              4028
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "c308d7c5c64a3a2ac1feeeeb0e547b285a329d3c2a16bd52790773e29bf8a725",
+        "vram.bin": "39465f9ebb6d6ed399b98c714b039138127e12a7391dcf3995a7b220e03c9f31",
+        "observation.json": "6757ea1fcacc9e915c4ad640bc8165d7a0dbd518d7eeae36386d00a5a7271eb2",
+        "transcript.json": "7becd14d41fd998f19828615172fc25a221fc55b8e3c9af8eef4cb22559af749",
+        "frame-0.png": "d41be235f0b5d9ee232026d7447413872b754c50d7783bf51f0288b307120935",
+        "frame-88000.png": "f14e243a7992aa25d006c0d1abb765ca6f5bb219bb16f1ef63da5524db15cb9f"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    "targets-002-menu": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 6,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723,
+              4909
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "63637add35b463f41a6cc2502dec6166a70023a74dce8eded2246897c6ff3b13",
+        "vram.bin": "0179c5c46928d6df1886a32c5bacd1b144f02553c7ddb54ac34b10305830a2b1",
+        "observation.json": "05733d3ad02c57fe3beff2ee90f2285d048899e0b21b3f67ce5d2dd86519640c",
+        "transcript.json": "c154844082638c59a86d43637e723476acc18511be2b8816e23334dceb184279",
+        "frame-0.png": "98799d7bd77bf06ea24802b68a22b32a1ec7fa5954bb79e244c1c1e8981ab4a2",
+        "frame-88000.png": "85860cf41bcfade022a6cd19e0fe9f4eb1de73294495f6ffc1b1e4ad3e3d8b70"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "targets-003-placement": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 6,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723,
+              4909
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "33343f1c2017bf684c882519fd20569e5e4b94434cea53390fde4f668742254b",
+        "vram.bin": "cb55ae7e83b1e994520c626d4926bfca263c6ca161fe5df12af3d213d87bbf03",
+        "observation.json": "d558b00f498e8aec8c828066ef5a86d72cd081f2693ce5f471e6e9111adfa02f",
+        "transcript.json": "41f277f8d713e8b6ee3cb6254e021ce2f343c6c4ab0248016ef090c0cd72089c",
+        "frame-0.png": "95df6238e8c9c39c0ff2df1adf3be101e59d6f7dc49ceebb5fce0cda02bf6b4f",
+        "frame-88000.png": "37ca5b9051afac4f4f18cbb481362283f8eed7cd83f9eadd6ce106e4d6845b2f"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "targets-004-effect-prompt": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              4909,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "a8266805a7bdbbbdd3b922e7814573877650e0313e2cd0dd56775671d14a3e19",
+        "vram.bin": "6dea6a522cf6f4d514983c5a9b056a257adfbc28cdc3752cc98a5b37d396649e",
+        "observation.json": "a9f9032e460bd42735a3f5ec9ecc3743801caf0adad5a754690a0aabc0f789c7",
+        "transcript.json": "6b790f36a57dfc64374f1c8621355d9aa5e5fa57d2334b499476ca547d61428a",
+        "frame-0.png": "212d9c31b154544a2215afc027011600e0f27086708dd0819535ec44337cbc04",
+        "frame-88000.png": "be7fee443ee240fa301fc5ebcb0272794699c8428076619d2cf8f43291075c79"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "targets-005-target-options": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              4909,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "0ca38fb0014dc33bedb94996ccb1936bde92e5268913bbdcad5546e868332d9b",
+        "vram.bin": "8cd9049743955f155f4c477011d6816a763eb3d48223957c8fa598d387b5155f",
+        "observation.json": "c2e505eaeb12ad554dadae7bf72b216e3b6ecb7ce109e9db7f4914fbba25d22e",
+        "transcript.json": "2ec72936ce4c0f0156d3c39f5e3a84ffa469bde23ac8908c8fbe588ea324a0af",
+        "frame-0.png": "b79fd87dd7158229969ba4b3078fd6d49999075addfd80778bbb94aedcf5d6dd",
+        "frame-88000.png": "c8b38a90a9ff550a6ced36e93022714ad7e9b3507f700ff90224dbd514193c44"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "targets-006-bound-target": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              4909,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "33fe9fbfd2a336a3456bf5695ee833863791e3fe835f9962fb9608dc8d76acb3",
+        "vram.bin": "d6335e13851064588d273ca8a251c774915c1e35285d514d047df57485020ccd",
+        "observation.json": "16d79a600af7a961ff4cae40a03fd9abfa111651ef3da2de5363923233f9915d",
+        "transcript.json": "daf0c10de4b3dc92f46b4e276f9cd9e3223946c9dc7b7db06f3a27291016cce7",
+        "frame-0.png": "1a3abc12cc77d92395c3e6443b88e419c1820cdfaff0311393c7048af87896a6",
+        "frame-88000.png": "5e7088c3fe20290213379a80a87c90e3cf2e509f5e22dd35d3e0366481461c36"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "targets-020-repeat-picker": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              4909,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "0ca38fb0014dc33bedb94996ccb1936bde92e5268913bbdcad5546e868332d9b",
+        "vram.bin": "8cd9049743955f155f4c477011d6816a763eb3d48223957c8fa598d387b5155f",
+        "observation.json": "709ff92fef7612883702e1d2acad2ec223e687c73eacb43b9a6d45e4f6623be5",
+        "transcript.json": "e6451ff7452b7fcfdf5be5e2b778ae14049ae9093bfb7c2e49333e5dda65b849",
+        "frame-0.png": "b79fd87dd7158229969ba4b3078fd6d49999075addfd80778bbb94aedcf5d6dd",
+        "frame-88000.png": "c8b38a90a9ff550a6ced36e93022714ad7e9b3507f700ff90224dbd514193c44"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "targets-021-repeat-selected": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              4909,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "af5d132720f60c69d7343ac987c7c2fd5a91f04eaae99082131b7a9453538e54",
+        "vram.bin": "19e7943fdc159b9bfd46d3646353a898c15903c088545148cb4f192d27774704",
+        "observation.json": "2f39905b3c67468be098442d6b176a53c48e4124b50c0103f4f78b18ae46040e",
+        "transcript.json": "b0cf152b680c872b79ecaddc6fd450ebc61b9d2d44813ed2c5703fa8e2ffa6ca",
+        "frame-0.png": "a89441d219289fff58fd92648dd59b981053af4277e5fa2bc977f4a77a61566c",
+        "frame-88000.png": "404dfe1b67e6a12f1cd718e1de31068e2d19a2db3d919c880c5275d6e00bae77"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "targets-022-details-no": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              4909,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "6fc6ec2bc4f1bdee7aef35867d02c2029cb5a1de7c1f147c80ffc60cffc63eb2",
+        "vram.bin": "ebf02635b5345f7b1d860bb5f9733e4b07041f643741e967bd69676c11157134",
+        "observation.json": "e2144aeea41c0603a02e20abead3a6df0fe5d77fbe253197e050fe9c14ef3a9d",
+        "transcript.json": "36ab5477efe0bcdfd9381c704116ef3669882eed1067b823b9a38ce402584c91",
+        "frame-0.png": "def7e96163932ffb1d5ee70201b7064724a1b97788e0d2135b16bd07cbd5d942",
+        "frame-88000.png": "27f6dcec9d2f3a4f74e0f35c367e451c816366764e1a88528f383798982d2782"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "targets-023-decline-chain": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              4909,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "c39246acf092369a1894031c7ef13b0535e19091f4f09a76b58c817d032aa369",
+        "vram.bin": "5a2457060df81665e96baf23f7b643fd6ab1b2869aa94975c0dd28d4c3370aeb",
+        "observation.json": "34180e44f476c386c7b89ac0495740e3232de6b9e14b268f4e7cf7da458c6046",
+        "transcript.json": "e75d596c8a2fc7903eb609e1f5e20533671b674e4f27e79b8458380f3eff0843",
+        "frame-0.png": "e522ff21005be68aec459725638d4bf4be2b9effe110acb3424a1eb177cd2012",
+        "frame-88000.png": "5067e23c36b5abb1e52446c39372a73e14e909077f4da0ef265299890b25c767"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "targets-024-token-one": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              4909,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              3902,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "91418b091f5a752f5e134d7f9581dd66387e99a1a250447d37443bda8d14c589",
+        "vram.bin": "8d677427ff89c82359c4a50d83dfa7fec07caab81434d656494499067e0503fe",
+        "observation.json": "3b86b2bc2d1f0bfd1cf821d08b3361db897954b3f27e58ea34482fb3e2c8322c",
+        "transcript.json": "bffc9aa5c8f9e5549b677c84604ee9b7e1886f28308926bd84b746593a65d9de",
+        "frame-0.png": "4baa0216c666e9abad02dab2ca7e815fde9199718aa6de3768ea5bfc7755fc64",
+        "frame-88000.png": "f96d80090e7a34bffaf3c9408249a89b659b342c85f8aeb9e52e0ae355630d95"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          257,
+          0
+        ]
+      ]
+    },
+    "targets-025-next": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              4909,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              3903,
+              4028,
+              3902,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "bfcebb12930258c0f0637457ca3d5204a995d8b649245ac990e4c05b46c64f9f",
+        "vram.bin": "d619a28ee59e098e30c8060b9cfef8b3207f9ffd18342fe7af6a823764ab5b24",
+        "observation.json": "a58a7a1cd8a003cdb6c108109a8a299f335b9c4580ff6221c901c695f87955ca",
+        "transcript.json": "3fca5ccc2a6044e2325b10eb559e0ae50a34c3272a4ac625e9772403746ba01b",
+        "frame-0.png": "0440258d43e20816663a2772cef90a754c03866e4924cb6ab45722d3ca8ab71d",
+        "frame-88000.png": "46835f0746d58a602f6e1355497611f64a8b1d525d8bbe0bbe8df6832a945421"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          257,
+          256,
+          257,
+          0
+        ]
+      ]
+    },
+    "targets-026-next": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              4909,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              3903,
+              4028,
+              3902,
+              3904
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "30f4c1c09f7c1c84bbbdfadd942ef9d765cd4beb5462c928de182ac9e542197d",
+        "vram.bin": "919df81edd0b789e01c200bda609555d56f02429b995a97157fa0ad1d9631513",
+        "observation.json": "f34cb547894bfe19de0f92d42a72943cd8d326827ef566dfcfc56d225e107c2f",
+        "transcript.json": "45914284374032897759c76a60b61b48f7e1956af8992f33b5a4d5862fe7bc19",
+        "frame-0.png": "cbdf601c2f5b2f72c86430b1a023b9762a1509d2edbfd04125e16bfdfa066374",
+        "frame-88000.png": "a3d073888dcc7f9d4a8139da3240136b4340611804f4698972ca8c99ecb63109"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          257,
+          256,
+          257,
+          257
+        ]
+      ]
+    },
+    "targets-027-next": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              4909,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              3905,
+              3903,
+              4028,
+              3902,
+              3904
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "ae08f23040e7a522e2ee4000b0c47d8b658bf8a8b6733196d47ecd4c1e56478d",
+        "vram.bin": "8b3e6ce3dcb9f711f375a08378bb633ca9bcbae324df560a08259ca782813656",
+        "observation.json": "289c8f6c03d9db561b635aee2404c9a757e276c1b1986650a5c03c34da4a971b",
+        "transcript.json": "0b0aec4881ef387b5f57250237c8bbae947096ef117bd769ace8e27738261dc7",
+        "frame-0.png": "a7bf489804c84f4b2cea442e108c43cecfdee3f2f483b4b3178927aed62ad462",
+        "frame-88000.png": "67137c0508bb857423e42301b134e71794c5329f12b9eb1c84458530da4d2eaa"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          257,
+          257,
+          256,
+          257,
+          257
+        ]
+      ]
+    },
+    "targets-028-resolved": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [
+              4909
+            ],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              3905,
+              3903,
+              4028,
+              3902,
+              3904
+            ],
+            "graveyardCardIds": [
+              6109,
+              4818
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "60d5d6f7b04f72e5d1f8179b244d6830c2e856f53bc31a285a849d3e000d8c93",
+        "vram.bin": "8f767df1497446fa8b915b4b409a6716fe281777c63fcce8ffb727d74dab7c1a",
+        "observation.json": "49da50673dc89b38545c96078b451641b6e913e2e0c9d82d52c9eb681a6ae1ed",
+        "transcript.json": "cb7c5cc2aea8d1b5fb0c3eb9b6379c16a82e67e23884bf2a713579a1d4b50404",
+        "frame-0.png": "b8e5579050544625c2adf365a06da79f79a4c697e971c5e47fc92bf2bfafcd7d",
+        "frame-88000.png": "74f93aba2b57cc6f899078b7c4e35aa22dcae1b1ab2e447175c6454c5c4299eb"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          257,
+          257,
+          256,
+          257,
+          257
+        ]
+      ]
+    },
+    "targets-030-picker": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              4909,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "0ca38fb0014dc33bedb94996ccb1936bde92e5268913bbdcad5546e868332d9b",
+        "vram.bin": "8cd9049743955f155f4c477011d6816a763eb3d48223957c8fa598d387b5155f",
+        "observation.json": "24ff73336ccd65b8bf762fcb70860f0c067dc56586eb3d6bf6e1c618bed8b996",
+        "transcript.json": "e6451ff7452b7fcfdf5be5e2b778ae14049ae9093bfb7c2e49333e5dda65b849",
+        "frame-0.png": "b79fd87dd7158229969ba4b3078fd6d49999075addfd80778bbb94aedcf5d6dd",
+        "frame-88000.png": "c8b38a90a9ff550a6ced36e93022714ad7e9b3507f700ff90224dbd514193c44"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "targets-031-selected": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              4909,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "af5d132720f60c69d7343ac987c7c2fd5a91f04eaae99082131b7a9453538e54",
+        "vram.bin": "19e7943fdc159b9bfd46d3646353a898c15903c088545148cb4f192d27774704",
+        "observation.json": "882f288acb8a6526356ae1e1b9d8ff1803f7bbc59532281bb7b65fb6722c2e0c",
+        "transcript.json": "b0cf152b680c872b79ecaddc6fd450ebc61b9d2d44813ed2c5703fa8e2ffa6ca",
+        "frame-0.png": "a89441d219289fff58fd92648dd59b981053af4277e5fa2bc977f4a77a61566c",
+        "frame-88000.png": "404dfe1b67e6a12f1cd718e1de31068e2d19a2db3d919c880c5275d6e00bae77"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "targets-032-details-no": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              4909,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "486023fa32a2f88fab0345ff3292dd6a914f34b33cee7a3ea1e61bf36627e75e",
+        "vram.bin": "c17e1ec0a4b447bd2e18bb9053abf5b3e383f73d463e89b24c03dee65d331b8e",
+        "observation.json": "5dc52a94ea4dae14cc9bc94873910a89f1ed4614e93e0305002f3f3814b2eb43",
+        "transcript.json": "f7fcf991b048ca4fdf43cc63d0a7c528a45abf2d1322f3515291c6004f494492",
+        "frame-0.png": "def7e96163932ffb1d5ee70201b7064724a1b97788e0d2135b16bd07cbd5d942",
+        "frame-88000.png": "20188bb65aa0707fde0b53b09bc103f6e3d982a1d6c5a9a3028d5d4202d14f9e"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "targets-033-decline-chain": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              4909,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "f127291acbaa3c1e7ca570c7a6ff09225d886acc37b34e068e98f06b6a86f37a",
+        "vram.bin": "b57114b9931dfac3ef37da9fd24f487e1d7f2ff94ad9cf1dc8c6268c4374df2c",
+        "observation.json": "a4bf2d0d3ca3459e6d85018438a1b0b9af2c98f6c65d09c3bd1e6ea3bbd139c1",
+        "transcript.json": "3ffc585defbfecf54765e899f4018f0a16d727b0c35c15021254c622d7aa36db",
+        "frame-0.png": "2ccddc29a58816803ed6e24ae05be21cc9ba747ed473fc13912e933a383010b5",
+        "frame-88000.png": "7f8ad11136e33994fb53ba9c3d6384e8d4483ea2fd31fba8954990598aa7c127"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "targets-034-token-one": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              4909,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              3902,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "3a789b484a9936da360627f439980ae37237ee15a1fd9f853e124efc394f3ca6",
+        "vram.bin": "a799178030900e2be60d126829549d3a4aa541967e975db71b47acb03c6b7dad",
+        "observation.json": "36e04d33d33764a40634ebb49ab13027f6733eef261a62c3c4164af7eac72bea",
+        "transcript.json": "2e047e8e7d141e9fb887102d36ec7855d40fcabe35c23a9ef259dca770d01255",
+        "frame-0.png": "b03755f23c9bbdbab1d6668645eedc0d5088ca735a81e6f618301a5ee785c01d",
+        "frame-88000.png": "42a3fa08a8da32db0369f7939728c7f904e8240d81f917a401f6b5f46f2527b7"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          257,
+          0
+        ]
+      ]
+    },
+    "targets-035-next": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              4909,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              3903,
+              4028,
+              3902,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "10381f182ff0534ae68752a76b71643fe0474b5d91b156183891749bb07e2a2c",
+        "vram.bin": "d619a28ee59e098e30c8060b9cfef8b3207f9ffd18342fe7af6a823764ab5b24",
+        "observation.json": "8fff52998fa91a0b824b848b8bcbf8de15942281b806c654dd8d43bf2dde1abc",
+        "transcript.json": "c46d6eb555dac61ee6cb7fbbc68974fe631b77efe62bdc309a072b8e0489d04b",
+        "frame-0.png": "0440258d43e20816663a2772cef90a754c03866e4924cb6ab45722d3ca8ab71d",
+        "frame-88000.png": "46835f0746d58a602f6e1355497611f64a8b1d525d8bbe0bbe8df6832a945421"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          257,
+          256,
+          257,
+          0
+        ]
+      ]
+    },
+    "targets-036-next": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              4909,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              3903,
+              4028,
+              3902,
+              3904
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "1d82bf58223658b0a051d1e028b1242d7283bfd0f9182aa9e7269fbc22a03ace",
+        "vram.bin": "919df81edd0b789e01c200bda609555d56f02429b995a97157fa0ad1d9631513",
+        "observation.json": "9c545b068d7bdcebaef2001ab6e38cca15e054a23a2e91d5c29e1906e9abf68a",
+        "transcript.json": "c50d2da2245d13b57eb21da6b5950b20380ab1b765caa724bcb4203dee195aff",
+        "frame-0.png": "cbdf601c2f5b2f72c86430b1a023b9762a1509d2edbfd04125e16bfdfa066374",
+        "frame-88000.png": "a3d073888dcc7f9d4a8139da3240136b4340611804f4698972ca8c99ecb63109"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          257,
+          256,
+          257,
+          257
+        ]
+      ]
+    },
+    "targets-037-next": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              4909,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              3905,
+              3903,
+              4028,
+              3902,
+              3904
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "8490a3117662413bd46a978ff0eaf5bec181c0522bf194d318aaa33411a2a4d0",
+        "vram.bin": "c1f5295923e2ce617e5b33359a88cada52dff8da6619717cef52945fbf69623a",
+        "observation.json": "e9fc4d524f2aac93702a4c3338e35d9fb2dd3c03b3efe1984c07f388b9c364d3",
+        "transcript.json": "671628d200edc0ba58bde6497ffcc814ee285eb88508fb0dd1855a891328f7c8",
+        "frame-0.png": "71f9ebd64bd709292c2130f9997ec61464804d540893ee87ff326fe3277b9965",
+        "frame-88000.png": "67137c0508bb857423e42301b134e71794c5329f12b9eb1c84458530da4d2eaa"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          257,
+          257,
+          256,
+          257,
+          257
+        ]
+      ]
+    },
+    "targets-038-resolved": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [
+              4909
+            ],
+            "handCardIds": [
+              9979,
+              9979,
+              7747,
+              7716,
+              9723
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              3905,
+              3903,
+              4028,
+              3902,
+              3904
+            ],
+            "graveyardCardIds": [
+              6109,
+              4818
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              4909,
+              4815,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "e60fb1cb1241f84cfa959ac5f53c132df421ce67ebf16da28a2528ab8b33fd23",
+        "vram.bin": "e5ea95761147ee4ac3c8bf995b189300f13d8da66d470d6b7b6890fd89f6118a",
+        "observation.json": "b55182993cf4fa9625c3b2b9ca06c260813f2181f5e6fe0f5050b14c2a285d5b",
+        "transcript.json": "4e5f36d40b29663554d3650c4478f04cd57cedb3e0e782b355a4f3f18f031725",
+        "frame-0.png": "712daad596a6b6ed99c39caa29c8cf05c9c6f5192e239e4b39b42129c77230fd",
+        "frame-88000.png": "74f93aba2b57cc6f899078b7c4e35aa22dcae1b1ab2e447175c6454c5c4299eb"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          257,
+          257,
+          256,
+          257,
+          257
+        ]
+      ]
+    }
+  },
+  "inputs": {
+    "costs-001-baseline": [],
+    "costs-002-vortex-menu": [
+      "cross",
+      "right",
+      "right",
+      "right",
+      "circle"
+    ],
+    "costs-003-placement": [
+      "circle"
+    ],
+    "costs-004-cost-prompt": [
+      "circle"
+    ],
+    "costs-005-discard-options": [
+      "circle"
+    ],
+    "costs-006-discard-confirm": [
+      "circle"
+    ],
+    "costs-007-pass": [
+      "cross",
+      "right",
+      "circle"
+    ],
+    "costs-010-before-discard": [
+      "cross",
+      "right",
+      "right",
+      "right",
+      "circle",
+      "circle",
+      "circle"
+    ],
+    "costs-011-cancel-before-payment": [
+      "cross"
+    ],
+    "costs-012-repeat-paid": [
+      "circle"
+    ],
+    "costs-013-repeat-resolved": [
+      "right",
+      "circle"
+    ],
+    "targets-002-menu": [
+      "cross",
+      "right",
+      "right",
+      "right",
+      "circle"
+    ],
+    "targets-003-placement": [
+      "circle"
+    ],
+    "targets-004-effect-prompt": [
+      "circle"
+    ],
+    "targets-005-target-options": [
+      "circle"
+    ],
+    "targets-006-bound-target": [
+      "circle"
+    ],
+    "targets-020-repeat-picker": [],
+    "targets-021-repeat-selected": [
+      "circle"
+    ],
+    "targets-022-details-no": [
+      "circle"
+    ],
+    "targets-023-decline-chain": [
+      "right",
+      "circle"
+    ],
+    "targets-024-token-one": [
+      "circle"
+    ],
+    "targets-025-next": [
+      "circle"
+    ],
+    "targets-026-next": [
+      "circle"
+    ],
+    "targets-027-next": [
+      "circle"
+    ],
+    "targets-028-resolved": [
+      "circle"
+    ],
+    "targets-030-picker": [],
+    "targets-031-selected": [
+      "circle"
+    ],
+    "targets-032-details-no": [
+      "circle"
+    ],
+    "targets-033-decline-chain": [
+      "right",
+      "circle"
+    ],
+    "targets-034-token-one": [
+      "circle"
+    ],
+    "targets-035-next": [
+      "circle"
+    ],
+    "targets-036-next": [
+      "circle"
+    ],
+    "targets-037-next": [
+      "circle"
+    ],
+    "targets-038-resolved": [
+      "circle"
+    ]
+  },
+  "selectedTarget": {
+    "player": 1,
+    "zone": 1,
+    "cardId": 4818,
+    "basis": "Inspected native target picker, Scapegoat response and resolved removal"
+  },
+  "setup": {
+    "scope": "Controlled hand/deck entry swap, not naturally reached gameplay. Whole original entries and inventory are preserved.",
+    "evidence": {
+      "setup.json": "2ea2a4158ec0e4b2aa075505d79e0ffc448e95c7f7af86a65905bc66fdd17c95",
+      "transcript.json": "581c428dba8e281081ffb4d3061262cff04592d7be5f97e02591fd16a86998e3"
+    },
+    "writes": [
+      {
+        "address": 165089336,
+        "originalBytesHex": "6114c007",
+        "newBytesHex": "2d138005",
+        "readbackBytesHex": "2d138005"
+      },
+      {
+        "address": 165089832,
+        "originalBytesHex": "2d138005",
+        "newBytesHex": "6114c007",
+        "readbackBytesHex": "6114c007"
+      }
+    ]
+  },
+  "targetAnchor": {
+    "path": "analysis/duel-reference/targets-mst-picker.ppst",
+    "sha256": "f41d14f8f2024f86947ac6e8bc8ffdfc3f48ef834b96cb80450fcbb377455894"
+  },
+  "validatorSha256": "e97693e56189803f2ab44a09394748f1da2f76b3072a1cee6d6f7838ca6ba122",
+  "nativeMatchClaim": false,
+  "managedScope": "Discard/target commitment only, before response/chain resolution",
+  "limitations": [
+    "MST uses a logged controlled initial hand/deck entry exchange; Vortex has no RAM setup.",
+    "MST menu initially retains a stale Vortex image; placement prompt, canonical source ID and target effect identify MST.",
+    "Native chain/Scapegoat behavior is research evidence, not implemented C# effect resolution.",
+    "Destroyed/returned/replaced target, leave/re-enter, negation and refund behavior are not established by this experiment.",
+    "Managed placement tokens, command/revision semantics, atomicity and combined-cost/target profile are synthetic contracts.",
+    "Card-detail/chain UI interpretation is manual; hashes validate retained frames, not OCR.",
+    "Savestate load helper reports were retained in tool output, not complete debugger load transcripts."
+  ]
+}
