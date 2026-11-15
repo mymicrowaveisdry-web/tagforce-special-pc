@@ -11,7 +11,7 @@ namespace TagForceSpecial.PC.Game;
 
 public sealed partial class GameLoop
 {
-    private const string FontFile = "fonts/psp-latin.pgf";
+    private const string FontFile = "fonts/psp-latin.pgf", CardTextFontFile = "fonts/psp-latin-card.pgf";
     private TitleFlow? titleFlow;
     private TitleFlowVisuals? flowVisuals;
     private PlayerProfileStore? profiles;
@@ -31,9 +31,10 @@ public sealed partial class GameLoop
         try
         {
             ImportPspFont();
-            string path = setup.Storage.PathFor(FontFile);
+            string path = setup.Storage.PathFor(FontFile), cardPath = setup.Storage.PathFor(CardTextFontFile);
             byte[]? font = File.Exists(path) ? File.ReadAllBytes(path) : null;
-            var next = new TitleFlowVisuals(GraphicsDevice, screenAssets, font);
+            byte[]? cardFont = File.Exists(cardPath) ? File.ReadAllBytes(cardPath) : null;
+            var next = new TitleFlowVisuals(GraphicsDevice, screenAssets, font, cardFont);
             try
             {
                 next.ValidateText(); gum.BindFlowLayer(next.Layer); next.RenderMainMenuLabels(); gum.BindMainMenu(next);
@@ -58,13 +59,19 @@ public sealed partial class GameLoop
 
     private void ImportPspFont()
     {
-        if (options.PspFontPath is not { } source || setup is null) return;
-        byte[] bytes = File.ReadAllBytes(source);
-        if (new PgfFont(bytes).Sha256 != TitleFlowVisuals.RequiredFontSha256)
-            throw new InvalidDataException("The selected file is not the pinned PSP Latin system font.");
-        string target = setup.Storage.PathFor(FontFile);
-        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-        File.WriteAllBytes(target, bytes);
+        if (setup is null) return;
+        Import(options.PspFontPath, TitleFlowVisuals.RequiredFontSha256, FontFile, "The selected file is not the pinned PSP Latin system font.");
+        Import(options.PspCardFontPath, TitleFlowVisuals.CardTextFontSha256, CardTextFontFile, "The selected file is not the pinned PSP card-text font (ltn0).");
+
+        void Import(string? source, string sha256, string file, string error)
+        {
+            if (source is null) return;
+            byte[] bytes = File.ReadAllBytes(source);
+            if (new PgfFont(bytes).Sha256 != sha256) throw new InvalidDataException(error);
+            string target = setup.Storage.PathFor(file);
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.WriteAllBytes(target, bytes);
+        }
     }
 
     private bool ProfilePresent => options.PresentationSmoke ? smokeProfile : profiles?.Present == true;

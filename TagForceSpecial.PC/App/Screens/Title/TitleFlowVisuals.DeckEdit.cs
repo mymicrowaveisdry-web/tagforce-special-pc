@@ -226,8 +226,15 @@ public sealed partial class TitleFlowVisuals
                 DrawMeasured(WithUv(c.Attribute, [(codes.Attribute - 1) * w, first[1], codes.Attribute * w, first[3]]));
             }
         }
-        if (kind is 13 or 14) { DrawMeasured(kind == 13 ? c.SpellLabel : c.TrapLabel); return; }
+        bool spellTrap = kind is 13 or 14;
+        DrawCardText(card, spellTrap ? c.Text.SpellTrapLines : c.Text.MonsterLines);
+        if (spellTrap) { DrawMeasured(kind == 13 ? c.SpellLabel : c.TrapLabel); return; }
         DrawStars(card, kind);
+        if (kind is 25 or 26 && card.Codes is { } pendulum)
+        {
+            DrawPendulumScale(pendulum.Field23To26, c.PendulumScaleX[0]);
+            DrawPendulumScale(pendulum.Field27To30, c.PendulumScaleX[1]);
+        }
         DrawMeasured(c.Separator);
         DrawMeasured(c.Labels);
         if (card.Statistics is { } stats)
@@ -237,11 +244,52 @@ public sealed partial class TitleFlowVisuals
         }
     }
 
+    /// <summary>The card's own text in the card's text box, cut after <paramref name="maxLines"/> lines without an ellipsis, as recorded.</summary>
+    private void DrawCardText(CardDefinition card, int maxLines)
+    {
+        var t = DeckEditProfile.Card.Text;
+        // The original sets card text in system font ltn0; without it the title font stands in, reported as inferred.
+        var font = cardTextRenderer ?? textRenderer;
+        if (cardTextRenderer is null) Infer("card text in the title font (card-text font ltn0 not imported)");
+        var lines = new List<string>();
+        foreach (string paragraph in card.Description.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
+        {
+            string line = "";
+            foreach (string word in paragraph.Split(' '))
+            {
+                string next = line.Length == 0 ? word : line + " " + word;
+                if (line.Length > 0 && font.TextWidth(next, t.ScaleX) > t.Width) { lines.Add(line); line = word; }
+                else line = next;
+            }
+            lines.Add(line);
+        }
+        for (int i = 0; i < Math.Min(maxLines, lines.Count); i++)
+            font.DrawLine(lines[i], t.X, t.Y + i * t.LineHeight, t.ScaleX, t.ScaleY, t.Color, 0, alpha: t.Alpha);
+    }
+
+    /// <summary>A Pendulum Scale in the frame's scale box: the stat digit sprite, or the recorded "10" sprite; other values were never recorded.</summary>
+    private void DrawPendulumScale(uint scale, float x)
+    {
+        var c = DeckEditProfile.Card;
+        string key = scale.ToString(CultureInfo.InvariantCulture);
+        float[] rect;
+        if (c.PendulumScaleUv.TryGetValue(key, out var measured)) rect = measured;
+        else if (scale <= 9)
+        {
+            Infer($"Pendulum Scale {scale} sprite");
+            float v0 = c.Digit.Uv.Min(u => u[1]), v1 = c.Digit.Uv.Max(u => u[1]);
+            rect = [scale * c.DigitCell, v0, (scale + 1) * c.DigitCell, v1];
+        }
+        else { Infer($"Pendulum Scale {scale} sprite (no recorded sprite; not drawn)"); return; }
+        float templateX = c.Digit.Points.Min(q => q[0]), templateY = c.Digit.Points.Min(q => q[1]);
+        DrawMeasured(WithUv(Shifted(c.Digit, x - templateX, c.PendulumScaleY - templateY), rect));
+    }
+
     private void DrawCardNumber(int? value, float onesX)
     {
         var c = DeckEditProfile.Card;
-        if (value is not { } number) { Infer("preview '?' stat sprite (never recorded)"); return; }
         float templateX = c.Digit.Points.Min(q => q[0]);
+        if (value is not { } number) { DrawMeasured(WithUv(Shifted(c.Digit, onesX - templateX, 0), c.Question)); return; }
         float v0 = c.Digit.Uv.Min(u => u[1]), v1 = c.Digit.Uv.Max(u => u[1]);
         string digits = number.ToString(CultureInfo.InvariantCulture);
         for (int i = 0; i < digits.Length; i++)

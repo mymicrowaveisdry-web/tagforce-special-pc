@@ -69,8 +69,14 @@ public sealed partial class TitleFlowVisuals : IDisposable
         return value;
     }
 
-    public TitleFlowVisuals(GraphicsDevice device, OriginalScreenAssetResolver assets, byte[]? fontFile)
+    public const string CardTextFontSha256 = PgfTextRenderer.CardTextFontSha256;
+    /// <summary>Card-face text renderer (system ltn0), or null when that font was not imported.</summary>
+    private readonly PgfTextRenderer? cardTextRenderer;
+
+    public TitleFlowVisuals(GraphicsDevice device, OriginalScreenAssetResolver assets, byte[]? fontFile, byte[]? cardTextFont = null)
     {
+        cardTextRenderer = cardTextFont is null ? null
+            : new(device, cardTextFont, (texture, quad, color) => DrawQuad(texture, quad, 0, 0, true, color), PgfTextRenderer.CardTextFontSha256);
         this.device = device;
         profile = LoadProfile();
         foreach (var frame in profile.Frames) frames.Add(frame.Id, frame);
@@ -263,8 +269,8 @@ public sealed partial class TitleFlowVisuals : IDisposable
         run.X.Length == value.Length ? run.X : null);
     private void DrawAdvanced(string value, FlowText run) => DrawLine(value, run.X[0], run.Y, run.ScaleX, run.ScaleY, run.Color, run.ShadowAlpha);
 
-    private void DrawLine(string value, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha, float[]? measuredX = null) =>
-        textRenderer.DrawLine(value, x, y, scaleX, scaleY, color, shadowAlpha, measuredX);
+    private void DrawLine(string value, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha, float[]? measuredX = null, int alpha = 255) =>
+        textRenderer.DrawLine(value, x, y, scaleX, scaleY, color, shadowAlpha, measuredX, alpha);
 
     public void Dispose()
     {

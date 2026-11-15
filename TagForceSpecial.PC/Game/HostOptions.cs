@@ -5,7 +5,8 @@ public sealed record HostOptions(string? CachePath = null, bool PixelExact = fal
     string? DataRoot = null, string? SetupSource = null, string? EditorCapture = null, bool SeedSpecified = false,
     bool AssetDiagnostics = false, string DiagnosticScreen = "title", string? AssetPreview = null, bool PresentationSmoke = false,
     string? PresentationTracePath = null, string? TitleLayerCaptureRoot = null, string? PspFontPath = null, string? FlowCaptureRoot = null,
-    IReadOnlyDictionary<int, int>? MainMenuFrameByRow = null, int? MainMenuEntryFrame = null, string? RealtimeWalkRoot = null, int? DeckMenuFrame = null, string? RecipeReferenceRoot = null, string? SetupFlowSmokeRoot = null)
+    IReadOnlyDictionary<int, int>? MainMenuFrameByRow = null, int? MainMenuEntryFrame = null, string? RealtimeWalkRoot = null, int? DeckMenuFrame = null, string? RecipeReferenceRoot = null, string? SetupFlowSmokeRoot = null,
+    string? PspCardFontPath = null)
 {
     /// <summary>Pixel-exact game frame per focused Main Menu row, for same-instant comparisons with GE dumps.</summary>
     public IReadOnlyDictionary<int, int> MainMenuFrames => MainMenuFrameByRow ?? new Dictionary<int, int>();
@@ -19,7 +20,7 @@ public sealed record HostOptions(string? CachePath = null, bool PixelExact = fal
         int deckVariant = 0;
         string? dataRoot = null, setupSource = null, editorCapture = null;
         string diagnosticScreen = "title";
-        string? assetPreview = null, presentationTrace = null, titleLayers = null, pspFont = null, flowCapture = null;
+        string? assetPreview = null, presentationTrace = null, titleLayers = null, pspFont = null, pspCardFont = null, flowCapture = null;
         Dictionary<int, int>? menuFrames = null;
         int? menuEntryFrame = null, deckMenuFrame = null;
         string? realtimeWalk = null, recipeReference = null, setupFlowSmoke = null;
@@ -38,6 +39,7 @@ public sealed record HostOptions(string? CachePath = null, bool PixelExact = fal
                 case "--presentation-trace" when i + 1 < args.Length: presentationTrace = Path.GetFullPath(args[++i]); break;
                 case "--capture-title-layers" when i + 1 < args.Length: titleLayers = Path.GetFullPath(args[++i]); break;
                 case "--psp-font" when i + 1 < args.Length: pspFont = Path.GetFullPath(args[++i]); break;
+                case "--psp-card-font" when i + 1 < args.Length: pspCardFont = Path.GetFullPath(args[++i]); break;
                 case "--capture-flow" when i + 1 < args.Length: flowCapture = Path.GetFullPath(args[++i]); break;
                 case "--main-menu-entry-frame" when i + 1 < args.Length:
                     menuEntryFrame = int.Parse(args[++i], System.Globalization.CultureInfo.InvariantCulture); break;
@@ -83,6 +85,6 @@ public sealed record HostOptions(string? CachePath = null, bool PixelExact = fal
         if (presentationTrace is not null && !presentationSmoke) throw new ArgumentException("--presentation-trace requires --presentation-smoke.");
         if (titleLayers is not null && (capture is null || presentationSmoke || smoke || assetDiagnostics))
             throw new ArgumentException("--capture-title-layers requires a title --capture launch.");
-        return new(cache, pixel, capture, smoke, seed, replay, resultCapture, deckVariant, dataRoot, setupSource, editorCapture, seedSpecified, assetDiagnostics, diagnosticScreen, assetPreview, presentationSmoke, presentationTrace, titleLayers, pspFont, flowCapture, menuFrames, menuEntryFrame, realtimeWalk, deckMenuFrame, recipeReference, setupFlowSmoke);
+        return new(cache, pixel, capture, smoke, seed, replay, resultCapture, deckVariant, dataRoot, setupSource, editorCapture, seedSpecified, assetDiagnostics, diagnosticScreen, assetPreview, presentationSmoke, presentationTrace, titleLayers, pspFont, flowCapture, menuFrames, menuEntryFrame, realtimeWalk, deckMenuFrame, recipeReference, setupFlowSmoke, pspCardFont);
     }
 }

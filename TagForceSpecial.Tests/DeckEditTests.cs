@@ -44,8 +44,17 @@ public class DeckEditTests
         var card = profile.Card;
         Assert.Equal(new[] { 5f, 4f, 113f, 158f }, card.Composite);
         Assert.Equal(7 / 128f, card.DigitCell, 4);
-        Assert.Equal(new[] { "1", "2", "6", "8", "9" }, card.AttributeUv.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(new[] { "1", "2", "3", "4", "5", "6", "7", "8", "9" }, card.AttributeUv.Keys.Order(StringComparer.Ordinal));
         Assert.Equal(new[] { 32f, 96f }, card.Stars["level"].Spans["8"]);
+        Assert.Equal(new[] { 20f, 98f }, card.Stars["level"].Spans["11"]);
+        // '?' and Pendulum Scales: the scale digits are the stat digit sprites; 10 has its own sprite.
+        Assert.Equal(10 * card.DigitCell, card.Question[0], 3);
+        Assert.Equal(7 * card.DigitCell, card.PendulumScaleUv["7"][0], 3);
+        Assert.Equal(new[] { 8f, 93f }, card.PendulumScaleX);
+        // Card text: system font ltn0 at 0.2 x 0.18, wrapped inside the recorded bounds, 3 lines for monsters and 6 for Spells/Traps.
+        Assert.Equal(0.2f, card.Text.ScaleX, 3);
+        Assert.InRange(card.Text.Width, card.Text.WidthBounds[0], card.Text.WidthBounds[1]);
+        Assert.Equal((3, 6), (card.Text.MonsterLines, card.Text.SpellTrapLines));
         Assert.Equal(new[] { 14f, 92f }, card.Stars["rank"].Spans["11"]);
         Assert.Equal("deck.all.spelltrap", card.SpellLabel.AssetKey);
         Assert.Contains("deck.all.spelltrap", profile.AssetKeys());

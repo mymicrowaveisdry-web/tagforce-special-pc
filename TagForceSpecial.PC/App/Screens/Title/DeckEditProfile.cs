@@ -34,7 +34,13 @@ public sealed record DeckEditStars(float[] Cell, Dictionary<string, float[]> Spa
 /// <summary>The preview card as the original composes it: drawn into an offscreen <see cref="BufferWidth"/> x <see cref="BufferHeight"/>
 /// buffer in card coordinates, then shown unscaled at <see cref="Composite"/>. Digits are 7 px sprites 0-9 side by side from u 0,
 /// right-aligned at the ones position and stepping <see cref="DigitPitch"/> px left, without leading zeros.</summary>
-public sealed record DeckEditCard(float[] Composite, int BufferWidth, int BufferHeight, FlowDraw Separator, FlowDraw Labels,
+/// <summary>Card text on the card face: PSP-font glyphs at a tiny scale, one colour at <see cref="Alpha"/> and no shadow, word-wrapped at
+/// <see cref="Width"/> (recorded bounds <see cref="WidthBounds"/>) and cut after <see cref="MonsterLines"/> or <see cref="SpellTrapLines"/> lines.</summary>
+public sealed record DeckEditCardText(float X, float Y, float LineHeight, float ScaleX, float ScaleY, int Color, int Alpha, float Width,
+    float[] WidthBounds, int MonsterLines, int SpellTrapLines);
+
+public sealed record DeckEditCard(DeckEditCardText Text, float[] Question, float[] PendulumScaleX, float PendulumScaleY,
+    Dictionary<string, float[]> PendulumScaleUv, float[] Composite, int BufferWidth, int BufferHeight, FlowDraw Separator, FlowDraw Labels,
     FlowDraw Digit, float DigitCell, float DigitPitch, float AttackOnesX, float DefenseOnesX, FlowDraw Attribute,
     Dictionary<string, float[]> AttributeUv, FlowDraw Star, Dictionary<string, DeckEditStars> Stars, FlowDraw SpellLabel, FlowDraw TrapLabel);
 

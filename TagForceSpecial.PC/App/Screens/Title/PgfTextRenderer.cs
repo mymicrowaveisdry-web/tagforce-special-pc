@@ -19,13 +19,16 @@ internal sealed class PgfTextRenderer : IDisposable
     internal bool OriginalFontAvailable => font is not null;
     internal List<(string Text, int X, int Y, Color Color)> FallbackLines { get; } = [];
 
-    internal PgfTextRenderer(GraphicsDevice device, byte[]? fontFile, Action<Texture2D, FlowQuad, Color> drawGlyph)
+    /// <summary>FTT-NewRodin Pro Latin (system ltn0): Deck Edit's card-face text, whose recorded glyph steps equal its advances x 0.2.</summary>
+    internal const string CardTextFontSha256 = "1184f16bc89bad1fea49093806784470281af54f279b57ef0378ce33e6603870";
+
+    internal PgfTextRenderer(GraphicsDevice device, byte[]? fontFile, Action<Texture2D, FlowQuad, Color> drawGlyph, string requiredSha256 = RequiredFontSha256)
     {
         this.drawGlyph = drawGlyph;
         if (fontFile is not null)
         {
             var parsed = new PgfFont(fontFile);
-            if (parsed.Sha256 != RequiredFontSha256) throw new InvalidDataException("PSP font file differs from the pinned system font.");
+            if (parsed.Sha256 != requiredSha256) throw new InvalidDataException("PSP font file differs from the pinned system font.");
             font = parsed;
             atlas = new(device, 512, 512);
         }
@@ -38,7 +41,7 @@ internal sealed class PgfTextRenderer : IDisposable
         return value.Sum(c => font.Glyph(c)?.AdvanceH26_6 / 64f * scaleX ?? CellSize * scaleX / 2);
     }
 
-    internal void DrawLine(string value, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha, float[]? measuredX = null)
+    internal void DrawLine(string value, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha, float[]? measuredX = null, int alpha = 255)
     {
         if (font is null || atlas is null)
         {
@@ -47,7 +50,7 @@ internal sealed class PgfTextRenderer : IDisposable
         }
         foreach (char c in value) EnsureGlyph(c);
         if (atlasDirty) { atlas.SetData(atlasPixels); atlasDirty = false; }
-        var main = new Color((color) & 255, (color >> 8) & 255, (color >> 16) & 255, 255);
+        var main = new Color((color) & 255, (color >> 8) & 255, (color >> 16) & 255, alpha);
         // Measured shadow: two copies at (+0,+1) and (+1,+1) beneath the opaque text.
         if (shadowAlpha > 0)
         {
