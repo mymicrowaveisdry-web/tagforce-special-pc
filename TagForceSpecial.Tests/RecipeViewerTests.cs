@@ -27,7 +27,7 @@ public sealed class RecipeViewerTests : IDisposable
         return RecipeCatalog.Open(storage, cards)!;
     }
 
-    private static bool Press(RecipeViewerSession viewer, PspAction action) => viewer.Handle(new(action, action));
+    private static bool Press(RecipeViewerSession viewer, InputAction action) => viewer.Handle(new(action, action));
 
     [Fact]
     public void SortingKeepsSourceSlotsAndRecordsAndReturnsAnExplicitlyUnverifiedSelection()
@@ -40,7 +40,7 @@ public sealed class RecipeViewerTests : IDisposable
         viewer.SetOrder(RecipeSort.CardCount, true);
         Assert.Equal(8, viewer.Selection!.Slot);
         Assert.Equal(new[] { "Zeta", "Alpha" }, catalog.Records.Select(r => r.Name));
-        Assert.True(Press(viewer, PspAction.Circle));
+        Assert.True(Press(viewer, InputAction.Back));
         Assert.Equal("unverified", viewer.Selection!.Verification);
         Assert.Equal(Digest, viewer.Selection.SourceIdentity);
     }
@@ -50,12 +50,12 @@ public sealed class RecipeViewerTests : IDisposable
     {
         var source = Open();
         var viewer = new RecipeViewerSession(source);
-        Press(viewer, PspAction.Cross);
+        Press(viewer, InputAction.Confirm);
         Assert.Equal(RecipeViewerModal.Manage, viewer.Modal);
-        Press(viewer, PspAction.Down);
-        Press(viewer, PspAction.Cross);
+        Press(viewer, InputAction.Down);
+        Press(viewer, InputAction.Confirm);
         Assert.Equal(RecipeViewerModal.Notice, viewer.Modal);
-        Press(viewer, PspAction.Circle);
+        Press(viewer, InputAction.Back);
         Assert.Equal(2, source.Records.Count);
         Assert.Equal(new uint[] { 1 }, source.Records[0].Main);
         Assert.Equal(4, viewer.Selection!.Slot);
@@ -65,12 +65,12 @@ public sealed class RecipeViewerTests : IDisposable
     public void EmptyCharacterMappingHasNoInventedSelectionAndCanReturnToUserRecords()
     {
         var viewer = new RecipeViewerSession(Open());
-        Press(viewer, PspAction.Square);
+        Press(viewer, InputAction.Switch);
         Assert.Equal(RecipeListKind.Character, viewer.Kind);
         Assert.Empty(viewer.Rows);
         Assert.Null(viewer.Selection);
-        Assert.False(Press(viewer, PspAction.Cross));
-        Press(viewer, PspAction.R);
+        Assert.False(Press(viewer, InputAction.Confirm));
+        Press(viewer, InputAction.NextPage);
         Assert.Equal(4, viewer.Selection!.Slot);
     }
 
@@ -87,12 +87,12 @@ public sealed class RecipeViewerTests : IDisposable
     public void CancelledSortLeavesThePriorOrderingAndCursorUntouched()
     {
         var viewer = new RecipeViewerSession(Open());
-        Press(viewer, PspAction.Down);
-        Press(viewer, PspAction.Triangle);
-        Press(viewer, PspAction.Down);
-        Press(viewer, PspAction.Right);
-        Press(viewer, PspAction.Down);
-        Press(viewer, PspAction.Circle);
+        Press(viewer, InputAction.Down);
+        Press(viewer, InputAction.Menu);
+        Press(viewer, InputAction.Down);
+        Press(viewer, InputAction.Right);
+        Press(viewer, InputAction.Down);
+        Press(viewer, InputAction.Back);
         Assert.Equal(RecipeSort.Id, viewer.Sort);
         Assert.False(viewer.Inverse);
         Assert.Equal(8, viewer.Selection!.Slot);

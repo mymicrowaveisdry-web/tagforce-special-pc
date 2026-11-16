@@ -4,7 +4,7 @@ using TagForceSpecial.PC.App.Screens.Title;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Routes pinned from config/reference/title-flow.json. PC Cross = confirm, PC Circle = back.</summary>
+/// <summary>Routes pinned from config/reference/title-flow.json. Confirm = the original Circle, Back = its Cross.</summary>
 public class TitleFlowTests
 {
     private sealed class Host : ITitleFlowHost
@@ -25,12 +25,12 @@ public class TitleFlowTests
         public void SaveProfile(string name, DuelistLevelChoice level, PlayerOptions options) { Saves++; SavedOptions = options; SavedLevel = level; }
     }
 
-    private static void Press(TitleFlow flow, PspAction action) => flow.Handle(new(action, action));
+    private static void Press(TitleFlow flow, InputAction action) => flow.Handle(new(action, action));
     /// <summary>Press and release: the held state ends, so no repeat can carry over to the next step.</summary>
-    private static void Tap(TitleFlow flow, PspAction action)
+    private static void Tap(TitleFlow flow, InputAction action)
     {
         Press(flow, action);
-        flow.Handle(new(PspAction.None, PspAction.None));
+        flow.Handle(new(InputAction.None, InputAction.None));
     }
     private static TitleFlow Create(out Host host, string name = "Tester")
     {
@@ -52,13 +52,13 @@ public class TitleFlowTests
         var flow = CreateTimed(out _);
         flow.BeginMainMenu();
         flow.Update(OneFrame * (MainMenuEntry.ReadyFrame - 1));
-        Tap(flow, PspAction.Down);
-        Tap(flow, PspAction.Circle);
+        Tap(flow, InputAction.Down);
+        Tap(flow, InputAction.Back);
         Assert.Equal(TitleFlowStep.MainMenu, flow.Step);
         Assert.Equal(0, flow.MenuFocus);
         flow.Update(OneFrame * 1.01);
         Assert.True(flow.MenuReady);
-        Tap(flow, PspAction.Down);
+        Tap(flow, InputAction.Down);
         Assert.Equal(1, flow.MenuFocus);
     }
 
@@ -68,9 +68,9 @@ public class TitleFlowTests
         var flow = CreateTimed(out _);
         flow.BeginMainMenu();
         flow.Update(OneFrame * (MainMenuEntry.ReadyFrame + 1));
-        Tap(flow, PspAction.Cross);
+        Tap(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.MainMenuUnavailable, flow.Step);
-        Tap(flow, PspAction.Circle);
+        Tap(flow, InputAction.Back);
         Assert.Equal(TitleFlowStep.MainMenu, flow.Step);
         Assert.True(flow.MenuReady);
     }
@@ -81,12 +81,12 @@ public class TitleFlowTests
         var flow = CreateTimed(out _);
         flow.BeginMainMenu();
         flow.Update(OneFrame * (MainMenuEntry.ReadyFrame + 1));
-        Tap(flow, PspAction.Circle);
-        Tap(flow, PspAction.Left);
-        Tap(flow, PspAction.Cross);
+        Tap(flow, InputAction.Back);
+        Tap(flow, InputAction.Left);
+        Tap(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.QuitQuestion, flow.Step);
         Assert.Equal(TitleFlowStep.ExitToTitle, flow.PendingStep);
-        Tap(flow, PspAction.Right);
+        Tap(flow, InputAction.Right);
         Assert.Equal(0, flow.ButtonFocus);
         flow.CommitPending();
         Assert.Equal(TitleFlowStep.ExitToTitle, flow.Step);
@@ -190,8 +190,8 @@ public class TitleFlowTests
         var flow = Create(out var host);
         host.ProfilePresent = true;
         flow.BeginContinue();
-        Press(flow, PspAction.Circle);
-        Press(flow, PspAction.Cross);
+        Press(flow, InputAction.Back);
+        Press(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.StorageCheck, flow.Step);
         flow.Update(TitleFlow.StorageCheckDuration - TimeSpan.FromMilliseconds(1));
         Assert.Equal(TitleFlowStep.StorageCheck, flow.Step);
@@ -218,18 +218,18 @@ public class TitleFlowTests
         var flow = Create(out _);
         flow.BeginContinue();
         flow.Update(TitleFlow.StorageCheckDuration);
-        Press(flow, PspAction.Circle);
+        Press(flow, InputAction.Back);
         Assert.Equal(TitleFlowStep.NoData, flow.Step);
-        Press(flow, PspAction.Cross);
+        Press(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.CancelLoadNoData, flow.Step);
         Assert.Equal(0, flow.ButtonFocus);
-        Press(flow, PspAction.Circle);
+        Press(flow, InputAction.Back);
         Assert.Equal(TitleFlowStep.CancelLoadNoData, flow.Step);
-        Press(flow, PspAction.Right);
-        Press(flow, PspAction.Cross);
+        Press(flow, InputAction.Right);
+        Press(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.NoData, flow.Step);
-        Press(flow, PspAction.Cross);
-        Press(flow, PspAction.Cross);
+        Press(flow, InputAction.Confirm);
+        Press(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.ExitToTitle, flow.Step);
     }
 
@@ -248,36 +248,36 @@ public class TitleFlowTests
     {
         var flow = Create(out _);
         flow.BeginNewGame();
-        Press(flow, PspAction.Start);
+        Press(flow, InputAction.Start);
         Assert.Equal(TitleFlowStep.RulesQuestion, flow.Step);
-        Press(flow, PspAction.Circle);
+        Press(flow, InputAction.Back);
         Assert.Equal(TitleFlowStep.DuelistLevel, flow.Step);
         Assert.Equal(DuelistLevelChoice.FirstTimer, flow.Level);
-        Press(flow, PspAction.Circle);
+        Press(flow, InputAction.Back);
         Assert.Equal(TitleFlowStep.DuelistLevel, flow.Step);
-        Press(flow, PspAction.Cross);
+        Press(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.CreateQuestion, flow.Step);
-        Press(flow, PspAction.Circle);
+        Press(flow, InputAction.Back);
         Assert.Equal(TitleFlowStep.MainMenu, flow.Step);
     }
 
     [Theory]
-    [InlineData(true, PspAction.Left, DuelistLevelChoice.BringItOn)]
-    [InlineData(true, PspAction.None, DuelistLevelChoice.BeenThere)]
-    [InlineData(false, PspAction.None, DuelistLevelChoice.FirstTimer)]
-    public void RulesAnswersSelectTheObservedDuelistLevel(bool knowsRules, PspAction confidence, DuelistLevelChoice expected)
+    [InlineData(true, InputAction.Left, DuelistLevelChoice.BringItOn)]
+    [InlineData(true, InputAction.None, DuelistLevelChoice.BeenThere)]
+    [InlineData(false, InputAction.None, DuelistLevelChoice.FirstTimer)]
+    public void RulesAnswersSelectTheObservedDuelistLevel(bool knowsRules, InputAction confidence, DuelistLevelChoice expected)
     {
         var flow = Create(out _);
         flow.BeginNewGame();
-        Press(flow, PspAction.Start);
+        Press(flow, InputAction.Start);
         if (knowsRules)
         {
-            Press(flow, PspAction.Left);
-            Press(flow, PspAction.Cross);
+            Press(flow, InputAction.Left);
+            Press(flow, InputAction.Confirm);
             Assert.Equal(TitleFlowStep.ConfidenceQuestion, flow.Step);
-            if (confidence != PspAction.None) Press(flow, confidence);
+            if (confidence != InputAction.None) Press(flow, confidence);
         }
-        Press(flow, PspAction.Cross);
+        Press(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.DuelistLevel, flow.Step);
         Assert.Equal(expected, flow.Level);
     }
@@ -287,30 +287,30 @@ public class TitleFlowTests
     {
         var flow = Create(out var host);
         flow.BeginNewGame();
-        Press(flow, PspAction.Start);
-        Press(flow, PspAction.Cross);
-        Press(flow, PspAction.Cross);
-        Press(flow, PspAction.Cross);
+        Press(flow, InputAction.Start);
+        Press(flow, InputAction.Confirm);
+        Press(flow, InputAction.Confirm);
+        Press(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.MainMenu, flow.Step);
         Assert.Null(host.Created);
 
         flow = Create(out host);
         flow.BeginNewGame();
-        Press(flow, PspAction.Start);
-        Press(flow, PspAction.Cross);
-        Press(flow, PspAction.Cross);
-        Press(flow, PspAction.Left);
-        Press(flow, PspAction.Cross);
+        Press(flow, InputAction.Start);
+        Press(flow, InputAction.Confirm);
+        Press(flow, InputAction.Confirm);
+        Press(flow, InputAction.Left);
+        Press(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.SystemSavePrompt, flow.Step);
         Assert.Null(host.Created);
-        Press(flow, PspAction.Cross);
+        Press(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.SystemSaveDone, flow.Step);
         Assert.Equal(("Tester", DuelistLevelChoice.FirstTimer), host.Created);
         Assert.Equal(PlayerOptions.Defaults().Values, host.SavedOptions!.Values);
         // "Save completed." ignores confirm and closes with back.
-        Press(flow, PspAction.Cross);
+        Press(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.SystemSaveDone, flow.Step);
-        Press(flow, PspAction.Circle);
+        Press(flow, InputAction.Back);
         Assert.Equal(TitleFlowStep.MainMenu, flow.Step);
     }
 
@@ -322,22 +322,22 @@ public class TitleFlowTests
         flow.BeginNewGame();
         flow.TypeCharacter('Z');
         Assert.Equal("ABCDEFGH", flow.Name);
-        Press(flow, PspAction.Cross);
+        Press(flow, InputAction.Confirm);
         Assert.True(flow.Editing);
         flow.TypeCharacter('Z');
         Assert.Equal("ABCDEFGH", flow.Name);
-        for (int i = 0; i < 9; i++) Press(flow, PspAction.Circle);
+        for (int i = 0; i < 9; i++) Press(flow, InputAction.Back);
         Assert.Equal("", flow.Name);
         flow.TypeCharacter('Q');
         flow.TypeCharacter('\b');
         flow.TypeCharacter('R');
-        Press(flow, PspAction.Start);
+        Press(flow, InputAction.Start);
         Assert.Equal(TitleFlowStep.NameEntry, flow.Step);
         Assert.Equal("R", flow.Name);
-        Press(flow, PspAction.Cross);
+        Press(flow, InputAction.Confirm);
         flow.TypeCharacter('\b');
-        Press(flow, PspAction.Start);
-        Press(flow, PspAction.Start);
+        Press(flow, InputAction.Start);
+        Press(flow, InputAction.Start);
         Assert.Equal(TitleFlowStep.NameEntry, flow.Step);
     }
 
@@ -346,7 +346,7 @@ public class TitleFlowTests
     {
         var flow = Create(out _);
         flow.BeginNewGame();
-        Press(flow, PspAction.Circle);
+        Press(flow, InputAction.Back);
         Assert.Equal(TitleFlowStep.ExitToTitle, flow.Step);
     }
 
@@ -355,9 +355,9 @@ public class TitleFlowTests
     {
         var flow = Create(out _);
         flow.BeginMainMenu();
-        Tap(flow, PspAction.Up);
+        Tap(flow, InputAction.Up);
         Assert.Equal(TitleFlow.MainMenuRows - 1, flow.MenuFocus);
-        Tap(flow, PspAction.Down);
+        Tap(flow, InputAction.Down);
         Assert.Equal(0, flow.MenuFocus);
     }
 
@@ -366,9 +366,9 @@ public class TitleFlowTests
     {
         var flow = Create(out _);
         flow.BeginMainMenu();
-        Press(flow, PspAction.Down);
+        Press(flow, InputAction.Down);
         Assert.Equal(1, flow.MenuFocus);
-        var held = new PspInputFrame(PspAction.None, PspAction.Down);
+        var held = new InputFrame(InputAction.None, InputAction.Down);
         flow.Handle(held);
         flow.Update(TitleFlow.MenuRepeatDelay - TimeSpan.FromMilliseconds(1));
         Assert.Equal(1, flow.MenuFocus);
@@ -389,9 +389,9 @@ public class TitleFlowTests
     {
         var flow = Create(out _);
         flow.BeginMainMenu();
-        Press(flow, PspAction.Up);
+        Press(flow, InputAction.Up);
         Assert.Equal(7, flow.MenuFocus);
-        var held = new PspInputFrame(PspAction.None, PspAction.Up);
+        var held = new InputFrame(InputAction.None, InputAction.Up);
         flow.Handle(held);
         flow.Update(TitleFlow.MenuRepeatDelay);
         Assert.Equal(6, flow.MenuFocus);
@@ -405,11 +405,11 @@ public class TitleFlowTests
     {
         var flow = Create(out _);
         flow.BeginMainMenu();
-        Press(flow, PspAction.Down);
-        flow.Handle(new(PspAction.None, PspAction.None));
+        Press(flow, InputAction.Down);
+        flow.Handle(new(InputAction.None, InputAction.None));
         flow.Update(TitleFlow.MenuRepeatDelay * 2);
         Assert.Equal(1, flow.MenuFocus);
-        flow.Handle(new(PspAction.None, PspAction.Down));
+        flow.Handle(new(InputAction.None, InputAction.Down));
         flow.Update(TitleFlow.MenuRepeatDelay * 2);
         Assert.Equal(1, flow.MenuFocus);
     }
@@ -419,7 +419,7 @@ public class TitleFlowTests
     {
         var flow = Create(out _);
         flow.BeginMainMenu();
-        foreach (var action in new[] { PspAction.Left, PspAction.Right, PspAction.Triangle, PspAction.Square, PspAction.Select, PspAction.Start, PspAction.L, PspAction.R })
+        foreach (var action in new[] { InputAction.Left, InputAction.Right, InputAction.Menu, InputAction.Switch, InputAction.Select, InputAction.Start, InputAction.PreviousPage, InputAction.NextPage })
         {
             Tap(flow, action);
             Assert.Equal(TitleFlowStep.MainMenu, flow.Step);
@@ -442,22 +442,22 @@ public class TitleFlowTests
     }
 
     [Theory]
-    [InlineData(PspAction.Cross)]
-    [InlineData(PspAction.Circle)]
-    public void UnavailableRowsShowANoticeAndReturnToTheSameRow(PspAction leave)
+    [InlineData(InputAction.Confirm)]
+    [InlineData(InputAction.Back)]
+    public void UnavailableRowsShowANoticeAndReturnToTheSameRow(InputAction leave)
     {
         var flow = Create(out var host);
         flow.BeginMainMenu();
         for (int row = 0; row < TitleFlow.MainMenuRows - 1; row++)
         {
-            if (MainMenuDestinations.All[row].Route != MainMenuRoute.Unavailable) { Tap(flow, PspAction.Down); continue; }
-            Tap(flow, PspAction.Cross);
+            if (MainMenuDestinations.All[row].Route != MainMenuRoute.Unavailable) { Tap(flow, InputAction.Down); continue; }
+            Tap(flow, InputAction.Confirm);
             Assert.Equal(TitleFlowStep.MainMenuUnavailable, flow.Step);
             Assert.Equal(MainMenuDestinations.All[row], flow.FocusedDestination);
             Tap(flow, leave);
             Assert.Equal(TitleFlowStep.MainMenu, flow.Step);
             Assert.Equal(row, flow.MenuFocus);
-            Tap(flow, PspAction.Down);
+            Tap(flow, InputAction.Down);
         }
         Assert.Equal(0, host.Saves);
     }
@@ -467,27 +467,27 @@ public class TitleFlowTests
     {
         var flow = Create(out var host);
         flow.BeginMainMenu();
-        Tap(flow, PspAction.Up);
-        Tap(flow, PspAction.Cross);
+        Tap(flow, InputAction.Up);
+        Tap(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.SystemSavePrompt, flow.Step);
-        Tap(flow, PspAction.Circle);
+        Tap(flow, InputAction.Back);
         Assert.Equal(TitleFlowStep.MainMenu, flow.Step);
         Assert.Equal(7, flow.MenuFocus);
         Assert.Equal(0, host.Saves);
-        Tap(flow, PspAction.Cross);
-        Tap(flow, PspAction.Right);
-        Tap(flow, PspAction.Cross);
+        Tap(flow, InputAction.Confirm);
+        Tap(flow, InputAction.Right);
+        Tap(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.MainMenu, flow.Step);
         Assert.Equal(7, flow.MenuFocus);
         Assert.Equal(0, host.Saves);
-        Tap(flow, PspAction.Cross);
-        Tap(flow, PspAction.Cross);
+        Tap(flow, InputAction.Confirm);
+        Tap(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.SystemSaveDone, flow.Step);
         Assert.Equal(1, host.Saves);
         Assert.Null(host.Created);
-        Tap(flow, PspAction.Cross);
+        Tap(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.SystemSaveDone, flow.Step);
-        Tap(flow, PspAction.Circle);
+        Tap(flow, InputAction.Back);
         Assert.Equal(TitleFlowStep.MainMenu, flow.Step);
         Assert.Equal(7, flow.MenuFocus);
     }
@@ -497,17 +497,17 @@ public class TitleFlowTests
     {
         var flow = Create(out var host);
         flow.BeginMainMenu();
-        Tap(flow, PspAction.Up);
-        Tap(flow, PspAction.Cross);
-        Tap(flow, PspAction.Circle);
+        Tap(flow, InputAction.Up);
+        Tap(flow, InputAction.Confirm);
+        Tap(flow, InputAction.Back);
         flow.BeginNewGame();
-        Press(flow, PspAction.Start);
-        Press(flow, PspAction.Cross);
-        Press(flow, PspAction.Cross);
-        Press(flow, PspAction.Left);
-        Press(flow, PspAction.Cross);
+        Press(flow, InputAction.Start);
+        Press(flow, InputAction.Confirm);
+        Press(flow, InputAction.Confirm);
+        Press(flow, InputAction.Left);
+        Press(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.SystemSavePrompt, flow.Step);
-        Press(flow, PspAction.Circle);
+        Press(flow, InputAction.Back);
         Assert.Equal(TitleFlowStep.CreateQuestion, flow.Step);
         Assert.Equal(0, host.Saves);
     }
@@ -517,17 +517,17 @@ public class TitleFlowTests
     {
         var flow = Create(out _);
         flow.BeginMainMenu();
-        Tap(flow, PspAction.Down);
+        Tap(flow, InputAction.Down);
         Assert.Equal(1, flow.MenuFocus);
-        Press(flow, PspAction.Circle);
+        Press(flow, InputAction.Back);
         Assert.Equal(TitleFlowStep.QuitQuestion, flow.Step);
         Assert.Equal(1, flow.ButtonFocus);
-        Press(flow, PspAction.Cross);
+        Press(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.MainMenu, flow.Step);
         Assert.Equal(1, flow.MenuFocus);
-        Press(flow, PspAction.Circle);
-        Press(flow, PspAction.Left);
-        Press(flow, PspAction.Cross);
+        Press(flow, InputAction.Back);
+        Press(flow, InputAction.Left);
+        Press(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.ExitToTitle, flow.Step);
     }
 

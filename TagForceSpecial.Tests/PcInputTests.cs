@@ -13,28 +13,28 @@ public class PcInputTests
         new(x, y, wheel, left ? ButtonState.Pressed : ButtonState.Released, ButtonState.Released,
             right ? ButtonState.Pressed : ButtonState.Released, ButtonState.Released, ButtonState.Released);
 
-    private static PspInputFrame Poll(PspInputMapper mapper, MouseState mouse, params Keys[] keys) =>
+    private static InputFrame Poll(InputMapper mapper, MouseState mouse, params Keys[] keys) =>
         mapper.Poll(new KeyboardState(keys), new GamePadState(), true, (mouse, Picture));
 
     [Fact]
     public void DefaultsKeepTheRetainedPrimaryKeysAndAddPcAlternatives()
     {
         var b = KeyBindings.Default;
-        Assert.Equal(Keys.Enter, b[PspAction.Cross, 0]);
-        Assert.Equal(Keys.Escape, b[PspAction.Circle, 0]);
-        Assert.Equal(Keys.Tab, b[PspAction.Triangle, 0]);
-        Assert.Equal(Keys.Space, b[PspAction.Square, 0]);
-        Assert.Equal(PspAction.Up | PspAction.Cross, b.Held(new KeyboardState(Keys.W, Keys.Z)));
+        Assert.Equal(Keys.Enter, b[InputAction.Confirm, 0]);
+        Assert.Equal(Keys.Escape, b[InputAction.Back, 0]);
+        Assert.Equal(Keys.Tab, b[InputAction.Menu, 0]);
+        Assert.Equal(Keys.Space, b[InputAction.Switch, 0]);
+        Assert.Equal(InputAction.Up | InputAction.Confirm, b.Held(new KeyboardState(Keys.W, Keys.Z)));
     }
 
     [Fact]
     public void RebindingMovesAKeyAndSwapsTheReplacedOne()
     {
-        var b = KeyBindings.Default.With(PspAction.Cross, 1, Keys.W); // W was Up's second key
-        Assert.Equal(Keys.W, b[PspAction.Cross, 1]);
-        Assert.Equal(Keys.Z, b[PspAction.Up, 1]); // Up takes Confirm's old Z, so no action loses a key
-        Assert.Same(b, b.With(PspAction.Up, 0, Keys.Escape)); // Escape is reserved
-        Assert.Same(b, b.With(PspAction.Circle, 0, Keys.X)); // Back keeps Escape in slot 0
+        var b = KeyBindings.Default.With(InputAction.Confirm, 1, Keys.W); // W was Up's second key
+        Assert.Equal(Keys.W, b[InputAction.Confirm, 1]);
+        Assert.Equal(Keys.Z, b[InputAction.Up, 1]); // Up takes Confirm's old Z, so no action loses a key
+        Assert.Same(b, b.With(InputAction.Up, 0, Keys.Escape)); // Escape is reserved
+        Assert.Same(b, b.With(InputAction.Back, 0, Keys.X)); // Back keeps Escape in slot 0
         var round = KeyBindings.FromDocument(b.ToDocument());
         Assert.Equal(b.ToDocument(), round.ToDocument());
     }
@@ -54,16 +54,16 @@ public class PcInputTests
     [Fact]
     public void TextEntryMutesTypingKeysOnly()
     {
-        var mapper = new PspInputMapper { TextEntry = true };
+        var mapper = new InputMapper { TextEntry = true };
         mapper.Poll(new KeyboardState(), new GamePadState(), true);
         var frame = mapper.Poll(new KeyboardState(Keys.Z, Keys.W, Keys.Back, Keys.Down), new GamePadState(), true);
-        Assert.Equal(PspAction.Down, frame.Pressed);
+        Assert.Equal(InputAction.Down, frame.Pressed);
     }
 
     [Fact]
     public void MouseMapsThroughTheLetterboxAndDropsClicksOutsideIt()
     {
-        var mapper = new PspInputMapper();
+        var mapper = new InputMapper();
         Poll(mapper, Mouse(0, 0));
         Poll(mapper, Mouse(0, 0));
         var inside = Poll(mapper, Mouse(80 + 200, 100, left: true));
@@ -82,14 +82,14 @@ public class PcInputTests
     public void PointerTargetsHoverFocusesClickConfirmsRightClickBacks()
     {
         int focus = 0;
-        var hover = PointerTargets.Apply(new(PspAction.None, PspAction.None, false, new(new(5, 5), true, false, false, 0)), 2, focus, i => focus = i);
+        var hover = PointerTargets.Apply(new(InputAction.None, InputAction.None, false, new(new(5, 5), true, false, false, 0)), 2, focus, i => focus = i);
         Assert.Equal(2, focus);
-        Assert.Equal(PspAction.None, hover.Pressed);
-        var click = PointerTargets.Apply(new(PspAction.None, PspAction.None, false, new(new(5, 5), false, true, false, 0)), 3, focus, i => focus = i);
+        Assert.Equal(InputAction.None, hover.Pressed);
+        var click = PointerTargets.Apply(new(InputAction.None, InputAction.None, false, new(new(5, 5), false, true, false, 0)), 3, focus, i => focus = i);
         Assert.Equal(3, focus);
-        Assert.True(click.IsPressed(PspAction.Cross));
-        var back = PointerTargets.Apply(new(PspAction.None, PspAction.None, false, new(new(5, 5), false, false, true, -1)), null, focus, i => focus = i);
-        Assert.True(back.IsPressed(PspAction.Circle) && back.IsPressed(PspAction.Down) && (back.Held & PspAction.Down) != 0);
+        Assert.True(click.IsPressed(InputAction.Confirm));
+        var back = PointerTargets.Apply(new(InputAction.None, InputAction.None, false, new(new(5, 5), false, false, true, -1)), null, focus, i => focus = i);
+        Assert.True(back.IsPressed(InputAction.Back) && back.IsPressed(InputAction.Down) && (back.Held & InputAction.Down) != 0);
     }
 
     [Fact]
@@ -98,15 +98,15 @@ public class PcInputTests
         var c = new ControlsEditor(KeyBindings.Default);
         var none = new KeyboardState();
         c.Handle(default, none);
-        Assert.Equal(ControlsOutcome.None, c.Handle(new(PspAction.Cross, PspAction.Cross), new KeyboardState(Keys.Enter)));
+        Assert.Equal(ControlsOutcome.None, c.Handle(new(InputAction.Confirm, InputAction.Confirm), new KeyboardState(Keys.Enter)));
         Assert.True(c.Capturing);
         Assert.Equal(ControlsOutcome.None, c.Handle(default, new KeyboardState(Keys.Enter))); // Enter still held: not a new key
         Assert.Equal(ControlsOutcome.Changed, c.Handle(default, new KeyboardState(Keys.I)));
-        Assert.Equal(Keys.I, c.Bindings[PspAction.Up, 0]);
-        c.Handle(new(PspAction.Cross, PspAction.Cross), none);
+        Assert.Equal(Keys.I, c.Bindings[InputAction.Up, 0]);
+        c.Handle(new(InputAction.Confirm, InputAction.Confirm), none);
         Assert.Equal(ControlsOutcome.None, c.Handle(default, new KeyboardState(Keys.Escape)));
         Assert.False(c.Capturing);
-        Assert.Equal(Keys.I, c.Bindings[PspAction.Up, 0]);
+        Assert.Equal(Keys.I, c.Bindings[InputAction.Up, 0]);
     }
 
     [Fact]
@@ -114,7 +114,7 @@ public class PcInputTests
     {
         var c = new ControlsEditor(KeyBindings.Default);
         float y = ControlsEditor.RowY(4) + 4; // Confirm
-        c.Handle(new(PspAction.None, PspAction.None, false, new(new(ControlsEditor.SlotX1 + 10, y), true, true, false, 0)), new KeyboardState());
+        c.Handle(new(InputAction.None, InputAction.None, false, new(new(ControlsEditor.SlotX1 + 10, y), true, true, false, 0)), new KeyboardState());
         Assert.Equal((4, 1), (c.Row, c.Slot));
         Assert.True(c.Capturing);
     }

@@ -7,7 +7,7 @@ using TagForceSpecial.PC.Decks;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Deck Edit Menu chain: measured profile, menu navigation and the list query. PC Cross = confirm, PC Circle = back.</summary>
+/// <summary>Deck Edit Menu chain: measured profile, menu navigation and the list query. Confirm = the original Circle, Back = its Cross.</summary>
 public class DeckEditMenuTests
 {
     /// <summary>The supported pool: eight Normal monsters (raw kind 0) and six Normal Spells (13, icon 0).</summary>
@@ -21,15 +21,15 @@ public class DeckEditMenuTests
         return new DeckEditSession(draft, PlayablePreview.Cards.Select(c => catalog[c.CardId]), 7);
     }
 
-    private static void Tap(DeckEditSession session, params PspAction[] actions)
+    private static void Tap(DeckEditSession session, params InputAction[] actions)
     {
         foreach (var action in actions) session.Handle(new(action, action));
     }
 
     private static void OpenRow(DeckEditSession session, int row)
     {
-        for (int i = 0; i < row; i++) Tap(session, PspAction.Down);
-        Tap(session, PspAction.Cross);
+        for (int i = 0; i < row; i++) Tap(session, InputAction.Down);
+        Tap(session, InputAction.Confirm);
     }
 
     [Fact]
@@ -54,13 +54,13 @@ public class DeckEditMenuTests
     public void TriangleOpensTheMenuAndBackClosesOneLevelAtATime()
     {
         var session = Session(out _);
-        Tap(session, PspAction.Triangle);
+        Tap(session, InputAction.Menu);
         Assert.Equal("main", session.Menus.Top!.Id);
         OpenRow(session, 3);
         Assert.Equal(["main", "search"], session.Menus.Stack.Select(l => l.Id));
-        Tap(session, PspAction.Circle);
+        Tap(session, InputAction.Back);
         Assert.Equal("main", session.Menus.Top!.Id);
-        Tap(session, PspAction.Circle);
+        Tap(session, InputAction.Back);
         Assert.False(session.Menus.Open);
         Assert.Equal(DeckEditPrompt.None, session.Prompt);
     }
@@ -70,14 +70,14 @@ public class DeckEditMenuTests
     {
         var session = Session(out var draft);
         var before = draft.Cards(DeckSection.Main).ToArray();
-        Tap(session, PspAction.Triangle);
+        Tap(session, InputAction.Menu);
         OpenRow(session, 8); // Undo Previous Move, greyed: nothing happens
         Assert.Equal(8, session.Menus.Top!.Focus);
-        Tap(session, PspAction.Circle);
-        Tap(session, PspAction.Cross, PspAction.Cross); // move the first Trunk card into the Deck
+        Tap(session, InputAction.Back);
+        Tap(session, InputAction.Confirm, InputAction.Confirm); // move the first Trunk card into the Deck
         Assert.NotEqual(before, draft.Cards(DeckSection.Main));
         Assert.True(session.CanUndo);
-        Tap(session, PspAction.Triangle);
+        Tap(session, InputAction.Menu);
         OpenRow(session, 8);
         Assert.Equal(before, draft.Cards(DeckSection.Main));
         Assert.False(session.Menus.Open);
@@ -88,13 +88,13 @@ public class DeckEditMenuTests
     {
         var session = Session(out _);
         var unsorted = session.Current.Select(e => e.Card.GameCardId).ToArray();
-        Tap(session, PspAction.Triangle);
+        Tap(session, InputAction.Menu);
         OpenRow(session, 3);
-        Tap(session, PspAction.Cross); // Sort, starting on Name
-        Tap(session, PspAction.Down, PspAction.Down, PspAction.Down, PspAction.Down); // ATK
+        Tap(session, InputAction.Confirm); // Sort, starting on Name
+        Tap(session, InputAction.Down, InputAction.Down, InputAction.Down, InputAction.Down); // ATK
         Assert.Equal(DeckEditSortKey.Attack, session.Query.SortKey);
         Assert.Equal(session.Current.Select(e => e.Card.Statistics.Attack ?? -2).Order(), session.Current.Select(e => e.Card.Statistics.Attack ?? -2));
-        Tap(session, PspAction.Circle);
+        Tap(session, InputAction.Back);
         Assert.Null(session.Query.SortKey);
         Assert.Equal(unsorted, session.Current.Select(e => e.Card.GameCardId));
     }
@@ -103,10 +103,10 @@ public class DeckEditMenuTests
     public void OrderInversePickClosesAllMenus()
     {
         var session = Session(out _);
-        Tap(session, PspAction.Triangle);
+        Tap(session, InputAction.Menu);
         OpenRow(session, 3);
-        Tap(session, PspAction.Cross, PspAction.Down, PspAction.Down); // Sort > Level/Rank
-        Tap(session, PspAction.Right, PspAction.Down, PspAction.Cross); // Order Inverse
+        Tap(session, InputAction.Confirm, InputAction.Down, InputAction.Down); // Sort > Level/Rank
+        Tap(session, InputAction.Right, InputAction.Down, InputAction.Confirm); // Order Inverse
         Assert.False(session.Menus.Open);
         Assert.Equal(DeckEditSortKey.LevelRank, session.Query.SortKey);
         Assert.True(session.Query.Inverse);
@@ -117,21 +117,21 @@ public class DeckEditMenuTests
     {
         var session = Session(out _);
         int all = session.Current.Count, spells = session.Current.Count(e => e.Card.Codes!.RawKind == 13);
-        Tap(session, PspAction.Triangle);
+        Tap(session, InputAction.Menu);
         OpenRow(session, 3);
         OpenRow(session, 1); // Narrow Search
-        Tap(session, PspAction.Cross); // Card Frame grid (3 x 4)
-        Tap(session, PspAction.Down, PspAction.Down, PspAction.Right, PspAction.Cross); // Spell
+        Tap(session, InputAction.Confirm); // Card Frame grid (3 x 4)
+        Tap(session, InputAction.Down, InputAction.Down, InputAction.Right, InputAction.Confirm); // Spell
         Assert.True(session.Menus.IsSelected("card-frame", 9));
-        Tap(session, PspAction.Down, PspAction.Cross); // Run
+        Tap(session, InputAction.Down, InputAction.Confirm); // Run
         Assert.Equal(spells, session.Menus.RunCount);
         Assert.Empty(session.Menus.Stack); // the notice shows over the already narrowed list
         Assert.Equal(spells, session.Current.Count);
-        Tap(session, PspAction.Cross); // OK
+        Tap(session, InputAction.Confirm); // OK
         Assert.False(session.Menus.Open);
         Assert.Equal(spells, session.Current.Count);
         Assert.All(session.Current, e => Assert.Equal(13u, e.Card.Codes!.RawKind));
-        Tap(session, PspAction.Triangle);
+        Tap(session, InputAction.Menu);
         OpenRow(session, 7); // Reset Narrow Search Results
         Assert.Equal(all, session.Current.Count);
     }
@@ -141,13 +141,13 @@ public class DeckEditMenuTests
     {
         var session = Session(out _);
         uint first = session.Focused!.Card.GameCardId;
-        Tap(session, PspAction.Triangle);
+        Tap(session, InputAction.Menu);
         OpenRow(session, 1); // Attach/Remove Label
         Assert.True(session.Menus.Open);
         Assert.Contains(first, session.Query.Labeled);
-        Tap(session, PspAction.Down, PspAction.Down, PspAction.Cross); // Search Menu (row 3) from row 1
+        Tap(session, InputAction.Down, InputAction.Down, InputAction.Confirm); // Search Menu (row 3) from row 1
         OpenRow(session, 4); // Label Display Settings
-        Tap(session, PspAction.Down, PspAction.Down, PspAction.Cross); // Only Show Labeled Cards
+        Tap(session, InputAction.Down, InputAction.Down, InputAction.Confirm); // Only Show Labeled Cards
         Assert.False(session.Menus.Open);
         Assert.Equal([first], session.Current.Select(e => e.Card.GameCardId));
     }
@@ -156,14 +156,14 @@ public class DeckEditMenuTests
     public void EmptyDeckAppliesAtOnceAndUnrecreatedRowsShowTheNotice()
     {
         var session = Session(out var draft);
-        Tap(session, PspAction.Triangle);
+        Tap(session, InputAction.Menu);
         OpenRow(session, 4);
         OpenRow(session, 4); // Empty Deck
         Assert.Empty(draft.Cards(DeckSection.Main));
         Assert.False(session.Menus.Open);
-        Tap(session, PspAction.Triangle, PspAction.Cross); // Card Details
+        Tap(session, InputAction.Menu, InputAction.Confirm); // Card Details
         Assert.Equal(("main", 0), session.Menus.Notice);
-        Tap(session, PspAction.Circle);
+        Tap(session, InputAction.Back);
         Assert.Null(session.Menus.Notice);
         Assert.Equal("main", session.Menus.Top!.Id);
     }

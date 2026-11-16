@@ -7,7 +7,7 @@ public readonly record struct GuiButtons(bool Up, bool Down, bool Left, bool Rig
 
 public sealed class GuiInput
 {
-    private readonly PspInputMapper mapper = new();
+    private readonly InputMapper mapper = new();
 
     public GuiButtons Poll(bool active)
         => mapper.Poll(active).ToGuiButtons();

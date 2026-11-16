@@ -70,7 +70,7 @@ public enum DeckMenuOutcome { None, Closing, Notice }
 
 /// <summary>Observed Deck Menu input: a press moves one row and wraps; held repeats stop at the end rows; confirm opens the focused
 /// destination; back closes the submenu. Every other button does nothing, and input is dropped until focus appears.
-/// PC confirm is PSP Circle in the original and PSP Cross here; PC back is the reverse.</summary>
+/// Confirm does what the original does with Circle, Back what it does with Cross.</summary>
 public sealed class DeckMenuSession(DeckMenuProfile profile)
 {
     private readonly MenuHoldRepeat repeat = new(TitleFlow.MenuRepeatDelay, TitleFlow.MenuRepeatInterval);
@@ -103,26 +103,26 @@ public sealed class DeckMenuSession(DeckMenuProfile profile)
     /// <summary>Exact captures fix the opening at a measured frame.</summary>
     public void SkipTo(int frame) => clock = TimeSpan.FromSeconds(frame / MainMenuEntry.GameFramesPerSecond);
 
-    public DeckMenuOutcome Handle(PspInputFrame input)
+    public DeckMenuOutcome Handle(InputFrame input)
     {
         if (NoticeOpen)
         {
             // The PC notice closes with either button and keeps focus, as returning from each original destination does.
-            if (input.IsPressed(PspAction.Cross) || input.IsPressed(PspAction.Circle)) NoticeOpen = false;
+            if (input.IsPressed(InputAction.Confirm) || input.IsPressed(InputAction.Back)) NoticeOpen = false;
             return DeckMenuOutcome.None;
         }
         if (!Ready) return DeckMenuOutcome.None;
-        int held = (input.Held & (PspAction.Up | PspAction.Down)) switch { PspAction.Up => -1, PspAction.Down => 1, _ => 0 };
+        int held = (input.Held & (InputAction.Up | InputAction.Down)) switch { InputAction.Up => -1, InputAction.Down => 1, _ => 0 };
         if (held != heldDirection) heldDirection = 0;
-        int pressed = input.IsPressed(PspAction.Up) ? -1 : input.IsPressed(PspAction.Down) ? 1 : 0;
+        int pressed = input.IsPressed(InputAction.Up) ? -1 : input.IsPressed(InputAction.Down) ? 1 : 0;
         if (pressed != 0 && pressed == held)
         {
             Focus = (Focus + pressed + Rows) % Rows;
             heldDirection = pressed;
             repeat.Restart();
         }
-        if (input.IsPressed(PspAction.Circle)) { Closing = true; heldDirection = 0; return DeckMenuOutcome.Closing; }
-        if (!input.IsPressed(PspAction.Cross)) return DeckMenuOutcome.None;
+        if (input.IsPressed(InputAction.Back)) { Closing = true; heldDirection = 0; return DeckMenuOutcome.Closing; }
+        if (!input.IsPressed(InputAction.Confirm)) return DeckMenuOutcome.None;
         heldDirection = 0;
         NoticeOpen = true;
         return DeckMenuOutcome.Notice;

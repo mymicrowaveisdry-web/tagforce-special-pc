@@ -110,23 +110,23 @@ public sealed class OptionsSession(int[] initial)
     public void PointRow(int row) { if (!CancelQuestion && row >= 0 && row < OptionsCatalog.Rows.Count) Focus = row; }
     public void PointCancel(int button) { if (CancelQuestion && button is 0 or 1) CancelFocus = button; }
 
-    public OptionsOutcome Handle(PspInputFrame input)
+    public OptionsOutcome Handle(InputFrame input)
     {
         if (CancelQuestion)
         {
-            if (input.IsPressed(PspAction.Left) || input.IsPressed(PspAction.Right)) CancelFocus = 1 - CancelFocus;
-            if (!input.IsPressed(PspAction.Cross)) return OptionsOutcome.None;
+            if (input.IsPressed(InputAction.Left) || input.IsPressed(InputAction.Right)) CancelFocus = 1 - CancelFocus;
+            if (!input.IsPressed(InputAction.Confirm)) return OptionsOutcome.None;
             if (CancelFocus == 0) return OptionsOutcome.Discarded;
             CancelQuestion = false;
             return OptionsOutcome.None;
         }
         int rows = OptionsCatalog.Rows.Count;
-        if (input.IsPressed(PspAction.Up)) Focus = (Focus + rows - 1) % rows;
-        else if (input.IsPressed(PspAction.Down)) Focus = (Focus + 1) % rows;
-        else if (input.IsPressed(PspAction.Left)) values[Focus] = Math.Max(0, values[Focus] - 1);
-        else if (input.IsPressed(PspAction.Right)) values[Focus] = Math.Min(OptionsCatalog.Rows[Focus].Count - 1, values[Focus] + 1);
-        if (input.IsPressed(PspAction.Cross)) return OptionsOutcome.Accepted;
-        if (input.IsPressed(PspAction.Circle)) { CancelQuestion = true; CancelFocus = 0; }
+        if (input.IsPressed(InputAction.Up)) Focus = (Focus + rows - 1) % rows;
+        else if (input.IsPressed(InputAction.Down)) Focus = (Focus + 1) % rows;
+        else if (input.IsPressed(InputAction.Left)) values[Focus] = Math.Max(0, values[Focus] - 1);
+        else if (input.IsPressed(InputAction.Right)) values[Focus] = Math.Min(OptionsCatalog.Rows[Focus].Count - 1, values[Focus] + 1);
+        if (input.IsPressed(InputAction.Confirm)) return OptionsOutcome.Accepted;
+        if (input.IsPressed(InputAction.Back)) { CancelQuestion = true; CancelFocus = 0; }
         return OptionsOutcome.None;
     }
 }

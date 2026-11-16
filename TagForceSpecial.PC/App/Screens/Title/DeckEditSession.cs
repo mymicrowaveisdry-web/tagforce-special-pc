@@ -16,7 +16,7 @@ public sealed record DeckEditEntry(CardDefinition Card, int Owned, int InMainOrE
 /// <summary>Observed Deck Edit core behaviour (Phase 6.2a, phase-62a handoff): Square cycles Trunk, Deck, EX, Side; seven rows are visible and
 /// the cursor wraps at both ends; confirm picks a card and asks where it goes ("The card will be moved to %s."), confirm again moves it,
 /// back cancels; an empty Side does nothing; back on the list asks "Exit Deck Edit and return to the game. Is this OK?" (OK focused), then
-/// "Save all contents acquired so far?" (YES focused). PC confirm is PSP Circle in the original and PSP Cross here; PC back is the reverse.
+/// "Save all contents acquired so far?" (YES focused). Confirm does what the original does with Circle, Back what it does with Cross.
 /// The Trunk lists the cards the PC supports, owned <see cref="OwnedCopies"/> times each: it is not the original save's collection.
 /// Triangle opens the Deck Edit Menu (<see cref="DeckEditMenus"/>); the Trunk list follows <see cref="Query"/>.</summary>
 public sealed class DeckEditSession
@@ -108,10 +108,10 @@ public sealed class DeckEditSession
     /// <summary>Pointer focus on the exit or save question's buttons (0 OK/YES, 1 CANCEL/NO).</summary>
     public void PointPrompt(int button) { if (Prompt is DeckEditPrompt.ExitQuestion or DeckEditPrompt.SaveQuestion && button is 0 or 1) PromptFocus = button; }
 
-    public DeckEditOutcome Handle(PspInputFrame input)
+    public DeckEditOutcome Handle(InputFrame input)
     {
         if (Menus.Open) { Menus.Handle(input, this); return DeckEditOutcome.None; }
-        bool confirm = input.IsPressed(PspAction.Cross), back = input.IsPressed(PspAction.Circle);
+        bool confirm = input.IsPressed(InputAction.Confirm), back = input.IsPressed(InputAction.Back);
         switch (Prompt)
         {
             case DeckEditPrompt.Move:
@@ -120,7 +120,7 @@ public sealed class DeckEditSession
                 return DeckEditOutcome.None;
             case DeckEditPrompt.ExitQuestion:
             case DeckEditPrompt.SaveQuestion:
-                if (input.IsPressed(PspAction.Left) || input.IsPressed(PspAction.Right)) PromptFocus = 1 - PromptFocus;
+                if (input.IsPressed(InputAction.Left) || input.IsPressed(InputAction.Right)) PromptFocus = 1 - PromptFocus;
                 if (Prompt == DeckEditPrompt.ExitQuestion)
                 {
                     if (back || confirm && PromptFocus == 1) { Prompt = DeckEditPrompt.None; PromptFocus = 0; return DeckEditOutcome.None; }
@@ -133,10 +133,10 @@ public sealed class DeckEditSession
                 return back ? DeckEditOutcome.Leave : DeckEditOutcome.None;
         }
         int rows = Current.Count;
-        if (input.IsPressed(PspAction.Square)) { Tab = (DeckEditTab)(((int)Tab + 1) % 4); Cursor = 0; Scroll = 0; return DeckEditOutcome.None; }
-        if (rows > 0 && input.IsPressed(PspAction.Down)) MoveCursor(Cursor + 1 >= rows ? 0 : Cursor + 1);
-        else if (rows > 0 && input.IsPressed(PspAction.Up)) MoveCursor(Cursor == 0 ? rows - 1 : Cursor - 1);
-        if (input.IsPressed(PspAction.Triangle)) { Menus.OpenMain(); return DeckEditOutcome.None; }
+        if (input.IsPressed(InputAction.Switch)) { Tab = (DeckEditTab)(((int)Tab + 1) % 4); Cursor = 0; Scroll = 0; return DeckEditOutcome.None; }
+        if (rows > 0 && input.IsPressed(InputAction.Down)) MoveCursor(Cursor + 1 >= rows ? 0 : Cursor + 1);
+        else if (rows > 0 && input.IsPressed(InputAction.Up)) MoveCursor(Cursor == 0 ? rows - 1 : Cursor - 1);
+        if (input.IsPressed(InputAction.Menu)) { Menus.OpenMain(); return DeckEditOutcome.None; }
         if (confirm && Focused is not null) { Prompt = DeckEditPrompt.Move; return DeckEditOutcome.None; }
         if (back) { Prompt = DeckEditPrompt.ExitQuestion; PromptFocus = 0; }
         return DeckEditOutcome.None;

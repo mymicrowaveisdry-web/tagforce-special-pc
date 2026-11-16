@@ -3,7 +3,7 @@ using TagForceSpecial.PC.App.Screens.Title;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Deck Menu behaviour observed on the same build (config/reference/deck-menu.json). PC Cross = confirm, PC Circle = back.</summary>
+/// <summary>Deck Menu behaviour observed on the same build (config/reference/deck-menu.json). Confirm = the original Circle, Back = its Cross.</summary>
 public class DeckMenuTests
 {
     private const int DeckMenuRow = 4;
@@ -23,10 +23,10 @@ public class DeckMenuTests
     }
 
     /// <summary>Press and release, so no held direction carries into the next step.</summary>
-    private static void Tap(TitleFlow flow, PspAction action)
+    private static void Tap(TitleFlow flow, InputAction action)
     {
         flow.Handle(new(action, action));
-        flow.Handle(new(PspAction.None, PspAction.None));
+        flow.Handle(new(InputAction.None, InputAction.None));
     }
 
     private static TitleFlow OpenSubmenu(out Host host, bool timed = false)
@@ -35,8 +35,8 @@ public class DeckMenuTests
         var flow = new TitleFlow(host, "Tester", instantTransitions: !timed);
         flow.BeginMainMenu();
         if (timed) flow.Update(OneFrame * (MainMenuEntry.ReadyFrame + 1));
-        for (int i = 0; i < DeckMenuRow; i++) Tap(flow, PspAction.Down);
-        Tap(flow, PspAction.Cross);
+        for (int i = 0; i < DeckMenuRow; i++) Tap(flow, InputAction.Down);
+        Tap(flow, InputAction.Confirm);
         return flow;
     }
 
@@ -80,7 +80,7 @@ public class DeckMenuTests
         Assert.True(flow.MainMenuDimmed);
         Assert.Equal(0, flow.DeckMenu!.Focus);
         Assert.Equal(DeckMenuRow, flow.MenuFocus);
-        Tap(flow, PspAction.Circle);
+        Tap(flow, InputAction.Back);
         Assert.Equal(TitleFlowStep.MainMenu, flow.Step);
         Assert.Equal(DeckMenuRow, flow.MenuFocus);
         Assert.False(flow.MainMenuDimmed);
@@ -93,11 +93,11 @@ public class DeckMenuTests
     {
         var flow = OpenSubmenu(out _);
         var session = flow.DeckMenu!;
-        Tap(flow, PspAction.Down); Assert.Equal(1, session.Focus);
-        Tap(flow, PspAction.Down); Assert.Equal(2, session.Focus);
-        Tap(flow, PspAction.Down); Assert.Equal(0, session.Focus);
-        Tap(flow, PspAction.Up); Assert.Equal(2, session.Focus);
-        foreach (var ignored in new[] { PspAction.Left, PspAction.Right, PspAction.Triangle, PspAction.Square, PspAction.L, PspAction.R, PspAction.Start, PspAction.Select })
+        Tap(flow, InputAction.Down); Assert.Equal(1, session.Focus);
+        Tap(flow, InputAction.Down); Assert.Equal(2, session.Focus);
+        Tap(flow, InputAction.Down); Assert.Equal(0, session.Focus);
+        Tap(flow, InputAction.Up); Assert.Equal(2, session.Focus);
+        foreach (var ignored in new[] { InputAction.Left, InputAction.Right, InputAction.Menu, InputAction.Switch, InputAction.PreviousPage, InputAction.NextPage, InputAction.Start, InputAction.Select })
         {
             Tap(flow, ignored);
             Assert.Equal(TitleFlowStep.DeckMenu, flow.Step);
@@ -107,25 +107,25 @@ public class DeckMenuTests
     }
 
     [Theory]
-    [InlineData(PspAction.Cross)]
-    [InlineData(PspAction.Circle)]
-    public void EveryDestinationShowsAPcNoticeAndReturnsToItsRow(PspAction leave)
+    [InlineData(InputAction.Confirm)]
+    [InlineData(InputAction.Back)]
+    public void EveryDestinationShowsAPcNoticeAndReturnsToItsRow(InputAction leave)
     {
         var flow = OpenSubmenu(out var host);
         var session = flow.DeckMenu!;
         for (int row = 0; row < DeckMenuDestinations.All.Count; row++)
         {
-            Tap(flow, PspAction.Cross);
+            Tap(flow, InputAction.Confirm);
             Assert.True(session.NoticeOpen);
             Assert.Equal(DeckMenuDestinations.All[row], session.Focused);
             // Directions do nothing while the notice is up.
-            Tap(flow, PspAction.Down);
+            Tap(flow, InputAction.Down);
             Assert.Equal(row, session.Focus);
             Tap(flow, leave);
             Assert.False(session.NoticeOpen);
             Assert.Equal(TitleFlowStep.DeckMenu, flow.Step);
             Assert.Equal(row, session.Focus);
-            Tap(flow, PspAction.Down);
+            Tap(flow, InputAction.Down);
         }
         Assert.Equal(0, host.Saves);
     }
@@ -149,9 +149,9 @@ public class DeckMenuTests
     public void ReopeningAlwaysStartsOnDeckEdit()
     {
         var flow = OpenSubmenu(out _);
-        Tap(flow, PspAction.Down); Tap(flow, PspAction.Down);
-        Tap(flow, PspAction.Circle);
-        Tap(flow, PspAction.Cross);
+        Tap(flow, InputAction.Down); Tap(flow, InputAction.Down);
+        Tap(flow, InputAction.Back);
+        Tap(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.DeckMenu, flow.Step);
         Assert.Equal(0, flow.DeckMenu!.Focus);
     }
@@ -162,12 +162,12 @@ public class DeckMenuTests
         var flow = OpenSubmenu(out _, timed: true);
         var profile = flow.DeckMenuProfile;
         flow.Update(OneFrame * (profile.ReadyFrame - 0.5));
-        Tap(flow, PspAction.Down);
-        Tap(flow, PspAction.Circle);
+        Tap(flow, InputAction.Down);
+        Tap(flow, InputAction.Back);
         Assert.Equal(TitleFlowStep.DeckMenu, flow.Step);
         Assert.Equal(0, flow.DeckMenu!.Focus);
         flow.Update(OneFrame);
-        Tap(flow, PspAction.Down);
+        Tap(flow, InputAction.Down);
         Assert.Equal(1, flow.DeckMenu.Focus);
     }
 
@@ -177,13 +177,13 @@ public class DeckMenuTests
         var flow = OpenSubmenu(out _, timed: true);
         var profile = flow.DeckMenuProfile;
         flow.Update(OneFrame * (profile.ReadyFrame + 1));
-        Tap(flow, PspAction.Circle);
+        Tap(flow, InputAction.Back);
         var session = flow.DeckMenu!;
         Assert.True(session.Closing);
         Assert.False(session.FocusVisible(session.Frame));
         Assert.True(flow.MainMenuDimmed);
         // Input is ignored while the submenu closes.
-        Tap(flow, PspAction.Down);
+        Tap(flow, InputAction.Down);
         Assert.Equal(0, session.Focus);
         flow.Update(OneFrame * (profile.CloseFrames - 0.5));
         Assert.Equal(TitleFlowStep.DeckMenu, flow.Step);
@@ -196,9 +196,9 @@ public class DeckMenuTests
         Assert.Equal(3, flow.MenuFocusRestartFrame);
         Assert.True(flow.MenuReady);
         // Any other route back to the menu (here the end-game question, answered with its default No) leaves the pulse on the menu's clock.
-        Tap(flow, PspAction.Circle);
+        Tap(flow, InputAction.Back);
         Assert.Equal(TitleFlowStep.QuitQuestion, flow.Step);
-        Tap(flow, PspAction.Cross);
+        Tap(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.MainMenu, flow.Step);
         Assert.Null(flow.MenuFocusRestartFrame);
     }
@@ -208,13 +208,13 @@ public class DeckMenuTests
     {
         var flow = OpenSubmenu(out _, timed: true);
         flow.Update(OneFrame * (flow.DeckMenuProfile.ReadyFrame + 1));
-        var down = new PspInputFrame(PspAction.None, PspAction.Down);
-        flow.Handle(new(PspAction.Down, PspAction.Down));
+        var down = new InputFrame(InputAction.None, InputAction.Down);
+        flow.Handle(new(InputAction.Down, InputAction.Down));
         for (int i = 0; i < 120; i++) { flow.Update(OneFrame); flow.Handle(down); }
         Assert.Equal(2, flow.DeckMenu!.Focus);
-        flow.Handle(new(PspAction.None, PspAction.None));
-        var up = new PspInputFrame(PspAction.None, PspAction.Up);
-        flow.Handle(new(PspAction.Up, PspAction.Up));
+        flow.Handle(new(InputAction.None, InputAction.None));
+        var up = new InputFrame(InputAction.None, InputAction.Up);
+        flow.Handle(new(InputAction.Up, InputAction.Up));
         for (int i = 0; i < 120; i++) { flow.Update(OneFrame); flow.Handle(up); }
         Assert.Equal(0, flow.DeckMenu.Focus);
     }

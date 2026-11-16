@@ -7,7 +7,7 @@ using TagForceSpecial.PC.Decks;
 
 namespace TagForceSpecial.Tests;
 
-/// <summary>Deck Edit core screen (Phase 6.2a): measured profile lookups and the observed list behaviour. PC Cross = confirm, PC Circle = back.</summary>
+/// <summary>Deck Edit core screen (Phase 6.2a): measured profile lookups and the observed list behaviour. Confirm = the original Circle, Back = its Cross.</summary>
 public class DeckEditTests
 {
     /// <summary>The supported pool with its catalog kinds: eight Normal monsters (raw kind 0) and six Spells (13).</summary>
@@ -22,7 +22,7 @@ public class DeckEditTests
         return new DeckEditSession(draft, PlayablePreview.Cards.Select(c => catalog[c.CardId]), 7);
     }
 
-    private static DeckEditOutcome Tap(DeckEditSession session, PspAction action) => session.Handle(new(action, action));
+    private static DeckEditOutcome Tap(DeckEditSession session, InputAction action) => session.Handle(new(action, action));
 
     [Fact]
     public void ProfileSeparatesObservedFromInferredLookups()
@@ -71,28 +71,28 @@ public class DeckEditTests
     {
         var session = Session(out _);
         Assert.Equal(DeckEditTab.Trunk, session.Tab);
-        Tap(session, PspAction.Square); Assert.Equal(DeckEditTab.Deck, session.Tab);
-        Tap(session, PspAction.Down); Assert.Equal(1, session.Cursor);
-        Tap(session, PspAction.Square); Assert.Equal(DeckEditTab.Extra, session.Tab); Assert.Equal(0, session.Cursor);
-        Tap(session, PspAction.Square); Assert.Equal(DeckEditTab.Side, session.Tab);
-        Tap(session, PspAction.Square); Assert.Equal(DeckEditTab.Trunk, session.Tab);
+        Tap(session, InputAction.Switch); Assert.Equal(DeckEditTab.Deck, session.Tab);
+        Tap(session, InputAction.Down); Assert.Equal(1, session.Cursor);
+        Tap(session, InputAction.Switch); Assert.Equal(DeckEditTab.Extra, session.Tab); Assert.Equal(0, session.Cursor);
+        Tap(session, InputAction.Switch); Assert.Equal(DeckEditTab.Side, session.Tab);
+        Tap(session, InputAction.Switch); Assert.Equal(DeckEditTab.Trunk, session.Tab);
     }
 
     [Fact]
     public void CursorWrapsBothWaysAndScrollKeepsItVisible()
     {
         var session = Session(out var draft);
-        Tap(session, PspAction.Square);
+        Tap(session, InputAction.Switch);
         int rows = draft.Cards(DeckSection.Main).Count;
-        Tap(session, PspAction.Up);
+        Tap(session, InputAction.Up);
         Assert.Equal(rows - 1, session.Cursor);
         Assert.Equal(rows - 7, session.Scroll);
-        Tap(session, PspAction.Down);
+        Tap(session, InputAction.Down);
         Assert.Equal((0, 0), (session.Cursor, session.Scroll));
-        for (int i = 0; i < 8; i++) Tap(session, PspAction.Down);
+        for (int i = 0; i < 8; i++) Tap(session, InputAction.Down);
         Assert.Equal((8, 2), (session.Cursor, session.Scroll));
         // Left and Right do nothing in the list layout.
-        Tap(session, PspAction.Left); Tap(session, PspAction.Right);
+        Tap(session, InputAction.Left); Tap(session, InputAction.Right);
         Assert.Equal(8, session.Cursor);
     }
 
@@ -102,20 +102,20 @@ public class DeckEditTests
         var session = Session(out var draft);
         int deck = session.Count(DeckEditTab.Deck), trunk = session.Count(DeckEditTab.Trunk);
         Assert.True(trunk > 0);
-        Tap(session, PspAction.Cross);
+        Tap(session, InputAction.Confirm);
         Assert.Equal(DeckEditPrompt.Move, session.Prompt);
         Assert.Equal(DeckEditTab.Deck, session.Destination);
-        Tap(session, PspAction.Circle);
+        Tap(session, InputAction.Back);
         Assert.Equal(DeckEditPrompt.None, session.Prompt);
         Assert.Equal(deck, session.Count(DeckEditTab.Deck));
-        Tap(session, PspAction.Cross); Tap(session, PspAction.Cross);
+        Tap(session, InputAction.Confirm); Tap(session, InputAction.Confirm);
         Assert.Equal((deck + 1, trunk - 1), (session.Count(DeckEditTab.Deck), session.Count(DeckEditTab.Trunk)));
         Assert.True(session.Changed);
         // From the Deck tab a card goes back to the Trunk.
-        Tap(session, PspAction.Square);
-        Tap(session, PspAction.Cross);
+        Tap(session, InputAction.Switch);
+        Tap(session, InputAction.Confirm);
         Assert.Equal(DeckEditTab.Trunk, session.Destination);
-        Tap(session, PspAction.Cross);
+        Tap(session, InputAction.Confirm);
         Assert.Equal((deck, trunk), (session.Count(DeckEditTab.Deck), session.Count(DeckEditTab.Trunk)));
         Assert.Equal(deck, draft.Cards(DeckSection.Main).Count);
     }
@@ -124,10 +124,10 @@ public class DeckEditTests
     public void AnEmptySideDoesNothingOnConfirm()
     {
         var session = Session(out _);
-        for (int i = 0; i < 3; i++) Tap(session, PspAction.Square);
+        for (int i = 0; i < 3; i++) Tap(session, InputAction.Switch);
         Assert.Equal(DeckEditTab.Side, session.Tab);
         Assert.Empty(session.Current);
-        Tap(session, PspAction.Cross);
+        Tap(session, InputAction.Confirm);
         Assert.Equal(DeckEditPrompt.None, session.Prompt);
     }
 
@@ -135,24 +135,24 @@ public class DeckEditTests
     public void ExitAsksWithOkFocusedThenAsksToSaveWithYesFocused()
     {
         var session = Session(out _);
-        Tap(session, PspAction.Circle);
+        Tap(session, InputAction.Back);
         Assert.Equal((DeckEditPrompt.ExitQuestion, 0), (session.Prompt, session.PromptFocus));
-        Tap(session, PspAction.Right);
-        Assert.Equal(DeckEditOutcome.None, Tap(session, PspAction.Cross));
+        Tap(session, InputAction.Right);
+        Assert.Equal(DeckEditOutcome.None, Tap(session, InputAction.Confirm));
         Assert.Equal((DeckEditPrompt.None, 0), (session.Prompt, session.PromptFocus));
-        Tap(session, PspAction.Circle);
-        Tap(session, PspAction.Circle);
+        Tap(session, InputAction.Back);
+        Tap(session, InputAction.Back);
         Assert.Equal(DeckEditPrompt.None, session.Prompt);
-        Tap(session, PspAction.Circle);
-        Tap(session, PspAction.Cross);
+        Tap(session, InputAction.Back);
+        Tap(session, InputAction.Confirm);
         Assert.Equal((DeckEditPrompt.SaveQuestion, 0), (session.Prompt, session.PromptFocus));
-        Assert.Equal(DeckEditOutcome.LeaveAndSave, Tap(session, PspAction.Cross));
+        Assert.Equal(DeckEditOutcome.LeaveAndSave, Tap(session, InputAction.Confirm));
         var second = Session(out _);
-        Tap(second, PspAction.Circle); Tap(second, PspAction.Cross); Tap(second, PspAction.Right);
-        Assert.Equal(DeckEditOutcome.Leave, Tap(second, PspAction.Cross));
+        Tap(second, InputAction.Back); Tap(second, InputAction.Confirm); Tap(second, InputAction.Right);
+        Assert.Equal(DeckEditOutcome.Leave, Tap(second, InputAction.Confirm));
         var third = Session(out _);
-        Tap(third, PspAction.Circle); Tap(third, PspAction.Cross);
-        Assert.Equal(DeckEditOutcome.Leave, Tap(third, PspAction.Circle));
+        Tap(third, InputAction.Back); Tap(third, InputAction.Confirm);
+        Assert.Equal(DeckEditOutcome.Leave, Tap(third, InputAction.Back));
     }
 
     private sealed class Host(bool catalog) : ITitleFlowHost
@@ -167,14 +167,14 @@ public class DeckEditTests
         public void SaveDeckEdit(DeckEditSession session) => Saves++;
     }
 
-    private static void Press(TitleFlow flow, PspAction action) { flow.Handle(new(action, action)); flow.Handle(new(PspAction.None, PspAction.None)); }
+    private static void Press(TitleFlow flow, InputAction action) { flow.Handle(new(action, action)); flow.Handle(new(InputAction.None, InputAction.None)); }
 
     private static TitleFlow OnDeckEditRow(Host host)
     {
         var flow = new TitleFlow(host, "Tester", instantTransitions: true);
         flow.BeginMainMenu();
-        for (int i = 0; i < 4; i++) Press(flow, PspAction.Down);
-        Press(flow, PspAction.Cross);
+        for (int i = 0; i < 4; i++) Press(flow, InputAction.Down);
+        Press(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.DeckMenu, flow.Step);
         return flow;
     }
@@ -184,16 +184,16 @@ public class DeckEditTests
     {
         var host = new Host(catalog: true);
         var flow = OnDeckEditRow(host);
-        Press(flow, PspAction.Cross);
+        Press(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.DeckEdit, flow.Step);
         Assert.NotNull(flow.DeckEdit);
-        Press(flow, PspAction.Circle); Press(flow, PspAction.Cross); Press(flow, PspAction.Right); Press(flow, PspAction.Cross);
+        Press(flow, InputAction.Back); Press(flow, InputAction.Confirm); Press(flow, InputAction.Right); Press(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.DeckMenu, flow.Step);
         Assert.Equal(0, flow.DeckMenu!.Focus);
         Assert.True(flow.DeckMenu.Ready);
         Assert.Equal(0, host.Saves);
-        Press(flow, PspAction.Cross);
-        Press(flow, PspAction.Circle); Press(flow, PspAction.Cross); Press(flow, PspAction.Cross);
+        Press(flow, InputAction.Confirm);
+        Press(flow, InputAction.Back); Press(flow, InputAction.Confirm); Press(flow, InputAction.Confirm);
         Assert.Equal(1, host.Saves);
     }
 
@@ -201,7 +201,7 @@ public class DeckEditTests
     public void WithoutACardCatalogTheRowKeepsItsPcNotice()
     {
         var flow = OnDeckEditRow(new Host(catalog: false));
-        Press(flow, PspAction.Cross);
+        Press(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.DeckMenu, flow.Step);
         Assert.True(flow.DeckMenu!.NoticeOpen);
         Assert.Equal(DeckMenuDestinations.DeckEditCore, DeckMenuDestinations.All[0].Status);

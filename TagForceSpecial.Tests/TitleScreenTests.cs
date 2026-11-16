@@ -7,9 +7,9 @@ namespace TagForceSpecial.Tests;
 public class TitleScreenTests
 {
     [Theory]
-    [InlineData(PspAction.Start)]
-    [InlineData(PspAction.Cross)]
-    public void StartAndDesktopConfirmReachStartChoicesWithoutLoadingGame(PspAction action)
+    [InlineData(InputAction.Start)]
+    [InlineData(InputAction.Confirm)]
+    public void StartAndDesktopConfirmReachStartChoicesWithoutLoadingGame(InputAction action)
     {
         using var router = Create(out var title, out var choices, out var calls);
         router.GoTo(title.ScreenId);
@@ -23,10 +23,10 @@ public class TitleScreenTests
     {
         using var router = Create(out var title, out var choices, out var calls);
         router.GoTo(title.ScreenId);
-        router.Tick(new(PspAction.Square | PspAction.Triangle | PspAction.Up | PspAction.Circle | PspAction.Select, PspAction.None), TimeSpan.Zero, TimeSpan.Zero);
+        router.Tick(new(InputAction.Switch | InputAction.Menu | InputAction.Up | InputAction.Back | InputAction.Select, InputAction.None), TimeSpan.Zero, TimeSpan.Zero);
         Assert.Equal(title.ScreenId, router.CurrentScreenId);
         router.GoTo(choices.ScreenId);
-        router.Tick(new(PspAction.Circle | PspAction.Cross, PspAction.None), TimeSpan.Zero, TimeSpan.Zero);
+        router.Tick(new(InputAction.Back | InputAction.Confirm, InputAction.None), TimeSpan.Zero, TimeSpan.Zero);
         Assert.Equal(title.ScreenId, router.CurrentScreenId);
         Assert.Empty(calls);
     }
@@ -36,10 +36,10 @@ public class TitleScreenTests
     {
         using var router = Create(out _, out var choices, out var calls);
         router.GoTo(choices.ScreenId);
-        router.Tick(new(PspAction.Cross, PspAction.None), TimeSpan.Zero, TimeSpan.Zero);
+        router.Tick(new(InputAction.Confirm, InputAction.None), TimeSpan.Zero, TimeSpan.Zero);
         Assert.Equal("continue", Assert.Single(calls));
-        router.Tick(new(PspAction.Up, PspAction.None), TimeSpan.Zero, TimeSpan.Zero);
-        router.Tick(new(PspAction.Cross, PspAction.None), TimeSpan.Zero, TimeSpan.Zero);
+        router.Tick(new(InputAction.Up, InputAction.None), TimeSpan.Zero, TimeSpan.Zero);
+        router.Tick(new(InputAction.Confirm, InputAction.None), TimeSpan.Zero, TimeSpan.Zero);
         Assert.Equal(new[] { "continue", "new-game" }, calls);
     }
 
@@ -50,8 +50,8 @@ public class TitleScreenTests
         {
             using var router = Create(out var title, out var choices, out var calls);
             router.GoTo(title.ScreenId);
-            router.Tick(new(PspAction.Start, PspAction.None), TimeSpan.FromSeconds(1), time);
-            router.Tick(new(PspAction.Cross, PspAction.None), TimeSpan.FromSeconds(1), time);
+            router.Tick(new(InputAction.Start, InputAction.None), TimeSpan.FromSeconds(1), time);
+            router.Tick(new(InputAction.Confirm, InputAction.None), TimeSpan.FromSeconds(1), time);
             Assert.Equal(choices.ScreenId, router.CurrentScreenId);
             Assert.Equal("continue", Assert.Single(calls));
         }
@@ -66,8 +66,8 @@ public class TitleScreenTests
             () => calls.Add("continue-no-data"), () => calls.Add("new-game"), savePresent: false));
         router.GoTo("original.title-start-menu");
         Assert.Equal(0, state.Choice);
-        router.Tick(new(PspAction.Down, PspAction.None), TimeSpan.Zero, TimeSpan.Zero);
-        router.Tick(new(PspAction.Cross, PspAction.None), TimeSpan.Zero, TimeSpan.Zero);
+        router.Tick(new(InputAction.Down, InputAction.None), TimeSpan.Zero, TimeSpan.Zero);
+        router.Tick(new(InputAction.Confirm, InputAction.None), TimeSpan.Zero, TimeSpan.Zero);
         Assert.Equal(1, state.Choice);
         Assert.Equal("continue-no-data", Assert.Single(calls));
     }

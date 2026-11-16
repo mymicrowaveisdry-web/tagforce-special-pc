@@ -20,7 +20,7 @@ public sealed partial class GameLoop
     private byte[]? presentationPixels;
     private int? presentationTextureCount;
     private readonly List<object> presentationTrace = [];
-    private PspInputFrame presentationInput;
+    private InputFrame presentationInput;
     private int presentationInputFrame = -1;
 
     private static (Keys?, string)[] BuildPresentationSteps(bool deckEdit, bool recipes)
@@ -205,7 +205,7 @@ public sealed partial class GameLoop
         press(Keys.Right, "DeckEdit/Deck/0/SaveQuestion/1/*"); press(Keys.Enter, $"DeckMenu/L/0/{menuRow}");
     }
 
-    private PspInputFrame PresentationSmokeInput()
+    private InputFrame PresentationSmokeInput()
     {
         var key = PresentationSteps[frames % PresentationSteps.Length].Key;
         // A new cycle starts from the empty-profile route again; the smoke never writes a profile.
@@ -302,7 +302,7 @@ public sealed partial class GameLoop
     private readonly List<object> realtimeTrace = [];
     private double nextRealtimeCapture = 1.5;
 
-    private PspInputFrame RealtimeWalkInput(GameTime time)
+    private InputFrame RealtimeWalkInput(GameTime time)
     {
         double now = time.TotalGameTime.TotalSeconds;
         foreach (var (at, key) in RealtimeKeys)

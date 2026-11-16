@@ -66,7 +66,7 @@ public sealed class ScreenRouter : IScreenNavigation, IDisposable
         }
         finally { dispatching = false; }
     }
-    public void Tick(PspInputFrame input, TimeSpan simulationDelta, TimeSpan presentationTime)
+    public void Tick(InputFrame input, TimeSpan simulationDelta, TimeSpan presentationTime)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         if (simulationDelta < TimeSpan.Zero || presentationTime < TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(simulationDelta));

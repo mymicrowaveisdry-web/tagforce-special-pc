@@ -23,7 +23,7 @@ public sealed class ControlsEditor(KeyBindings bindings)
     public static float RowY(int row) => Top + row * Pitch;
 
     /// <param name="keys">This frame's keyboard (raw, for capture).</param>
-    public ControlsOutcome Handle(PspInputFrame input, KeyboardState keys)
+    public ControlsOutcome Handle(InputFrame input, KeyboardState keys)
     {
         var previous = before;
         before = keys;
@@ -46,15 +46,15 @@ public sealed class ControlsEditor(KeyBindings bindings)
             if (slot is int s) Slot = s;
             click = p.LeftPressed;
         }
-        if (input.IsPressed(PspAction.Up) || p.Wheel > 0) Row = (Row + Rows - 1) % Rows;
-        else if (input.IsPressed(PspAction.Down) || p.Wheel < 0) Row = (Row + 1) % Rows;
-        else if (input.IsPressed(PspAction.Left) || input.IsPressed(PspAction.Right)) Slot = 1 - Slot;
-        if (input.IsPressed(PspAction.Circle) || p.RightPressed) return ControlsOutcome.Back;
-        if (!input.IsPressed(PspAction.Cross) && !click) return ControlsOutcome.None;
+        if (input.IsPressed(InputAction.Up) || p.Wheel > 0) Row = (Row + Rows - 1) % Rows;
+        else if (input.IsPressed(InputAction.Down) || p.Wheel < 0) Row = (Row + 1) % Rows;
+        else if (input.IsPressed(InputAction.Left) || input.IsPressed(InputAction.Right)) Slot = 1 - Slot;
+        if (input.IsPressed(InputAction.Back) || p.RightPressed) return ControlsOutcome.Back;
+        if (!input.IsPressed(InputAction.Confirm) && !click) return ControlsOutcome.None;
         if (Row == BackRow) return ControlsOutcome.Back;
         if (Row == ResetRow) { Bindings = KeyBindings.Default; return ControlsOutcome.Changed; }
         // Back slot 0 is Escape for good; it cannot be captured.
-        if (!(KeyBindings.Actions[Row].Action == PspAction.Circle && Slot == 0)) Capturing = true;
+        if (!(KeyBindings.Actions[Row].Action == InputAction.Back && Slot == 0)) Capturing = true;
         return ControlsOutcome.None;
     }
 

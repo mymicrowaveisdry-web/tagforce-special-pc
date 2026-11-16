@@ -10,24 +10,24 @@ public static class PointerTargets
     /// <param name="focus">Currently focused target.</param>
     /// <param name="setFocus">Moves focus to a target without confirming it.</param>
     /// <param name="wheel">Actions for wheel away from / toward the user (default Up / Down; null ignores the wheel).</param>
-    public static PspInputFrame Apply(PspInputFrame input, int? hit, int focus, Action<int> setFocus,
-        (PspAction Away, PspAction Toward)? wheel = null)
+    public static InputFrame Apply(InputFrame input, int? hit, int focus, Action<int> setFocus,
+        (InputAction Away, InputAction Toward)? wheel = null)
     {
         var p = input.Pointer;
         if (!p.Any) return input;
-        var pressed = PspAction.None;
+        var pressed = InputAction.None;
         if (hit is int target && (p.Moved || p.LeftPressed) && target != focus) setFocus(target);
-        if (p.LeftPressed && hit is not null) pressed |= PspAction.Cross;
-        if (p.RightPressed) pressed |= PspAction.Circle;
-        var (away, toward) = wheel ?? (PspAction.Up, PspAction.Down);
+        if (p.LeftPressed && hit is not null) pressed |= InputAction.Confirm;
+        if (p.RightPressed) pressed |= InputAction.Back;
+        var (away, toward) = wheel ?? (InputAction.Up, InputAction.Down);
         if (p.Wheel > 0) pressed |= away;
         else if (p.Wheel < 0) pressed |= toward;
         return input.With(pressed);
     }
 
     /// <summary>Clicks only (no focus targets): left click anywhere confirms, right click backs out.</summary>
-    public static PspInputFrame Clicks(PspInputFrame input, PspAction left = PspAction.Cross) =>
-        input.Pointer.LeftPressed ? input.With(left) : input.Pointer.RightPressed ? input.With(PspAction.Circle) : input;
+    public static InputFrame Clicks(InputFrame input, InputAction left = InputAction.Confirm) =>
+        input.Pointer.LeftPressed ? input.With(left) : input.Pointer.RightPressed ? input.With(InputAction.Back) : input;
 
     public static bool Inside(CanvasPoint point, float x0, float y0, float x1, float y1) =>
         point.X >= x0 && point.X < x1 && point.Y >= y0 && point.Y < y1;

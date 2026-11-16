@@ -151,22 +151,22 @@ public sealed partial class GameLoop
     }
 
     private void Register(ScreenId id, Action<GuiButtons> inputHandler, Action draw, string? gumName = null, Action? update = null,
-        Func<PspInputFrame, PspInputFrame>? pointer = null, Action<PspInputFrame>? raw = null)
+        Func<InputFrame, InputFrame>? pointer = null, Action<InputFrame>? raw = null)
     {
-        Action<PspInputFrame> handle = raw ?? (frame => inputHandler((pointer?.Invoke(frame) ?? frame).ToGuiButtons()));
+        Action<InputFrame> handle = raw ?? (frame => inputHandler((pointer?.Invoke(frame) ?? frame).ToGuiButtons()));
         router!.Register(new HostScreen(ScreenName(id), handle, () => { renderer.End(); renderer.Begin(); draw(); }, update,
             () => { activeScreen = id; menuIndex = savedFocus.GetValueOrDefault(id); if (gumName is not null) gum.Show(gumName, true); },
             () => { if (gumName is not null) gum.Show(gumName, false); animations.CancelOwner(ScreenName(id)); audioCues.CancelOwner(ScreenName(id)); },
             () => menuIndex.ToString(System.Globalization.CultureInfo.InvariantCulture),
             focus => { activeScreen = id; if (int.TryParse(focus, out int index)) menuIndex = index; }));
     }
-    private sealed class HostScreen(string screenId, Action<PspInputFrame> input, Action draw, Action? update,
+    private sealed class HostScreen(string screenId, Action<InputFrame> input, Action draw, Action? update,
         Action enter, Action exit, Func<string?> focus, Action<string?> restore) : IGameScreen, IScreenFocus
     {
         public string ScreenId => screenId;
         public void OnEnter(ScreenContext context, ScreenArguments arguments) => enter();
         public void OnExit() => exit();
-        public void HandleInput(PspInputFrame frame) => input(frame);
+        public void HandleInput(InputFrame frame) => input(frame);
         public void Update(TimeSpan simulationDelta, TimeSpan presentationTime) => update?.Invoke();
         public void Draw(ScreenDrawContext context) => draw();
         public string? CaptureFocus() => focus();
@@ -246,7 +246,7 @@ public sealed partial class GameLoop
         gum.BindText("NativePreferences", "Notice", preferencesNotice);
     }
     /// <summary>Pointer rows sharing the native screens' <see cref="menuIndex"/> focus.</summary>
-    private Func<PspInputFrame, PspInputFrame> Rows(Func<Rendering.CanvasPoint?, int?> hit) =>
+    private Func<InputFrame, InputFrame> Rows(Func<Rendering.CanvasPoint?, int?> hit) =>
         frame => PointerTargets.Apply(frame, hit(frame.Pointer.Position), menuIndex, i => menuIndex = i);
 
     /// <summary>Text-row hit areas of the native screens: rows of <paramref name="pitch"/> from <paramref name="y"/> (paged from
@@ -258,7 +258,7 @@ public sealed partial class GameLoop
         return row >= 0 && row < page && first + row < count ? first + row : null;
     }
 
-    private PspInputFrame EditorPointer(PspInputFrame frame)
+    private InputFrame EditorPointer(InputFrame frame)
     {
         if (editor is null || editor.Draft is not { } draft) return frame;
         if (editor.EditingText is not null) return PointerTargets.Clicks(frame);
@@ -273,7 +273,7 @@ public sealed partial class GameLoop
     private ControlsEditor? controls;
 
     /// <summary>Controls: rebinding saves at once with the other preferences; the mapper switches to the new keys on the next frame.</summary>
-    private void UpdateControls(PspInputFrame frame)
+    private void UpdateControls(InputFrame frame)
     {
         controls ??= new(input.Bindings);
         switch (controls.Handle(frame, input.LastKeys))
@@ -313,7 +313,7 @@ public sealed partial class GameLoop
                 bool cell = focused && slot == c.Slot;
                 if (cell) renderer.Fill(new(x, y - 2, (int)ControlsEditor.SlotWidth, 14), c.Capturing ? new Color(90, 70, 30) : new Color(42, 59, 74));
                 string label = cell && c.Capturing ? "PRESS A KEY..." : KeyBindings.KeyName(c.Bindings[action, slot]).ToUpperInvariant();
-                renderer.Text(label, x + 4, y, action == PspAction.Circle && slot == 0 ? muted : cell ? gold : Color.White);
+                renderer.Text(label, x + 4, y, action == InputAction.Back && slot == 0 ? muted : cell ? gold : Color.White);
             }
         }
         renderer.Text(c.Capturing ? "PRESS A KEY. ESC OR RIGHT CLICK: CANCEL" : "ENTER/CLICK: REBIND  LEFT/RIGHT: SLOT  ESC: BACK",

@@ -74,11 +74,11 @@ public sealed class DeckEditMenus
     private void Pop() { stack.RemoveAt(stack.Count - 1); Frame = 0; }
     private void SetTop(DeckEditMenuLevel level) => stack[^1] = level;
 
-    /// <summary>One frame of input while a menu is open. PC confirm is PSP Cross (original Circle), PC back PSP Circle (original Cross).</summary>
-    public void Handle(PspInputFrame input, DeckEditSession session)
+    /// <summary>One frame of input while a menu is open. Confirm acts as the original Circle, Back as its Cross.</summary>
+    public void Handle(InputFrame input, DeckEditSession session)
     {
         Frame++;
-        bool confirm = input.IsPressed(PspAction.Cross), back = input.IsPressed(PspAction.Circle);
+        bool confirm = input.IsPressed(InputAction.Confirm), back = input.IsPressed(InputAction.Back);
         if (Notice is not null) { if (confirm || back) Notice = null; return; }
         if (RunCount is not null)
         {
@@ -97,18 +97,18 @@ public sealed class DeckEditMenus
         else HandleList(input, confirm, session, top, popup);
     }
 
-    private void HandleList(PspInputFrame input, bool confirm, DeckEditSession session, DeckEditMenuLevel top, DeckEditMenuPopup popup)
+    private void HandleList(InputFrame input, bool confirm, DeckEditSession session, DeckEditMenuLevel top, DeckEditMenuPopup popup)
     {
         int count = popup.Count;
-        if (input.IsPressed(PspAction.Down) || input.IsPressed(PspAction.Up))
+        if (input.IsPressed(InputAction.Down) || input.IsPressed(InputAction.Up))
         {
-            int next = (top.Focus + (input.IsPressed(PspAction.Down) ? 1 : count - 1)) % count;
+            int next = (top.Focus + (input.IsPressed(InputAction.Down) ? 1 : count - 1)) % count;
             SetTop(top with { Focus = next });
             if (top.Id == "sort") { session.Query.SortKey = (DeckEditSortKey)next; session.ListChanged(); }
             return;
         }
-        if (top.Id == "sort" && (input.IsPressed(PspAction.Right) || confirm)) { Push("sort-order", session.Query.Inverse ? 1 : 0); return; }
-        if (top.Id == "sort-order" && input.IsPressed(PspAction.Left)) { Pop(); return; }
+        if (top.Id == "sort" && (input.IsPressed(InputAction.Right) || confirm)) { Push("sort-order", session.Query.Inverse ? 1 : 0); return; }
+        if (top.Id == "sort-order" && input.IsPressed(InputAction.Left)) { Pop(); return; }
         if (!confirm || IsDisabled(top.Id, top.Focus, session)) return;
         Pick(top.Id, top.Focus, session);
     }
@@ -157,30 +157,30 @@ public sealed class DeckEditMenus
         .Select((c, i) => (c, i)).GroupBy(x => x.c.Box[1]).OrderBy(g => g.Key)
         .Select(g => g.OrderBy(x => x.c.Box[0]).Select(x => x.i).ToArray()).ToArray();
 
-    private void HandleGrid(PspInputFrame input, bool confirm, DeckEditSession session, DeckEditMenuLevel top, DeckEditMenuPopup popup)
+    private void HandleGrid(InputFrame input, bool confirm, DeckEditSession session, DeckEditMenuLevel top, DeckEditMenuPopup popup)
     {
         var rows = GridRows(popup);
         int r = Array.FindIndex(rows, x => x.Contains(top.Focus)), c = Array.IndexOf(rows[r], top.Focus);
         bool hasRun = popup.Run is not null;
         if (top.OnRun)
         {
-            if (input.IsPressed(PspAction.Up)) SetTop(top with { Focus = rows[^1][Math.Min(c, rows[^1].Length - 1)], OnRun = false });
-            else if (input.IsPressed(PspAction.Down)) SetTop(top with { Focus = rows[0][Math.Min(c, rows[0].Length - 1)], OnRun = false });
+            if (input.IsPressed(InputAction.Up)) SetTop(top with { Focus = rows[^1][Math.Min(c, rows[^1].Length - 1)], OnRun = false });
+            else if (input.IsPressed(InputAction.Down)) SetTop(top with { Focus = rows[0][Math.Min(c, rows[0].Length - 1)], OnRun = false });
             else if (confirm) Run(session);
             return;
         }
-        if (input.IsPressed(PspAction.Right) || input.IsPressed(PspAction.Left))
+        if (input.IsPressed(InputAction.Right) || input.IsPressed(InputAction.Left))
         {
             int n = rows[r].Length;
-            SetTop(top with { Focus = rows[r][(c + (input.IsPressed(PspAction.Right) ? 1 : n - 1)) % n] });
+            SetTop(top with { Focus = rows[r][(c + (input.IsPressed(InputAction.Right) ? 1 : n - 1)) % n] });
         }
-        else if (input.IsPressed(PspAction.Down))
+        else if (input.IsPressed(InputAction.Down))
         {
             if (r + 1 < rows.Length) SetTop(top with { Focus = rows[r + 1][Math.Min(c, rows[r + 1].Length - 1)] });
             else if (hasRun) SetTop(top with { OnRun = true });
             else SetTop(top with { Focus = rows[0][Math.Min(c, rows[0].Length - 1)] });
         }
-        else if (input.IsPressed(PspAction.Up))
+        else if (input.IsPressed(InputAction.Up))
         {
             if (r > 0) SetTop(top with { Focus = rows[r - 1][Math.Min(c, rows[r - 1].Length - 1)] });
             else if (hasRun) SetTop(top with { OnRun = true });

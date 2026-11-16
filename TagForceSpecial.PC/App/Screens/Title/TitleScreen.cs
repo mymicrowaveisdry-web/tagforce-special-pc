@@ -20,7 +20,7 @@ public sealed class TitleScreen(string screenId, bool choicesVisible, Action<Tit
         choice = (savePresentNow?.Invoke() ?? savePresent) ? 1 : 0;
         show(new(choicesVisible, choice));
     }
-    public void HandleInput(PspInputFrame input)
+    public void HandleInput(InputFrame input)
     {
         input = choicesVisible && hitChoice is not null
             ? PointerTargets.Apply(input, hitChoice(input.Pointer.Position), choice, c => { choice = c; show(new(true, choice)); })
@@ -28,14 +28,14 @@ public sealed class TitleScreen(string screenId, bool choicesVisible, Action<Tit
         if (!choicesVisible)
         {
             // Desktop A/Enter is the application confirm alias; F1/pad Start preserves Start.
-            if (input.IsPressed(PspAction.Start) || input.IsPressed(PspAction.Cross))
+            if (input.IsPressed(InputAction.Start) || input.IsPressed(InputAction.Confirm))
                 context.Navigation.GoTo("original.title-start-menu");
             return;
         }
-        if (input.IsPressed(PspAction.Circle)) { context.Navigation.GoTo("original.title"); return; }
-        if (input.IsPressed(PspAction.Up) || input.IsPressed(PspAction.Down))
+        if (input.IsPressed(InputAction.Back)) { context.Navigation.GoTo("original.title"); return; }
+        if (input.IsPressed(InputAction.Up) || input.IsPressed(InputAction.Down))
         { choice = 1 - choice; show(new(true, choice)); }
-        if (input.IsPressed(PspAction.Cross))
+        if (input.IsPressed(InputAction.Confirm))
         {
             if (choice == 1) continueRequested(); else newGameRequested();
         }

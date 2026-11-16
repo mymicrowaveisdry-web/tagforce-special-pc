@@ -344,7 +344,7 @@ public sealed partial class GameLoop
             owner.renderedFlowKey = null;
             owner.RefreshFlow();
         }
-        public void HandleInput(PspInputFrame input)
+        public void HandleInput(InputFrame input)
         {
             var flow = owner.titleFlow!;
             if (owner.flowVisuals is { } visuals) input = (owner.flowPointer ??= new(owner.gum)).Translate(flow, visuals, input, FrameFor(flow.Step));

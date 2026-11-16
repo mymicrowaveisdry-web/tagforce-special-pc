@@ -9,7 +9,7 @@ public interface IGameScreen
 {
     string ScreenId { get; }
     void OnEnter(ScreenContext context, ScreenArguments arguments);
-    void HandleInput(PspInputFrame input);
+    void HandleInput(InputFrame input);
     void Update(TimeSpan simulationDelta, TimeSpan presentationTime);
     void Draw(ScreenDrawContext draw);
     void OnExit();

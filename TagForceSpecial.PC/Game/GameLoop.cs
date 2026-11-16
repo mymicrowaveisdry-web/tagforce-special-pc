@@ -17,7 +17,7 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
     private readonly GraphicsDeviceManager graphics;
     private readonly HostOptions options;
     private readonly GameThreadGuard graphicsThread = new();
-    private readonly TagForceSpecial.PC.App.Input.PspInputMapper input = new();
+    private readonly TagForceSpecial.PC.App.Input.InputMapper input = new();
     private SpriteRenderer renderer = null!;
     private RenderTarget2D canvas = null!;
     private SpriteBatch presenter = null!;
@@ -95,7 +95,7 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
         GraphicsDevice.PresentationParameters.BackBufferHeight, options.PixelExact || setup?.Preferences.IntegerScaling == true);
 
     /// <summary>Player input: saved key bindings, typing keys muted while a text field has focus, and the mouse over the picture.</summary>
-    private App.Input.PspInputFrame PollPlayer()
+    private App.Input.InputFrame PollPlayer()
     {
         input.TextEntry = titleFlow?.Editing == true || editor?.EditingText is not null;
         return input.Poll(IsActive, PictureRect());

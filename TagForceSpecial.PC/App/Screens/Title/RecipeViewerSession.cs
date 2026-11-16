@@ -68,11 +68,11 @@ public sealed class RecipeViewerSession(RecipeCatalog catalog)
         ModalFocus = row; OrderColumn = false; Revision++;
     }
 
-    public bool Handle(PspInputFrame input)
+    public bool Handle(InputFrame input)
     {
-        if (input.Pressed == PspAction.None) return false;
-        bool confirm = input.IsPressed(PspAction.Cross), back = input.IsPressed(PspAction.Circle);
-        int delta = input.IsPressed(PspAction.Down) ? 1 : input.IsPressed(PspAction.Up) ? -1 : 0;
+        if (input.Pressed == InputAction.None) return false;
+        bool confirm = input.IsPressed(InputAction.Confirm), back = input.IsPressed(InputAction.Back);
+        int delta = input.IsPressed(InputAction.Down) ? 1 : input.IsPressed(InputAction.Up) ? -1 : 0;
         Revision++;
         if (Modal == RecipeViewerModal.Notice)
         {
@@ -89,8 +89,8 @@ public sealed class RecipeViewerSession(RecipeCatalog catalog)
         if (Modal == RecipeViewerModal.Sort)
         {
             if (back) { Modal = RecipeViewerModal.None; return false; }
-            if (input.IsPressed(PspAction.Right)) OrderColumn = true;
-            if (input.IsPressed(PspAction.Left)) OrderColumn = false;
+            if (input.IsPressed(InputAction.Right)) OrderColumn = true;
+            if (input.IsPressed(InputAction.Left)) OrderColumn = false;
             if (delta != 0)
             {
                 if (OrderColumn) PendingInverse = !PendingInverse;
@@ -100,13 +100,13 @@ public sealed class RecipeViewerSession(RecipeCatalog catalog)
             return false;
         }
         if (back) return true;
-        if (input.IsPressed(PspAction.Square) || input.IsPressed(PspAction.L) || input.IsPressed(PspAction.R))
+        if (input.IsPressed(InputAction.Switch) || input.IsPressed(InputAction.PreviousPage) || input.IsPressed(InputAction.NextPage))
         {
             Kind = Kind == RecipeListKind.User ? RecipeListKind.Character : RecipeListKind.User;
             SetOrder(Sort, Inverse);
             return false;
         }
-        if (input.IsPressed(PspAction.Triangle))
+        if (input.IsPressed(InputAction.Menu))
         {
             Modal = RecipeViewerModal.Sort; ModalFocus = (int)Sort; OrderColumn = false; PendingInverse = Inverse;
             return false;

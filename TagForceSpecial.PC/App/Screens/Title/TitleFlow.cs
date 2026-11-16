@@ -34,7 +34,7 @@ public interface ITitleFlowHost
 }
 
 /// <summary>Observed Continue/New Game routes (config/reference/title-flow.json) and Main Menu/Options/Deck Menu routes (main-menu.json,
-/// options.json, deck-menu.json). PC confirm is PSP Circle in the original and PSP Cross here; PC back is the reverse.
+/// options.json, deck-menu.json). Confirm does what the original does with Circle, Back what it does with Cross.
 /// Tag Force 6 data transfer is deliberately unsupported: New Game opens name entry directly.</summary>
 public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool instantTransitions = false, DeckMenuProfile? deckMenuProfile = null)
 {
@@ -155,20 +155,20 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
     /// <summary>Pointer focus on a Main Menu row once the menu accepts input.</summary>
     public void PointMenu(int row) { if (Step == TitleFlowStep.MainMenu && MenuReady && PendingStep is null && row >= 0 && row < MainMenuRows) MenuFocus = row; }
 
-    public void Handle(PspInputFrame input)
+    public void Handle(InputFrame input)
     {
         if (PendingStep is not null) return;
         if (Step == TitleFlowStep.NameKeyboard)
         {
-            if (input.IsPressed(PspAction.Start) || input.IsPressed(PspAction.Cross)) { Name = Clip(Name.Trim()); Enter(TitleFlowStep.NameEntry); }
-            else if (input.IsPressed(PspAction.Circle)) Backspace();
+            if (input.IsPressed(InputAction.Start) || input.IsPressed(InputAction.Confirm)) { Name = Clip(Name.Trim()); Enter(TitleFlowStep.NameEntry); }
+            else if (input.IsPressed(InputAction.Back)) Backspace();
             return;
         }
         if (Step == TitleFlowStep.NameEntry)
         {
-            if (input.IsPressed(PspAction.Start)) { if (Name.Length > 0) Enter(TitleFlowStep.RulesQuestion); }
-            else if (input.IsPressed(PspAction.Cross)) Enter(TitleFlowStep.NameKeyboard);
-            else if (input.IsPressed(PspAction.Circle)) EnterFaded(TitleFlowStep.ExitToTitle);
+            if (input.IsPressed(InputAction.Start)) { if (Name.Length > 0) Enter(TitleFlowStep.RulesQuestion); }
+            else if (input.IsPressed(InputAction.Confirm)) Enter(TitleFlowStep.NameKeyboard);
+            else if (input.IsPressed(InputAction.Back)) EnterFaded(TitleFlowStep.ExitToTitle);
             return;
         }
         if (Step == TitleFlowStep.MainMenu) { HandleMainMenu(input); return; }
@@ -185,27 +185,27 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
             }
             return;
         }
-        if (ButtonCount == 2 && (input.IsPressed(PspAction.Left) || input.IsPressed(PspAction.Right))) ButtonFocus = 1 - ButtonFocus;
-        if (input.IsPressed(PspAction.Cross)) Confirm();
-        else if (input.IsPressed(PspAction.Circle)) Back();
+        if (ButtonCount == 2 && (input.IsPressed(InputAction.Left) || input.IsPressed(InputAction.Right))) ButtonFocus = 1 - ButtonFocus;
+        if (input.IsPressed(InputAction.Confirm)) Confirm();
+        else if (input.IsPressed(InputAction.Back)) Back();
     }
 
-    private void HandleMainMenu(PspInputFrame input)
+    private void HandleMainMenu(InputFrame input)
     {
         // Presses during the entry sequence are dropped, not queued.
         if (!MenuReady) return;
         // A direction only repeats if its own press started on this menu, so a key held across a screen change cannot scroll.
-        int held = (input.Held & (PspAction.Up | PspAction.Down)) switch { PspAction.Up => -1, PspAction.Down => 1, _ => 0 };
+        int held = (input.Held & (InputAction.Up | InputAction.Down)) switch { InputAction.Up => -1, InputAction.Down => 1, _ => 0 };
         if (held != heldDirection) heldDirection = 0;
-        int pressed = input.IsPressed(PspAction.Up) ? -1 : input.IsPressed(PspAction.Down) ? 1 : 0;
+        int pressed = input.IsPressed(InputAction.Up) ? -1 : input.IsPressed(InputAction.Down) ? 1 : 0;
         if (pressed != 0 && pressed == held)
         {
             MenuFocus = (MenuFocus + pressed + MainMenuRows) % MainMenuRows;
             heldDirection = pressed;
             menuRepeat.Restart();
         }
-        if (input.IsPressed(PspAction.Circle)) { Enter(TitleFlowStep.QuitQuestion); return; }
-        if (!input.IsPressed(PspAction.Cross)) return;
+        if (input.IsPressed(InputAction.Back)) { Enter(TitleFlowStep.QuitQuestion); return; }
+        if (!input.IsPressed(InputAction.Confirm)) return;
         switch (FocusedDestination.Route)
         {
             case MainMenuRoute.NativeSave: saveSource = SaveSource.MainMenu; Enter(TitleFlowStep.SystemSavePrompt); break;
@@ -217,7 +217,7 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
         }
     }
 
-    private void HandleDeckMenu(PspInputFrame input)
+    private void HandleDeckMenu(InputFrame input)
     {
         // Observed: back hides the submenu's focus, then returns to the Main Menu on the Deck Menu row after the close frames.
         var outcome = DeckMenu!.Handle(input);
@@ -236,7 +236,7 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
         }
     }
 
-    private void HandleDeckEdit(PspInputFrame input)
+    private void HandleDeckEdit(InputFrame input)
     {
         var outcome = DeckEdit!.Handle(input);
         if (outcome == DeckEditOutcome.None) return;
@@ -252,7 +252,7 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
         sinceSubmenuClosed = TimeSpan.Zero;
     }
 
-    private void HandleOptions(PspInputFrame input)
+    private void HandleOptions(InputFrame input)
     {
         // Options ignores input until its entry sequence finishes.
         if (!MenuReady || Options is null) return;

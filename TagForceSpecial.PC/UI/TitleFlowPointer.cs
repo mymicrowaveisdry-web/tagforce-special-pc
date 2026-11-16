@@ -9,7 +9,7 @@ namespace TagForceSpecial.PC.UI;
 /// the Options accept strip are PC choices. Output is the same actions the keys give, so the screens keep one input path.</summary>
 public sealed class TitleFlowPointer(GumPresentation gum)
 {
-    public PspInputFrame Translate(TitleFlow flow, TitleFlowVisuals visuals, PspInputFrame input, string? dialogFrame)
+    public InputFrame Translate(TitleFlow flow, TitleFlowVisuals visuals, InputFrame input, string? dialogFrame)
     {
         if (!input.Pointer.Any || flow.PendingStep is not null) return input;
         var at = input.Pointer.Position;
@@ -26,44 +26,44 @@ public sealed class TitleFlowPointer(GumPresentation gum)
                 return Options(input, options);
             case TitleFlowStep.OptionsSaveQuestion:
                 return PointerTargets.Apply(input, gum.HitIndex("OriginalOptions", "SaveDialog.Button", 2, at), flow.ButtonFocus, flow.PointButton,
-                    (PspAction.Left, PspAction.Right));
+                    (InputAction.Left, InputAction.Right));
             case TitleFlowStep.RecipeViewer when flow.Recipes is { } recipes:
                 return Recipes(input, recipes);
             case TitleFlowStep.DeckEdit when flow.DeckEdit is { } edit:
                 return DeckEdit(input, edit, visuals);
             case TitleFlowStep.NameKeyboard:
-                return input.Pointer.LeftPressed ? input.With(PspAction.Cross) : input; // typing screen: a click finishes the name
+                return input.Pointer.LeftPressed ? input.With(InputAction.Confirm) : input; // typing screen: a click finishes the name
         }
         if (flow.ButtonCount == 2 && dialogFrame is not null && visuals.DialogFrame(dialogFrame).Buttons is { Length: 2 } buttons)
             return PointerTargets.Apply(input, PointerTargets.Find(at, buttons.Select(b => b.Rect).ToArray()), flow.ButtonFocus, flow.PointButton,
-                (PspAction.Left, PspAction.Right));
+                (InputAction.Left, InputAction.Right));
         return PointerTargets.Clicks(input);
     }
 
     /// <summary>Hovering a row focuses it; its arrows step the value; the help strip below the rows accepts (the original confirm);
     /// right click asks to cancel. A plain click on a row only focuses it, since confirm leaves the screen.</summary>
-    private PspInputFrame Options(PspInputFrame input, OptionsSession options)
+    private InputFrame Options(InputFrame input, OptionsSession options)
     {
         var p = input.Pointer;
         var at = p.Position;
         if (options.CancelQuestion)
             return PointerTargets.Apply(input, gum.HitIndex("OriginalOptions", "CancelDialog.Button", 2, at), options.CancelFocus, options.PointCancel,
-                (PspAction.Left, PspAction.Right));
+                (InputAction.Left, InputAction.Right));
         int rows = OptionsCatalog.Rows.Count;
         if (gum.HitIndex("OriginalOptions", "Row", rows, at) is int row && (p.Moved || p.LeftPressed)) options.PointRow(row);
-        var pressed = PspAction.None;
+        var pressed = InputAction.None;
         if (p.LeftPressed)
         {
-            if (gum.HitIndex("OriginalOptions", "Row", rows, at, ".ArrowLeft") is not null) pressed |= PspAction.Left;
-            else if (gum.HitIndex("OriginalOptions", "Row", rows, at, ".ArrowRight") is not null) pressed |= PspAction.Right;
-            else if (gum.Hit("OriginalOptions", "Help", at)) pressed |= PspAction.Cross;
+            if (gum.HitIndex("OriginalOptions", "Row", rows, at, ".ArrowLeft") is not null) pressed |= InputAction.Left;
+            else if (gum.HitIndex("OriginalOptions", "Row", rows, at, ".ArrowRight") is not null) pressed |= InputAction.Right;
+            else if (gum.Hit("OriginalOptions", "Help", at)) pressed |= InputAction.Confirm;
         }
-        if (p.RightPressed) pressed |= PspAction.Circle;
-        if (p.Wheel != 0) pressed |= p.Wheel > 0 ? PspAction.Up : PspAction.Down;
+        if (p.RightPressed) pressed |= InputAction.Back;
+        if (p.Wheel != 0) pressed |= p.Wheel > 0 ? InputAction.Up : InputAction.Down;
         return input.With(pressed);
     }
 
-    private static PspInputFrame Recipes(PspInputFrame input, RecipeViewerSession recipes)
+    private static InputFrame Recipes(InputFrame input, RecipeViewerSession recipes)
     {
         if (recipes.Modal == RecipeViewerModal.Notice) return PointerTargets.Clicks(input);
         var l = recipes.Catalog.Layout;
@@ -77,7 +77,7 @@ public sealed class TitleFlowPointer(GumPresentation gum)
         return PointerTargets.Apply(input, PointerTargets.Find(input.Pointer.Position, rects), recipes.Cursor - recipes.Scroll, recipes.PointRow);
     }
 
-    private PspInputFrame DeckEdit(PspInputFrame input, DeckEditSession edit, TitleFlowVisuals visuals)
+    private InputFrame DeckEdit(InputFrame input, DeckEditSession edit, TitleFlowVisuals visuals)
     {
         var at = input.Pointer.Position;
         var p = visuals.DeckEditProfile;
@@ -86,12 +86,12 @@ public sealed class TitleFlowPointer(GumPresentation gum)
             case DeckEditPrompt.Move: return PointerTargets.Clicks(input);
             case DeckEditPrompt.SaveQuestion:
                 return PointerTargets.Apply(input, gum.HitIndex("OriginalOptions", "SaveDialog.Button", 2, at), edit.PromptFocus, edit.PointPrompt,
-                    (PspAction.Left, PspAction.Right));
+                    (InputAction.Left, InputAction.Right));
             case DeckEditPrompt.ExitQuestion:
                 var d = p.ExitDialog;
                 var focus = Bounds(d.Focus);
                 var buttons = d.Buttons.Select(b => Offset(focus, 0, b.X - d.Buttons[0].X)).ToArray();
-                return PointerTargets.Apply(input, PointerTargets.Find(at, buttons), edit.PromptFocus, edit.PointPrompt, (PspAction.Left, PspAction.Right));
+                return PointerTargets.Apply(input, PointerTargets.Find(at, buttons), edit.PromptFocus, edit.PointPrompt, (InputAction.Left, InputAction.Right));
         }
         if (edit.Menus.Open) return Menus(input, edit, visuals.DeckEditMenuProfile);
         if (input.Pointer.LeftPressed && Tab(at, p) is { } tab && tab != edit.Tab) { edit.PointTab(tab); return input; }
@@ -115,7 +115,7 @@ public sealed class TitleFlowPointer(GumPresentation gum)
         return null;
     }
 
-    private static PspInputFrame Menus(PspInputFrame input, DeckEditSession edit, DeckEditMenuProfile profile)
+    private static InputFrame Menus(InputFrame input, DeckEditSession edit, DeckEditMenuProfile profile)
     {
         var menus = edit.Menus;
         if (menus.Notice is not null || menus.RunCount is not null || menus.Top is not { } top) return PointerTargets.Clicks(input);
@@ -133,7 +133,7 @@ public sealed class TitleFlowPointer(GumPresentation gum)
         if (popup.Run is { } button) cells.Add(Bounds([button.Button]));
         int focus = top.OnRun ? run : top.Focus;
         return PointerTargets.Apply(input, PointerTargets.Find(at, cells), focus,
-            i => menus.Point(i == run ? top.Focus : i, i == run, edit), (PspAction.Up, PspAction.Down));
+            i => menus.Point(i == run ? top.Focus : i, i == run, edit), (InputAction.Up, InputAction.Down));
     }
 
     private static float[] Bounds(IEnumerable<FlowDraw> draws)
