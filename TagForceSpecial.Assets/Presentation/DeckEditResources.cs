@@ -6,8 +6,12 @@ public static class DeckEditResources
 {
     public const string ArchiveKey = "deck.source.all-ehp";
 
-    /// <summary>(asset key, member, frame, palette level, reason). Empty since the Card Frame captures recorded every previously unverified
-    /// member (row-image sheets 2 and 3, the Normal-monster frame); kept for members a future screen needs before it is recorded.</summary>
+    /// <summary>(asset key, member, frame, palette level, reason). The Card Frame captures recorded the earlier unverified members; the Deck
+    /// Edit menus draw two icon sheets that no pixel-verified screen covers yet.</summary>
     public static IReadOnlyList<(string AssetKey, string Member, int? Frame, int? PaletteLevel, string Reason)> Supplements { get; } =
-        Array.AsReadOnly(Array.Empty<(string, string, int?, int?, string)>());
+        Array.AsReadOnly(new (string, string, int?, int?, string)[]
+        {
+            ("deck.all.icon05", "icon05.gim", null, null, "Deck Edit menu row icons; drawn in recorded menu dumps, pixels not yet verified"),
+            ("deck.all.icon06", "icon06.gim", null, null, "Key Search cells; drawn in a recorded menu dump, pixels not yet verified")
+        });
 }

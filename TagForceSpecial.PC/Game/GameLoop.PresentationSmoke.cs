@@ -163,10 +163,34 @@ public sealed partial class GameLoop
         press(Keys.Escape, $"DeckMenu/L/2/{menuRow}");
     }
 
+    /// <summary>Deck Edit menu state for smoke labels: "-" closed, else top popup:focus, R on Run, N notice, C count notice.</summary>
+    private static string MenuState(DeckEditMenus menus) => menus.RunCount is not null ? "C" : menus.Top is not { } top ? "-"
+        : $"{top.Id}:{top.Focus}{(top.OnRun ? "R" : "")}{(menus.Notice is null ? "" : "N")}";
+
+    /// <summary>Deck Edit Menu walk: Search > Sort preview and Order, back out restoring the sort; Narrow Search > Card Frame toggle, Run,
+    /// count notice OK; Reset Narrow Search Results; a PC notice (Card Details) closed with back. Leaves the list as it started.</summary>
+    private static void DeckEditMenuRoute(Action<Keys, string> press)
+    {
+        string M(string state) => $"DeckEdit/Trunk/0/None/0/{state}/*";
+        press(Keys.Tab, M("main:0"));
+        press(Keys.Down, M("main:1")); press(Keys.Down, M("main:2")); press(Keys.Down, M("main:3"));
+        press(Keys.Enter, M("search:0")); press(Keys.Enter, M("sort:0")); press(Keys.Down, M("sort:1"));
+        press(Keys.Right, M("sort-order:0")); press(Keys.Escape, M("sort:1")); press(Keys.Escape, M("search:0"));
+        press(Keys.Down, M("search:1")); press(Keys.Enter, M("narrow:0")); press(Keys.Enter, M("card-frame:0"));
+        press(Keys.Down, M("card-frame:4")); press(Keys.Down, M("card-frame:8")); press(Keys.Right, M("card-frame:9"));
+        press(Keys.Enter, M("card-frame:9")); press(Keys.Down, M("card-frame:9R")); press(Keys.Enter, M("C"));
+        press(Keys.Enter, M("-"));
+        press(Keys.Tab, M("main:0"));
+        for (int row = 1; row <= 7; row++) press(Keys.Down, M($"main:{row}"));
+        press(Keys.Enter, M("-"));
+        press(Keys.Tab, M("main:0")); press(Keys.Enter, M("main:0N")); press(Keys.Escape, M("main:0")); press(Keys.Escape, M("-"));
+    }
+
     private static void DeckEditRoute(Action<Keys, string> press, int menuRow)
     {
         // The built-in deck uses most supported cards, so cursor and wrap are exercised on the 40-card Deck tab.
         press(Keys.Enter, "DeckEdit/Trunk/0/None/0/*");
+        DeckEditMenuRoute(press);
         press(Keys.Space, "DeckEdit/Deck/0/None/0/*");
         press(Keys.Down, "DeckEdit/Deck/1/None/0/*"); press(Keys.Down, "DeckEdit/Deck/2/None/0/*"); press(Keys.Up, "DeckEdit/Deck/1/None/0/*");
         press(Keys.Up, "DeckEdit/Deck/0/None/0/*"); press(Keys.Up, "DeckEdit/Deck/*"); press(Keys.Down, "DeckEdit/Deck/0/None/0/*");
@@ -205,7 +229,7 @@ public sealed partial class GameLoop
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.RecipeViewer, Recipes: { } recipes } =>
             $"Recipe/{recipes.Kind}/{recipes.Cursor}/{recipes.Modal}/{recipes.Sort}/{recipes.Inverse}",
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.DeckEdit, DeckEdit: { } edit } =>
-            $"DeckEdit/{edit.Tab}/{edit.Cursor}/{edit.Prompt}/{edit.PromptFocus}/{edit.Count(DeckEditTab.Deck)}/{edit.Count(DeckEditTab.Trunk)}",
+            $"DeckEdit/{edit.Tab}/{edit.Cursor}/{edit.Prompt}/{edit.PromptFocus}/{MenuState(edit.Menus)}/{edit.Count(DeckEditTab.Deck)}/{edit.Count(DeckEditTab.Trunk)}",
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.DeckMenu, DeckMenu: { } deck } flow =>
             $"DeckMenu/{(deck.NoticeOpen ? "N" : "L")}/{deck.Focus}/{flow.MenuFocus}",
         ScreenId.TitleFlow when titleFlow is { } flow => $"{flow.Step}/{flow.ButtonFocus}/{flow.MenuFocus}",

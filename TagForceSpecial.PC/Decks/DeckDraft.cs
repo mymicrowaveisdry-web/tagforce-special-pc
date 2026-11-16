@@ -31,6 +31,8 @@ public sealed class DeckDraft
     }
     public bool Remove(uint id) => sections[Section].Remove(id);
     public void Clear() { foreach (var section in sections.Values) section.Clear(); }
+    /// <summary>Restores a section's exact card order (Deck Edit undo and reset); cards are not re-validated.</summary>
+    public void ReplaceSection(DeckSection section, IEnumerable<uint> cards) { sections[section].Clear(); sections[section].AddRange(cards); }
     /// <summary>Confirmed pool cards present in this catalog, matching the search and the card-kind filter, by name.</summary>
     public IReadOnlyList<CardDefinition> VisibleCards()
     {

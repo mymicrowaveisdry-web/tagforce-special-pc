@@ -26,7 +26,7 @@ public sealed partial class TitleFlowVisuals
         // Pinned keys must verify; the named supplements are decoded but not yet seen on a recorded screen.
         var supplements = DeckEditResources.Supplements.Select(s => s.AssetKey).ToHashSet(StringComparer.Ordinal);
         // EBOOT dialog textures are already decoded from the stored EBOOT by the title flow.
-        foreach (string key in DeckEditProfile.AssetKeys().Where(k => !textures.ContainsKey(k)))
+        foreach (string key in DeckEditProfile.AssetKeys().Concat(DeckEditMenuProfile.AssetKeys()).Distinct(StringComparer.Ordinal).Where(k => !textures.ContainsKey(k)))
             textures.AddBorrowed(key, (supplements.Contains(key) ? assets.ResolveUnverified(key) : assets.Resolve(key)).Texture);
         DeckEditLayer = new(device, 480, 272, false, SurfaceFormat.Color, DepthFormat.Depth24Stencil8, 0, RenderTargetUsage.PreserveContents);
         cardLayer = new(device, DeckEditProfile.Card.BufferWidth, DeckEditProfile.Card.BufferHeight, false, SurfaceFormat.Color,
@@ -368,6 +368,7 @@ public sealed partial class TitleFlowVisuals
         if (!moving) foreach (var draw in p.Cursor) DrawMeasured(Shifted(draw, 0, (session.Cursor - session.Scroll) * p.RowPitch));
         if (session.Focused is { } focused) DrawPreview(focused.Card);
         if (moving && session.Focused is { } picked) DrawMoveOverlay(picked.Card, session.Destination);
+        if (session.Menus.Open) DrawDeckEditMenus(session);
         if (session.Prompt == DeckEditPrompt.ExitQuestion) DrawExitDialog(session.PromptFocus);
     });
 

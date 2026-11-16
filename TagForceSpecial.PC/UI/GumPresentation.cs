@@ -30,7 +30,7 @@ public sealed class GumPresentation : IDisposable
         }
         noticeShade = new Texture2D(device, 1, 1);
         noticeShade.SetData([Color.White]);
-        foreach (string screen in new[] { "OriginalMainMenu", "OriginalDeckMenu" })
+        foreach (string screen in new[] { "OriginalMainMenu", "OriginalDeckMenu", "OriginalDeckEdit" })
         {
             var shade = MainMenuSprite(roots[screen], "NoticeShade");
             shade.Texture = noticeShade;
@@ -318,6 +318,16 @@ public sealed class GumPresentation : IDisposable
         BindText("OriginalMainMenu", "NoticeBody", destination.Notice);
         var shade = MainMenuSprite(root, "NoticeShade");
         shade.Red = 12; shade.Green = 18; shade.Blue = 32; shade.Alpha = 235;
+    }
+    /// <summary>PC notice over Deck Edit for a menu row the PC does not recreate; null hides it.</summary>
+    public void ShowDeckEditNotice(string? title, string body)
+    {
+        var root = roots["OriginalDeckEdit"];
+        var notice = root.GetGraphicalUiElementByName("Notice") ?? throw new InvalidDataException("Missing Deck Edit notice.");
+        notice.Visible = title is not null;
+        if (title is null) return;
+        BindText("OriginalDeckEdit", "NoticeTitle", title);
+        BindText("OriginalDeckEdit", "NoticeBody", body);
     }
     public void Show(string name, bool visible) { if (roots.TryGetValue(name, out var root)) root.Visible = visible; }
     public void BindTitleLayers(App.Screens.Title.OriginalTitleVisuals visuals)

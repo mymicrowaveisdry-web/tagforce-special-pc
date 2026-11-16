@@ -179,7 +179,11 @@ public sealed partial class GameLoop
         }
         gum.Show("OriginalOptions", false);
         gum.Show("OriginalDeckEdit", true);
-        string key = $"{edit.Tab}/{edit.Cursor}/{edit.Scroll}/{edit.Prompt}/{edit.PromptFocus}/{edit.Count(DeckEditTab.Deck)}/{edit.Count(DeckEditTab.Extra)}/{edit.Count(DeckEditTab.Side)}/{edit.Count(DeckEditTab.Trunk)}";
+        edit.Menus.HoldPulse = options.PixelExact;
+        // PC-authored notice for rows the PC does not recreate; its title is the row's own source label.
+        gum.ShowDeckEditNotice(edit.Menus.Notice is { } notice ? visuals.DeckEditMenuLabel(notice.Popup, notice.Row) : null,
+            "Not recreated on the PC yet: its original screen or data is not available here. Nothing was changed.");
+        string key = $"{edit.Tab}/{edit.Cursor}/{edit.Scroll}/{edit.Prompt}/{edit.PromptFocus}/{edit.Count(DeckEditTab.Deck)}/{edit.Count(DeckEditTab.Extra)}/{edit.Count(DeckEditTab.Side)}/{edit.Count(DeckEditTab.Trunk)}/{edit.Menus.Signature}/{edit.Query.Signature}";
         if (key == renderedDeckEditKey) return;
         visuals.RenderDeckEdit(edit, edit.Draft.Name);
         renderedDeckEditKey = key;
