@@ -61,6 +61,15 @@ public sealed class DeckEditMenus
     public void OpenMain() { stack.Clear(); Push("main", 0); }
     public void CloseAll() { stack.Clear(); Notice = null; RunCount = null; }
 
+    /// <summary>Pointer focus on a row or cell of the top popup, or on its Run button. Sort previews the pointed key as moving would.</summary>
+    public void Point(int focus, bool onRun, DeckEditSession session)
+    {
+        if (Top is not { } top || Notice is not null || RunCount is not null || focus < 0 || focus >= profile[top.Id].Count) return;
+        if (top.Focus == focus && top.OnRun == onRun) return;
+        SetTop(top with { Focus = focus, OnRun = onRun && profile[top.Id].Run is not null });
+        if (top.Id == "sort" && !onRun) { session.Query.SortKey = (DeckEditSortKey)focus; session.ListChanged(); }
+    }
+
     private void Push(string id, int focus) { stack.Add(new(id, focus)); Frame = 0; }
     private void Pop() { stack.RemoveAt(stack.Count - 1); Frame = 0; }
     private void SetTop(DeckEditMenuLevel level) => stack[^1] = level;

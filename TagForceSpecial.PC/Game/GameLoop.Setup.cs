@@ -20,6 +20,8 @@ public sealed partial class GameLoop
         if (options.Smoke && !SetupAutomation) return;
         string root = options.DataRoot ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TagForceSpecial");
         setup = new(root); editor = new(setup); setupOperation = new(setup);
+        // Automated walks press the retained default keys whatever the player saved.
+        if (!options.PresentationSmoke && options.RealtimeWalkRoot is null && setup.Issue is null) input.Bindings = setup.Preferences.Bindings();
         Window.TextInput += (_, e) =>
         {
             if (titleFlow?.Editing == true) { titleFlow.TypeCharacter(e.Character); return; }

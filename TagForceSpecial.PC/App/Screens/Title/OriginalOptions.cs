@@ -106,6 +106,10 @@ public sealed class OptionsSession(int[] initial)
     public IReadOnlyList<int> Values => values;
     public bool Changed => !values.AsSpan().SequenceEqual(initial);
 
+    /// <summary>Pointer focus on a row, or on a cancel-question button while it is open.</summary>
+    public void PointRow(int row) { if (!CancelQuestion && row >= 0 && row < OptionsCatalog.Rows.Count) Focus = row; }
+    public void PointCancel(int button) { if (CancelQuestion && button is 0 or 1) CancelFocus = button; }
+
     public OptionsOutcome Handle(PspInputFrame input)
     {
         if (CancelQuestion)

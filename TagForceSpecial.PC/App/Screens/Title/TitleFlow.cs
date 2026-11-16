@@ -149,6 +149,12 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
         else Enter(TitleFlowStep.NoData);
     }
 
+    /// <summary>Pointer focus on a dialog button (no confirm).</summary>
+    public void PointButton(int button) { if (PendingStep is null && button >= 0 && button < ButtonCount) ButtonFocus = button; }
+
+    /// <summary>Pointer focus on a Main Menu row once the menu accepts input.</summary>
+    public void PointMenu(int row) { if (Step == TitleFlowStep.MainMenu && MenuReady && PendingStep is null && row >= 0 && row < MainMenuRows) MenuFocus = row; }
+
     public void Handle(PspInputFrame input)
     {
         if (PendingStep is not null) return;

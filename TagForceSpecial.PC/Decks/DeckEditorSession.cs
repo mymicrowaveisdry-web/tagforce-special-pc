@@ -19,6 +19,8 @@ public sealed class DeckEditorSession(SetupStore store)
     public IReadOnlyList<SavedDeck> SavedDecks { get; private set; } = [];
     public int CardIndex { get; set; }
     public int MenuIndex { get; private set; }
+    /// <summary>Pointer focus on a menu action while the menu is open.</summary>
+    public void PointMenu(int index) { if (MenuOpen && index >= 0 && index < Actions.Count) MenuIndex = index; }
     public bool MenuOpen { get; private set; }
     public string? EditingText { get; private set; }
     public bool EditingName { get; private set; }

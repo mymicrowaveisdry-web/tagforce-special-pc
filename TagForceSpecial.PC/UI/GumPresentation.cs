@@ -329,6 +329,27 @@ public sealed class GumPresentation : IDisposable
         BindText("OriginalDeckEdit", "NoticeTitle", title);
         BindText("OriginalDeckEdit", "NoticeBody", body);
     }
+    /// <summary>Whether a visible element (dotted path from the screen root, e.g. "Row3.ArrowLeft") contains the canvas point.</summary>
+    public bool Hit(string screenName, string path, Rendering.CanvasPoint? point)
+    {
+        if (point is not { } at || !roots.TryGetValue(screenName, out var root) || !root.Visible) return false;
+        GraphicalUiElement? element = root;
+        foreach (string part in path.Split('.'))
+        {
+            element = element?.GetGraphicalUiElementByName(part);
+            if (element is null || !element.Visible) return false;
+        }
+        return at.X >= element!.AbsoluteLeft && at.X < element.AbsoluteRight && at.Y >= element.AbsoluteTop && at.Y < element.AbsoluteBottom;
+    }
+
+    /// <summary>The first n in [0, count) whose element "{prefix}{n}{suffix}" contains the point.</summary>
+    public int? HitIndex(string screenName, string prefix, int count, Rendering.CanvasPoint? point, string suffix = "")
+    {
+        for (int i = 0; i < count; i++)
+            if (Hit(screenName, prefix + i.ToString(System.Globalization.CultureInfo.InvariantCulture) + suffix, point)) return i;
+        return null;
+    }
+
     public void Show(string name, bool visible) { if (roots.TryGetValue(name, out var root)) root.Visible = visible; }
     public void BindTitleLayers(App.Screens.Title.OriginalTitleVisuals visuals)
     {

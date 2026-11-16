@@ -91,6 +91,23 @@ public sealed class DeckEditSession
     /// <summary>Destination named by the move prompt: Trunk cards go to their deck (Deck or EX), deck cards back to the Trunk.</summary>
     public DeckEditTab Destination => Tab == DeckEditTab.Trunk ? Focused is { } e && IsExtra(e.Card) ? DeckEditTab.Extra : DeckEditTab.Deck : DeckEditTab.Trunk;
 
+    /// <summary>Pointer focus on a visible list row.</summary>
+    public void PointRow(int visibleRow)
+    {
+        int row = Scroll + visibleRow;
+        if (Prompt == DeckEditPrompt.None && !Menus.Open && row >= 0 && row < Current.Count) Cursor = row;
+    }
+
+    /// <summary>Pointer click on a tab: shows it as Square cycling would.</summary>
+    public void PointTab(DeckEditTab tab)
+    {
+        if (Prompt != DeckEditPrompt.None || Menus.Open || tab == Tab) return;
+        Tab = tab; Cursor = 0; Scroll = 0;
+    }
+
+    /// <summary>Pointer focus on the exit or save question's buttons (0 OK/YES, 1 CANCEL/NO).</summary>
+    public void PointPrompt(int button) { if (Prompt is DeckEditPrompt.ExitQuestion or DeckEditPrompt.SaveQuestion && button is 0 or 1) PromptFocus = button; }
+
     public DeckEditOutcome Handle(PspInputFrame input)
     {
         if (Menus.Open) { Menus.Handle(input, this); return DeckEditOutcome.None; }

@@ -83,6 +83,8 @@ public sealed partial class GameLoop
         screen = ScreenId.TitleFlow;
     }
 
+    private UI.TitleFlowPointer? flowPointer;
+
     private static string? FrameFor(TitleFlowStep step) => step switch
     {
         TitleFlowStep.StorageCheck => "storage",
@@ -345,6 +347,7 @@ public sealed partial class GameLoop
         public void HandleInput(PspInputFrame input)
         {
             var flow = owner.titleFlow!;
+            if (owner.flowVisuals is { } visuals) input = (owner.flowPointer ??= new(owner.gum)).Translate(flow, visuals, input, FrameFor(flow.Step));
             flow.Handle(input);
             if (flow.PendingStep is { } pending)
                 // Dialogs hold briefly after confirming. The title has its own fade-in; the menu's entry sequence includes one.

@@ -54,6 +54,20 @@ public sealed class RecipeViewerSession(RecipeCatalog catalog)
     }
 
     /// <summary>Returns true only when leaving; confirmation manages User recipes rather than replacing the active deck.</summary>
+    /// <summary>Pointer focus on a visible list row (no modal open) or on a modal row.</summary>
+    public void PointRow(int visibleRow)
+    {
+        int row = Scroll + visibleRow;
+        if (Modal != RecipeViewerModal.None || row < 0 || row >= Rows.Count || row == Cursor) return;
+        Cursor = row; CardCursor = 0; Revision++;
+    }
+    public void PointModal(int row)
+    {
+        int count = Modal switch { RecipeViewerModal.Manage => 2, RecipeViewerModal.Sort => 4, _ => 0 };
+        if (row < 0 || row >= count || row == ModalFocus) return;
+        ModalFocus = row; OrderColumn = false; Revision++;
+    }
+
     public bool Handle(PspInputFrame input)
     {
         if (input.Pressed == PspAction.None) return false;

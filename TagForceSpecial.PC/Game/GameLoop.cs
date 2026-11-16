@@ -90,11 +90,22 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
         return true;
     }
 
+    /// <summary>Where the 480 x 272 picture sits in the window (letterboxed); the mouse maps through it.</summary>
+    private Rendering.CanvasRect PictureRect() => PspViewport.Fit(GraphicsDevice.PresentationParameters.BackBufferWidth,
+        GraphicsDevice.PresentationParameters.BackBufferHeight, options.PixelExact || setup?.Preferences.IntegerScaling == true);
+
+    /// <summary>Player input: saved key bindings, typing keys muted while a text field has focus, and the mouse over the picture.</summary>
+    private App.Input.PspInputFrame PollPlayer()
+    {
+        input.TextEntry = titleFlow?.Editing == true || editor?.EditingText is not null;
+        return input.Poll(IsActive, PictureRect());
+    }
+
     protected override void Update(GameTime gameTime)
     {
         PollSetupTask();
         var frame = options.PresentationSmoke ? PresentationSmokeInput()
-            : options.RealtimeWalkRoot is not null ? RealtimeWalkInput(gameTime) : input.Poll(IsActive);
+            : options.RealtimeWalkRoot is not null ? RealtimeWalkInput(gameTime) : PollPlayer();
         navigationTime = gameTime;
         // Input is ignored while a fade runs; the change at black may also move to another screen.
         bool fading = screenFade.Active;
@@ -155,8 +166,7 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
         if (options.RealtimeWalkRoot is not null) CheckRealtimeWalkFrame(gameTime);
         GraphicsDevice.SetRenderTarget(null);
         GraphicsDevice.Clear(Color.Black);
-        var target = PspViewport.Fit(GraphicsDevice.PresentationParameters.BackBufferWidth,
-            GraphicsDevice.PresentationParameters.BackBufferHeight, options.PixelExact || setup?.Preferences.IntegerScaling == true);
+        var target = PictureRect();
         presenter.Begin(samplerState: SamplerState.PointClamp);
         presenter.Draw(canvas, new Rectangle(target.X, target.Y, target.Width, target.Height), Color.White);
         presenter.End();
