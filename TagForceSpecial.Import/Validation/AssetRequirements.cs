@@ -1,11 +1,12 @@
 using TagForceSpecial.Assets.Presentation;
 
-namespace TagForceSpecial.PC.Import;
+namespace TagForceSpecial.Import.Validation;
 
 public sealed record AssetRequirement(string Screen, string AssetKey);
 public sealed record AssetDiagnostic(string Screen, string AssetKey, string Status, string Source, string Detail);
 
-public static class AssetDiagnostics
+/// <summary>Per-screen status of required presentation assets: verified, decoded-unverified, unresolved, missing or invalid.</summary>
+public static class AssetRequirements
 {
     public static IReadOnlyList<AssetRequirement> DefaultRequirements { get; } = Array.AsReadOnly(new[]
     {
@@ -15,14 +16,15 @@ public static class AssetDiagnostics
         new("story", "story.map.0")
     }.Concat(PresentationReferenceCases.Cases.Select(c => new AssetRequirement(c.Screen, c.AssetKey))).ToArray());
 
-    public static IReadOnlyList<AssetDiagnostic> Inspect(SemanticAssetRegistry? registry,
-        IEnumerable<AssetRequirement> requirements, bool invalidPackage = false)
+    public static IReadOnlyList<string> Statuses { get; } = Array.AsReadOnly(new[] { "verified", "decoded-unverified", "unresolved", "missing", "invalid" });
+
+    public static IReadOnlyList<AssetDiagnostic> Inspect(SemanticAssetRegistry? registry, IEnumerable<AssetRequirement> requirements, bool invalidPackage = false)
     {
         var rows = new List<AssetDiagnostic>();
         foreach (var requirement in requirements)
         {
             if (invalidPackage)
-            { rows.Add(new(requirement.Screen, requirement.AssetKey, "invalid", "unavailable", "Cache validation failed; rebuild the presentation generation.")); continue; }
+            { rows.Add(new(requirement.Screen, requirement.AssetKey, "invalid", "unavailable", "Import validation failed; import the ISO again.")); continue; }
             if (registry is null || !registry.Entries.TryGetValue(requirement.AssetKey, out var entry))
             { rows.Add(new(requirement.Screen, requirement.AssetKey, "missing", "unavailable", "No validated semantic resource is registered.")); continue; }
             string attribution = entry.Source.Archive + (entry.Source.Member is null ? "" : " / " + entry.Source.Member);
@@ -40,6 +42,4 @@ public static class AssetDiagnostics
         }
         return rows.AsReadOnly();
     }
-
-    public static IReadOnlyList<string> Statuses { get; } = Array.AsReadOnly(new[] { "verified", "decoded-unverified", "unresolved", "missing", "invalid" });
 }

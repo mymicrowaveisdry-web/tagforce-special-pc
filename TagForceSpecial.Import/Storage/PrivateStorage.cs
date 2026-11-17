@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace TagForceSpecial.PC.Setup;
+namespace TagForceSpecial.Import.Storage;
 
 /// <summary>Bounded private documents and atomic replacement inside an ordinary local directory.</summary>
 public sealed class PrivateStorage
@@ -33,16 +33,26 @@ public sealed class PrivateStorage
             if ((File.Exists(p) || Directory.Exists(p)) && (File.GetAttributes(p) & FileAttributes.ReparsePoint) != 0)
                 throw new InvalidDataException("Linked storage locations are not supported.");
     }
-    public T Read<T>(string relative, int maximumBytes = 1024 * 1024)
+    public T Read<T>(string relative, int maximumBytes = 1024 * 1024) => Parse<T>(ReadBytes(relative, maximumBytes), Json);
+
+    /// <summary>Reads a bounded file's exact bytes, for documents whose hash is checked before parsing.</summary>
+    public byte[] ReadBytes(string relative, int maximumBytes)
     {
         string path = PathFor(relative);
         if (new FileInfo(path).Length > maximumBytes) throw new InvalidDataException("Private document exceeds its limit.");
-        using var stream = File.OpenRead(path);
-        using var document = JsonDocument.Parse(stream, new JsonDocumentOptions { MaxDepth = 16 });
-        Unique(document.RootElement);
-        return document.RootElement.Deserialize<T>(Json) ?? throw new InvalidDataException("Private document is empty.");
+        return File.ReadAllBytes(path);
     }
-    public void Write<T>(string relative, T value)
+
+    public static T Parse<T>(byte[] bytes, JsonSerializerOptions options)
+    {
+        using var document = JsonDocument.Parse(bytes, new JsonDocumentOptions { MaxDepth = 16 });
+        Unique(document.RootElement);
+        return document.RootElement.Deserialize<T>(options) ?? throw new InvalidDataException("Private document is empty.");
+    }
+    public void Write<T>(string relative, T value) => WriteBytes(relative, JsonSerializer.SerializeToUtf8Bytes(value, Json));
+
+    /// <summary>Writes through a unique pending file, then replaces the destination in one move.</summary>
+    public void WriteBytes(string relative, byte[] bytes)
     {
         string path = PathFor(relative);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!); Check(path);
@@ -50,11 +60,16 @@ public sealed class PrivateStorage
         try
         {
             using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-            { JsonSerializer.Serialize(stream, value, Json); stream.Flush(true); }
+            { stream.Write(bytes); stream.Flush(true); }
             Check(path); File.Move(temporary, path, overwrite: true);
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
+
+    /// <summary>Storage, format and argument failures a caller can report and retry without crashing.</summary>
+    public static bool Recoverable(Exception e) => e is IOException or InvalidDataException or UnauthorizedAccessException or
+        ArgumentException or JsonException or InvalidOperationException;
+
     private static void Unique(JsonElement element)
     {
         if (element.ValueKind == JsonValueKind.Object)

@@ -19,7 +19,7 @@ public sealed class OriginalTitleVisuals : IDisposable
         for (string? at = root; at is not null; at = Path.GetDirectoryName(at))
             if (Directory.Exists(Path.Combine(at, ".git")) || File.Exists(Path.Combine(at, ".git")))
                 throw new InvalidDataException("Derived original title layers must stay outside Git worktrees.");
-        Setup.PrivateStorage.Check(root);
+        TagForceSpecial.Import.Storage.PrivateStorage.Check(root);
         Directory.CreateDirectory(root);
         foreach (var (name, layer) in layers)
         {

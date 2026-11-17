@@ -1,4 +1,5 @@
 using TagForceSpecial.Core.Decks;
+using TagForceSpecial.Import.Storage;
 using TagForceSpecial.PC.Setup;
 
 namespace TagForceSpecial.PC.Decks;
@@ -42,7 +43,7 @@ public sealed class DeckLibrary(PrivateStorage storage)
             {
                 string key = Path.GetFileName(group) + "/" + Path.GetFileName(path);
                 try { var deck = Load(key); results.Add(new(key, deck.DeckId, deck)); }
-                catch (Exception e) when (SetupStore.Recoverable(e)) { results.Add(new(key, "Unreadable revision", null, "This revision could not be read. Select an earlier revision.")); }
+                catch (Exception e) when (PrivateStorage.Recoverable(e)) { results.Add(new(key, "Unreadable revision", null, "This revision could not be read. Select an earlier revision.")); }
             }
         }
         return results.AsReadOnly();

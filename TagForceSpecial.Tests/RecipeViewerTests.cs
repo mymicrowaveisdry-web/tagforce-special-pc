@@ -3,7 +3,7 @@ using TagForceSpecial.Cards;
 using TagForceSpecial.PC.App.Input;
 using TagForceSpecial.PC.App.Screens.Title;
 using TagForceSpecial.PC.Recipes;
-using TagForceSpecial.PC.Setup;
+using TagForceSpecial.Import.Storage;
 
 namespace TagForceSpecial.Tests;
 

@@ -13,9 +13,8 @@ public sealed partial class GameLoop
     // Every observed Continue/New Game branch, in PC keys: Enter = confirm, Escape = back, F1 = Start.
     // Built on first use, after setup: Deck Edit is only reachable when the data root holds a card cache.
     private (Keys? Key, string Expected)[]? presentationSteps;
-    private (Keys? Key, string Expected)[] PresentationSteps => presentationSteps ??= BuildPresentationSteps(setup?.Cache is not null,
-        options.RecipeReferenceRoot is not null || setup is not null &&
-        (File.Exists(setup.Storage.PathFor("recipes/active.json")) || File.Exists(setup.Storage.PathFor("recipes/viewer.json"))));
+    private (Keys? Key, string Expected)[] PresentationSteps => presentationSteps ??= BuildPresentationSteps(setup?.Game is not null,
+        options.RecipeReferenceRoot is not null || setup?.Game?.RecipeRoot is not null);
     private readonly Dictionary<int, string> presentationHashes = [];
     private byte[]? presentationPixels;
     private int? presentationTextureCount;

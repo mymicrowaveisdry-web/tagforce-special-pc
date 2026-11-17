@@ -1,18 +1,18 @@
 using TagForceSpecial.Effects;
 using TagForceSpecial.PC.Decks;
 using TagForceSpecial.PC.DuelUI;
-using TagForceSpecial.PC.Import;
+using TagForceSpecial.Import.Installed;
 using TagForceSpecial.Core.Decks;
 
 namespace TagForceSpecial.PC.Game;
 
 public static class SupportedDuelFactory
 {
-    public static DuelController Create(ValidatedGameCache cache, int deckVariant, uint seed)
+    public static DuelController Create(InstalledGame cache, int deckVariant, uint seed)
         => Create(cache, InitialOpponentDecks.Create(deckVariant), seed);
 
     /// <summary>Validates each deck under the regulation it names, then plays them with every confirmed card family loaded.</summary>
-    public static DuelController Create(ValidatedGameCache cache, DeckDefinition deck, uint seed)
+    public static DuelController Create(InstalledGame cache, DeckDefinition deck, uint seed)
     {
         var opponent = InitialOpponentDecks.Create(0, "local-opponent");
         var catalog = cache.Catalog.Catalog;

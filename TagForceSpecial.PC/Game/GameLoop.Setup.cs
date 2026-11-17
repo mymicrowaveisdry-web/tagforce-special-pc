@@ -1,5 +1,6 @@
 using Microsoft.Xna.Framework;
 using TagForceSpecial.Core.Decks;
+using TagForceSpecial.Import.Storage;
 using TagForceSpecial.PC.Decks;
 using TagForceSpecial.PC.DuelUI.Input;
 using TagForceSpecial.PC.Setup;
@@ -8,13 +9,13 @@ namespace TagForceSpecial.PC.Game;
 
 public sealed partial class GameLoop
 {
-    private SetupStore? setup;
+    private GameDataStore? setup;
     private DeckEditorSession? editor;
-    private SetupOperation? setupOperation;
+    private ImportOperation? setupOperation;
     private int setupSmokeStage, editorFrame;
     private string preferencesNotice = "Changes are saved locally.";
-    private static readonly string[] SetupActions = ["CONTINUE TO GAME", "SELECT ORIGINAL ISO", "IMPORT RECIPE LIBRARY", "RESUME IMPORT", "VERIFY CURRENT CACHE", "REBUILD FROM ORIGINAL ISO", "RESTART INTERRUPTED WORK", "PREFERENCES", "RESTORE SETTINGS BACKUP", "RESOURCE STATUS", "PC DUEL TOOLS"];
-    private bool CanContinueToGame => setupOperation?.Busy != true && setup?.Cache is not null && originalTitle is not null;
+    private static readonly string[] SetupActions = ["CONTINUE TO GAME", "IMPORT ORIGINAL ISO", "IMPORT RECIPE LIBRARY", "REPEAT LAST IMPORT", "VERIFY GAME DATA", "PREFERENCES", "RESTORE SETTINGS BACKUP", "RESOURCE STATUS", "PC DUEL TOOLS"];
+    private bool CanContinueToGame => setupOperation?.Busy != true && setup?.Game is not null && originalTitle is not null;
     private void InitializeSetup()
     {
         if (options.Smoke && !SetupAutomation) return;
@@ -28,15 +29,20 @@ public sealed partial class GameLoop
             editor.TypeCharacter(e.Character);
         };
         if (setup.Issue is { } issue) setupMessage = issue.Message;
-        else if (options.SetupSource is null && setup.Preferences.ActiveGeneration is not null)
+        else if (options.SetupSource is null)
         {
-            setupOperation.Validate(initial: true);
+            // Reading synchronously keeps startup routing deterministic for presentation runs; the reader re-verifies every output.
+            setup.Reload();
         }
-        if (options.SetupSource is { } source) { screen = ScreenId.Setup; BeginImport(source); }
+        if (options.SetupSource is { } source)
+        {
+            screen = ScreenId.Setup;
+            BeginImport(source, options.RecipeReferenceRoot is { } reference ? Path.Combine(reference, "recipes", "viewer.json") : null);
+        }
     }
-    private void BeginImport(string source)
+    private void BeginImport(string source, string? recipeLibrary = null)
     {
-        if (setupOperation?.Import(source) != true) return;
+        if (setupOperation?.Import(source, recipeLibrary) != true) return;
         setupMessage = "Importing local game data";
         screen = ScreenId.Setup;
     }
@@ -53,15 +59,17 @@ public sealed partial class GameLoop
         if (!CanContinueToGame) { setupMessage = "Import or verify your game data before continuing."; return; }
         screen = ScreenId.Title;
     }
+    /// <summary>The source of the active import; a repeat import reuses every verified stage output and only re-checks the image.</summary>
+    private string? LastSource => setup?.Game?.Manifest?.Source.Path is { Length: > 0 } path ? path : null;
     private void BeginRecipeImport(string file)
     {
-        if (setup?.Cache is not { } cache || setupOperation?.ImportRecipes(file, cache.Catalog.Catalog) != true)
-        { setupMessage = "Import or verify game data before importing a recipe library."; return; }
+        if (LastSource is not { } source) { setupMessage = "Import your original ISO before adding a recipe library."; return; }
+        BeginImport(source, file);
         setupMessage = "Importing recipe library";
     }
     private void OpenEditor()
     {
-        if (setup?.Cache is null) { screen = ScreenId.Setup; menuIndex = 0; return; }
+        if (setup?.Game is null) { screen = ScreenId.Setup; menuIndex = 0; return; }
         editor!.Open();
         screen = ScreenId.DeckEditor;
     }
@@ -95,27 +103,25 @@ public sealed partial class GameLoop
             switch (menuIndex)
             {
                 case 0: ContinueToGame(); break;
-                case 1: case 5:
+                case 1:
                     string? file = WindowsFilePicker.ChooseIso(); if (file is not null) BeginImport(file); break;
                 case 2:
-                    if (setup.Cache is null) { setupMessage = "Import or verify game data before importing recipes."; break; }
-                    string? recipes = options.SetupFlowSmokeRoot is not null && options.RecipeReferenceRoot is { } reference
-                        ? Path.Combine(reference, "recipes", "viewer.json") : WindowsFilePicker.ChooseRecipeLibrary();
+                    if (setup.Game is null) { setupMessage = "Import your original ISO before adding a recipe library."; break; }
+                    string? recipes = WindowsFilePicker.ChooseRecipeLibrary();
                     if (recipes is not null) BeginRecipeImport(recipes);
                     break;
                 case 3:
-                    if (setup.ResumeSource() is { } source) BeginImport(source);
-                    else setupMessage = "No previous source is available. Select your original ISO.";
+                    if (LastSource is { } source) BeginImport(source);
+                    else setupMessage = "No previous import is recorded. Select your original ISO.";
                     break;
                 case 4: setupOperation!.Validate(); setupMessage = "Checking local game data"; break;
-                case 6: setup.RestartWork(); setupMessage = "Interrupted work retained separately. Select your ISO or resume to restart."; break;
-                case 7: screen = ScreenId.Preferences; menuIndex = 0; break;
-                case 8: setupMessage = setup.RestorePreferences().Issue?.Message ?? "Previous preferences restored."; editor!.ResetDraft(); break;
-                case 9: OpenAssetDiagnostics(); break;
-                case 10: screen = ScreenId.PcTools; break;
+                case 5: screen = ScreenId.Preferences; menuIndex = 0; break;
+                case 6: setupMessage = setup.RestorePreferences().Issue?.Message ?? "Previous preferences restored."; editor!.ResetDraft(); break;
+                case 7: OpenAssetDiagnostics(); break;
+                case 8: screen = ScreenId.PcTools; break;
             }
         }
-        catch (Exception e) when (SetupStore.Recoverable(e)) { setupMessage = "The operation could not finish. Check local storage and retry."; }
+        catch (Exception e) when (PrivateStorage.Recoverable(e)) { setupMessage = "The operation could not finish. Check local storage and retry."; }
     }
     private void UpdatePreferences(GuiButtons buttons)
     {
@@ -156,10 +162,14 @@ public sealed partial class GameLoop
         renderer.Wrapped(setupMessage, 12, 36, 75, 3, muted);
         if (setupOperation?.Busy == true)
         {
-            renderer.Wrapped(setupOperation!.Progress.Message, 12, 87, 75, 3);
+            var progress = setupOperation!.Progress;
+            renderer.Text(progress.StageName.ToUpperInvariant(), 12, 77, new Color(238, 196, 104));
+            renderer.Wrapped(progress.Message, 12, 92, 75, 3);
             renderer.Fill(new(12, 125, 450, 12), new Color(30, 43, 60));
-            renderer.Fill(new(12, 125, Math.Clamp(setupOperation!.Progress.Percent, 0, 100) * 450 / 100, 12), new Color(75, 174, 177));
-            renderer.Text($"{setupOperation!.Progress.Percent}%   ESC/B: STOP SAFELY", 12, 153);
+            // Only measurable work shows a fraction; otherwise a moving block marks indeterminate progress.
+            if (progress.Fraction is { } fraction) renderer.Fill(new(12, 125, (int)(fraction * 450), 12), new Color(75, 174, 177));
+            else renderer.Fill(new(12 + (int)(PresentationTime.TotalSeconds * 120 % 390), 125, 60, 12), new Color(75, 174, 177));
+            renderer.Text((progress.Fraction is { } f ? $"{f * 100:0}%   " : "") + "ESC/B: STOP SAFELY", 12, 153);
         }
         else
             for (int i = 0; i < SetupActions.Length; i++)
@@ -216,7 +226,7 @@ public sealed partial class GameLoop
     {
         if (!SetupAutomation || duel is not null) return;
         if (setupOperation?.Busy == true) return;
-        if (setup?.Cache is null) throw new InvalidOperationException(setupMessage);
+        if (setup?.Game is null) throw new InvalidOperationException(setupMessage);
         if (setupSmokeStage == 0)
         {
             OpenEditor(); var draft = editor!.Draft!; draft.Name = "Setup acceptance";

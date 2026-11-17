@@ -1,59 +1,12 @@
 using TagForceSpecial.Core.Decks;
 using TagForceSpecial.PC.Decks;
 using TagForceSpecial.PC.DuelUI.Input;
+using TagForceSpecial.Import.Manifest;
+using TagForceSpecial.Import.Pipeline;
+using TagForceSpecial.Import.Storage;
 using TagForceSpecial.PC.Setup;
 
 namespace TagForceSpecial.Tests;
-
-public sealed class SetupOperationTests
-{
-    [Fact]
-    public async Task ValidationCompletionIsConsumedOnceAndCanBeRetried()
-    {
-        using var directory = new HostSessionDirectory();
-        var store = new SetupStore(directory.Root);
-        using var operation = new SetupOperation(store);
-        Assert.Null(operation.Poll());
-        operation.Validate(initial: true);
-        Assert.True(operation.Busy);
-        Assert.Equal("Checking existing local game data", operation.Progress.Message);
-        var completion = await Complete(operation);
-        Assert.False(completion.Success);
-        Assert.Equal(store.Issue!.Message, completion.Message);
-        Assert.False(operation.Busy); Assert.Null(operation.Poll());
-        operation.Validate();
-        Assert.Equal(completion, await Complete(operation));
-        Assert.Null(store.Preferences.ActiveGeneration);
-    }
-
-    [Fact]
-    public async Task FailedImportKeepsSourcePrivateAndAllowsAnotherOperation()
-    {
-        using var directory = new HostSessionDirectory();
-        var store = new SetupStore(directory.Root);
-        using var operation = new SetupOperation(store);
-        string missing = Path.Combine(directory.Root, "private-source-name.iso");
-        Assert.True(operation.Import(missing));
-        var completion = await Complete(operation);
-        Assert.False(completion.Success);
-        Assert.DoesNotContain(missing, completion.Message);
-        Assert.DoesNotContain("private-source-name", completion.Message);
-        Assert.Null(store.Cache); Assert.Null(store.Preferences.SourcePath);
-        Assert.False(File.Exists(Path.Combine(directory.Root, "preferences.json")));
-        Assert.True(operation.Import(missing));
-        Assert.Equal(completion, await Complete(operation));
-    }
-
-    private static async Task<SetupCompletion> Complete(SetupOperation operation)
-    {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        while (true)
-        {
-            if (operation.Poll() is { } completion) return completion;
-            await Task.Delay(5, timeout.Token);
-        }
-    }
-}
 
 [Trait("Category", "LocalReference")]
 public sealed class DeckEditorSessionTests(DeckSessionFixture fixture) : IClassFixture<DeckSessionFixture>
@@ -126,7 +79,7 @@ public sealed class DeckEditorSessionTests(DeckSessionFixture fixture) : IClassF
             Assert.True(error is IOException or UnauthorizedAccessException, error?.ToString());
         }
         Assert.Equal(previous, session.DraftKey); Assert.Equal(previous, store.Preferences.SelectedDeck);
-        Assert.Equal(previous, new SetupStore(fixture.Root).Preferences.SelectedDeck);
+        Assert.Equal(previous, new GameDataStore(fixture.Root).Preferences.SelectedDeck);
         Assert.Equal(revisions + 1, library.List().Count);
         Assert.NotEqual("Retained on failure", library.Load(previous).DeckId);
         Assert.Contains(library.List(), d => d.Deck?.DeckId == "Retained on failure");
@@ -149,13 +102,13 @@ public sealed class DeckSessionFixture : IDisposable
     {
         string iso = Environment.GetEnvironmentVariable("TAGFORCE_ISO") ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "PPSSPP/PSP/GAME/Yu-Gi-Oh! ARC-V Tag Force Special (English v2.1).iso");
-        var store = new SetupStore(Root);
-        var result = store.Import(iso);
-        Assert.True(result.Success, result.Issue?.Code);
+        // Catalog only: the deck session needs card data, not presentation resources.
+        var manifest = ImportPipeline.Run(new(iso, Root, new ImportOptions(Presentation: false, Recipes: false)));
+        Assert.True(manifest.Status is ImportStatus.Succeeded or ImportStatus.SucceededWithWarnings, manifest.Status.ToString());
     }
-    public SetupStore Store()
+    public GameDataStore Store()
     {
-        var store = new SetupStore(Root); Assert.True(store.ValidateActive().Success);
+        var store = new GameDataStore(Root); Assert.True(store.Reload().Success);
         store.SavePreferences(store.Preferences with { SelectedDeck = null });
         return store;
     }

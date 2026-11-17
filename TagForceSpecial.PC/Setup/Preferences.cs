@@ -29,4 +29,3 @@ public sealed record Preferences(
 }
 public sealed record SetupIssue(string Code, string Message);
 public sealed record SetupResult(bool Success, SetupIssue? Issue = null);
-public sealed record ImportProgress(int Percent, string Message);

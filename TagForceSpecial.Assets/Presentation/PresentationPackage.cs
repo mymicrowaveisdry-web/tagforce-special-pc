@@ -87,11 +87,10 @@ public sealed class PresentationPackage
         Directory.CreateDirectory(Path.Combine(stage, "blobs"));
         try
         {
-            var iso = new Iso9660Source(source.Image);
             var records = new List<PresentationResource>();
             foreach (var request in plan)
             {
-                var selected = PresentationSourceReader.Read(source, iso, request);
+                var selected = PresentationSourceReader.Read(source, source.Files, request);
                 var decoded = PresentationResourceDecoder.Decode(selected, request, jpegDecoderExecutable, nativeReferenceRoot);
                 byte[] content = decoded.Content;
                 var diagnostics = selected.Diagnostics.Concat(decoded.Diagnostics).ToArray();

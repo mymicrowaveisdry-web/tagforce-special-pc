@@ -1,10 +1,13 @@
 using System.Security.Cryptography;
 using TagForceSpecial.Assets.GameSource;
 using TagForceSpecial.Cards;
+using TagForceSpecial.Import.Manifest;
+using TagForceSpecial.Import.Pipeline;
+using TagForceSpecial.Import.Stages;
+using TagForceSpecial.Import.Storage;
 using TagForceSpecial.PC.App.Screens.Title;
 using TagForceSpecial.PC.Game;
 using TagForceSpecial.PC.Recipes;
-using TagForceSpecial.PC.Setup;
 
 namespace TagForceSpecial.Tests;
 
@@ -28,6 +31,9 @@ public sealed class StartupImportTests : IDisposable
         return (source, source.PathFor("recipes/viewer.json"));
     }
 
+    private StageResult Import(string library, PrivateStorage destination, bool reuse = true, CancellationToken cancellation = default) =>
+        RecipeStage.Run(new StageCache(destination), library, GameBuildProfile.English21, cards, reuse, null, cancellation);
+
     [Fact]
     public void NormalLaunchAlwaysOpensImporterWhileExplicitPresentationModesRetainTheirEntryPoint()
     {
@@ -39,44 +45,65 @@ public sealed class StartupImportTests : IDisposable
     }
 
     [Fact]
-    public void ImportedRecipesSurviveReopeningAndRemovalOfTheSourceLibrary()
+    public void ImportedRecipesSurviveRemovalOfTheSourceLibraryAndOpenInTheGameCatalog()
     {
         var source = Source();
         var destination = new PrivateStorage(Path.Combine(root, "app"));
-        Assert.Equal(1, new RecipeLibraryStore(destination).Import(source.File, cards));
+        var result = Import(source.File, destination);
+        Assert.Equal(StageStatus.Succeeded, result.Status);
         Directory.Delete(source.Source.Root, recursive: true);
-        var reopened = new RecipeLibraryStore(new PrivateStorage(destination.Root)).OpenActive(cards)!;
+        var reopened = RecipeCatalog.Open(new PrivateStorage(destination.PathFor(result.Output!.Directory)), cards)!;
         Assert.Equal("Imported source recipe", Assert.Single(reopened.Records).Name);
         Assert.Equal(new byte[] { 1, 2, 3, 4 }, reopened.ReadTexture("fixture")!.Value.Pixels);
     }
 
     [Fact]
-    public void CorruptedReplacementRetainsPreviouslyActivatedRecipes()
+    public void RepeatImportReusesTheVerifiedOutputAndACorruptedSourceBlobIsRejected()
     {
         var source = Source();
         var destination = new PrivateStorage(Path.Combine(root, "app"));
-        var store = new RecipeLibraryStore(destination);
-        store.Import(source.File, cards);
-        byte[] active = File.ReadAllBytes(destination.PathFor("recipes/active.json"));
+        var first = Import(source.File, destination);
+        Assert.Equal(StageStatus.Reused, Import(source.File, destination).Status);
         string blob = Directory.GetFiles(source.Source.PathFor("recipes/blobs")).Single();
         File.WriteAllBytes(blob, [4, 3, 2, 1]);
-        Assert.Throws<InvalidDataException>(() => store.Import(source.File, cards));
-        Assert.Equal(active, File.ReadAllBytes(destination.PathFor("recipes/active.json")));
-        Assert.Equal("Imported source recipe", Assert.Single(store.OpenActive(cards)!.Records).Name);
+        Assert.Throws<InvalidDataException>(() => Import(source.File, destination, reuse: false));
+        Assert.True(StageCache.Matches(destination.PathFor(first.Output!.Directory), first.Output.Artifacts));
     }
 
     [Fact]
-    public void CanceledReplacementLeavesTheActiveGenerationUntouched()
+    public void RecipesNamingUnknownCardsOrAnotherBuildAreRejected()
     {
         var source = Source();
         var destination = new PrivateStorage(Path.Combine(root, "app"));
-        var store = new RecipeLibraryStore(destination);
-        store.Import(source.File, cards);
-        byte[] active = File.ReadAllBytes(destination.PathFor("recipes/active.json"));
+        var otherCards = new CardCatalog(new(null, "other"), [new CardDefinition(2, "Other", "", new(0, 0, 1))]);
+        Assert.Throws<InvalidDataException>(() =>
+            RecipeStage.Run(new StageCache(destination), source.File, GameBuildProfile.English21, otherCards, true, null, default));
+        File.WriteAllText(source.File, File.ReadAllText(source.File).Replace(GameBuildProfile.English21.BuildId, "other-build"));
+        Assert.Throws<InvalidDataException>(() => Import(source.File, destination));
+    }
+
+    [Fact]
+    public void CancelledImportPublishesNothing()
+    {
+        var source = Source();
+        var destination = new PrivateStorage(Path.Combine(root, "app"));
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
-        Assert.Throws<OperationCanceledException>(() => store.Import(source.File, cards, cancellation.Token));
-        Assert.Equal(active, File.ReadAllBytes(destination.PathFor("recipes/active.json")));
+        Assert.Throws<OperationCanceledException>(() => Import(source.File, destination, cancellation: cancellation.Token));
+        string stages = destination.PathFor("import/stages/recipes");
+        Assert.Empty(Directory.Exists(stages) ? Directory.EnumerateFileSystemEntries(stages) : []);
+    }
+
+    [Fact]
+    public void LegacyRecipeImportsAreFoundForCarryForward()
+    {
+        var destination = new PrivateStorage(Path.Combine(root, "app"));
+        Assert.Null(RecipeStage.FindLegacy(destination));
+        string generation = Guid.NewGuid().ToString("N");
+        Directory.CreateDirectory(destination.PathFor($"recipes/imports/{generation}/recipes"));
+        File.WriteAllText(destination.PathFor($"recipes/imports/{generation}/recipes/viewer.json"), "{}");
+        File.WriteAllText(destination.PathFor("recipes/active.json"), $$"""{"schemaVersion":1,"generation":"{{generation}}","documentSha256":"{{Digest}}"}""");
+        Assert.Equal(destination.PathFor($"recipes/imports/{generation}/recipes/viewer.json"), RecipeStage.FindLegacy(destination));
     }
 
     public void Dispose()

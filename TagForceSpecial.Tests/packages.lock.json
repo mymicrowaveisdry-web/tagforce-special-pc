@@ -212,6 +212,14 @@
           "TagForceSpecial.Core": "[1.0.0, )"
         }
       },
+      "tagforcespecial.import": {
+        "type": "Project",
+        "dependencies": {
+          "TagForceSpecial.Assets": "[1.0.0, )",
+          "TagForceSpecial.Cards": "[1.0.0, )",
+          "TagForceSpecial.Effects": "[1.0.0, )"
+        }
+      },
       "tagforcespecial.pc": {
         "type": "Project",
         "dependencies": {
@@ -221,7 +229,8 @@
           "TagForceSpecial.Assets": "[1.0.0, )",
           "TagForceSpecial.Cards": "[1.0.0, )",
           "TagForceSpecial.Core": "[1.0.0, )",
-          "TagForceSpecial.Effects": "[1.0.0, )"
+          "TagForceSpecial.Effects": "[1.0.0, )",
+          "TagForceSpecial.Import": "[1.0.0, )"
         }
       },
       "tagforcespecial.tools": {

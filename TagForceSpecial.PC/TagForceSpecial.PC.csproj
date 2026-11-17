@@ -29,5 +29,6 @@
     <ProjectReference Include="..\TagForceSpecial.Cards\TagForceSpecial.Cards.csproj" />
     <ProjectReference Include="..\TagForceSpecial.Core\TagForceSpecial.Core.csproj" />
     <ProjectReference Include="..\TagForceSpecial.Effects\TagForceSpecial.Effects.csproj" />
+    <ProjectReference Include="..\TagForceSpecial.Import\TagForceSpecial.Import.csproj" />
   </ItemGroup>
 </Project>

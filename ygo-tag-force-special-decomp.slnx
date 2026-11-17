@@ -4,6 +4,7 @@
   <Project Path="TagForceSpecial.Cards/TagForceSpecial.Cards.csproj" />
   <Project Path="TagForceSpecial.Core/TagForceSpecial.Core.csproj" />
   <Project Path="TagForceSpecial.Effects/TagForceSpecial.Effects.csproj" />
+  <Project Path="TagForceSpecial.Import/TagForceSpecial.Import.csproj" />
   <Project Path="TagForceSpecial.PC/TagForceSpecial.PC.csproj" />
   <Project Path="TagForceSpecial.Tests/TagForceSpecial.Tests.csproj" />
   <Project Path="TagForceSpecial.Tools/TagForceSpecial.Tools.csproj" />
