@@ -9,7 +9,13 @@ internal static class PcHost
     {
         try
         {
-            using var game = new GameLoop(HostOptions.Parse(args));
+            var options = HostOptions.Parse(args);
+            if (options.OpenImporterOnLaunch)
+            {
+                Setup.WorkbenchLauncher.Start(options.DataRoot);
+                return 0;
+            }
+            using var game = new GameLoop(options);
             game.Run();
             return 0;
         }

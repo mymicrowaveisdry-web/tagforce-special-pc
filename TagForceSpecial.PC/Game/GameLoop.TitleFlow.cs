@@ -3,6 +3,7 @@ using TagForceSpecial.Assets.Presentation;
 using TagForceSpecial.PC.App.Input;
 using TagForceSpecial.PC.App.Screens;
 using TagForceSpecial.PC.App.Screens.Title;
+using TagForceSpecial.Import.Storage;
 using TagForceSpecial.PC.Setup;
 using TagForceSpecial.PC.Decks;
 using TagForceSpecial.Effects;
@@ -11,7 +12,7 @@ namespace TagForceSpecial.PC.Game;
 
 public sealed partial class GameLoop
 {
-    private const string FontFile = "fonts/psp-latin.pgf", CardTextFontFile = "fonts/psp-latin-card.pgf";
+    private const string FontFile = TagForceSpecial.Import.Resources.GameFonts.MenuFile, CardTextFontFile = TagForceSpecial.Import.Resources.GameFonts.CardFile;
     private TitleFlow? titleFlow;
     private TitleFlowVisuals? flowVisuals;
     private PlayerProfileStore? profiles;
@@ -31,6 +32,7 @@ public sealed partial class GameLoop
         try
         {
             ImportPspFont();
+            TagForceSpecial.Import.Resources.GameFonts.Ensure(setup.Storage, setup.Game?.Manifest?.Source.Path);
             string path = setup.Storage.PathFor(FontFile), cardPath = setup.Storage.PathFor(CardTextFontFile);
             byte[]? font = File.Exists(path) ? File.ReadAllBytes(path) : null;
             byte[]? cardFont = File.Exists(cardPath) ? File.ReadAllBytes(cardPath) : null;
@@ -46,10 +48,10 @@ public sealed partial class GameLoop
             flowVisuals = next;
             profiles = new(setup.Storage);
             titleFlow = new(new FlowHost(this), Environment.UserName, instantTransitions: options.PixelExact);
-            if (font is null) Console.Error.WriteLine("TITLE_FLOW_FONT_MISSING text uses the authored fallback; pass --psp-font once.");
+            if (font is null) Console.Error.WriteLine("TITLE_FLOW_FONT_MISSING select a local PSP font folder in the importer.");
             return true;
         }
-        catch (Exception e) when (e is InvalidDataException or KeyNotFoundException || SetupStore.Recoverable(e))
+        catch (Exception e) when (e is InvalidDataException or KeyNotFoundException || PrivateStorage.Recoverable(e))
         {
             setupMessage = "Original title assets need a validated title presentation import.";
             Console.Error.WriteLine("TITLE_FLOW_PENDING " + e.Message);
@@ -200,7 +202,7 @@ public sealed partial class GameLoop
         gum.Show("OriginalDeckMenu", titleFlow.DeckMenu is not null);
         gum.Show("OriginalDeckEdit", false);
         gum.Show("OriginalRecipeViewer", false);
-        if (titleFlow.Step == TitleFlowStep.RecipeViewer && titleFlow.Recipes is { } recipes && setup?.Cache is { } recipeCache)
+        if (titleFlow.Step == TitleFlowStep.RecipeViewer && titleFlow.Recipes is { } recipes && setup?.Game is { } recipeCache)
         {
             if (!ReferenceEquals(renderedRecipeSession, recipes) || renderedRecipeRevision != recipes.Revision)
             {
@@ -299,7 +301,7 @@ public sealed partial class GameLoop
         /// Presentation checks start each visit from a fresh built-in deck so repeated cycles stay identical, and never save.</summary>
         public DeckEditSession? OpenDeckEdit()
         {
-            if (owner.setup?.Cache?.Catalog.Catalog is not { } catalog || owner.flowVisuals is null) return null;
+            if (owner.setup?.Game?.Catalog.Catalog is not { } catalog || owner.flowVisuals is null) return null;
             DeckDraft draft;
             if (owner.options.PresentationSmoke) draft = new(catalog, InitialOpponentDecks.Create(0));
             else if (owner.editor is { } editor) { editor.EnsureDraft(); draft = editor.Draft!; }
@@ -310,15 +312,15 @@ public sealed partial class GameLoop
         }
         public RecipeViewerSession? OpenRecipeViewer()
         {
-            if (owner.setup?.Cache?.Catalog.Catalog is not { } catalog) return null;
+            if (owner.setup?.Game is not { } game) return null;
             try
             {
-                var storage = owner.options.RecipeReferenceRoot is { } path ? new PrivateStorage(path) : owner.setup.Storage;
-                var source = owner.options.RecipeReferenceRoot is not null ? Recipes.RecipeCatalog.Open(storage, catalog) :
-                    new Recipes.RecipeLibraryStore(storage).OpenActive(catalog);
+                // The importer's recipe stage output, or a prepared library passed with --recipe-reference.
+                string? root = owner.options.RecipeReferenceRoot ?? game.RecipeRoot;
+                var source = root is null ? null : Recipes.RecipeCatalog.Open(new PrivateStorage(root), game.Catalog.Catalog);
                 return source is null ? null : new RecipeViewerSession(source);
             }
-            catch (Exception e) when (SetupStore.Recoverable(e))
+            catch (Exception e) when (PrivateStorage.Recoverable(e))
             { Console.Error.WriteLine("RECIPE_SOURCE_PENDING " + e.Message); return null; }
         }
         public void CloseRecipeViewer(RecipeSelection? selection) => owner.lastRecipeSelection = selection;

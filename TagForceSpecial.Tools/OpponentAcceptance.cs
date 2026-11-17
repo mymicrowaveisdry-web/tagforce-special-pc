@@ -5,7 +5,8 @@ using TagForceSpecial.Core;
 using TagForceSpecial.Core.Views;
 using TagForceSpecial.Effects;
 using TagForceSpecial.PC.Game;
-using TagForceSpecial.PC.Import;
+using TagForceSpecial.Import.Installed;
+using TagForceSpecial.Import.Storage;
 
 namespace TagForceSpecial.Tools;
 
@@ -16,13 +17,14 @@ public static class OpponentAcceptance
 
     public static int Run(string[] args, TextWriter output, TextWriter error)
     {
-        if (args.Length != 2) { error.WriteLine("Usage: opponent-acceptance <validated-cache> <new-private-output-directory>"); return 2; }
+        if (args.Length != 2) { error.WriteLine("Usage: opponent-acceptance <catalog-directory> <new-private-output-directory>"); return 2; }
         try
         {
             string destination = Path.GetFullPath(args[1]);
             if (Directory.Exists(destination) || File.Exists(destination)) throw new IOException("Choose a new acceptance directory.");
-            var validated = GameCache.Validate(args[0]);
-            if (validated.Cache is not { } cache) { error.WriteLine(JsonSerializer.Serialize(validated.Diagnostics, Json)); return 1; }
+            InstalledGame cache;
+            try { cache = InstalledGame.FromCatalogDirectory(args[0]); }
+            catch (Exception e) when (PrivateStorage.Recoverable(e)) { error.WriteLine("Catalog directory failed verification: " + e.Message); return 1; }
             Directory.CreateDirectory(destination);
             var rows = new List<object>();
             foreach (uint seed in new uint[] { 0, 1, 7, 42, uint.MaxValue })

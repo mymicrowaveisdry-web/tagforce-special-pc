@@ -98,25 +98,8 @@ public static class ProjectProgress
         }
     }
 
-    public static IReadOnlyList<DiscoveredFunction> ReadFunctions(string csv)
-    {
-        var lines = csv.Replace("\r\n", "\n").TrimEnd('\n').Split('\n');
-        if (lines.Length < 2 || lines[0] != "address,body_bytes")
-            throw new InvalidDataException("Expected candidate registry header: address,body_bytes.");
-        var found = new HashSet<uint>();
-        var functions = new List<DiscoveredFunction>();
-        foreach (string line in lines.Skip(1))
-        {
-            var fields = line.Split(',');
-            if (fields.Length != 2 || !fields[0].StartsWith("0x", StringComparison.Ordinal) ||
-                !uint.TryParse(fields[0].AsSpan(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out uint address) ||
-                !int.TryParse(fields[1], NumberStyles.None, CultureInfo.InvariantCulture, out int size) || size <= 0 ||
-                !found.Add(address))
-                throw new InvalidDataException("Invalid or duplicate discovered function.");
-            functions.Add(new(address, size));
-        }
-        return functions.AsReadOnly();
-    }
+    public static IReadOnlyList<DiscoveredFunction> ReadFunctions(string csv) =>
+        TagForceSpecial.Import.Inspection.FunctionInventory.Read(csv).Select(f => new DiscoveredFunction(f.Address, f.BodyBytes)).ToList().AsReadOnly();
 
     public static ProgressValidation ReadValidation(string trx)
     {

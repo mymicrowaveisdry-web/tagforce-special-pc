@@ -8,9 +8,24 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\TagForceSpecial.Workbench\TagForceSpecial.Workbench.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" />
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.6" />
     <PackageReference Include="Gum.MonoGame" Version="2026.11.2.1" />
   </ItemGroup>
+
+  <Target Name="BundleImporterWorkbench" AfterTargets="Build">
+    <ItemGroup>
+      <WorkbenchFiles Include="..\TagForceSpecial.Workbench\bin\$(Configuration)\net10.0-windows\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(WorkbenchFiles)" DestinationFiles="@(WorkbenchFiles->'$(TargetDir)workbench\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="PublishImporterWorkbench" AfterTargets="ComputeFilesToPublish">
+    <ItemGroup>
+      <WorkbenchPublishFiles Include="$(MSBuildProjectDirectory)\..\TagForceSpecial.Workbench\bin\$(Configuration)\net10.0-windows\**\*" />
+      <ResolvedFileToPublish Include="@(WorkbenchPublishFiles)" RelativePath="workbench\%(RecursiveDir)%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
 
   <ItemGroup>
     <None Update="UI\Gum\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
@@ -29,5 +44,6 @@
     <ProjectReference Include="..\TagForceSpecial.Cards\TagForceSpecial.Cards.csproj" />
     <ProjectReference Include="..\TagForceSpecial.Core\TagForceSpecial.Core.csproj" />
     <ProjectReference Include="..\TagForceSpecial.Effects\TagForceSpecial.Effects.csproj" />
+    <ProjectReference Include="..\TagForceSpecial.Import\TagForceSpecial.Import.csproj" />
   </ItemGroup>
 </Project>

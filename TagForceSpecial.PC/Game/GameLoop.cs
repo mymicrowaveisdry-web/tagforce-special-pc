@@ -4,13 +4,14 @@ using System.Text.Json;
 using TagForceSpecial.Effects;
 using TagForceSpecial.PC.DuelUI;
 using TagForceSpecial.PC.DuelUI.Input;
-using TagForceSpecial.PC.Import;
+using TagForceSpecial.Import.Installed;
+using TagForceSpecial.Import.Storage;
 using TagForceSpecial.PC.Rendering;
 using TagForceSpecial.PC.Screens;
 
 namespace TagForceSpecial.PC.Game;
 
-public enum ScreenId { Title, PcTools, DeckSelection, Setup, Duel, Result, Controls, Paused, DeckEditor, SavedDecks, Preferences, AssetDiagnostics, TitleStartMenu, TitleFlow }
+public enum ScreenId { Title, PcTools, DeckSelection, Duel = 4, Result, Controls, Paused, DeckEditor, SavedDecks, Preferences, AssetDiagnostics, TitleStartMenu, TitleFlow }
 
 public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
 {
@@ -63,25 +64,30 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
 
     private bool StartDuel(int variant)
     {
-        if (options.CachePath is null && setup?.Cache is null)
+        if (options.CachePath is null && setup?.Game is null)
         {
-            setupMessage = "Select your original ISO in Local Game Setup, then prepare a deck.";
-            screen = ScreenId.Setup;
+            setupMessage = "Select your original ISO in the importer workbench, then prepare a deck.";
+            screen = ScreenId.PcTools;
             return false;
         }
-        var validation = options.CachePath is null ? null : GameCache.Validate(options.CachePath);
-        var cache = validation?.Cache ?? (options.CachePath is null ? setup?.Cache : null);
+        InstalledGame? cache = setup?.Game;
+        if (options.CachePath is { } catalogPath)
+        {
+            // --cache names a directory holding a pinned catalog/ package, such as a catalog stage output.
+            try { cache = InstalledGame.FromCatalogDirectory(catalogPath); }
+            catch (Exception e) when (PrivateStorage.Recoverable(e)) { cache = null; }
+        }
         if (cache is null)
         {
-            setupMessage = "Game data could not be verified. Rebuild it in Local Game Setup.";
-            screen = ScreenId.Setup;
+            setupMessage = "Game data could not be verified. Rebuild it in the importer workbench.";
+            screen = ScreenId.PcTools;
             return false;
         }
         try { duel = SupportedDuelFactory.Create(cache, variant, CurrentSeed); }
         catch (InvalidDataException error)
         {
             setupMessage = error.Message;
-            screen = ScreenId.Setup;
+            screen = ScreenId.PcTools;
             return false;
         }
         screen = ScreenId.Duel;
@@ -113,7 +119,7 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
         if (fading) frame = default;
         // F12 is a host utility shortcut.
         if (frame.UtilityRequested && screen is ScreenId.Title or ScreenId.TitleStartMenu or ScreenId.PcTools or ScreenId.TitleFlow)
-        { utilityReturn = screen; screen = ScreenId.Setup; return; }
+        { utilityReturn = screen; screen = ScreenId.PcTools; return; }
         if (options.Smoke)
         {
             RunSetupSmoke();
@@ -162,7 +168,6 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
         DrawFlowOverlay();
         DrawTransitionOverlay();
         if (options.PresentationSmoke) CheckPresentationSmokeFrame();
-        if (options.SetupFlowSmokeRoot is not null) CheckSetupFlowFrame();
         if (options.RealtimeWalkRoot is not null) CheckRealtimeWalkFrame(gameTime);
         GraphicsDevice.SetRenderTarget(null);
         GraphicsDevice.Clear(Color.Black);

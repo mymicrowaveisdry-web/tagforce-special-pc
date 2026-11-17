@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 using TagForceSpecial.Assets.Presentation;
-using TagForceSpecial.PC.Import;
+using TagForceSpecial.Import.Stages;
 
 namespace TagForceSpecial.Tests;
 
@@ -39,7 +39,7 @@ public class DeckEditAssetTests
     [Fact]
     public void ImportAndVerificationIncludeEveryPin()
     {
-        var required = TitlePresentationImport.Required.Select(c => c.AssetKey).ToHashSet(StringComparer.Ordinal);
+        var required = GamePresentationPlan.Required.Select(c => c.AssetKey).ToHashSet(StringComparer.Ordinal);
         var verifiable = PresentationReferenceCases.Cases.Select(c => c.AssetKey).ToHashSet(StringComparer.Ordinal);
         Assert.All(DeckEditReferenceResources.Cases, c =>
         {
@@ -47,6 +47,6 @@ public class DeckEditAssetTests
             Assert.Contains(c.AssetKey, verifiable);
         });
         // The PC's confirmed pool gets thumbnails; their keys are the ones CardArtworkProvider reads.
-        Assert.Equal(TagForceSpecial.Effects.ConfirmedCardPool.CardIds, TitlePresentationImport.ThumbnailCards);
+        Assert.Equal(TagForceSpecial.Effects.ConfirmedCardPool.CardIds, GamePresentationPlan.ThumbnailCards);
     }
 }

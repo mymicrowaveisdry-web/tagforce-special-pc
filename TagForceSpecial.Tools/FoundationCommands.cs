@@ -4,7 +4,7 @@ using TagForceSpecial.Assets.GameSource;
 using TagForceSpecial.Core.Decks;
 using TagForceSpecial.Effects;
 using TagForceSpecial.PC.Decks;
-using TagForceSpecial.PC.Import;
+using TagForceSpecial.Import.Installed;
 
 namespace TagForceSpecial.Tools;
 
@@ -26,25 +26,11 @@ public static class FoundationCommands
                     profileFingerprint = source?.Profile.Fingerprint, result.Diagnostics });
                 return result.IsValid ? 0 : 1;
             }
-            if (command == "cache-create" && args.Length == 3)
-            {
-                var validated = GameSourceValidator.Open(args[0]); using var source = validated.Source;
-                if (!validated.IsValid) { Print(new { validated.IsValid, validated.Diagnostics }); return 1; }
-                var result = GameCache.Create(source!, args[1], args[2]);
-                Print(new { result.IsValid, buildId = result.Cache?.BuildId, result.Diagnostics });
-                return result.IsValid ? 0 : 1;
-            }
-            if (command == "cache-check" && args.Length == 1)
-            {
-                var result = GameCache.Validate(args[0]);
-                Print(new { result.IsValid, buildId = result.Cache?.BuildId, cards = result.Cache?.Catalog.Catalog.Count, result.Diagnostics });
-                return result.IsValid ? 0 : 1;
-            }
             if (command == "deck-check" && args.Length == 3)
             {
-                var cache = GameCache.Validate(args[0]);
-                if (!cache.IsValid) { Print(new { cache.IsValid, cache.Diagnostics }); return 1; }
-                var result = DeckValidator.Validate(DeckFiles.ReadDeck(args[1]), cache.Cache!.Catalog.Catalog,
+                // args[0] holds a pinned catalog/ package, such as an importer catalog stage output.
+                var game = InstalledGame.FromCatalogDirectory(args[0]);
+                var result = DeckValidator.Validate(DeckFiles.ReadDeck(args[1]), game.Catalog.Catalog,
                     InitialDeckPolicy.Create(), DeckFiles.ReadCollection(args[2]));
                 Print(result); return result.CanPlay ? 0 : 1;
             }
@@ -62,8 +48,8 @@ public static class FoundationCommands
                 DeckFiles.WriteCollection(Path.Combine(args[0], names[3]), InitialDeckPolicy.ExampleCollection());
                 Print(new { created = names }); return 0;
             }
-            error.WriteLine("Usage: source-check <iso> | cache-create <iso> <catalog-package> <new-cache> | cache-check <cache>\n" +
-                "       deck-check <cache> <deck.json> <collection.json> | foundation-examples <new-directory>");
+            error.WriteLine("Usage: source-check <iso> | deck-check <catalog-directory> <deck.json> <collection.json>\n" +
+                "       foundation-examples <new-directory>");
             return 2;
         }
         catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException or ArgumentException or JsonException)

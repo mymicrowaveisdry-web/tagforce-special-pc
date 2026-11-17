@@ -5,8 +5,9 @@ using TagForceSpecial.PC.App.Screens;
 using TagForceSpecial.PC.App.Screens.Title;
 using TagForceSpecial.PC.App.Visual;
 using TagForceSpecial.PC.DuelUI.Input;
-using TagForceSpecial.PC.Import;
+using TagForceSpecial.Import.Storage;
 using TagForceSpecial.PC.Screens;
+using TagForceSpecial.PC.Setup;
 using TagForceSpecial.PC.UI;
 
 namespace TagForceSpecial.PC.Game;
@@ -31,7 +32,7 @@ public sealed partial class GameLoop
         set
         {
             if (router is null) { activeScreen = value; return; }
-            if (value == ScreenId.Title && originalTitle is null) value = ScreenId.Setup;
+            if (value == ScreenId.Title && originalTitle is null) value = ScreenId.PcTools;
             savedFocus[activeScreen] = menuIndex;
             if (value == ScreenId.Paused) router.PushModal("duel.pause");
             else if (value == ScreenId.Duel && activeScreen == ScreenId.Paused) router.PopModal();
@@ -45,7 +46,7 @@ public sealed partial class GameLoop
         ScreenId.TitleFlow => "original.title-flow",
         ScreenId.Preferences => "pc.preferences", ScreenId.DeckEditor => "pc.deck-editor",
         ScreenId.DeckSelection => "pc.quick-duel", ScreenId.SavedDecks => "pc.saved-decks",
-        ScreenId.Setup => "pc.local-game-setup", ScreenId.AssetDiagnostics => "pc.asset-diagnostics",
+        ScreenId.AssetDiagnostics => "pc.asset-diagnostics",
         ScreenId.Controls => "pc.controls", ScreenId.Duel => "duel.field",
         ScreenId.Result => "duel.result", ScreenId.Paused => "duel.pause",
         _ => throw new ArgumentOutOfRangeException(nameof(id))
@@ -53,10 +54,9 @@ public sealed partial class GameLoop
     private void InitializeRouting()
     {
         gum = new(GraphicsDevice);
-        // OpenActive validates the generation; absent/corrupt optional presentation data keeps the authored UI usable.
-        TagForceSpecial.Assets.Presentation.SemanticAssetRegistry? registry = null;
-        try { if (setup is not null) registry = new PresentationCacheStore(setup.Storage).OpenActive(); }
-        catch (Exception e) when (Setup.SetupStore.Recoverable(e)) { Console.Error.WriteLine("TITLE_PRESENTATION_PENDING " + e.Message); }
+        // The importer's reader already validated the presentation package; absent data keeps the authored UI usable.
+        var registry = setup?.Game?.Presentation;
+        if (setup?.Game is not null && registry is null) Console.Error.WriteLine("TITLE_PRESENTATION_PENDING no validated presentation output");
         screenAssets = new(GraphicsDevice, registry);
         if (registry is not null)
         {
@@ -79,8 +79,6 @@ public sealed partial class GameLoop
             pointer: Rows(at => gum.HitIndex("NativeToolsMenu", "Row", 5, at)));
         Register(ScreenId.Preferences, b => RecoverSetup(() => UpdatePreferences(b)), DrawPreferences, "NativePreferences",
             pointer: Rows(at => gum.HitIndex("NativePreferences", "Row", 4, at)));
-        Register(ScreenId.Setup, b => RecoverSetup(() => UpdateSetupScreen(b)), DrawSetupScreen,
-            pointer: Rows(at => setupOperation?.Busy == true ? null : TextRow(at, 12, 77, 15, SetupActions.Length, 0)));
         Register(ScreenId.DeckEditor, b => RecoverSetup(() => UpdateEditor(b)), DrawEditor, pointer: EditorPointer);
         Register(ScreenId.SavedDecks, b => RecoverSetup(() => UpdateSavedDecks(b)), DrawSetupLists,
             pointer: Rows(at => TextRow(at, 12, 55, 22, editor?.SavedDecks.Count ?? 0, menuIndex / 8 * 8, 8)));
@@ -92,18 +90,14 @@ public sealed partial class GameLoop
         Register(ScreenId.Result, b =>
         {
             if (b.Back) screen = ScreenId.PcTools;
-            else if (b.Confirm) { if (setup?.Cache is not null) OpenEditor(); else screen = ScreenId.DeckSelection; }
+            else if (b.Confirm) { if (setup?.Game is not null) OpenEditor(); else screen = ScreenId.DeckSelection; }
         }, DrawDuel, pointer: f => PointerTargets.Clicks(f));
         Register(ScreenId.Paused, UpdatePause, DrawPause, pointer: Rows(at => TextRow(at, 40, 84, 23, 2, 0)));
         if (options.PresentationSmoke && originalTitle is null)
             throw new InvalidOperationException("Presentation smoke requires the validated Phase 3 title generation in --data-root.");
         if (options.TitleLayerCaptureRoot is { } layerRoot)
             (originalTitle ?? throw new InvalidOperationException("Title layer capture requires a validated title generation.")).ExportReviewLayers(layerRoot);
-        // Missing presentation data opens the setup wizard.
-        if (activeScreen == ScreenId.Title && originalTitle is null) utilityReturn = ScreenId.Title;
-        var initial = options.OpenImporterOnLaunch ? ScreenId.Setup :
-            activeScreen == ScreenId.Title && originalTitle is null ? ScreenId.Setup : activeScreen;
-        if (options.OpenImporterOnLaunch) menuIndex = setup?.Preferences.ActiveGeneration is null ? 1 : 0;
+        var initial = activeScreen == ScreenId.Title && originalTitle is null ? ScreenId.PcTools : activeScreen;
         router.GoTo(ScreenName(initial));
     }
     private void TryActivateImportedTitle()
@@ -113,7 +107,7 @@ public sealed partial class GameLoop
         OriginalTitleVisuals? nextTitle = null;
         try
         {
-            var registry = new PresentationCacheStore(setup.Storage).OpenActive();
+            var registry = setup.Game?.Presentation;
             if (registry is null) return;
             nextAssets = new(GraphicsDevice, registry);
             nextTitle = new(GraphicsDevice, nextAssets);
@@ -123,7 +117,7 @@ public sealed partial class GameLoop
             if (!TryInitializeTitleFlow()) { screenAssets = previousAssets; nextTitle.Dispose(); nextAssets.Dispose(); return; }
             previousAssets.Dispose(); originalTitle = nextTitle;
         }
-        catch (Exception e) when (Setup.SetupStore.Recoverable(e) || e is KeyNotFoundException)
+        catch (Exception e) when (PrivateStorage.Recoverable(e) || e is KeyNotFoundException)
         {
             Console.Error.WriteLine("TITLE_ACTIVATION_FAILED " + e.Message);
             nextTitle?.Dispose(); nextAssets?.Dispose(); setupMessage = "Game data is ready; original title artwork still needs a validated import.";
@@ -175,17 +169,17 @@ public sealed partial class GameLoop
     private void RecoverSetup(Action action)
     {
         try { action(); }
-        catch (Exception e) when (Setup.SetupStore.Recoverable(e))
+        catch (Exception e) when (PrivateStorage.Recoverable(e))
         {
             if (editor is not null) editor.Notice = "The operation could not finish. Check storage and retry.";
             if (screen == ScreenId.Preferences) preferencesNotice = "Preferences were not saved. Check access and free space.";
             if (screen == ScreenId.SavedDecks) screen = ScreenId.DeckEditor;
         }
     }
-    /// <summary>The PC utility hub, reached only through F12 and Local Game Setup. It is not an original screen.</summary>
+    /// <summary>The PC utility hub, reached through F12. It is not an original screen.</summary>
     private void UpdatePcTools(GuiButtons buttons)
     {
-        if (buttons.Back) { screen = ScreenId.Setup; return; }
+        if (buttons.Back) { WorkbenchLauncher.Start(setup?.Storage.Root); Exit(); return; }
         MoveMenu(buttons, 5);
         if (!buttons.Confirm) return;
         // Navigation/application actions only. Gum never receives a DuelController.

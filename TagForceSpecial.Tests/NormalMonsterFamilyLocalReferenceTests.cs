@@ -37,7 +37,7 @@ public sealed class NormalMonsterFamilyLocalReferenceTests
         string package = Path.Combine(Path.GetTempPath(), "tagforce-frozen-converter-" + Guid.NewGuid().ToString("N"));
         try
         {
-            // Same identity as the PC importer (SetupStore).
+            // Same identity as the PC importer (importer catalog stage).
             CardCatalogPackage.Write(package, imported,
                 new("tfsp-original", "1", "en", $"cardinfo-sha256:{imported.Source.ContainerSha256}"));
             foreach (var pinned in GameBuildProfile.English21.CacheFiles.Where(f => f.Path.StartsWith("catalog/", StringComparison.Ordinal)))

@@ -6,7 +6,7 @@ using TagForceSpecial.Core.Decks;
 using TagForceSpecial.Effects;
 using TagForceSpecial.PC.Decks;
 using TagForceSpecial.PC.Game;
-using TagForceSpecial.PC.Import;
+using TagForceSpecial.Import.Storage;
 using TagForceSpecial.PC.Setup;
 
 namespace TagForceSpecial.Tests;
@@ -16,11 +16,11 @@ public sealed class UsableSetupTests
     [Fact]
     public void FreshSetupHasActionableFirstLaunchAndPreferencesPersistAtomically()
     {
-        using var temp = new PrivateDirectory(); var setup = new SetupStore(temp.Root);
-        Assert.Null(setup.Cache);
-        Assert.Equal("CacheMissing", setup.ValidateActive().Issue!.Code);
+        using var temp = new PrivateDirectory(); var setup = new GameDataStore(temp.Root);
+        Assert.Null(setup.Game);
+        Assert.Equal("ImportMissing", setup.Reload().Issue!.Code);
         setup.SavePreferences(setup.Preferences with { OpponentSeed = uint.MaxValue, IntegerScaling = true });
-        var reload = new SetupStore(temp.Root);
+        var reload = new GameDataStore(temp.Root);
         Assert.Null(reload.Issue);
         Assert.Equal(uint.MaxValue, reload.Preferences.OpponentSeed);
         Assert.True(reload.Preferences.IntegerScaling);
@@ -38,20 +38,20 @@ public sealed class UsableSetupTests
     {
         using var temp = new PrivateDirectory();
         File.WriteAllText(Path.Combine(temp.Root, "preferences.json"), json);
-        var setup = new SetupStore(temp.Root);
+        var setup = new GameDataStore(temp.Root);
         Assert.Equal("PreferencesInvalid", setup.Issue!.Code);
-        Assert.Null(setup.Cache); Assert.Null(setup.Preferences.ActiveGeneration);
+        Assert.Null(setup.Game); Assert.Null(setup.Preferences.ActiveGeneration);
         Assert.Equal(json, File.ReadAllText(Path.Combine(temp.Root, "preferences.json")));
     }
 
     [Fact]
     public void ResetAfterCorruptPreferencesDoesNotOverwriteTheLastAcceptedBackup()
     {
-        using var temp = new PrivateDirectory(); var original = new SetupStore(temp.Root);
+        using var temp = new PrivateDirectory(); var original = new GameDataStore(temp.Root);
         original.SavePreferences(original.Preferences with { OpponentSeed = 42 });
         original.SavePreferences(original.Preferences with { OpponentSeed = 77 });
         File.WriteAllText(Path.Combine(temp.Root, "preferences.json"), "broken");
-        var recovery = new SetupStore(temp.Root);
+        var recovery = new GameDataStore(temp.Root);
         Assert.Equal("PreferencesInvalid", recovery.Issue!.Code);
         recovery.SavePreferences(new Preferences());
         recovery.RestorePreferences();
@@ -67,37 +67,6 @@ public sealed class UsableSetupTests
     {
         using var temp = new PrivateDirectory(); var storage = new PrivateStorage(temp.Root);
         Assert.Throws<InvalidDataException>(() => storage.PathFor(key));
-    }
-
-    [Fact]
-    public void MissingAndWrongBuildSourcesNeverChangePreferencesOrExposeTheirPaths()
-    {
-        using var temp = new PrivateDirectory(); var setup = new SetupStore(temp.Root);
-        string missing = Path.Combine(temp.Root, "private-name.iso");
-        var absent = setup.Import(missing);
-        Assert.Equal("SourceUnavailable", absent.Issue!.Code);
-        Assert.DoesNotContain(missing, absent.Issue.Message);
-        File.WriteAllBytes(missing, [1, 2, 3]);
-        var unsupported = setup.Import(missing);
-        Assert.Equal("SourceLengthMismatch", unsupported.Issue!.Code);
-        Assert.Null(setup.Preferences.ActiveGeneration);
-        Assert.Equal(new byte[] { 1, 2, 3 }, File.ReadAllBytes(missing));
-        Assert.False(File.Exists(Path.Combine(temp.Root, "preferences.json")));
-    }
-
-    [Fact]
-    public void CancelBeforeStartingAndRestartWorkAreNonDestructive()
-    {
-        using var temp = new PrivateDirectory(); var setup = new SetupStore(temp.Root);
-        var cancelled = setup.Import("not-opened.iso", cancellation: new CancellationToken(true));
-        Assert.Equal("ImportCancelled", cancelled.Issue!.Code);
-        string work = setup.Storage.PathFor("work/original.txt"); Directory.CreateDirectory(Path.GetDirectoryName(work)!);
-        File.WriteAllText(work, "retained checkpoint");
-        setup.RestartWork();
-        Assert.False(Directory.Exists(Path.Combine(temp.Root, "work")));
-        string retained = Assert.Single(Directory.EnumerateFiles(Path.Combine(temp.Root, "retained"), "original.txt", SearchOption.AllDirectories));
-        Assert.Equal("retained checkpoint", File.ReadAllText(retained));
-        Assert.Null(setup.Preferences.ActiveGeneration);
     }
 
     [Fact]
@@ -179,56 +148,9 @@ public sealed class UsableSetupTests
         Assert.False(new DeckDraft(Catalog(), outside).Validate().CanPlay);
     }
 
-    [Fact]
-    [Trait("Category", "LocalReference")]
-    public void OriginalIsoImportsResumesRebuildsAndLaunchesASavedDeckWithoutConvertedInput()
-    {
-        using var temp = new PrivateDirectory(); var setup = new SetupStore(temp.Root);
-        string iso = Environment.GetEnvironmentVariable("TAGFORCE_ISO") ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "PPSSPP/PSP/GAME/Yu-Gi-Oh! ARC-V Tag Force Special (English v2.1).iso");
-        using var cancel = new CancellationTokenSource();
-        var interrupted = setup.Import(iso, new CallbackProgress(p => { if (p.Percent == 35) cancel.Cancel(); }), cancel.Token);
-        Assert.Equal("ImportCancelled", interrupted.Issue!.Code);
-        Assert.Null(setup.Preferences.ActiveGeneration);
-        var reloaded = new SetupStore(temp.Root);
-        Assert.Equal(Path.GetFullPath(iso), reloaded.ResumeSource());
-        var imported = reloaded.Import(reloaded.ResumeSource()!);
-        Assert.True(imported.Success, imported.Issue?.Code);
-        Assert.Equal(7254, reloaded.Cache!.Catalog.Catalog.Count);
-        Assert.All(PlayablePreview.Cards, c => Assert.Contains(reloaded.Resources!.Cards, r => r.CardId == c.CardId));
-        string originalGeneration = reloaded.Preferences.ActiveGeneration!;
-        var draft = new DeckDraft(reloaded.Cache.Catalog.Catalog, InitialOpponentDecks.Create(2)) { Name = "Saved through setup" };
-        uint card = draft.Cards(DeckSection.Main)[0]; draft.Remove(card); draft.Add(card);
-        Assert.True(draft.Validate().CanPlay);
-        var library = new DeckLibrary(reloaded.Storage); string saved = library.Save(draft.Snapshot("saved"));
-        reloaded.SavePreferences(reloaded.Preferences with { SelectedDeck = saved, OpponentSeed = 42, SourcePath = Path.Combine(temp.Root, "disconnected.iso") });
-        var cached = new SetupStore(temp.Root);
-        Assert.True(cached.ValidateActive().Success); Assert.Equal(42u, cached.Preferences.OpponentSeed);
-        var session = SupportedDuelFactory.Create(cached.Cache!, library.Load(saved), cached.Preferences.OpponentSeed);
-        for (int step = 0; step < 6000 && session.View.Outcome is null; step++)
-            Assert.True(session.View.Choices.Count > 0 ? session.Choose(session.View.Revision, 0) : session.StepOpponent());
-        Assert.NotNull(session.View.Outcome);
-        reloaded.Storage.Write($"caches/{originalGeneration}/resources.json", reloaded.Resources! with { Converter = "tampered" });
-        Assert.Equal("ResourceIndexMismatch", reloaded.ValidateActive().Issue!.Code);
-        Assert.Null(reloaded.Cache);
-        Assert.True(reloaded.Import(iso).Success);
-        Assert.NotEqual(originalGeneration, reloaded.Preferences.ActiveGeneration);
-        Assert.True(Directory.Exists(reloaded.Storage.PathFor($"caches/{originalGeneration}")));
-        Assert.Equal(40, library.Load(saved).Main.Count);
-        string active = reloaded.Preferences.ActiveGeneration!;
-        File.WriteAllBytes(reloaded.Storage.PathFor($"caches/{active}/cache/assets/cardh_j.cip"), [0]);
-        Assert.False(reloaded.ValidateActive().Success);
-        Assert.True(reloaded.Import(iso).Success);
-        Assert.Equal(40, library.Load(saved).Main.Count);
-        using var original = File.OpenRead(iso);
-        Assert.Equal(GameBuildProfile.English21.ImageSha256, Convert.ToHexStringLower(SHA256.HashData(original)));
-    }
-
     private static CardCatalog Catalog() => new(new(TfspCardMetadata.CardInfoSha256, "authored-setup-legality-fixture"),
         NormalSpellTests.Catalog().Cards); // Version stamp for policy fixtures.
     private static DeckDraft Draft() => new(Catalog(), InitialOpponentDecks.Create(0));
-    private sealed class CallbackProgress(Action<ImportProgress> callback) : IProgress<ImportProgress>
-    { public void Report(ImportProgress value) => callback(value); }
     private sealed class PrivateDirectory : IDisposable
     {
         public string Root { get; } = Directory.CreateTempSubdirectory("tagforce-setup-").FullName;

@@ -13,8 +13,8 @@ before creating a format-independent catalog; authored cards use the Cards API d
 `catalog-check <directory>` validates it. `native-archetype-import|native-archetype-check <table.bin> <catalog-package> <labels.json> <expected-sha256> <directory>` creates a new private archetype package or checks reproducibility and numeric membership parity; candidates remain diagnostics. `archetype-package <authoring-directory> <dependency-startup.json|-> <new-directory>` packages reviewed JSON, `archetype-package-native` accepts the same inputs as native import for a startup-ready package, and `archetype-load <startup.json>` inspects its pinned profile/dependencies; `archetype-classic` inspects embedded reviewed gameplay content ([schema](../TagForceSpecial.Effects/Archetypes/Schema.md)). `card-support` emits per-source support
 manifests; `preview-duel` accepts either a package directory or the file/ID-range arguments.
 `pool-duel <package-directory> [duels] [seed] [report.json]` plays seeded duels over every supported card, checking engine invariants and replay.
-`source-check`, `cache-create`, `cache-check`, `foundation-examples` and `deck-check`
-exercise the source/cache and deck foundations with deterministic diagnostics.
+`source-check`, `foundation-examples` and `deck-check` exercise the source and deck foundations.
+`import <iso-or-directory> <data-root> [--recipes <recipes/viewer.json>]` imports game data, automatically discovers local fonts/recipes, and accepts `--fonts <folder>` or `--no-recipes`; `import-check <data-root>` verifies it. `import-clean-legacy` and `import-clean-stages` accept `<data-root> [--yes]` and preview removals unless `--yes` is supplied; legacy cleanup requires recipes to be carried forward first.
 
 Legacy `progress` and `research-check` require ignored research configs, evidence
 and the former documentation layout. They are outside the clean-checkout workflow.

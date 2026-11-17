@@ -9,15 +9,14 @@ internal sealed record SelectedPresentationSource(string SourceSha256, long Offs
 /// <summary>Bounded source selection only; format decoding and screen mappings are separate.</summary>
 internal static class PresentationSourceReader
 {
-    public static SelectedPresentationSource Read(ValidatedGameSource source, Iso9660Source iso, PresentationResourceRequest request)
+    public static SelectedPresentationSource Read(ValidatedGameSource source, IGameFiles files, PresentationResourceRequest request)
     {
-        if (request.Conversion is PresentationConversion.CpjRgba or PresentationConversion.CpjReferenceRgba) return CpjArtworkSourceReader.Read(source, iso, request);
-        var image = source.Image;
-        var entry = iso.Find(request.SourcePath);
+        if (request.Conversion is PresentationConversion.CpjRgba or PresentationConversion.CpjReferenceRgba) return CpjArtworkSourceReader.Read(source, files, request);
+        var entry = files.Find(request.SourcePath);
         if (entry is not { Directory: false } || entry.Length > PresentationPackage.MaximumResourceBytes)
             throw new InvalidDataException("Missing or oversized source: " + request.AssetKey);
-        image.Position = entry.Offset;
-        byte[] raw = new byte[checked((int)entry.Length)]; image.ReadExactly(raw);
+        byte[] raw = new byte[checked((int)entry.Length)];
+        using (var input = files.OpenRead(entry)) input.ReadExactly(raw);
         string sourceHash = Convert.ToHexStringLower(SHA256.HashData(raw));
         if (request.Conversion == PresentationConversion.CardThumbnailRgba)
         {

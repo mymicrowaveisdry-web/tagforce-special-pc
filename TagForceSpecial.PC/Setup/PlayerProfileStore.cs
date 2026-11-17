@@ -1,3 +1,4 @@
+using TagForceSpecial.Import.Storage;
 using TagForceSpecial.PC.App.Screens.Title;
 
 namespace TagForceSpecial.PC.Setup;
@@ -23,7 +24,7 @@ public sealed class PlayerProfileStore(PrivateStorage storage)
             Current = value.SchemaVersion == 1 ? value with { SchemaVersion = CurrentSchema, Options = PlayerOptions.Defaults() } : value;
             return true;
         }
-        catch (Exception e) when (SetupStore.Recoverable(e)) { return false; }
+        catch (Exception e) when (PrivateStorage.Recoverable(e)) { return false; }
     }
 
     public void Save(string name, DuelistLevelChoice level, PlayerOptions options)
