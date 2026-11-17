@@ -81,7 +81,7 @@ public sealed partial class GameLoop
                 };
             }
         }
-        if (buttons.Back) { savedFocus[ScreenId.Setup] = 7; screen = ScreenId.Setup; return; }
+        if (buttons.Back) { savedFocus[ScreenId.PcTools] = 0; screen = ScreenId.PcTools; return; }
         int delta = buttons.Right ? 1 : buttons.Left ? -1 : 0;
         if (delta != 0)
         { diagnosticScreenIndex = (diagnosticScreenIndex + delta + DiagnosticScreens.Length) % DiagnosticScreens.Length; diagnosticAssetIndex = 0; }

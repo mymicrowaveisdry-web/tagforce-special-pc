@@ -20,6 +20,7 @@ public sealed class MainWindow : Window
         Title = "Tag Force Special / Importer & Analysis Workbench"; Width = 1440; Height = 900; MinWidth = 1000; MinHeight = 650;
         var root = new DockPanel { Margin = new Thickness(12) }; Content = root;
         var header = new StackPanel(); header.Children.Add(Controls.Text("IMPORTER & ANALYSIS WORKBENCH  ·  " + TagForceSpecial.Import.ToolIdentity.ImporterVersion.Split('+')[0], 22));
+        header.Children.Add(Controls.AsyncButton("Play Game", () => GameLauncher.StartAsync(workspace)));
         var summary = Controls.Text(""); summary.SetBinding(TextBlock.TextProperty, new Binding(nameof(Workspace.Summary)) { Source = workspace }); header.Children.Add(summary);
         var activity = new ProgressBar { Height = 3, Maximum = 1 };
         activity.SetBinding(ProgressBar.IsIndeterminateProperty, new Binding(nameof(Workspace.Busy)) { Source = workspace }); header.Children.Add(activity);
@@ -41,6 +42,7 @@ public sealed class MainWindow : Window
         Loaded += async (_, _) =>
         {
             await workspace.RunAsync(workspace.ReloadAsync);
+            if (workspace.Selected is null) Navigate("Import");
             string[] args = Environment.GetCommandLineArgs();
             int report = Array.IndexOf(args, "--smoke-report");
             if (report >= 0 && report + 1 < args.Length) await WorkbenchSmoke.RunAsync(this, workspace, args[report + 1]);

@@ -1,7 +1,6 @@
 using Microsoft.Xna.Framework;
 using TagForceSpecial.Core.Decks;
 using TagForceSpecial.Import.Storage;
-using TagForceSpecial.Import.Maintenance;
 using TagForceSpecial.PC.Decks;
 using TagForceSpecial.PC.DuelUI.Input;
 using TagForceSpecial.PC.Setup;
@@ -15,10 +14,6 @@ public sealed partial class GameLoop
     private ImportOperation? setupOperation;
     private int setupSmokeStage, editorFrame;
     private string preferencesNotice = "Changes are saved locally.";
-    private CleanupPlan? cleanupConfirmation;
-    private bool showImportResults;
-    private static readonly string[] SetupActions = ["CONTINUE TO GAME", "IMPORT ORIGINAL ISO", "IMPORT RECIPE LIBRARY", "REPEAT LAST IMPORT", "VERIFY GAME DATA", "PREFERENCES", "RESTORE SETTINGS BACKUP", "RESOURCE STATUS", "PC DUEL TOOLS", "IMPORT EXTRACTED FOLDER", "CLEAN PREVIOUS IMPORTER DATA"];
-    private bool CanContinueToGame => setupOperation?.Busy != true && setup?.Game is not null && originalTitle is not null;
     private void InitializeSetup()
     {
         if (options.Smoke && !SetupAutomation) return;
@@ -39,7 +34,7 @@ public sealed partial class GameLoop
         }
         if (options.SetupSource is { } source)
         {
-            screen = ScreenId.Setup;
+            screen = ScreenId.PcTools;
             BeginImport(source, options.RecipeReferenceRoot is { } reference ? Path.Combine(reference, "recipes", "viewer.json") : null);
         }
     }
@@ -47,7 +42,7 @@ public sealed partial class GameLoop
     {
         if (setupOperation?.Import(source, recipeLibrary) != true) return;
         setupMessage = "Importing local game data";
-        screen = ScreenId.Setup;
+        screen = ScreenId.PcTools;
     }
     private uint CurrentSeed => options.SeedSpecified ? options.Seed : setup?.Preferences.OpponentSeed ?? options.Seed;
     private bool SetupAutomation => options.Smoke && (options.SetupSource is not null || options.CachePath is null && options.DataRoot is not null);
@@ -55,25 +50,11 @@ public sealed partial class GameLoop
     {
         if (setupOperation?.Poll() is not { } result) return;
         setupMessage = result.Message;
-        showImportResults = setupOperation.CompletedStages.Count > 0;
         if (result.Success) TryActivateImportedTitle();
-    }
-    private void ContinueToGame()
-    {
-        if (!CanContinueToGame) { setupMessage = "Import or verify your game data before continuing."; return; }
-        screen = ScreenId.Title;
-    }
-    /// <summary>The source of the active import; a repeat import reuses every verified stage output and only re-checks the image.</summary>
-    private string? LastSource => setup?.Game?.Manifest?.Source.Path is { Length: > 0 } path ? path : null;
-    private void BeginRecipeImport(string file)
-    {
-        if (LastSource is not { } source) { setupMessage = "Import your original ISO before adding a recipe library."; return; }
-        BeginImport(source, file);
-        setupMessage = "Importing recipe library";
     }
     private void OpenEditor()
     {
-        if (setup?.Game is null) { screen = ScreenId.Setup; menuIndex = 0; return; }
+        if (setup?.Game is null) { screen = ScreenId.PcTools; menuIndex = 0; return; }
         editor!.Open();
         screen = ScreenId.DeckEditor;
     }
@@ -83,70 +64,12 @@ public sealed partial class GameLoop
         var result = editor.Launch(CurrentSeed);
         if (result.Controller is null)
         {
-            if (result.SetupError is { } error) { setupMessage = error; screen = ScreenId.Setup; }
+            if (result.SetupError is { } error) { setupMessage = error; screen = ScreenId.PcTools; }
             return false;
         }
         duel = result.Controller;
         screen = ScreenId.Duel; choiceIndex = 0; inspectIndex = -1;
         return true;
-    }
-    private void UpdateSetupScreen(GuiButtons buttons)
-    {
-        if (setupOperation?.Busy == true)
-        { if (buttons.Back) { setupOperation?.Cancel(); setupMessage = "Stopping safely..."; } return; }
-        if (cleanupConfirmation is { } plan)
-        {
-            if (buttons.Back) cleanupConfirmation = null;
-            else if (buttons.Confirm) { cleanupConfirmation = null; setupOperation!.CleanLegacy(plan); }
-            return;
-        }
-        if (showImportResults)
-        {
-            if (buttons.Back || buttons.Confirm) showImportResults = false;
-            return;
-        }
-        if (buttons.Back)
-        {
-            if (utilityReturn == ScreenId.Title) ContinueToGame();
-            else screen = utilityReturn;
-            return;
-        }
-        MoveMenu(buttons, SetupActions.Length);
-        if (!buttons.Confirm || setup is null) return;
-        try
-        {
-            switch (menuIndex)
-            {
-                case 0: ContinueToGame(); break;
-                case 1:
-                    string? file = WindowsFilePicker.ChooseIso(); if (file is not null) BeginImport(file); break;
-                case 2:
-                    if (setup.Game is null) { setupMessage = "Import your original ISO before adding a recipe library."; break; }
-                    string? recipes = WindowsFilePicker.ChooseRecipeLibrary();
-                    if (recipes is not null) BeginRecipeImport(recipes);
-                    break;
-                case 3:
-                    if (LastSource is { } source) BeginImport(source);
-                    else setupMessage = "No previous import is recorded. Select your original ISO.";
-                    break;
-                case 4: setupOperation!.Validate(); setupMessage = "Checking local game data"; break;
-                case 5: screen = ScreenId.Preferences; menuIndex = 0; break;
-                case 6: setupMessage = setup.RestorePreferences().Issue?.Message ?? "Previous preferences restored."; editor!.ResetDraft(); break;
-                case 7: OpenAssetDiagnostics(); break;
-                case 8: screen = ScreenId.PcTools; break;
-                case 9:
-                    string? directory = WindowsFilePicker.ChooseDirectory();
-                    if (directory is not null) BeginImport(directory);
-                    break;
-                case 10:
-                    var cleanup = Cleanup.PlanLegacy(setup.Storage);
-                    if (cleanup.Blocked is not null) setupMessage = cleanup.Blocked;
-                    else if (cleanup.Items.Count == 0) setupMessage = "No previous importer data to remove.";
-                    else cleanupConfirmation = cleanup;
-                    break;
-            }
-        }
-        catch (Exception e) when (PrivateStorage.Recoverable(e)) { setupMessage = "The operation could not finish. Check local storage and retry."; }
     }
     private void UpdatePreferences(GuiButtons buttons)
     {
@@ -179,42 +102,6 @@ public sealed partial class GameLoop
         if (!buttons.Confirm) return;
         editor.LoadSaved(menuIndex);
         screen = ScreenId.DeckEditor;
-    }
-    private void DrawSetupScreen()
-    {
-        var gold = new Color(238, 196, 104); var muted = new Color(143, 162, 187);
-        renderer.Text("LOCAL GAME SETUP", 12, 12, gold, 2);
-        renderer.Wrapped(setupMessage, 12, 36, 75, 3, muted);
-        if (cleanupConfirmation is { } plan)
-        {
-            renderer.Text($"REMOVE {plan.Items.Count} OLD IMPORTER LOCATIONS ({plan.Bytes / 1048576.0:0.0} MB)?", 12, 77, gold);
-            renderer.Wrapped(string.Join(", ", plan.Items.Select(i => i.RelativePath)), 12, 97, 75, 5);
-            renderer.Text("PLAYER DATA AND NEW IMPORT ARE KEPT.", 12, 185, muted);
-            renderer.Text("ENTER/A: CONFIRM   ESC/B: CANCEL", 12, 210, gold);
-        }
-        else if (showImportResults && setupOperation is not null)
-        {
-            int row = 0;
-            foreach (var stage in setupOperation.CompletedStages)
-                renderer.Text($"{stage.Name}: {stage.Status}", 12, 77 + row++ * 18);
-            renderer.Text("ENTER/A: RETURN TO IMPORT MENU", 12, 217, gold);
-        }
-        else if (setupOperation?.Busy == true)
-        {
-            var progress = setupOperation!.Progress;
-            renderer.Text(progress.StageName.ToUpperInvariant(), 12, 77, new Color(238, 196, 104));
-            renderer.Wrapped(progress.Message, 12, 92, 75, 3);
-            renderer.Fill(new(12, 125, 450, 12), new Color(30, 43, 60));
-            // Only measurable work shows a fraction; otherwise a moving block marks indeterminate progress.
-            if (progress.Fraction is { } fraction) renderer.Fill(new(12, 125, (int)(fraction * 450), 12), new Color(75, 174, 177));
-            else renderer.Fill(new(12 + (int)(PresentationTime.TotalSeconds * 120 % 390), 125, 60, 12), new Color(75, 174, 177));
-            renderer.Text((progress.Fraction is { } f ? $"{f * 100:0}%   " : "") + "ESC/B: STOP SAFELY", 12, 153);
-        }
-        else
-            for (int i = 0; i < SetupActions.Length; i++)
-                renderer.Text((menuIndex == i ? "> " : "  ") + SetupActions[i] + (i == 0 && !CanContinueToGame ? " (IMPORT REQUIRED)" : ""),
-                    12, 77 + i * 15, i == 0 && !CanContinueToGame ? muted : menuIndex == i ? gold : Color.White);
-        renderer.Text("ESC/B: BACK   ORIGINALS READ-ONLY. ASSETS LOCAL.", 12, 251, muted);
     }
     private void DrawEditor()
     {

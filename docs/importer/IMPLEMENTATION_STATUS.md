@@ -4,7 +4,7 @@
 |---|---|---|
 | Sources | Read-only ISO/extracted-directory import; PARAM.SFO recognition, structure and trusted-build support are separate findings | English v2.1 exact image/tree pins; other builds can be inventoried but are not game-ready |
 | Pipeline | Catalog, presentation, prepared recipes, complete inventory, validation, immutable keyed outputs, cancellation, atomic active pointer | Audio/dialogue conversion, encrypted saves and arbitrary archive decompression are unsupported |
-| Game integration | New import layout only; source selection, recipes, repeat/cancel, results and confirmed legacy cleanup | Native dialogs and cleanup confirmation need human acceptance |
+| Game integration | Normal PC launch opens bundled WPF; Play Game validates data and launches the game; old importer UI removed | Native dialogs and cleanup confirmation need human acceptance |
 | Dashboard / Import / Settings | Session metadata/results, source verification, options, progress/cancel, recent sources, settings and cleanup previews | Windows WPF; settings are local |
 | Asset Explorer | Directory tree, virtualized searchable/sortable table, metadata/hex, EHP members, GIM first-frame preview/PNG export, normalized cards | Compressed/audio/script/executable content remains metadata-only; source must be available and unchanged |
 | Validation / Logs | Historical checks, artifact revalidation, JSON/Markdown export, searchable diagnostics, copy/export and view-only clearing | Revalidation does not repeat source verification; checks are scoped |

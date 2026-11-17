@@ -7,6 +7,7 @@ using TagForceSpecial.PC.App.Visual;
 using TagForceSpecial.PC.DuelUI.Input;
 using TagForceSpecial.Import.Storage;
 using TagForceSpecial.PC.Screens;
+using TagForceSpecial.PC.Setup;
 using TagForceSpecial.PC.UI;
 
 namespace TagForceSpecial.PC.Game;
@@ -31,7 +32,7 @@ public sealed partial class GameLoop
         set
         {
             if (router is null) { activeScreen = value; return; }
-            if (value == ScreenId.Title && originalTitle is null) value = ScreenId.Setup;
+            if (value == ScreenId.Title && originalTitle is null) value = ScreenId.PcTools;
             savedFocus[activeScreen] = menuIndex;
             if (value == ScreenId.Paused) router.PushModal("duel.pause");
             else if (value == ScreenId.Duel && activeScreen == ScreenId.Paused) router.PopModal();
@@ -45,7 +46,7 @@ public sealed partial class GameLoop
         ScreenId.TitleFlow => "original.title-flow",
         ScreenId.Preferences => "pc.preferences", ScreenId.DeckEditor => "pc.deck-editor",
         ScreenId.DeckSelection => "pc.quick-duel", ScreenId.SavedDecks => "pc.saved-decks",
-        ScreenId.Setup => "pc.local-game-setup", ScreenId.AssetDiagnostics => "pc.asset-diagnostics",
+        ScreenId.AssetDiagnostics => "pc.asset-diagnostics",
         ScreenId.Controls => "pc.controls", ScreenId.Duel => "duel.field",
         ScreenId.Result => "duel.result", ScreenId.Paused => "duel.pause",
         _ => throw new ArgumentOutOfRangeException(nameof(id))
@@ -78,8 +79,6 @@ public sealed partial class GameLoop
             pointer: Rows(at => gum.HitIndex("NativeToolsMenu", "Row", 5, at)));
         Register(ScreenId.Preferences, b => RecoverSetup(() => UpdatePreferences(b)), DrawPreferences, "NativePreferences",
             pointer: Rows(at => gum.HitIndex("NativePreferences", "Row", 4, at)));
-        Register(ScreenId.Setup, b => RecoverSetup(() => UpdateSetupScreen(b)), DrawSetupScreen,
-            pointer: Rows(at => setupOperation?.Busy == true || cleanupConfirmation is not null || showImportResults ? null : TextRow(at, 12, 77, 15, SetupActions.Length, 0)));
         Register(ScreenId.DeckEditor, b => RecoverSetup(() => UpdateEditor(b)), DrawEditor, pointer: EditorPointer);
         Register(ScreenId.SavedDecks, b => RecoverSetup(() => UpdateSavedDecks(b)), DrawSetupLists,
             pointer: Rows(at => TextRow(at, 12, 55, 22, editor?.SavedDecks.Count ?? 0, menuIndex / 8 * 8, 8)));
@@ -98,11 +97,7 @@ public sealed partial class GameLoop
             throw new InvalidOperationException("Presentation smoke requires the validated Phase 3 title generation in --data-root.");
         if (options.TitleLayerCaptureRoot is { } layerRoot)
             (originalTitle ?? throw new InvalidOperationException("Title layer capture requires a validated title generation.")).ExportReviewLayers(layerRoot);
-        // Missing presentation data opens the setup wizard.
-        if (activeScreen == ScreenId.Title && originalTitle is null) utilityReturn = ScreenId.Title;
-        var initial = options.OpenImporterOnLaunch ? ScreenId.Setup :
-            activeScreen == ScreenId.Title && originalTitle is null ? ScreenId.Setup : activeScreen;
-        if (options.OpenImporterOnLaunch) menuIndex = setup?.Game is null ? 1 : 0;
+        var initial = activeScreen == ScreenId.Title && originalTitle is null ? ScreenId.PcTools : activeScreen;
         router.GoTo(ScreenName(initial));
     }
     private void TryActivateImportedTitle()
@@ -181,10 +176,10 @@ public sealed partial class GameLoop
             if (screen == ScreenId.SavedDecks) screen = ScreenId.DeckEditor;
         }
     }
-    /// <summary>The PC utility hub, reached only through F12 and Local Game Setup. It is not an original screen.</summary>
+    /// <summary>The PC utility hub, reached through F12. It is not an original screen.</summary>
     private void UpdatePcTools(GuiButtons buttons)
     {
-        if (buttons.Back) { screen = ScreenId.Setup; return; }
+        if (buttons.Back) { WorkbenchLauncher.Start(setup?.Storage.Root); Exit(); return; }
         MoveMenu(buttons, 5);
         if (!buttons.Confirm) return;
         // Navigation/application actions only. Gum never receives a DuelController.

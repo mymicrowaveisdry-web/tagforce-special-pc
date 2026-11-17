@@ -39,6 +39,7 @@ public sealed class StartupImportTests : IDisposable
     {
         Assert.True(HostOptions.Parse([]).OpenImporterOnLaunch);
         Assert.True(HostOptions.Parse(["--data-root", root]).OpenImporterOnLaunch);
+        Assert.False(HostOptions.Parse(["--game", "--data-root", root]).OpenImporterOnLaunch);
         Assert.False(HostOptions.Parse(["--presentation-smoke"]).OpenImporterOnLaunch);
         Assert.False(HostOptions.Parse(["--asset-diagnostics"]).OpenImporterOnLaunch);
         Assert.False(HostOptions.Parse(["--capture", Path.Combine(root, "capture.png")]).OpenImporterOnLaunch);

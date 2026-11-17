@@ -6,12 +6,12 @@ public sealed record HostOptions(string? CachePath = null, bool PixelExact = fal
     bool AssetDiagnostics = false, string DiagnosticScreen = "title", string? AssetPreview = null, bool PresentationSmoke = false,
     string? PresentationTracePath = null, string? TitleLayerCaptureRoot = null, string? PspFontPath = null, string? FlowCaptureRoot = null,
     IReadOnlyDictionary<int, int>? MainMenuFrameByRow = null, int? MainMenuEntryFrame = null, string? RealtimeWalkRoot = null, int? DeckMenuFrame = null, string? RecipeReferenceRoot = null,
-    string? PspCardFontPath = null)
+    string? PspCardFontPath = null, bool LaunchGame = false)
 {
     /// <summary>Pixel-exact game frame per focused Main Menu row, for same-instant comparisons with GE dumps.</summary>
     public IReadOnlyDictionary<int, int> MainMenuFrames => MainMenuFrameByRow ?? new Dictionary<int, int>();
 
-    public bool OpenImporterOnLaunch => !Smoke && !PresentationSmoke && !AssetDiagnostics && CapturePath is null && RealtimeWalkRoot is null;
+    public bool OpenImporterOnLaunch => !LaunchGame && !Smoke && !PresentationSmoke && !AssetDiagnostics && CapturePath is null && RealtimeWalkRoot is null;
 
     public static HostOptions Parse(string[] args)
     {
@@ -25,11 +25,12 @@ public sealed record HostOptions(string? CachePath = null, bool PixelExact = fal
         int? menuEntryFrame = null, deckMenuFrame = null;
         string? realtimeWalk = null, recipeReference = null;
         bool seedSpecified = false;
-        bool pixel = false, smoke = false, assetDiagnostics = false, presentationSmoke = false;
+        bool pixel = false, smoke = false, assetDiagnostics = false, presentationSmoke = false, launchGame = false;
         for (int i = 0; i < args.Length; i++)
         {
             switch (args[i])
             {
+                case "--game": launchGame = true; break;
                 case "--recipe-reference" when i + 1 < args.Length: recipeReference = Path.GetFullPath(args[++i]); break;
                 case "--cache" when i + 1 < args.Length: cache = Path.GetFullPath(args[++i]); break;
                 case "--capture" when i + 1 < args.Length: capture = Path.GetFullPath(args[++i]); break;
@@ -82,6 +83,6 @@ public sealed record HostOptions(string? CachePath = null, bool PixelExact = fal
         if (presentationTrace is not null && !presentationSmoke) throw new ArgumentException("--presentation-trace requires --presentation-smoke.");
         if (titleLayers is not null && (capture is null || presentationSmoke || smoke || assetDiagnostics))
             throw new ArgumentException("--capture-title-layers requires a title --capture launch.");
-        return new(cache, pixel, capture, smoke, seed, replay, resultCapture, deckVariant, dataRoot, setupSource, editorCapture, seedSpecified, assetDiagnostics, diagnosticScreen, assetPreview, presentationSmoke, presentationTrace, titleLayers, pspFont, flowCapture, menuFrames, menuEntryFrame, realtimeWalk, deckMenuFrame, recipeReference, pspCardFont);
+        return new(cache, pixel, capture, smoke, seed, replay, resultCapture, deckVariant, dataRoot, setupSource, editorCapture, seedSpecified, assetDiagnostics, diagnosticScreen, assetPreview, presentationSmoke, presentationTrace, titleLayers, pspFont, flowCapture, menuFrames, menuEntryFrame, realtimeWalk, deckMenuFrame, recipeReference, pspCardFont, launchGame);
     }
 }

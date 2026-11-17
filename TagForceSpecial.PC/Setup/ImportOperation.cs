@@ -8,7 +8,7 @@ namespace TagForceSpecial.PC.Setup;
 
 public sealed record SetupCompletion(bool Success, string Message);
 
-/// <summary>Owns one background import or verification job for the in-game import screen; progress is queued for the game thread.</summary>
+/// <summary>Owns background import jobs used by headless setup acceptance; interactive imports belong to the WPF workbench.</summary>
 public sealed class ImportOperation(GameDataStore store) : IDisposable
 {
     private Task<SetupCompletion>? task;

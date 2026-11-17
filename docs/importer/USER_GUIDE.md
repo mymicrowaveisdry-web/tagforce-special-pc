@@ -13,7 +13,7 @@ On Import select the English v2.1 ISO or its complete extracted directory. Verif
 
 Dashboard selects recorded sessions. Asset Explorer loads the inventory or card catalog; search matches paths, formats, parser results and other fields, and column headers sort. Expand the directory tree, select a file, then select EHP members for GIM previews. PNG export saves the displayed frame. Previews require the unchanged original source. Validation loads recorded checks or rechecks generated artifacts; repeat import to recheck the source. Logs supports search/copy/export and view-only clearing. Comparison uses two sessions from the current data root. Analysis loads persisted functions/evidence without executing tests.
 
-The in-game importer offers the same import/recipes/repeat/cancel core and Continue. Cleanup in either GUI previews owned paths and asks for confirmation. CLI equivalents:
+Normal PC launch opens this bundled workbench. Play Game validates the active data root and launches the game; the old in-game importer is removed. F12 opens PC tools, whose Back action returns to the workbench. Cleanup previews owned paths and asks for confirmation. CLI equivalents:
 
 ```powershell
 dotnet run --project TagForceSpecial.Tools --no-build -- import <iso-or-folder> <data-root> --recipes <recipes/viewer.json>
