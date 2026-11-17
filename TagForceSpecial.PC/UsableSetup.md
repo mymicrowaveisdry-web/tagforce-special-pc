@@ -1,6 +1,6 @@
 # Local import and supported deck editor
 
-Launch the PC application to open the WPF workbench and import the original English v2.1 ISO or its complete extracted folder. Recognition, structural checks and exact build support remain separate; other builds and CSO cannot provide game-ready data. Import Recipe Library accepts prepared `recipes/viewer.json`; repeat import retains the active library. The [WPF workbench](../docs/importer/USER_GUIDE.md) provides richer browsing and diagnostics.
+Launch the PC application to open the WPF workbench and import the original English v2.1 ISO or its complete extracted folder. Recognition, structural checks and exact build support remain separate; other builds and CSO cannot provide game-ready data. Include recipes is enabled by default and discovers a compatible local prepared library; uncheck it to skip recipes. Pinned PSP menu/card fonts are installed automatically; optional source overrides are available in the workbench. The [WPF workbench](../docs/importer/USER_GUIDE.md) provides richer browsing and diagnostics.
 
 Import runs in a worker with measured or indeterminate progress. Cancel requests safe cancellation. Repeat import validates the source and reuses checked outputs. Completion lists each result; Play Game requires a usable catalog and presentation. Clean previous importer data previews owned paths and requires confirmation; recipes must be carried forward first. Decks, fonts, profile and unrelated preferences remain intact.
 

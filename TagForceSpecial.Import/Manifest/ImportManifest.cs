@@ -21,7 +21,7 @@ public sealed record SourceIdentity(string Kind, string Path, string DisplayName
 
 /// <summary>Which stages run. Recipes use <see cref="RecipeLibrary"/> or the data root's previous recipe import.</summary>
 public sealed record ImportOptions(bool Catalog = true, bool Presentation = true, bool Recipes = true,
-    string? RecipeLibrary = null, bool Inventory = true, bool ReuseCache = true);
+    string? RecipeLibrary = null, bool Inventory = true, bool ReuseCache = true, string? FontDirectory = null);
 
 public sealed record StageRecord(string Id, string Name, StageStatus Status, DateTimeOffset? StartedUtc, DateTimeOffset? FinishedUtc,
     long? Processed, long? Total, int Warnings, int Errors, string? Message, string? CacheKey, string? OutputDirectory);

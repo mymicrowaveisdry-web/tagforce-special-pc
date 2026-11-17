@@ -7,7 +7,7 @@ namespace TagForceSpecial.PC.App.Screens.Title;
 /// <summary>Owns the pinned PGF glyph atlas, metrics, shadows and authored fallback text on the game thread.</summary>
 internal sealed class PgfTextRenderer : IDisposable
 {
-    internal const string RequiredFontSha256 = "250babd8a242d7eaaa84284c78d5e2273b29e61d0d8c01b65414e3248d7c1164";
+    internal const string RequiredFontSha256 = TagForceSpecial.Import.Resources.GameFonts.MenuSha256;
     private const int CellSize = 30, CellPitch = 32, BaselineRow = 24, GlyphLeft = 7;
     private const char Bullet = '\u25CF';
     private readonly Action<Texture2D, FlowQuad, Color> drawGlyph;
@@ -20,7 +20,7 @@ internal sealed class PgfTextRenderer : IDisposable
     internal List<(string Text, int X, int Y, Color Color)> FallbackLines { get; } = [];
 
     /// <summary>FTT-NewRodin Pro Latin (system ltn0): Deck Edit's card-face text, whose recorded glyph steps equal its advances x 0.2.</summary>
-    internal const string CardTextFontSha256 = "1184f16bc89bad1fea49093806784470281af54f279b57ef0378ce33e6603870";
+    internal const string CardTextFontSha256 = TagForceSpecial.Import.Resources.GameFonts.CardSha256;
 
     internal PgfTextRenderer(GraphicsDevice device, byte[]? fontFile, Action<Texture2D, FlowQuad, Color> drawGlyph, string requiredSha256 = RequiredFontSha256)
     {

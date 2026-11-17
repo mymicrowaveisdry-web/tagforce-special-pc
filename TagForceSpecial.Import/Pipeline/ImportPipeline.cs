@@ -17,7 +17,7 @@ public static class ImportPipeline
     public static readonly IReadOnlyList<(string Id, string Name)> Stages =
     [
         (SourceStage.Id, "Recognize source"), (InventoryStage.Id, "Scan files"), (CatalogStage.Id, "Convert card catalog"), (PresentationStage.Id, "Decode presentation"),
-        (RecipeStage.Id, "Import recipes"), (ValidationStage.Id, "Validate"), (PublishStage.Id, "Publish")
+        (FontStage.Id, "Install PSP fonts"), (RecipeStage.Id, "Import recipes"), (ValidationStage.Id, "Validate"), (PublishStage.Id, "Publish")
     ];
 
     public static ImportManifest Run(ImportRequest request, IProgress<ImportProgress>? progress = null,
@@ -77,11 +77,14 @@ public static class ImportPipeline
                 session.Outputs = session.Outputs with { Presentation = result.Output, PresentationBinding = binding };
                 return result;
             });
+            session.Run(FontStage.Id, _ => source is null ? new(StageStatus.Skipped, "Requires a supported source.") :
+                FontStage.Run(storage, request.SourcePath, request.Options.FontDirectory, cancellation));
             session.Run(RecipeStage.Id, report =>
             {
                 if (!request.Options.Recipes) return new(StageStatus.Skipped, "Not selected.");
                 if (source is null || catalog is null) return new(StageStatus.Skipped, "Requires a supported source and an imported catalog.");
-                string? library = request.Options.RecipeLibrary ?? CurrentRecipes(storage) ?? RecipeStage.FindLegacy(storage);
+                string? library = request.Options.RecipeLibrary ?? CurrentRecipes(storage) ?? RecipeStage.FindLegacy(storage) ??
+                    Resources.ResourceDiscovery.FindRecipes(Resources.ResourceDiscovery.Roots(storage, request.SourcePath), source.Profile.BuildId);
                 if (library is not null) log.Info(RecipeStage.Id, "Recipe library selected.", Path.GetFileName(Path.GetDirectoryName(Path.GetDirectoryName(library))));
                 var result = RecipeStage.Run(cache, library, source.Profile, catalog.Catalog, request.Options.ReuseCache,
                     new InlineProgress<(long Done, long Total)>(p => report(p.Done, p.Total, "Copying recipe textures")), cancellation);

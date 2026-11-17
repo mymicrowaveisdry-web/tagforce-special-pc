@@ -3,7 +3,8 @@ using TagForceSpecial.Import.Storage;
 
 namespace TagForceSpecial.Workbench.Infrastructure;
 
-public sealed record WorkbenchSettings(string DataRoot, string RepositoryRoot, string[] RecentSources)
+public sealed record WorkbenchSettings(string DataRoot, string RepositoryRoot, string[] RecentSources,
+    bool ImportRecipes = true, string? RecipeLibrary = null, string? FontDirectory = null)
 {
     public static string SettingsPath => Environment.GetEnvironmentVariable("TFSP_WORKBENCH_SETTINGS") is { Length: > 0 } path ? Path.GetFullPath(path) :
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TagForceSpecial.Workbench", "settings.json");

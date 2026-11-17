@@ -11,7 +11,7 @@ namespace TagForceSpecial.Tools;
 /// <summary>Command-line front end of the shared importer: the same pipeline the workbench and the game use.</summary>
 public static class ImportCommands
 {
-    private const string Usage = "Usage: import <iso-or-extracted-directory> <data-root> [--recipes <recipes/viewer.json>] [--no-presentation] [--no-recipes] [--no-inventory] [--no-cache]\n" +
+    private const string Usage = "Usage: import <iso-or-extracted-directory> <data-root> [--recipes <recipes/viewer.json>] [--fonts <font-folder>] [--no-presentation] [--no-recipes] [--no-inventory] [--no-cache]\n" +
         "       import-check <data-root>\n" +
         "       import-clean-legacy <data-root> [--yes]\n" +
         "       import-clean-stages <data-root> [--yes]";
@@ -38,6 +38,7 @@ public static class ImportCommands
                 options = args[i] switch
                 {
                     "--recipes" when i + 1 < args.Length => options with { RecipeLibrary = Path.GetFullPath(args[++i]) },
+                    "--fonts" when i + 1 < args.Length => options with { FontDirectory = Path.GetFullPath(args[++i]) },
                     "--no-presentation" => options with { Presentation = false },
                     "--no-recipes" => options with { Recipes = false },
                     "--no-inventory" => options with { Inventory = false },

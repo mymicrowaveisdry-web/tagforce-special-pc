@@ -24,12 +24,18 @@ internal static class WorkbenchSmoke
                 var model = window.Page<ImportPage>("Import").Model; model.Source = args[importSource + 1];
                 int recipes = Array.IndexOf(args, "--smoke-recipes");
                 if (recipes >= 0 && recipes + 1 < args.Length) model.Recipes = args[recipes + 1];
+                if (args.Contains("--smoke-no-recipes")) model.ImportRecipes = false;
                 await model.VerifyAsync(); Check(); observations.Add("Source verification UI: " + model.ProgressText);
                 await model.ImportAsync(); Check(); observations.Add("Import UI: " + model.ProgressText);
                 if (workspace.Selected?.Status is not (TagForceSpecial.Import.Manifest.ImportStatus.Succeeded or TagForceSpecial.Import.Manifest.ImportStatus.SucceededWithWarnings))
                     throw new InvalidDataException("Desktop import did not succeed: " + model.ProgressText);
                 observations.Add("Import stages: " + string.Join("; ", workspace.Selected.Stages.Select(s => s.Id + "=" + s.Status)));
                 observations.Add($"Import elapsed seconds: {(workspace.Selected.FinishedUtc - workspace.Selected.StartedUtc).TotalSeconds:0.0}");
+                if (!TagForceSpecial.Import.Resources.GameFonts.Ready(workspace.Storage)) throw new InvalidDataException("Automatic font import did not install both pinned fonts.");
+                observations.Add("Automatic fonts: menu and card-text PGFs installed, hashes verified.");
+                if (model.ImportRecipes && workspace.Selected.Outputs.Recipes is null) throw new InvalidDataException("Automatic recipe import did not produce a library.");
+                if (!model.ImportRecipes && workspace.Selected.Outputs.Recipes is not null) throw new InvalidDataException("Recipe opt-out did not exclude recipes.");
+                observations.Add("Include recipes toggle: " + model.ImportRecipes);
                 Capture("import");
                 if (args.Contains("--smoke-cancel"))
                 {

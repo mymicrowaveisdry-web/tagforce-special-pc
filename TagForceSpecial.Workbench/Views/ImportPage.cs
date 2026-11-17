@@ -21,9 +21,19 @@ internal sealed class ImportPage : DockPanel
             Controls.AsyncButton("Verify source", Model.VerifyAsync)));
         var recent = new ComboBox { ItemsSource = workspace.Settings.RecentSources, ToolTip = "Recent sources" };
         recent.SelectionChanged += (_, _) => { if (recent.SelectedItem is string path) Model.Source = path; }; form.Children.Add(recent);
-        form.Children.Add(Controls.Text("Optional recipes/viewer.json (blank keeps the previous recipe library)"));
-        form.Children.Add(Controls.Field(Model, nameof(Model.Recipes)));
-        form.Children.Add(Controls.Button("Select recipe library…", () => { if (Controls.File("Prepared recipe library", "Recipe library|viewer.json") is { } p) Model.Recipes = p; }));
+        form.Children.Add(Controls.Check("Include recipes (automatically find and import the local library)", Model, nameof(Model.ImportRecipes)));
+        var overrides = new StackPanel();
+        var recipeOptions = new StackPanel();
+        recipeOptions.SetBinding(IsEnabledProperty, new Binding(nameof(Model.ImportRecipes)) { Source = Model });
+        recipeOptions.Children.Add(Controls.Text("Recipe library override (blank discovers automatically)"));
+        recipeOptions.Children.Add(Controls.Field(Model, nameof(Model.Recipes)));
+        recipeOptions.Children.Add(Controls.Button("Select recipe library…", () => { if (Controls.File("Prepared recipe library", "Recipe library|viewer.json") is { } p) Model.Recipes = p; }));
+        overrides.Children.Add(recipeOptions);
+        overrides.Children.Add(Controls.Text("Optional local PSP font folder override (blank discovers automatically):"));
+        overrides.Children.Add(Controls.Field(Model, nameof(Model.FontDirectory)));
+        overrides.Children.Add(Controls.Button("Select PSP font folder…", () => { if (Controls.Folder("Folder containing ltn4.pgf and ltn0.pgf") is { } p) Model.FontDirectory = p; }));
+        form.Children.Add(new Expander { Header = "Optional library and font source overrides", Foreground = System.Windows.Media.Brushes.White, Content = overrides });
+        form.Children.Add(Controls.Text("Pinned menu and card-text PSP fonts are installed automatically from local resources."));
         form.Children.Add(Controls.Row(Controls.Check("Presentation textures", Model, nameof(Model.Presentation)), Controls.Check("Full file inventory", Model, nameof(Model.Inventory)), Controls.Check("Reuse verified outputs", Model, nameof(Model.ReuseCache))));
         form.Children.Add(Controls.Text("Card catalog, validation and reports are included. Audio/dialogue conversion is not supported."));
         form.Children.Add(Controls.Row(Controls.AsyncButton("Start / repeat import", Model.ImportAsync), Controls.Button("Cancel safely", Model.Cancel),

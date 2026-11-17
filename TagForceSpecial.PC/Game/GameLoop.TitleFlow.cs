@@ -12,7 +12,7 @@ namespace TagForceSpecial.PC.Game;
 
 public sealed partial class GameLoop
 {
-    private const string FontFile = "fonts/psp-latin.pgf", CardTextFontFile = "fonts/psp-latin-card.pgf";
+    private const string FontFile = TagForceSpecial.Import.Resources.GameFonts.MenuFile, CardTextFontFile = TagForceSpecial.Import.Resources.GameFonts.CardFile;
     private TitleFlow? titleFlow;
     private TitleFlowVisuals? flowVisuals;
     private PlayerProfileStore? profiles;
@@ -32,6 +32,7 @@ public sealed partial class GameLoop
         try
         {
             ImportPspFont();
+            TagForceSpecial.Import.Resources.GameFonts.Ensure(setup.Storage, setup.Game?.Manifest?.Source.Path);
             string path = setup.Storage.PathFor(FontFile), cardPath = setup.Storage.PathFor(CardTextFontFile);
             byte[]? font = File.Exists(path) ? File.ReadAllBytes(path) : null;
             byte[]? cardFont = File.Exists(cardPath) ? File.ReadAllBytes(cardPath) : null;
@@ -47,7 +48,7 @@ public sealed partial class GameLoop
             flowVisuals = next;
             profiles = new(setup.Storage);
             titleFlow = new(new FlowHost(this), Environment.UserName, instantTransitions: options.PixelExact);
-            if (font is null) Console.Error.WriteLine("TITLE_FLOW_FONT_MISSING text uses the authored fallback; pass --psp-font once.");
+            if (font is null) Console.Error.WriteLine("TITLE_FLOW_FONT_MISSING select a local PSP font folder in the importer.");
             return true;
         }
         catch (Exception e) when (e is InvalidDataException or KeyNotFoundException || PrivateStorage.Recoverable(e))

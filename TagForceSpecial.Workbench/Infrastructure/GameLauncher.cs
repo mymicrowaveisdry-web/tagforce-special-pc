@@ -13,6 +13,9 @@ internal static class GameLauncher
             var result = await Task.Run(() => InstalledGameReader.Open(workspace.Storage));
             if (!result.Usable || result.Game?.Presentation is null)
                 throw new InvalidOperationException("Import and validate the game catalog and presentation before playing.");
+            var missing = await Task.Run(() => TagForceSpecial.Import.Resources.GameFonts.Ensure(workspace.Storage,
+                result.Game.Manifest?.Source.Path, workspace.Settings.FontDirectory));
+            if (missing.Count > 0) throw new InvalidOperationException("PSP fonts are missing. Select a local folder containing ltn4.pgf and ltn0.pgf on Import, then repeat import.");
             string[] args = Environment.GetCommandLineArgs();
             int host = Array.IndexOf(args, "--game-host");
             string executable = host >= 0 && host + 1 < args.Length ? Path.GetFullPath(args[host + 1]) : FindHost();

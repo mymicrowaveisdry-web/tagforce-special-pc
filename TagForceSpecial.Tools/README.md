@@ -14,7 +14,7 @@ before creating a format-independent catalog; authored cards use the Cards API d
 manifests; `preview-duel` accepts either a package directory or the file/ID-range arguments.
 `pool-duel <package-directory> [duels] [seed] [report.json]` plays seeded duels over every supported card, checking engine invariants and replay.
 `source-check`, `foundation-examples` and `deck-check` exercise the source and deck foundations.
-`import <iso-or-directory> <data-root> [--recipes <recipes/viewer.json>]` imports game data; `import-check <data-root>` verifies it. `import-clean-legacy` and `import-clean-stages` accept `<data-root> [--yes]` and preview removals unless `--yes` is supplied; legacy cleanup requires recipes to be carried forward first.
+`import <iso-or-directory> <data-root> [--recipes <recipes/viewer.json>]` imports game data, automatically discovers local fonts/recipes, and accepts `--fonts <folder>` or `--no-recipes`; `import-check <data-root>` verifies it. `import-clean-legacy` and `import-clean-stages` accept `<data-root> [--yes]` and preview removals unless `--yes` is supplied; legacy cleanup requires recipes to be carried forward first.
 
 Legacy `progress` and `research-check` require ignored research configs, evidence
 and the former documentation layout. They are outside the clean-checkout workflow.

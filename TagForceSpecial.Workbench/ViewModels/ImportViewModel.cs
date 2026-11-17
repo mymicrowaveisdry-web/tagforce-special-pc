@@ -11,12 +11,16 @@ namespace TagForceSpecial.Workbench.ViewModels;
 
 public sealed class ImportViewModel(Workspace workspace) : Observable
 {
-    private string source = workspace.Settings.RecentSources.FirstOrDefault() ?? "", recipes = "", progressText = "Select an ISO or extracted game folder.";
+    private string source = workspace.Settings.RecentSources.FirstOrDefault() ?? "", recipes = workspace.Settings.RecipeLibrary ?? "",
+        fontDirectory = workspace.Settings.FontDirectory ?? "", progressText = "Select an ISO or extracted game folder.";
+    private bool importRecipes = workspace.Settings.ImportRecipes;
     private double fraction;
     private bool indeterminate;
     private CancellationTokenSource? cancellation;
     public string Source { get => source; set => Set(ref source, value); }
     public string Recipes { get => recipes; set => Set(ref recipes, value); }
+    public bool ImportRecipes { get => importRecipes; set => Set(ref importRecipes, value); }
+    public string FontDirectory { get => fontDirectory; set => Set(ref fontDirectory, value); }
     public string ProgressText { get => progressText; private set => Set(ref progressText, value); }
     public double Fraction { get => fraction; private set => Set(ref fraction, value); }
     public bool Indeterminate { get => indeterminate; private set => Set(ref indeterminate, value); }
@@ -41,8 +45,8 @@ public sealed class ImportViewModel(Workspace workspace) : Observable
     public Task ImportAsync() => workspace.RunAsync(async () =>
     {
         string path = Source, root = workspace.Settings.DataRoot;
-        var options = new ImportOptions(Presentation: Presentation, Inventory: Inventory, ReuseCache: ReuseCache,
-            RecipeLibrary: string.IsNullOrWhiteSpace(Recipes) ? null : Recipes);
+        var options = new ImportOptions(Presentation: Presentation, Inventory: Inventory, ReuseCache: ReuseCache, Recipes: ImportRecipes,
+            RecipeLibrary: string.IsNullOrWhiteSpace(Recipes) ? null : Recipes, FontDirectory: string.IsNullOrWhiteSpace(FontDirectory) ? null : FontDirectory);
         using var stop = new CancellationTokenSource(); cancellation = stop;
         Logs.Clear(); Stages.Clear();
         var dispatcher = Application.Current.Dispatcher;
@@ -56,7 +60,8 @@ public sealed class ImportViewModel(Workspace workspace) : Observable
             var manifest = await Task.Run(() => ImportPipeline.Run(new(path, root, options), progress, stop.Token,
                 entry => dispatcher.InvokeAsync(() => Logs.Add(entry))));
             foreach (var stage in manifest.Stages) Stages.Add(stage);
-            workspace.SaveSettings(workspace.Settings with { RecentSources = new[] { path }.Concat(workspace.Settings.RecentSources).Distinct(StringComparer.OrdinalIgnoreCase).Take(12).ToArray() });
+            workspace.SaveSettings(workspace.Settings with { RecentSources = new[] { path }.Concat(workspace.Settings.RecentSources).Distinct(StringComparer.OrdinalIgnoreCase).Take(12).ToArray(),
+                ImportRecipes = options.Recipes, RecipeLibrary = options.RecipeLibrary, FontDirectory = options.FontDirectory });
             await workspace.ReloadAsync(); workspace.Selected = workspace.Sessions.FirstOrDefault(s => s.SessionId == manifest.SessionId) ?? manifest;
             ProgressText = $"{manifest.Status}: {manifest.Warnings} warnings / {manifest.Errors} errors. Session {manifest.SessionId}";
             workspace.Notice = ProgressText;
