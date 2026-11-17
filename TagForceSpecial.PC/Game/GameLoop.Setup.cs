@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework;
 using TagForceSpecial.Core.Decks;
 using TagForceSpecial.Import.Storage;
+using TagForceSpecial.Import.Maintenance;
 using TagForceSpecial.PC.Decks;
 using TagForceSpecial.PC.DuelUI.Input;
 using TagForceSpecial.PC.Setup;
@@ -14,7 +15,9 @@ public sealed partial class GameLoop
     private ImportOperation? setupOperation;
     private int setupSmokeStage, editorFrame;
     private string preferencesNotice = "Changes are saved locally.";
-    private static readonly string[] SetupActions = ["CONTINUE TO GAME", "IMPORT ORIGINAL ISO", "IMPORT RECIPE LIBRARY", "REPEAT LAST IMPORT", "VERIFY GAME DATA", "PREFERENCES", "RESTORE SETTINGS BACKUP", "RESOURCE STATUS", "PC DUEL TOOLS"];
+    private CleanupPlan? cleanupConfirmation;
+    private bool showImportResults;
+    private static readonly string[] SetupActions = ["CONTINUE TO GAME", "IMPORT ORIGINAL ISO", "IMPORT RECIPE LIBRARY", "REPEAT LAST IMPORT", "VERIFY GAME DATA", "PREFERENCES", "RESTORE SETTINGS BACKUP", "RESOURCE STATUS", "PC DUEL TOOLS", "IMPORT EXTRACTED FOLDER", "CLEAN PREVIOUS IMPORTER DATA"];
     private bool CanContinueToGame => setupOperation?.Busy != true && setup?.Game is not null && originalTitle is not null;
     private void InitializeSetup()
     {
@@ -52,6 +55,7 @@ public sealed partial class GameLoop
     {
         if (setupOperation?.Poll() is not { } result) return;
         setupMessage = result.Message;
+        showImportResults = setupOperation.CompletedStages.Count > 0;
         if (result.Success) TryActivateImportedTitle();
     }
     private void ContinueToGame()
@@ -90,6 +94,17 @@ public sealed partial class GameLoop
     {
         if (setupOperation?.Busy == true)
         { if (buttons.Back) { setupOperation?.Cancel(); setupMessage = "Stopping safely..."; } return; }
+        if (cleanupConfirmation is { } plan)
+        {
+            if (buttons.Back) cleanupConfirmation = null;
+            else if (buttons.Confirm) { cleanupConfirmation = null; setupOperation!.CleanLegacy(plan); }
+            return;
+        }
+        if (showImportResults)
+        {
+            if (buttons.Back || buttons.Confirm) showImportResults = false;
+            return;
+        }
         if (buttons.Back)
         {
             if (utilityReturn == ScreenId.Title) ContinueToGame();
@@ -119,6 +134,16 @@ public sealed partial class GameLoop
                 case 6: setupMessage = setup.RestorePreferences().Issue?.Message ?? "Previous preferences restored."; editor!.ResetDraft(); break;
                 case 7: OpenAssetDiagnostics(); break;
                 case 8: screen = ScreenId.PcTools; break;
+                case 9:
+                    string? directory = WindowsFilePicker.ChooseDirectory();
+                    if (directory is not null) BeginImport(directory);
+                    break;
+                case 10:
+                    var cleanup = Cleanup.PlanLegacy(setup.Storage);
+                    if (cleanup.Blocked is not null) setupMessage = cleanup.Blocked;
+                    else if (cleanup.Items.Count == 0) setupMessage = "No previous importer data to remove.";
+                    else cleanupConfirmation = cleanup;
+                    break;
             }
         }
         catch (Exception e) when (PrivateStorage.Recoverable(e)) { setupMessage = "The operation could not finish. Check local storage and retry."; }
@@ -160,7 +185,21 @@ public sealed partial class GameLoop
         var gold = new Color(238, 196, 104); var muted = new Color(143, 162, 187);
         renderer.Text("LOCAL GAME SETUP", 12, 12, gold, 2);
         renderer.Wrapped(setupMessage, 12, 36, 75, 3, muted);
-        if (setupOperation?.Busy == true)
+        if (cleanupConfirmation is { } plan)
+        {
+            renderer.Text($"REMOVE {plan.Items.Count} OLD IMPORTER LOCATIONS ({plan.Bytes / 1048576.0:0.0} MB)?", 12, 77, gold);
+            renderer.Wrapped(string.Join(", ", plan.Items.Select(i => i.RelativePath)), 12, 97, 75, 5);
+            renderer.Text("PLAYER DATA AND NEW IMPORT ARE KEPT.", 12, 185, muted);
+            renderer.Text("ENTER/A: CONFIRM   ESC/B: CANCEL", 12, 210, gold);
+        }
+        else if (showImportResults && setupOperation is not null)
+        {
+            int row = 0;
+            foreach (var stage in setupOperation.CompletedStages)
+                renderer.Text($"{stage.Name}: {stage.Status}", 12, 77 + row++ * 18);
+            renderer.Text("ENTER/A: RETURN TO IMPORT MENU", 12, 217, gold);
+        }
+        else if (setupOperation?.Busy == true)
         {
             var progress = setupOperation!.Progress;
             renderer.Text(progress.StageName.ToUpperInvariant(), 12, 77, new Color(238, 196, 104));

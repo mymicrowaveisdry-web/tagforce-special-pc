@@ -23,6 +23,11 @@ public static class ImportPipeline
     public static ImportManifest Run(ImportRequest request, IProgress<ImportProgress>? progress = null,
         CancellationToken cancellation = default, Action<LogEntry>? onLog = null)
     {
+        string sourcePath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(request.SourcePath));
+        string dataPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(request.DataRoot));
+        if (Directory.Exists(sourcePath) && (string.Equals(sourcePath, dataPath, StringComparison.OrdinalIgnoreCase) ||
+            dataPath.StartsWith(sourcePath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException("Choose a data root outside the original extracted source directory.");
         var storage = new PrivateStorage(request.DataRoot);
         Directory.CreateDirectory(storage.PathFor(ImportLayout.Root));
         // One import per data root: a second process cannot interleave stage or pointer writes.

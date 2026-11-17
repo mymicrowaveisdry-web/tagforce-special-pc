@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using TagForceSpecial.Import.Manifest;
+using TagForceSpecial.Import.Maintenance;
 using TagForceSpecial.Import.Pipeline;
 using TagForceSpecial.Import.Storage;
 
@@ -14,11 +15,13 @@ public sealed class ImportOperation(GameDataStore store) : IDisposable
     private CancellationTokenSource? cancellation;
     private readonly ConcurrentQueue<ImportProgress> updates = new();
     public bool Busy => task is not null;
+    public IReadOnlyList<StageRecord> CompletedStages { get; private set; } = [];
     public ImportProgress Progress { get; private set; } = new("idle", "Import", "Select your original ISO to begin.");
 
     public void Validate(bool initial = false)
     {
         if (task is not null) return;
+        CompletedStages = [];
         Progress = new("verify", "Verify", initial ? "Checking existing local game data" : "Verifying local game data");
         task = Task.Run(() =>
         {
@@ -31,6 +34,7 @@ public sealed class ImportOperation(GameDataStore store) : IDisposable
     public bool Import(string source, string? recipeLibrary = null)
     {
         if (task is not null) return false;
+        CompletedStages = [];
         cancellation?.Dispose(); cancellation = new();
         var token = cancellation.Token;
         Progress = new("source", "Recognize source", "Checking the original image");
@@ -41,6 +45,7 @@ public sealed class ImportOperation(GameDataStore store) : IDisposable
                 var manifest = ImportPipeline.Run(new(source, store.Storage.Root, new ImportOptions(RecipeLibrary: recipeLibrary)),
                     new InlineProgress<ImportProgress>(updates.Enqueue), token);
                 var reload = store.Reload();
+                CompletedStages = manifest.Stages;
                 return Completion(manifest, reload.Success);
             }
             catch (Exception e) when (PrivateStorage.Recoverable(e))
@@ -53,6 +58,18 @@ public sealed class ImportOperation(GameDataStore store) : IDisposable
     }
 
     public void Cancel() => cancellation?.Cancel();
+
+    public void CleanLegacy(CleanupPlan plan)
+    {
+        if (task is not null) return;
+        CompletedStages = [];
+        Progress = new("cleanup", "Clean previous importer data", "Removing confirmed importer-owned files");
+        task = Task.Run(() =>
+        {
+            Cleanup.Execute(store.Storage, plan);
+            return new SetupCompletion(true, "Previous importer data removed. Player data and the new import were kept.");
+        });
+    }
 
     public SetupCompletion? Poll()
     {

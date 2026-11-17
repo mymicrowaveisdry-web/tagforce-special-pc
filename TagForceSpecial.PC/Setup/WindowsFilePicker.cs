@@ -4,6 +4,41 @@ namespace TagForceSpecial.PC.Setup;
 
 internal static class WindowsFilePicker
 {
+    public static string? ChooseDirectory()
+    {
+        if (!OperatingSystem.IsWindows()) throw new InvalidOperationException("Source selection currently requires Windows.");
+        string? result = null;
+        var thread = new Thread(() =>
+        {
+            var info = new BrowseInfo { Title = "Select the extracted game folder containing PSP_GAME", Flags = 0x41 };
+            IntPtr id = SHBrowseForFolder(ref info);
+            if (id == IntPtr.Zero) return;
+            try
+            {
+                var path = new System.Text.StringBuilder(32768);
+                if (SHGetPathFromIDList(id, path)) result = path.ToString();
+            }
+            finally { Marshal.FreeCoTaskMem(id); }
+        });
+        thread.SetApartmentState(ApartmentState.STA); thread.Start(); thread.Join();
+        return result;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct BrowseInfo
+    {
+        public IntPtr Owner, Root, DisplayName;
+        public string Title;
+        public uint Flags;
+        public IntPtr Callback, Parameter;
+        public int Image;
+    }
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr SHBrowseForFolder(ref BrowseInfo info);
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SHGetPathFromIDList(IntPtr id, System.Text.StringBuilder path);
+
     public static string? ChooseIso() => Choose("Select your original Tag Force Special English v2.1 ISO",
         "PSP disc image (*.iso)\0*.iso\0All files\0*.*\0\0");
     public static string? ChooseRecipeLibrary() => Choose("Select recipes/viewer.json from your prepared recipe library",

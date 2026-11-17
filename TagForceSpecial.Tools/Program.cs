@@ -15,7 +15,7 @@ if (args.Length == 1 && args[0] == "presentation-reference-cases")
     return 0;
 }
 
-if (args.Length > 0 && args[0] is "import" or "import-check") return ImportCommands.Run(args[0], args[1..], Console.Out, Console.Error);
+if (args.Length > 0 && args[0] is "import" or "import-check" or "import-clean-legacy" or "import-clean-stages") return ImportCommands.Run(args[0], args[1..], Console.Out, Console.Error);
 if (args.Length > 0 && args[0] == "progress") return ProjectProgress.Run(args[1..], Console.Out, Console.Error);
 if (args.Length > 0 && args[0] == "research-check") return ResearchValidation.Run(args[1..], Console.Out, Console.Error);
 if (args.Length > 0 && args[0] == "card-support") return CardSupportInventory.Run(args[1..], Console.Out, Console.Error);

@@ -9,7 +9,7 @@ Presentation check: `dotnet run --project TagForceSpecial.PC -- --presentation-s
 ## Private data and recovery
 
 - Data defaults to `%LOCALAPPDATA%/TagForceSpecial`; `--data-root <directory>` isolates testing.
-- Setup offers progress/cancel/resume, integrity checks, safe rebuilds, retained interrupted work and preference backup recovery.
+- Setup offers ISO/folder import, recipes, progress/cancel/repeat, completion results, legacy cleanup and preference backup recovery; the separate [WPF workbench](../docs/importer/USER_GUIDE.md) adds asset/evidence inspection.
 - Deck revisions remain separate from caches; invalid drafts can be saved but cannot launch.
 
 Original sources stay read-only. Assets/catalogs remain private and are not bundled or downloaded; resource status lists remaining art/font/audio gaps.

@@ -8,6 +8,7 @@
   <Project Path="TagForceSpecial.PC/TagForceSpecial.PC.csproj" />
   <Project Path="TagForceSpecial.Tests/TagForceSpecial.Tests.csproj" />
   <Project Path="TagForceSpecial.Tools/TagForceSpecial.Tools.csproj" />
+  <Project Path="TagForceSpecial.Workbench/TagForceSpecial.Workbench.csproj" />
   <Folder Name="/Workspace/">
     <File Path=".gitignore" />
     <File Path="Directory.Build.props" />

@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using TagForceSpecial.Import.Installed;
 using TagForceSpecial.Import.Manifest;
+using TagForceSpecial.Import.Maintenance;
 using TagForceSpecial.Import.Pipeline;
 using TagForceSpecial.Import.Storage;
 
@@ -11,7 +12,9 @@ namespace TagForceSpecial.Tools;
 public static class ImportCommands
 {
     private const string Usage = "Usage: import <iso-or-extracted-directory> <data-root> [--recipes <recipes/viewer.json>] [--no-presentation] [--no-recipes] [--no-inventory] [--no-cache]\n" +
-        "       import-check <data-root>";
+        "       import-check <data-root>\n" +
+        "       import-clean-legacy <data-root> [--yes]\n" +
+        "       import-clean-stages <data-root> [--yes]";
     private static readonly JsonSerializerOptions Json = new()
     {
         WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase, Converters = { new JsonStringEnumConverter() }
@@ -22,6 +25,12 @@ public static class ImportCommands
         try
         {
             if (command == "import-check" && args.Length == 1) return Check(args[0], output);
+            if (command is "import-clean-legacy" or "import-clean-stages")
+            {
+                if (args.Length is < 1 or > 2 || args.Length == 2 && args[1] != "--yes")
+                { error.WriteLine(Usage); return 2; }
+                return Clean(command, args[0], args.Length == 2, output);
+            }
             if (command != "import" || args.Length < 2) { error.WriteLine(Usage); return 2; }
             var options = new ImportOptions();
             for (int i = 2; i < args.Length; i++)
@@ -66,6 +75,18 @@ public static class ImportCommands
             issues = result.Issues
         }, Json));
         return result.Usable ? 0 : 1;
+    }
+
+    private static int Clean(string command, string root, bool execute, TextWriter output)
+    {
+        if (!Directory.Exists(root)) throw new DirectoryNotFoundException("Data root does not exist.");
+        var storage = new PrivateStorage(Path.GetFullPath(root));
+        var plan = command == "import-clean-legacy" ? Cleanup.PlanLegacy(storage) : Cleanup.PlanUnusedStages(storage);
+        output.WriteLine(JsonSerializer.Serialize(new { plan.Kind, plan.Items, plan.Bytes, plan.Blocked, dryRun = !execute }, Json));
+        if (plan.Blocked is not null) return 1;
+        if (execute) { Cleanup.Execute(storage, plan); output.WriteLine("Cleanup completed."); }
+        else output.WriteLine("Preview only. Run again with --yes to remove these importer-owned files.");
+        return 0;
     }
 
     private static double? Seconds(StageRecord s) => s.StartedUtc is { } a && s.FinishedUtc is { } b ? Math.Round((b - a).TotalSeconds, 2) : null;

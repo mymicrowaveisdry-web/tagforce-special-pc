@@ -42,9 +42,12 @@ public class CardInfoReaderTests
         Assert.Equal(9, stream.Position); Assert.Equal(before, b); Assert.Equal(1, result.MissingIds);
         Assert.Equal(new CardInfoRow(1, 100, "A", 100u | 0x80000000, 0x12345678, 123), result.Rows[0]);
         Assert.Equal("B", result.Rows[1].Name); Assert.NotEmpty(result.Limitations);
+        // Raw property counts include internal row zero; it is a sentinel, not a card.
+        Assert.Equal(Tables()["CARD_Prop.bin"].Length / 8 - 1, result.Rows.Count);
     }
 
     [Theory]
+    [InlineData("nonzero-sentinel")]
     [InlineData("missing")]
     [InlineData("wrong-length")]
     [InlineData("bad-row")]
@@ -59,6 +62,7 @@ public class CardInfoReaderTests
         var t = Tables();
         switch (scenario)
         {
+            case "nonzero-sentinel": Put(t["CARD_Prop.bin"], 0, 1); break;
             case "missing": t.Remove("CARD_Prop.bin"); break;
             case "wrong-length": t["CARD_Prop.bin"] = new byte[23]; break;
             case "bad-row": t["CARD_IntID.bin"][0] = 99; break;

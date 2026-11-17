@@ -79,7 +79,7 @@ public sealed partial class GameLoop
         Register(ScreenId.Preferences, b => RecoverSetup(() => UpdatePreferences(b)), DrawPreferences, "NativePreferences",
             pointer: Rows(at => gum.HitIndex("NativePreferences", "Row", 4, at)));
         Register(ScreenId.Setup, b => RecoverSetup(() => UpdateSetupScreen(b)), DrawSetupScreen,
-            pointer: Rows(at => setupOperation?.Busy == true ? null : TextRow(at, 12, 77, 15, SetupActions.Length, 0)));
+            pointer: Rows(at => setupOperation?.Busy == true || cleanupConfirmation is not null || showImportResults ? null : TextRow(at, 12, 77, 15, SetupActions.Length, 0)));
         Register(ScreenId.DeckEditor, b => RecoverSetup(() => UpdateEditor(b)), DrawEditor, pointer: EditorPointer);
         Register(ScreenId.SavedDecks, b => RecoverSetup(() => UpdateSavedDecks(b)), DrawSetupLists,
             pointer: Rows(at => TextRow(at, 12, 55, 22, editor?.SavedDecks.Count ?? 0, menuIndex / 8 * 8, 8)));
