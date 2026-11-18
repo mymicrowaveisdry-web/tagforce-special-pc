@@ -1,4 +1,5 @@
 using TagForceSpecial.PC.App.Input;
+using FreeDuelScreen = TagForceSpecial.PC.App.Screens.FreeDuel;
 
 namespace TagForceSpecial.PC.App.Screens.Title;
 
@@ -9,7 +10,7 @@ public enum TitleFlowStep
     RulesQuestion, ConfidenceQuestion, DuelistLevel, CreateQuestion, SystemSavePrompt, SystemSaveDone,
     MainMenu, MainMenuUnavailable, QuitQuestion, ExitToTitle,
     Options, OptionsSaveQuestion,
-    DeckMenu, DeckEdit, RecipeViewer, DatabaseMenu, CardAlbum
+    DeckMenu, DeckEdit, RecipeViewer, DatabaseMenu, CardAlbum, FreeDuelSettings
 }
 
 public enum DuelistLevelChoice { FirstTimer, BeenThere, BringItOn }
@@ -32,6 +33,8 @@ public interface ITitleFlowHost
     RecipeViewerSession? OpenRecipeViewer() => null;
     void CloseRecipeViewer(RecipeSelection? selection) { }
     Album.CardAlbumSession? OpenCardAlbum() => null;
+    /// <summary>The Free Duel settings screen, or null when its measured assets are not imported (the row then keeps its notice).</summary>
+    FreeDuelScreen.FreeDuelSettingsSession? OpenFreeDuel() => null;
 }
 
 /// <summary>Observed Continue/New Game routes (config/reference/title-flow.json) and Main Menu/Options/Deck Menu routes (main-menu.json,
@@ -45,6 +48,7 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
     private DeckEditSession? pendingDeckEdit;
     private RecipeViewerSession? pendingRecipes;
     private Album.CardAlbumSession? pendingAlbum;
+    private FreeDuelScreen.FreeDuelSettingsSession? pendingFreeDuel;
     private int returnSubmenuFocus;
     private bool submenuSettled;
     public const int NameLimit = 8;
@@ -91,6 +95,7 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
     public RecipeViewerSession? Recipes { get; private set; }
     /// <summary>The Card Album while <see cref="TitleFlowStep.CardAlbum"/> is active.</summary>
     public Album.CardAlbumSession? CardAlbum { get; private set; }
+    public FreeDuelScreen.FreeDuelSettingsSession? FreeDuel { get; private set; }
     /// <summary>Measured: the Main Menu is dimmed, without focus, for as long as the submenu is drawn, including its close frames.</summary>
     public bool MainMenuDimmed => Step is TitleFlowStep.DeckMenu or TitleFlowStep.DatabaseMenu;
     /// <summary>Game frames since the Main Menu focus reappeared after the submenu closed; measured, its pulse restarts there.
@@ -136,6 +141,7 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
         menuClock += delta;
         if (sinceSubmenuClosed is { } since) sinceSubmenuClosed = since + delta;
         if (Step == TitleFlowStep.CardAlbum) { CardAlbum?.Update(delta); return; }
+        if (Step == TitleFlowStep.FreeDuelSettings) { FreeDuel?.Update(delta); return; }
         if (Submenu is { } submenu)
         {
             submenu.Update(delta);
@@ -194,6 +200,15 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
             { submenuSettled = true; returnSubmenuFocus = 1; EnterFaded(TitleFlowStep.DatabaseMenu, keepMenuFocus: true, lead: 0); }
             return;
         }
+        if (Step == TitleFlowStep.FreeDuelSettings)
+        {
+            // Measured: Back from the first step returns to the Main Menu on Free Duel, replaying its entry; Next waits for the versus screen.
+            var outcome = FreeDuel!.Handle(input);
+            if (outcome == FreeDuelScreen.FreeDuelSettingsOutcome.Close)
+                EnterFaded(TitleFlowStep.MainMenu, keepMenuFocus: true, replayEntry: true, lead: 0);
+            else if (outcome == FreeDuelScreen.FreeDuelSettingsOutcome.Next) FreeDuel.ShowNotice();
+            return;
+        }
         if (Step == TitleFlowStep.RecipeViewer)
         {
             if (Recipes!.Handle(input))
@@ -233,6 +248,9 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
             // Observed: the submenu opens over the live, dimmed menu with no fade.
             case MainMenuRoute.DeckMenu: Enter(TitleFlowStep.DeckMenu, keepMenuFocus: true); break;
             case MainMenuRoute.DatabaseMenu: Enter(TitleFlowStep.DatabaseMenu, keepMenuFocus: true); break;
+            // Inferred: the menu fades out at once like Options (Free Duel's transition timing is not measured yet).
+            case MainMenuRoute.FreeDuel when host.OpenFreeDuel() is { } freeDuel:
+                pendingFreeDuel = freeDuel; EnterFaded(TitleFlowStep.FreeDuelSettings, keepMenuFocus: true, lead: 0); break;
             default: Enter(TitleFlowStep.MainMenuUnavailable); break;
         }
     }
@@ -426,6 +444,8 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
         pendingRecipes = null;
         CardAlbum = next == TitleFlowStep.CardAlbum ? pendingAlbum : null;
         pendingAlbum = null;
+        FreeDuel = next == TitleFlowStep.FreeDuelSettings ? pendingFreeDuel : null;
+        pendingFreeDuel = null;
         sinceSubmenuClosed = null;
     }
 

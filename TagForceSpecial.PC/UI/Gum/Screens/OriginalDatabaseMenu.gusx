@@ -313,7 +313,7 @@
       <Value xsi:type="xsd:int">0</Value>
     </Variable>
     <Variable Type="string" Name="NoticeHint.Text" SetsValue="true">
-      <Value xsi:type="xsd:string">PC notice. Enter / A or Esc / B: back to the Deck Menu</Value>
+      <Value xsi:type="xsd:string">PC notice. Enter / A or Esc / B: back to the Database menu</Value>
     </Variable>
     <Variable IsFont="true" Type="string" Name="NoticeHint.Font" SetsValue="true">
       <Value xsi:type="xsd:string">Fonts/LiberationSans-Regular.ttf</Value>

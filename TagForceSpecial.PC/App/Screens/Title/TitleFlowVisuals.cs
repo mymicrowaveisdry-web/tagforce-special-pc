@@ -161,9 +161,15 @@ public sealed partial class TitleFlowVisuals : IDisposable
     /// <summary>Adds imported textures under their asset keys (pinned to the original uploads) and the archive the album's labels come from.</summary>
     public void UseAlbumAssets(OriginalScreenAssetResolver assets, IEnumerable<string> keys, string archiveKey, string cardInfoKey)
     {
-        foreach (string key in keys.Where(k => !textures.ContainsKey(k))) textures.AddBorrowed(key, assets.Resolve(key).Texture);
+        UseTextures(assets, keys);
         albumArchive ??= assets.ResolveBytes(archiveKey);
         cardInfoArchive ??= assets.ResolveBytes(cardInfoKey);
+    }
+
+    /// <summary>Adds imported textures under their asset keys (pinned to the original uploads) when not loaded yet.</summary>
+    public void UseTextures(OriginalScreenAssetResolver assets, IEnumerable<string> keys)
+    {
+        foreach (string key in keys.Where(k => !textures.ContainsKey(k))) textures.AddBorrowed(key, assets.Resolve(key).Texture);
     }
 
     /// <summary>The whole message at a source offset (UTF-16 up to its terminator), normalized like other source text.</summary>

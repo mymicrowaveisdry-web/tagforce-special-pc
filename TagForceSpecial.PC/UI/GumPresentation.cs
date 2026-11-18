@@ -21,7 +21,7 @@ public sealed class GumPresentation : IDisposable
             ?? throw new InvalidDataException("Gum project did not load.");
         gum.CanvasWidth = 480; gum.CanvasHeight = 272;
         // Root order is draw order: the submenus sit over the Main Menu.
-        foreach (string name in new[] { "OriginalTitle", "OriginalTitleStartMenu", "OriginalTitleFlow", "OriginalMainMenu", "OriginalDeckMenu", "OriginalDatabaseMenu", "OriginalDeckEdit", "OriginalRecipeViewer", "OriginalCardAlbum", "OriginalOptions", "NativeToolsMenu", "NativePreferences" })
+        foreach (string name in new[] { "OriginalTitle", "OriginalTitleStartMenu", "OriginalTitleFlow", "OriginalMainMenu", "OriginalDeckMenu", "OriginalDatabaseMenu", "OriginalDeckEdit", "OriginalRecipeViewer", "OriginalCardAlbum", "OriginalFreeDuel", "OriginalOptions", "NativeToolsMenu", "NativePreferences" })
         {
             var root = project.Screens.Single(s => s.Name == name).ToGraphicalUiElement();
             root.Visible = false;
@@ -30,7 +30,7 @@ public sealed class GumPresentation : IDisposable
         }
         noticeShade = new Texture2D(device, 1, 1);
         noticeShade.SetData([Color.White]);
-        foreach (string screen in new[] { "OriginalMainMenu", "OriginalDeckMenu", "OriginalDatabaseMenu", "OriginalDeckEdit" })
+        foreach (string screen in new[] { "OriginalMainMenu", "OriginalDeckMenu", "OriginalDatabaseMenu", "OriginalDeckEdit", "OriginalFreeDuel" })
         {
             var shade = MainMenuSprite(roots[screen], "NoticeShade");
             shade.Texture = noticeShade;
@@ -159,6 +159,18 @@ public sealed class GumPresentation : IDisposable
 
     /// <summary>The Card Album is drawn whole into its own layer; Gum only shows it.</summary>
     public void BindCardAlbum(RenderTarget2D layer) => Bind(MainMenuSprite(roots["OriginalCardAlbum"], "Layer"), layer, new Rectangle(0, 0, 480, 272), true);
+
+    public void BindFreeDuel(RenderTarget2D layer) => Bind(MainMenuSprite(roots["OriginalFreeDuel"], "Layer"), layer, new Rectangle(0, 0, 480, 272), true);
+
+    /// <summary>PC notice over the Free Duel settings for rows the PC cannot play yet; its title is the row's own source label.</summary>
+    public void ShowFreeDuelNotice(string? title)
+    {
+        var notice = roots["OriginalFreeDuel"].GetGraphicalUiElementByName("Notice") ?? throw new InvalidDataException("Missing Free Duel notice.");
+        notice.Visible = title is not null;
+        if (title is null) return;
+        BindText("OriginalFreeDuel", "NoticeTitle", title);
+        BindText("OriginalFreeDuel", "NoticeBody", "This mode has not been recreated in the PC version yet.");
+    }
 
     public void BindRecipes(RenderTarget2D layer)
     {

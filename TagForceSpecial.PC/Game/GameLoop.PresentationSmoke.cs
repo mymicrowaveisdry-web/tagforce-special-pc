@@ -65,6 +65,7 @@ public sealed partial class GameLoop
             Press(Keys.Up, $"MainMenu/0/{row}");
             if (MainMenuDestinations.All[row].Route == MainMenuRoute.Options) { OptionsRoute(Press); continue; }
             if (MainMenuDestinations.All[row].Route == MainMenuRoute.DeckMenu) { DeckMenuRoute(Press, Hold, row, deckEdit, recipes); continue; }
+            if (MainMenuDestinations.All[row].Route == MainMenuRoute.FreeDuel) { FreeDuelRoute(Press, row); continue; }
             if (MainMenuDestinations.All[row].Route == MainMenuRoute.DatabaseMenu) { DatabaseMenuRoute(Press, Hold, row, album ? frames => { for (int i = 0; i < frames; i++) steps.Add((null, AnyState)); } : null); continue; }
             Press(Keys.Enter, $"MainMenuUnavailable/0/{row}"); Press(Keys.Escape, $"MainMenu/0/{row}");
             Press(Keys.Enter, $"MainMenuUnavailable/0/{row}"); Press(Keys.Enter, $"MainMenu/0/{row}");
@@ -115,6 +116,26 @@ public sealed partial class GameLoop
         Press(Keys.Enter, "SystemSavePrompt/0/6"); Press(Keys.Enter, "SystemSaveDone/0/6"); Press(Keys.Escape, "MainMenu/0/6");
         Press(Keys.Enter, "Options/L/0/1"); Press(Keys.Left, "Options/L/0/0"); Press(Keys.Enter, "OptionsSaveQuestion/0/6"); Press(Keys.Right, "OptionsSaveQuestion/1/6");
         Press(Keys.Enter, "MainMenu/0/6");
+    }
+
+    /// <summary>Free Duel settings: wrap, PC notices on Tag Duel / Match / a time limit (focus kept), the rule-change path and Back to
+    /// Rules, the music list's wrap and scroll, the confirmation and its Next notice, and the Back chain to the Main Menu on Free Duel.</summary>
+    private static void FreeDuelRoute(Action<Keys, string, string?> press, int menuRow)
+    {
+        void Press(Keys key, string expected) => press(key, expected, null);
+        static string F(string step, int focus, int top = 0, bool notice = false) => $"FreeDuel/{step}/{focus}/{top}{(notice ? "/N" : "")}";
+        Press(Keys.Enter, F("Format", 0)); Press(Keys.Up, F("Format", 2)); Press(Keys.Down, F("Format", 0)); Press(Keys.Down, F("Format", 1));
+        Press(Keys.Enter, F("Format", 1, notice: true)); Press(Keys.Down, F("Format", 1, notice: true)); Press(Keys.Escape, F("Format", 1));
+        Press(Keys.Up, F("Format", 0)); Press(Keys.Enter, F("Ending", 0)); Press(Keys.Down, F("Ending", 1));
+        Press(Keys.Enter, F("Ending", 1, notice: true)); Press(Keys.Enter, F("Ending", 1)); Press(Keys.Up, F("Ending", 0));
+        Press(Keys.Enter, F("Rules", 0)); Press(Keys.Down, F("Rules", 1)); Press(Keys.Enter, F("LifePoints", 0)); Press(Keys.Enter, F("TimeLimit", 0));
+        Press(Keys.Down, F("TimeLimit", 1)); Press(Keys.Enter, F("TimeLimit", 1, notice: true)); Press(Keys.Escape, F("TimeLimit", 1));
+        Press(Keys.Escape, F("LifePoints", 0)); Press(Keys.Escape, F("Rules", 1)); Press(Keys.Up, F("Rules", 0)); Press(Keys.Enter, F("Music", 0));
+        Press(Keys.Up, F("Music", 43, 38)); Press(Keys.Down, F("Music", 0));
+        for (int row = 1; row <= 6; row++) Press(Keys.Down, F("Music", row, Math.Max(0, row - 5)));
+        Press(Keys.Enter, F("Confirm", 0)); Press(Keys.Enter, F("Confirm", 0, notice: true)); Press(Keys.Escape, F("Confirm", 0));
+        Press(Keys.Escape, F("Music", 6, 1)); Press(Keys.Escape, F("Rules", 0)); Press(Keys.Escape, F("Ending", 0)); Press(Keys.Escape, F("Format", 0));
+        Press(Keys.Escape, $"MainMenu/0/{menuRow}");
     }
 
     /// <summary>Database submenu over the dimmed Main Menu: press wrap both ways, ignored buttons, every row's PC notice with both exits
@@ -286,6 +307,8 @@ public sealed partial class GameLoop
             $"Recipe/{recipes.Kind}/{recipes.Cursor}/{recipes.Modal}/{recipes.Sort}/{recipes.Inverse}",
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.DeckEdit, DeckEdit: { } edit } =>
             $"DeckEdit/{edit.Tab}/{edit.Cursor}/{edit.Prompt}/{edit.PromptFocus}/{MenuState(edit.Menus)}/{edit.Count(DeckEditTab.Deck)}/{edit.Count(DeckEditTab.Trunk)}",
+        ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.FreeDuelSettings, FreeDuel: { } fd } =>
+            $"FreeDuel/{fd.Step}/{fd.Focus}/{fd.Top}{(fd.NoticeOpen ? "/N" : "")}",
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.CardAlbum, CardAlbum: { } album } =>
             $"CardAlbum/{album.View}/{album.Focus}/{(album.RightPage ? "R" : "L")}/{album.Pocket}/{album.BarButton}{(album.JumpOpen ? $"/J{album.JumpRow}{album.JumpColumn}" : "")}{(album.Detail is { Closing: false } d ? $"/D{(int)d.Tab}" : "")}",
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.DeckMenu or TitleFlowStep.DatabaseMenu, Submenu: { } sub } flow =>
@@ -304,7 +327,7 @@ public sealed partial class GameLoop
             throw new InvalidOperationException($"Presentation route/focus mismatch at frame {frames}, step {step}: expected {expected}, got {label}.");
         if (duel is not null || smokeCommands != 0 || router!.ModalDepth != 0)
             throw new InvalidOperationException("Presentation navigation changed gameplay or modal ownership.");
-        if (gum.RootCount != 12 || gum.AttachedRootCount != 12 || originalTitle?.Layers.Count != 11)
+        if (gum.RootCount != 13 || gum.AttachedRootCount != 13 || originalTitle?.Layers.Count != 11)
             throw new InvalidOperationException("Presentation root/layer count changed.");
         presentationTextureCount ??= gum.CachedTextureCount;
         if (gum.CachedTextureCount != presentationTextureCount)

@@ -88,6 +88,19 @@ public sealed partial class TitleFlowVisuals
         DrawMenuBackgroundLayers(gameFrame, entryFrame);
     });
 
+    /// <summary>Only the animated background layers (draws before the header's first piece), for screens that draw their own header;
+    /// measured on Free Duel: same layers, with its own header over them.</summary>
+    public void DrawMenuBackdrop(int gameFrame)
+    {
+        var frame = frames[MainMenuFrame];
+        for (int i = 0; i < FirstHeaderDraw - 1; i++)
+        {
+            if (i == TintDraw) DrawMeasured(TintDrawAt(frame.Draws[i], gameFrame));
+            else if (animatedDraws.TryGetValue(i, out var animated)) DrawMeasured(animated(gameFrame));
+            else DrawMeasured(frame.Draws[i]);
+        }
+    }
+
     /// <summary>The menu background; another screen can supply its own measured title quad (Options uses the same header).</summary>
     private void DrawMenuBackgroundLayers(int gameFrame, int entryFrame, FlowQuad? title = null)
     {
