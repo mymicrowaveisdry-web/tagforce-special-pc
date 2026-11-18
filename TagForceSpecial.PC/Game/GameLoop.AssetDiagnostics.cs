@@ -2,8 +2,8 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using TagForceSpecial.Assets.Presentation;
 using TagForceSpecial.PC.DuelUI.Input;
-using TagForceSpecial.PC.Import;
-using TagForceSpecial.PC.Setup;
+using TagForceSpecial.Import.Storage;
+using TagForceSpecial.Import.Validation;
 using TagForceSpecial.PC.UI;
 
 namespace TagForceSpecial.PC.Game;
@@ -24,18 +24,19 @@ public sealed partial class GameLoop
     {
         diagnosticLayout ??= new(Path.Combine(AppContext.BaseDirectory, "UI/Gum/Screens/AssetDiagnostics.gusx"));
         if (diagnosticTask is not null) { screen = ScreenId.AssetDiagnostics; return; }
-        var storage = setup?.Storage;
-        diagnosticTask = Task.Run(() => InspectPrivatePresentation(storage, options.AssetPreview));
+        var registry = setup?.Game?.Presentation;
+        bool invalid = setup?.GameIssues.Any(i => i.Code == "PresentationInvalid") == true;
+        diagnosticTask = Task.Run(() => InspectPrivatePresentation(registry, invalid, options.AssetPreview));
         diagnosticAssetIndex = 0;
         screen = ScreenId.AssetDiagnostics;
     }
 
-    private static DiagnosticSnapshot InspectPrivatePresentation(PrivateStorage? storage, string? previewKey)
+    private static DiagnosticSnapshot InspectPrivatePresentation(SemanticAssetRegistry? registry, bool invalid, string? previewKey)
     {
+        if (invalid) return new(AssetRequirements.Inspect(null, AssetRequirements.DefaultRequirements, invalidPackage: true), null);
         try
         {
-            var registry = storage is null ? null : new PresentationCacheStore(storage).OpenActive();
-            var requirements = AssetDiagnostics.DefaultRequirements.ToList();
+            var requirements = AssetRequirements.DefaultRequirements.ToList();
             if (registry is not null)
                 foreach (string key in registry.Entries.Keys.Except(requirements.Select(r => r.AssetKey), StringComparer.Ordinal))
                 {
@@ -51,10 +52,10 @@ public sealed partial class GameLoop
                     preview = new(previewKey, resource.Manifest.Output.Width.Value, resource.Manifest.Output.Height.Value,
                         resource.Content, PresentationReferenceCases.Cases.Single(c => c.AssetKey == previewKey).NativeCard);
             }
-            return new(AssetDiagnostics.Inspect(registry, requirements), preview);
+            return new(AssetRequirements.Inspect(registry, requirements), preview);
         }
-        catch (Exception error) when (SetupStore.Recoverable(error))
-        { return new(AssetDiagnostics.Inspect(null, AssetDiagnostics.DefaultRequirements, invalidPackage: true), null); }
+        catch (Exception error) when (PrivateStorage.Recoverable(error))
+        { return new(AssetRequirements.Inspect(null, AssetRequirements.DefaultRequirements, invalidPackage: true), null); }
     }
 
     private void UpdateAssetDiagnostics(GuiButtons buttons)
@@ -80,7 +81,7 @@ public sealed partial class GameLoop
                 };
             }
         }
-        if (buttons.Back) { savedFocus[ScreenId.Setup] = 7; screen = ScreenId.Setup; return; }
+        if (buttons.Back) { savedFocus[ScreenId.PcTools] = 0; screen = ScreenId.PcTools; return; }
         int delta = buttons.Right ? 1 : buttons.Left ? -1 : 0;
         if (delta != 0)
         { diagnosticScreenIndex = (diagnosticScreenIndex + delta + DiagnosticScreens.Length) % DiagnosticScreens.Length; diagnosticAssetIndex = 0; }
@@ -119,7 +120,7 @@ public sealed partial class GameLoop
         string selected = DiagnosticScreens[diagnosticScreenIndex];
         var rows = assetDiagnostics.Where(r => r.Screen == selected).ToArray();
         Label("ScreenLabel", "SCREEN: " + selected.ToUpperInvariant(), Color.White);
-        Label("Summary", string.Join(" / ", AssetDiagnostics.Statuses.Select(s => s.ToUpperInvariant() + " " + rows.Count(r => r.Status == s))), muted);
+        Label("Summary", string.Join(" / ", AssetRequirements.Statuses.Select(s => s.ToUpperInvariant() + " " + rows.Count(r => r.Status == s))), muted);
         var area = layout.Bounds("Rows");
         int first = diagnosticAssetIndex / 3 * 3;
         for (int i = first; i < Math.Min(rows.Length, first + 3); i++)

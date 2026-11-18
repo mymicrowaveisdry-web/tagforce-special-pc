@@ -1,5 +1,6 @@
 using Microsoft.Xna.Framework;
 using TagForceSpecial.Core.Decks;
+using TagForceSpecial.Import.Storage;
 using TagForceSpecial.PC.Decks;
 using TagForceSpecial.PC.DuelUI.Input;
 using TagForceSpecial.PC.Setup;
@@ -8,34 +9,40 @@ namespace TagForceSpecial.PC.Game;
 
 public sealed partial class GameLoop
 {
-    private SetupStore? setup;
+    private GameDataStore? setup;
     private DeckEditorSession? editor;
-    private SetupOperation? setupOperation;
+    private ImportOperation? setupOperation;
     private int setupSmokeStage, editorFrame;
     private string preferencesNotice = "Changes are saved locally.";
-    private static readonly string[] SetupActions = ["SELECT ORIGINAL ISO", "RESUME IMPORT", "VERIFY CURRENT CACHE", "REBUILD FROM ORIGINAL ISO", "RESTART INTERRUPTED WORK", "PREFERENCES", "RESTORE SETTINGS BACKUP", "RESOURCE STATUS", "PC DUEL TOOLS"];
     private void InitializeSetup()
     {
         if (options.Smoke && !SetupAutomation) return;
         string root = options.DataRoot ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TagForceSpecial");
         setup = new(root); editor = new(setup); setupOperation = new(setup);
+        // Automated walks press the retained default keys whatever the player saved.
+        if (!options.PresentationSmoke && options.RealtimeWalkRoot is null && setup.Issue is null) input.Bindings = setup.Preferences.Bindings();
         Window.TextInput += (_, e) =>
         {
             if (titleFlow?.Editing == true) { titleFlow.TypeCharacter(e.Character); return; }
             editor.TypeCharacter(e.Character);
         };
         if (setup.Issue is { } issue) setupMessage = issue.Message;
-        else if (options.SetupSource is null && setup.Preferences.ActiveGeneration is not null)
+        else if (options.SetupSource is null)
         {
-            setupOperation.Validate(initial: true);
+            // Reading synchronously keeps startup routing deterministic for presentation runs; the reader re-verifies every output.
+            setup.Reload();
         }
-        if (options.SetupSource is { } source) { screen = ScreenId.Setup; BeginImport(source); }
+        if (options.SetupSource is { } source)
+        {
+            screen = ScreenId.PcTools;
+            BeginImport(source, options.RecipeReferenceRoot is { } reference ? Path.Combine(reference, "recipes", "viewer.json") : null);
+        }
     }
-    private void BeginImport(string source)
+    private void BeginImport(string source, string? recipeLibrary = null)
     {
-        if (setupOperation?.Import(source) != true) return;
+        if (setupOperation?.Import(source, recipeLibrary) != true) return;
         setupMessage = "Importing local game data";
-        screen = ScreenId.Setup;
+        screen = ScreenId.PcTools;
     }
     private uint CurrentSeed => options.SeedSpecified ? options.Seed : setup?.Preferences.OpponentSeed ?? options.Seed;
     private bool SetupAutomation => options.Smoke && (options.SetupSource is not null || options.CachePath is null && options.DataRoot is not null);
@@ -47,7 +54,7 @@ public sealed partial class GameLoop
     }
     private void OpenEditor()
     {
-        if (setup?.Cache is null) { screen = ScreenId.Setup; menuIndex = 0; return; }
+        if (setup?.Game is null) { screen = ScreenId.PcTools; menuIndex = 0; return; }
         editor!.Open();
         screen = ScreenId.DeckEditor;
     }
@@ -57,39 +64,12 @@ public sealed partial class GameLoop
         var result = editor.Launch(CurrentSeed);
         if (result.Controller is null)
         {
-            if (result.SetupError is { } error) { setupMessage = error; screen = ScreenId.Setup; }
+            if (result.SetupError is { } error) { setupMessage = error; screen = ScreenId.PcTools; }
             return false;
         }
         duel = result.Controller;
         screen = ScreenId.Duel; choiceIndex = 0; inspectIndex = -1;
         return true;
-    }
-    private void UpdateSetupScreen(GuiButtons buttons)
-    {
-        if (setupOperation?.Busy == true)
-        { if (buttons.Back) { setupOperation?.Cancel(); setupMessage = "Stopping safely..."; } return; }
-        if (buttons.Back) { screen = utilityReturn; return; }
-        MoveMenu(buttons, SetupActions.Length);
-        if (!buttons.Confirm || setup is null) return;
-        try
-        {
-            switch (menuIndex)
-            {
-                case 0: case 3:
-                    string? file = WindowsFilePicker.ChooseIso(); if (file is not null) BeginImport(file); break;
-                case 1:
-                    if (setup.ResumeSource() is { } source) BeginImport(source);
-                    else setupMessage = "No previous source is available. Select your original ISO.";
-                    break;
-                case 2: setupOperation!.Validate(); setupMessage = "Checking local game data"; break;
-                case 4: setup.RestartWork(); setupMessage = "Interrupted work retained separately. Select your ISO or resume to restart."; break;
-                case 5: screen = ScreenId.Preferences; menuIndex = 0; break;
-                case 6: setupMessage = setup.RestorePreferences().Issue?.Message ?? "Previous preferences restored."; editor!.ResetDraft(); break;
-                case 7: OpenAssetDiagnostics(); break;
-                case 8: screen = ScreenId.PcTools; break;
-            }
-        }
-        catch (Exception e) when (SetupStore.Recoverable(e)) { setupMessage = "The operation could not finish. Check local storage and retry."; }
     }
     private void UpdatePreferences(GuiButtons buttons)
     {
@@ -122,23 +102,6 @@ public sealed partial class GameLoop
         if (!buttons.Confirm) return;
         editor.LoadSaved(menuIndex);
         screen = ScreenId.DeckEditor;
-    }
-    private void DrawSetupScreen()
-    {
-        var gold = new Color(238, 196, 104); var muted = new Color(143, 162, 187);
-        renderer.Text("LOCAL GAME SETUP", 12, 12, gold, 2);
-        renderer.Wrapped(setupMessage, 12, 36, 75, 3, muted);
-        if (setupOperation?.Busy == true)
-        {
-            renderer.Wrapped(setupOperation!.Progress.Message, 12, 87, 75, 3);
-            renderer.Fill(new(12, 125, 450, 12), new Color(30, 43, 60));
-            renderer.Fill(new(12, 125, Math.Clamp(setupOperation!.Progress.Percent, 0, 100) * 450 / 100, 12), new Color(75, 174, 177));
-            renderer.Text($"{setupOperation!.Progress.Percent}%   ESC/B: STOP SAFELY", 12, 153);
-        }
-        else
-            for (int i = 0; i < SetupActions.Length; i++)
-                renderer.Text((menuIndex == i ? "> " : "  ") + SetupActions[i], 12, 82 + i * 19, menuIndex == i ? gold : Color.White);
-        renderer.Text("ESC/B: BACK   ORIGINALS READ-ONLY. ASSETS LOCAL.", 12, 251, muted);
     }
     private void DrawEditor()
     {
@@ -189,7 +152,7 @@ public sealed partial class GameLoop
     {
         if (!SetupAutomation || duel is not null) return;
         if (setupOperation?.Busy == true) return;
-        if (setup?.Cache is null) throw new InvalidOperationException(setupMessage);
+        if (setup?.Game is null) throw new InvalidOperationException(setupMessage);
         if (setupSmokeStage == 0)
         {
             OpenEditor(); var draft = editor!.Draft!; draft.Name = "Setup acceptance";

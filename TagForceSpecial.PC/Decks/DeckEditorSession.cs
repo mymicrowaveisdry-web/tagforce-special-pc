@@ -3,6 +3,7 @@ using TagForceSpecial.Effects;
 using TagForceSpecial.PC.DuelUI;
 using TagForceSpecial.PC.DuelUI.Input;
 using TagForceSpecial.PC.Game;
+using TagForceSpecial.Import.Storage;
 using TagForceSpecial.PC.Setup;
 
 namespace TagForceSpecial.PC.Decks;
@@ -11,7 +12,7 @@ public enum DeckEditorRequest { None, SavedDecks, Play, Back }
 public sealed record DeckLaunchResult(DuelController? Controller, string? SetupError = null);
 
 /// <summary>Owns an editable deck session and revision transactions; returns navigation requests to the host.</summary>
-public sealed class DeckEditorSession(SetupStore store)
+public sealed class DeckEditorSession(GameDataStore store)
 {
     private readonly DeckLibrary library = new(store.Storage);
     public DeckDraft? Draft { get; private set; }
@@ -19,6 +20,8 @@ public sealed class DeckEditorSession(SetupStore store)
     public IReadOnlyList<SavedDeck> SavedDecks { get; private set; } = [];
     public int CardIndex { get; set; }
     public int MenuIndex { get; private set; }
+    /// <summary>Pointer focus on a menu action while the menu is open.</summary>
+    public void PointMenu(int index) { if (MenuOpen && index >= 0 && index < Actions.Count) MenuIndex = index; }
     public bool MenuOpen { get; private set; }
     public string? EditingText { get; private set; }
     public bool EditingName { get; private set; }
@@ -31,21 +34,25 @@ public sealed class DeckEditorSession(SetupStore store)
 
     public void Open()
     {
-        if (Draft is null)
-        {
-            if (store.Preferences.SelectedDeck is { } key)
-            {
-                try { Draft = new(store.Cache!.Catalog.Catalog, library.Load(key)); DraftKey = key; }
-                catch (Exception e) when (SetupStore.Recoverable(e))
-                { Notice = "Saved revision is unreadable. Load an earlier revision or use a new deck."; }
-            }
-            Draft ??= new(store.Cache!.Catalog.Catalog, InitialOpponentDecks.Create(0));
-        }
+        EnsureDraft();
         CardIndex = 0; MenuOpen = false;
     }
 
+    /// <summary>Loads the selected saved revision, else the built-in deck, once per session; the native Deck Edit shares this draft.</summary>
+    public void EnsureDraft()
+    {
+        if (Draft is not null || store.Game is null) return;
+        if (store.Preferences.SelectedDeck is { } key)
+        {
+            try { Draft = new(store.Game.Catalog.Catalog, library.Load(key)); DraftKey = key; }
+            catch (Exception e) when (PrivateStorage.Recoverable(e))
+            { Notice = "Saved revision is unreadable. Load an earlier revision or use a new deck."; }
+        }
+        Draft ??= new(store.Game.Catalog.Catalog, InitialOpponentDecks.Create(0));
+    }
+
     public void ResetDraft() => Draft = null;
-    public void ReloadDraft() => Draft = new(store.Cache!.Catalog.Catalog, library.Load(DraftKey!));
+    public void ReloadDraft() => Draft = new(store.Game!.Catalog.Catalog, library.Load(DraftKey!));
 
     public void Save()
     {
@@ -60,20 +67,20 @@ public sealed class DeckEditorSession(SetupStore store)
     public DeckLaunchResult Launch(uint seed)
     {
         if (Draft is null) return new(null);
-        var result = store.ValidateActive();
+        var result = store.Reload();
         if (!result.Success) return new(null, result.Issue!.Message);
         if (!Draft.Validate().CanPlay) { Notice = "Fix deck legality before starting a duel."; return new(null); }
         Save();
         // A duel receives the persisted revision rather than mutable editor cards.
         var saved = library.Load(DraftKey!);
-        return new(SupportedDuelFactory.Create(store.Cache!, saved, seed));
+        return new(SupportedDuelFactory.Create(store.Game!, saved, seed));
     }
 
     public void LoadSaved(int index)
     {
         var selected = SavedDecks[index];
         if (selected.Deck is null) { Notice = selected.Error!; return; }
-        Draft = new(store.Cache!.Catalog.Catalog, library.Load(selected.Key)); DraftKey = selected.Key;
+        Draft = new(store.Game!.Catalog.Catalog, library.Load(selected.Key)); DraftKey = selected.Key;
         store.SavePreferences(store.Preferences with { SelectedDeck = selected.Key });
         CardIndex = 0;
     }
@@ -111,7 +118,7 @@ public sealed class DeckEditorSession(SetupStore store)
                 case 0: Save(); break;
                 case 1: EditingName = true; EditingText = Draft.Name; break;
                 case 2: EditingName = false; EditingText = Draft.Search; break;
-                case 3: Draft.Filter = (DeckFilter)(((int)Draft.Filter + 1) % 3); CardIndex = 0; break;
+                case 3: Draft.Filter = (DeckFilter)(((int)Draft.Filter + 1) % Enum.GetValues<DeckFilter>().Length); CardIndex = 0; break;
                 case 4: SavedDecks = library.List(); return DeckEditorRequest.SavedDecks;
                 case 5: Draft = new(Draft.Catalog, InitialOpponentDecks.Create(0)); Draft.Clear(); Draft.Name = "New deck"; DraftKey = null; break;
                 case 6: Draft = new(Draft.Catalog, InitialOpponentDecks.Create(0)); DraftKey = null; break;

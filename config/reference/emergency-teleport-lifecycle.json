@@ -1,0 +1,436 @@
+{
+  "schemaVersion": 1,
+  "sourceIsoSha256": "e99cff5774856e16329b94c9ff48f9eb0c6bc61ff1127882d0785ca4221bd707",
+  "moduleSha256": "ee0e50c12d78e28ebb9f91625e556d131a84a1729e06359ca5c045bf911085c0",
+  "scope": "Deck Krebons in face-up attack: unchanged Main1 board directly to End Phase banishment",
+  "repeatCount": 2,
+  "captures": [
+    {
+      "before": "spell-lifecycle-031-end-selected",
+      "watch": "spell-lifecycle-032-banish-watch",
+      "after": "spell-lifecycle-033-banished"
+    },
+    {
+      "before": "spell-lifecycle-035-before-repeat",
+      "watch": "spell-lifecycle-036-banish-watch-repeat",
+      "after": "spell-lifecycle-037-banished-repeat"
+    }
+  ],
+  "snapshots": {
+    "spell-lifecycle-031-end-selected": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 31,
+            "monsterCardIds": [
+              0,
+              7716,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [
+              7747
+            ],
+            "handCardIds": [
+              9979,
+              9979,
+              7716,
+              9723,
+              5217
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "banishedCardIds": []
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ],
+            "banishedCardIds": []
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "ae9ce2d505d1113523700e84707375ad1458f782247a053330247642c240e6e9",
+        "vram.bin": "f31ea653c7265be5a8cfd2e47f1e603a666c5e4f3de874be3b17f73ca3b444af",
+        "observation.json": "f7cb7caafd82d7a61c9c7f622a4608ab3602bd679675a4b0b5b405d84f107181",
+        "transcript.json": "7e55992bf8ca457ae9ad24d2a86f013a4195b7eefb34f70b3902f1812c94095f",
+        "frame-0.png": "e93190760e58de27ec1919f4f09c758b559317c46470c428d9748230b0213123",
+        "frame-88000.png": "576f1dc4ed06f287352f2d11abba93061841d4fc18137e38cb05e94e9b143a13"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          256,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "spell-lifecycle-033-banished": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "End",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 31,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [
+              7747
+            ],
+            "handCardIds": [
+              9979,
+              9979,
+              7716,
+              9723,
+              5217
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "banishedCardIds": [
+              7716
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ],
+            "banishedCardIds": []
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "2cfb500f75e11479da78557408d713e0fbb9ae3216fbdaac77f3057f3746793a",
+        "vram.bin": "2038d462a7a5613e761e97b7fce8019e93d29c4daefba7b0fefe2e61ba6883f1",
+        "observation.json": "05b5011ad318d4c2fd2cd7f7a2c634fd9f480ac757c65ec5ba4bfa001ba9f0fa",
+        "transcript.json": "8f876d05ca7ec636ef51286254287549da2297f734d8faec58f7c6f8d3250006",
+        "frame-0.png": "47f246aa9c16482990765f68769c1193c1e715075b73d832bc19812ce9e1dc56",
+        "frame-88000.png": "1bb95dceeff0226bbf7ad28e315c7389aef743e11bea79a37cd5e2c9b699e24d"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "spell-lifecycle-035-before-repeat": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "Main1",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 31,
+            "monsterCardIds": [
+              0,
+              7716,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [
+              7747
+            ],
+            "handCardIds": [
+              9979,
+              9979,
+              7716,
+              9723,
+              5217
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "banishedCardIds": []
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ],
+            "banishedCardIds": []
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "ae9ce2d505d1113523700e84707375ad1458f782247a053330247642c240e6e9",
+        "vram.bin": "f31ea653c7265be5a8cfd2e47f1e603a666c5e4f3de874be3b17f73ca3b444af",
+        "observation.json": "94886ad5f80427963ef2a449867a2f41c520e2638b66397f4e1c601205243fdf",
+        "transcript.json": "967c6ff8ce2fa43dd1e53ce6a3f1d76bf203245ad58b09cbbf1a10b3741f6a48",
+        "frame-0.png": "e93190760e58de27ec1919f4f09c758b559317c46470c428d9748230b0213123",
+        "frame-88000.png": "576f1dc4ed06f287352f2d11abba93061841d4fc18137e38cb05e94e9b143a13"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          256,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    },
+    "spell-lifecycle-037-banished-repeat": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 7,
+        "phase": "End",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7200,
+            "handCount": 5,
+            "deckCount": 31,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              6151,
+              0
+            ],
+            "graveyardCardIds": [
+              7747
+            ],
+            "handCardIds": [
+              9979,
+              9979,
+              7716,
+              9723,
+              5217
+            ],
+            "spellTrapCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "banishedCardIds": [
+              7716
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 2,
+            "deckCount": 32,
+            "monsterCardIds": [
+              0,
+              0,
+              4028,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              6109
+            ],
+            "handCardIds": [
+              4842,
+              4818
+            ],
+            "spellTrapCardIds": [
+              0,
+              4818,
+              4909,
+              4815,
+              4664
+            ],
+            "banishedCardIds": []
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "ba024bac77ee1e30081a8d0e5ab1c5e641664c106090eae16e7d0cda7fe97499",
+        "vram.bin": "2038d462a7a5613e761e97b7fce8019e93d29c4daefba7b0fefe2e61ba6883f1",
+        "observation.json": "ee48c422c4ca6c49263d231487fc9e95b794c8fc75bf16f1a81b077bf5e6571e",
+        "transcript.json": "6f77cb76438f500123a72dd7f097d2082d8830609771999988755e2396f14102",
+        "frame-0.png": "47f246aa9c16482990765f68769c1193c1e715075b73d832bc19812ce9e1dc56",
+        "frame-88000.png": "1bb95dceeff0226bbf7ad28e315c7389aef743e11bea79a37cd5e2c9b699e24d"
+      },
+      "captureScriptSha256": "11c98d34af52e42c517f7c07db9f76fe801ae45c95cb01adc733befb2c15303e",
+      "monsterPositionUpper16Raw": [
+        [
+          0,
+          0,
+          256,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          256,
+          0,
+          0
+        ]
+      ]
+    }
+  },
+  "watches": {
+    "spell-lifecycle-032-banish-watch": {
+      "watch.json": "62712dba2331241c555983b647b4234b495c6f21d3c2919818284dc26c0f3f85",
+      "transcript.json": "d1179dc63d2dfbcac076fb9b762449315d9cdb0b202a77853c831288655647a8"
+    },
+    "spell-lifecycle-036-banish-watch-repeat": {
+      "watch.json": "bed47e535246795d5a9aeb552ee39f2c8bffba79a085e2a365fef68f081a33c8",
+      "transcript.json": "036fbd070b5dcd515e67d21cc0484d36ed5720f2f14d18177c6aaa7736a4d5b0"
+    }
+  },
+  "anchor": {
+    "path": "analysis/duel-reference/spell-lifecycle-deck-end-selected.ppst",
+    "sha256": "61d720c3c1f8c0bb80064ffec6bc785cb7d56251ec87bf319bf535ef61283837"
+  },
+  "entryIdentityBytesCompared": 128,
+  "staticEvidence": {
+    "provenance.json": "1ade0de6432488c02e1e147b37195b955e2b39269d08939c5051cd1efae2d88d",
+    "functions.json": "2e1d0a22bc6e26c7da5b7b0e85a237f38c106daa890eb183ab4d3b6224f50a5f",
+    "sites.json": "8e5ae27d47af403ba682629be5b07224e889dc31b34ba6b96e2e6d91de3d5879"
+  },
+  "validatorSha256": "24a154c3a132c0d923209505c8bbf8077457dbfb2a4f239d0b7986a7de8a3307",
+  "nativeMatchClaim": false,
+  "comparison": {
+    "included": [
+      "actor/turn/phase; p1 hand, deck count, field, graveyard and banished IDs; unchanged LP/opponent deltas"
+    ],
+    "excluded": [
+      "absolute native LP and opponent contents",
+      "shuffle/deck order",
+      "engine event granularity versus native timing"
+    ]
+  },
+  "limitations": [
+    "No hand/defense managed support, responses, negation or effect exceptions.",
+    "No move, face-down reset, control change, leave/re-enter, multiple obligations or intervening gameplay experiment.",
+    "Stop is immediately after original banished-list/count update; no full End Phase/next-turn timing claim.",
+    "Savestate restores use the isolated host helper; its debugger transcript is not retained.",
+    "Managed event order and atomicity are synthetic design contracts."
+  ]
+}

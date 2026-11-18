@@ -1,0 +1,747 @@
+{
+  "schemaVersion": 1,
+  "sourceIsoSha256": "e99cff5774856e16329b94c9ff48f9eb0c6bc61ff1127882d0785ca4221bd707",
+  "moduleSha256": "ee0e50c12d78e28ebb9f91625e556d131a84a1729e06359ca5c045bf911085c0",
+  "moduleBase": "0x09819300",
+  "emulator": "PPSSPP v1.20.4, software renderer",
+  "repeatCount": 2,
+  "scope": "UI action/placement constraints and selected unchanged duel-state fields. Summon/Set is hidden after the allowance is used; occupied-zone confirmation offers only Show Details and leaves placement pending. No PSP error return was observed. Synthetic C# decks test corresponding command rejections.",
+  "attemptedCardId": 9979,
+  "attemptedLevel": 4,
+  "summonedCardId": 7716,
+  "summonedLevel": 2,
+  "summonedZone": 2,
+  "scenario": {
+    "id": "second-normal-summon-unavailable",
+    "before": {
+      "activePlayer": 0,
+      "turnNumber": 1,
+      "phase": "Main1",
+      "players": [
+        {
+          "lifePoints": 8000,
+          "handCount": 4,
+          "deckCount": 35,
+          "monsterCardIds": [
+            0,
+            0,
+            7716,
+            0,
+            0
+          ]
+        },
+        {
+          "lifePoints": 8000,
+          "handCount": 5,
+          "deckCount": 35,
+          "monsterCardIds": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    "after": {
+      "activePlayer": 0,
+      "turnNumber": 1,
+      "phase": "Main1",
+      "players": [
+        {
+          "lifePoints": 8000,
+          "handCount": 4,
+          "deckCount": 35,
+          "monsterCardIds": [
+            0,
+            0,
+            7716,
+            0,
+            0
+          ]
+        },
+        {
+          "lifePoints": 8000,
+          "handCount": 5,
+          "deckCount": 35,
+          "monsterCardIds": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    "expectedCSharpError": "NormalSummonLimitReached",
+    "originalErrorCode": null
+  },
+  "occupiedScenario": {
+    "id": "occupied-monster-zone-unavailable",
+    "before": {
+      "activePlayer": 0,
+      "turnNumber": 3,
+      "phase": "Main2",
+      "players": [
+        {
+          "lifePoints": 8000,
+          "handCount": 5,
+          "deckCount": 34,
+          "monsterCardIds": [
+            0,
+            0,
+            7716,
+            0,
+            0
+          ]
+        },
+        {
+          "lifePoints": 8000,
+          "handCount": 4,
+          "deckCount": 34,
+          "monsterCardIds": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    "after": {
+      "activePlayer": 0,
+      "turnNumber": 3,
+      "phase": "Main2",
+      "players": [
+        {
+          "lifePoints": 8000,
+          "handCount": 5,
+          "deckCount": 34,
+          "monsterCardIds": [
+            0,
+            0,
+            7716,
+            0,
+            0
+          ]
+        },
+        {
+          "lifePoints": 8000,
+          "handCount": 4,
+          "deckCount": 34,
+          "monsterCardIds": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    "attemptedZone": 2,
+    "expectedCSharpError": "MonsterZoneOccupied",
+    "originalErrorCode": null
+  },
+  "uiEvidence": {
+    "interpretation": "Inspected reference frames; menu text is a manual visual observation, not OCR or a native error result.",
+    "beforeFirstSummon": {
+      "snapshot": "m3-edge-011-tin-before-summon",
+      "actions": [
+        "Summon",
+        "Set",
+        "Show Details"
+      ]
+    },
+    "afterFirstSummon": [
+      {
+        "snapshot": "m3-edge-008-own-monster-menu",
+        "actions": [
+          "Show Details"
+        ]
+      },
+      {
+        "snapshot": "m3-edge-017-second-menu-repeat",
+        "actions": [
+          "Show Details"
+        ]
+      }
+    ]
+  },
+  "occupiedUiEvidence": {
+    "interpretation": "Inspected reference frames: manual destination picker remains active for Tin Goldfish; confirming occupied Krebons zone opens only Show Details. No native error code was measured.",
+    "manualPlacementSetup": "Select Manual in duel options and confirm with Circle; Cross cancels the option edit.",
+    "targets": [
+      "m3-edge-090-occupied-target-1",
+      "m3-edge-093-occupied-target-2"
+    ],
+    "afterConfirmation": [
+      {
+        "snapshot": "m3-edge-091-occupied-rejected-1",
+        "actions": [
+          "Show Details"
+        ]
+      },
+      {
+        "snapshot": "m3-edge-094-occupied-rejected-2",
+        "actions": [
+          "Show Details"
+        ]
+      }
+    ]
+  },
+  "snapshots": {
+    "m3-edge-003-summoned": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 1,
+        "phase": "Main1",
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 35,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 35,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "attemptedCardPresentInHand": true,
+      "unclassifiedPlayerFields20To28": [
+        1,
+        1,
+        1
+      ],
+      "ramSha256": "9c81f22157a185513ee2181835b582c0c0ea0d38dd433b37887bfa1541d59c4a",
+      "vramSha256": "14b7f2ac9d789712fe2e39e88103c4395a49030baeb68f4cea5efedc78a36681",
+      "observationSha256": "60f425a82eaad64dd3aa2588c2ab00018dbf3286f00f520dbb56cb94b1482317",
+      "transcriptSha256": "107045924b34952ffa85f04f11e8cb5eeb27d960539b50b2b6ae0851a55d022f",
+      "frameSha256": "1513d0676a248342ef8e30e1a616aa1bc2a9a7dcc04bf1783cf214d23abbd573",
+      "alternateFrameSha256": "56013888895edce8edcfc79835276766d51dac6c0662e8487e5a743e5748c81c"
+    },
+    "m3-edge-008-own-monster-menu": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 1,
+        "phase": "Main1",
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 35,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 35,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "attemptedCardPresentInHand": true,
+      "unclassifiedPlayerFields20To28": [
+        1,
+        1,
+        1
+      ],
+      "ramSha256": "e67e9ceae324d076ab2b0d7d5a75a23cb3da2361107bcc3cd43baec798bb6cf1",
+      "vramSha256": "aff46db33e841861c14766935b052ea7073f0981b814f2409d22cc87f572f8f8",
+      "observationSha256": "dbccfc9968ce09d785ac97b711ea4117386ecb11bd9d1aadd9a821d3b01441c6",
+      "transcriptSha256": "f893949948b93537dbb018b664630b639dff8d741e94e6b0ae2f30269dfd39b0",
+      "frameSha256": "657cbd45a8a67f2f7c08ef131cd45db5d6f73f0fb77054c792f509c59ac418d9",
+      "alternateFrameSha256": "ef68e3c0da02383ca54a2f872419573bca1b25a6a816205ed8b30a6281a2d49a"
+    },
+    "m3-edge-011-tin-before-summon": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 1,
+        "phase": "Main1",
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 35,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 35,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "attemptedCardPresentInHand": true,
+      "unclassifiedPlayerFields20To28": [
+        0,
+        0,
+        0
+      ],
+      "ramSha256": "9a3312871ca4757d8aa7fdc0ddafdb544be0d93d6c917dfb295d77401ee23e42",
+      "vramSha256": "4440ba89f28dead9fc0252f269c7a6b2124dc9d53efa283deb70674cdf7cea99",
+      "observationSha256": "895f18cb4601933e869b764552b76ab5b592c1d77384e3a20b2d18732ecdf1c6",
+      "transcriptSha256": "2ecef99066ee99808226631a5293823824095ec5e34fc4a76b858a1fdb15c3a5",
+      "frameSha256": "da433f6151d7d3191f148f5a11b17bbb86392864f930e1681de5b65315a69bb4",
+      "alternateFrameSha256": "ed608bb710141a4fb34e41f7f34c9a70f984f6f9abc5d12a176ad1f1f6d13ce3"
+    },
+    "m3-edge-016-summon-repeat": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 1,
+        "phase": "Main1",
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 35,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 35,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "attemptedCardPresentInHand": true,
+      "unclassifiedPlayerFields20To28": [
+        1,
+        1,
+        1
+      ],
+      "ramSha256": "de9c744889602e479f5d21de58a32b608fbc2e2410106f4b319647c53482699b",
+      "vramSha256": "897d8a233b3d901118effcfee2c65d7dcb872e8b5cbcf3f7512707bd4bc66650",
+      "observationSha256": "5d44cf18fcc8a4551bfd8c03569add8ab04a3947e85cdddb3373af5054d98e27",
+      "transcriptSha256": "c5b725652353eec3375ceaf40e2d1a706762c8b53b3dfb89fbd3afe2dee6d0d9",
+      "frameSha256": "684405228c75993960301355d3704032282ddc870b4f1fa5791b90d5c50e17a4",
+      "alternateFrameSha256": "b67868ba769a89ab684bd8dbfd25223e4211302f5a0530be22a7ac5fd60b26d6"
+    },
+    "m3-edge-017-second-menu-repeat": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 1,
+        "phase": "Main1",
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 35,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 35,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "attemptedCardPresentInHand": true,
+      "unclassifiedPlayerFields20To28": [
+        1,
+        1,
+        1
+      ],
+      "ramSha256": "f34d172efd9822dcaade7378417217ed900112e1b1c872449f9f1fdb9dd9e4ee",
+      "vramSha256": "cde859d4ff19ac8c6f7ad9fc6ae7d161f1112d63ec04a523517c6c2d84b78f26",
+      "observationSha256": "788b534d87734666d5ab78050843aeb843fd67ddb1e47608731c7cd477e9aad8",
+      "transcriptSha256": "1f592b0487d0f0689e9309c58416b1b27aaae4faeeb6b9ecf375dbe550d231dd",
+      "frameSha256": "c3a20b4f648e7420a138916433126fdb9a508477f38f8d03b99e86892381296e",
+      "alternateFrameSha256": "2b7ba8d4f4ff240163384423813773d588d9c3242d21ffbaba9989a0d8eddf50"
+    },
+    "m3-edge-089-occupied-before-1": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 3,
+        "phase": "Main2",
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "attemptedCardPresentInHand": true,
+      "unclassifiedPlayerFields20To28": [
+        0,
+        0,
+        0
+      ],
+      "ramSha256": "3ed8bd79676316ee9ad4620368bc99f1904c460b5926c7c9e4e5ba79ecd3aec9",
+      "vramSha256": "d7568569a4bfe7640822492570a6233418a08bd43dccd32dda1c0069c2c617c7",
+      "observationSha256": "3e532e611e043d79780e4dacc7268a1b1b02ea8f356d66af4fb8102cd678915a",
+      "transcriptSha256": "1bd7a08b7321da18c3a8d4ea23e6fcf7866346a338491a8f11d36030d634a56e",
+      "frameSha256": "b5680f12dd1dbdd20912ec91ebf7e56d4da2dbc06a05977823d361e95ba62a51",
+      "alternateFrameSha256": "e81d24179c55929d8e32dcc81a698755c79a812992a8a7f0b3bfd7f27d0c30fc"
+    },
+    "m3-edge-090-occupied-target-1": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 3,
+        "phase": "Main2",
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "attemptedCardPresentInHand": true,
+      "unclassifiedPlayerFields20To28": [
+        0,
+        0,
+        0
+      ],
+      "ramSha256": "5d36bdf12bb73b857b5bdb89d74f047f3b785557e72d5ab47e2b929c4aa586cc",
+      "vramSha256": "213cc54c7228065274b1e45632cc6c9004ae8d259c639e8c0a2d99c56510dc1d",
+      "observationSha256": "abadb3cced0c8a8871432d54c1ccceb03c3d059748826e7706eadc3952bc827b",
+      "transcriptSha256": "bed1b79612a64e1dfa88db88efcfd85bdcadff9781b477b76eda3153cac39336",
+      "frameSha256": "99f839bffe7c1c25101a0978ee16de06afac852e6d76d5ed0491d008f66f26a6",
+      "alternateFrameSha256": "9d37b3eb3b2e3b4d4ac96da2ed6e7d9fdffebe5257367238ed0fc1505e855716"
+    },
+    "m3-edge-091-occupied-rejected-1": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 3,
+        "phase": "Main2",
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "attemptedCardPresentInHand": true,
+      "unclassifiedPlayerFields20To28": [
+        0,
+        0,
+        0
+      ],
+      "ramSha256": "987cabf49276a2a15367108b8fd41d35f44253268bf59dbabe7d4e826d7a597c",
+      "vramSha256": "107ef5e6294503a9c83681591ebbacefbb30a67f293f69f27b188ebafec6af30",
+      "observationSha256": "d3b5a69bb4a14abea5fa2858c649767a26f33ffbd428eeb2753ea9d6cb2c7b87",
+      "transcriptSha256": "71d0693a1a11d6fec4c720dab7f7c7a20cca2061fe47d93ca4fcdec632add6ac",
+      "frameSha256": "c5528630aa732d0d66b2a32a8f769b81d7576f444f78c6cc0e4804a3b10f418f",
+      "alternateFrameSha256": "e15c48302dc660e16dd6c219896ceb0278cf8d961d1293ff5fa504b383b81cd0"
+    },
+    "m3-edge-092-occupied-before-2": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 3,
+        "phase": "Main2",
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "attemptedCardPresentInHand": true,
+      "unclassifiedPlayerFields20To28": [
+        0,
+        0,
+        0
+      ],
+      "ramSha256": "dc79eb6be0e1c968f6a3faa75885a841f39b721642fd21fde3d08fef8b37c348",
+      "vramSha256": "79ee16811fc98e83e5b47188d523c5cd96878d5607a61c636632ab155c8a91ac",
+      "observationSha256": "10c09300c2dcb5d53962fb5467112918debd77a9a8608d84b8e47e322697df5d",
+      "transcriptSha256": "7f0e6997258b013572fd30e41b6935717ada6cd1170f8c72d5ac9268677fa51e",
+      "frameSha256": "2d290a6a1fb16ea0602766d168df69438430fe156f2e507ff409f231e15fa70a",
+      "alternateFrameSha256": "ab2e098bbbbe67ee771d34dae7221c151557a039f6a385238fcfdcda38e50fa7"
+    },
+    "m3-edge-093-occupied-target-2": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 3,
+        "phase": "Main2",
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "attemptedCardPresentInHand": true,
+      "unclassifiedPlayerFields20To28": [
+        0,
+        0,
+        0
+      ],
+      "ramSha256": "57fca515baed309ba5fde197e0e7f5fee7eaa68bf6988b8158720787a3d807bc",
+      "vramSha256": "c0480c9faa1c9ce3d2b31de7612b54b9802fee30211c9c8f20919eaedc2a9df8",
+      "observationSha256": "ca9a73db96f72cb718063ba5465e6c359e44b50e14d5b7b5fc1325dcf6d10e47",
+      "transcriptSha256": "bf7e90d3d5bd584e632391a7b3c2bbc30c5ce5d8905858966e645a719eb81bef",
+      "frameSha256": "7d2b68a3a9ec50edc4717b11047dc8a91eab4d87a09a27b3c7b1da0d3d73365f",
+      "alternateFrameSha256": "572398ea64a37c189a295f447a50bdc12de95dd6ea592c63bd392e06f3ee49c5"
+    },
+    "m3-edge-094-occupied-rejected-2": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 3,
+        "phase": "Main2",
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "attemptedCardPresentInHand": true,
+      "unclassifiedPlayerFields20To28": [
+        0,
+        0,
+        0
+      ],
+      "ramSha256": "e8df1848ff3754f7083d93cb50ae56df275823bae38cd92817838a52b53216ce",
+      "vramSha256": "8a8be23a0e6f5618cafdba5e7ad269d63593a80b8da2829cc5e4d4548d9eca6b",
+      "observationSha256": "67677e7e3361f469ff35e224d825f376a96b459fb29a6ea86f5b3ad39222996f",
+      "transcriptSha256": "82bdf0bc99f448b3bf6df964f1c44e86fd25a9dee1226939144e4f5370e0f036",
+      "frameSha256": "ff9f4a27cb1d9858c671465c9293398f5b8d6d04a31f722a1476af043c1a64b8",
+      "alternateFrameSha256": "78556917112d7e253d82b7de832708a251191a70f7b8a39ec711c0474344ced6"
+    }
+  },
+  "inputTranscripts": {
+    "m3-edge-001-baseline": "4eded2bd81274b0a6f4e5a8cb79b7166045274d9c0a985cbf943bddff0461527",
+    "m3-edge-002-select-zone": "00faca8575b8d1f4e91379d609c8aef57db823bf22a9a5deebb3987034305013",
+    "m3-edge-003-summoned": "107045924b34952ffa85f04f11e8cb5eeb27d960539b50b2b6ae0851a55d022f",
+    "m3-edge-004-hand": "2bdbd2ab85aee3f23a06e31d79f6fe42cd5924381b5001342439192979c422ec",
+    "m3-edge-005-next-card": "ce6f3b99780eefa5f1d4c9d61cfd44237b0369325cfeb0dec9fdb9fb4fa40eae",
+    "m3-edge-006-second-summon-unavailable": "7eb2204cfe3d458f374a156906a8460364327b271aaa263f1cd94dc2ff491466",
+    "m3-edge-007-own-hand": "b6e53c9c657a90d1121082eaad643971861ab3ebc9ba74376b5b346510135705",
+    "m3-edge-008-own-monster-menu": "f893949948b93537dbb018b664630b639dff8d741e94e6b0ae2f30269dfd39b0",
+    "m3-edge-009-restored": "64c715299534bc5ad3915762bd325a60d6c37c9313f2ff7eedf598205e452731",
+    "m3-edge-010-tin-menu": "42632d47c9dda88c45baca5ec48e690bf071da0efa5fb1cc73c070fed14a518a",
+    "m3-edge-011-tin-before-summon": "2ecef99066ee99808226631a5293823824095ec5e34fc4a76b858a1fdb15c3a5",
+    "m3-edge-012-close-menu": "74f80f1257ef197b861c7bfd1eb60f2dc2b719d019da19604be9653052a96610",
+    "m3-edge-013-krebons": "83c7d00d647c2be12929de9f28aa3a94e43e8feb79a8ee523dd5e778d5e3ef18",
+    "m3-edge-014-summon-menu": "bedfe56bbcd4f76647ff9bd6f5aa5468742e77c21ad76d004432995744e4d72b",
+    "m3-edge-015-zone": "209159e4298a398dda079c216f21062fc2f75facc5dd7f14c45a80d2451cb7fe",
+    "m3-edge-016-summon-repeat": "c5b725652353eec3375ceaf40e2d1a706762c8b53b3dfb89fbd3afe2dee6d0d9",
+    "m3-edge-017-second-menu-repeat": "1f592b0487d0f0689e9309c58416b1b27aaae4faeeb6b9ecf375dbe550d231dd",
+    "m3-edge-085-options-real": "a8c123188440b1b4d9d755705d890d07a04b45800c3811c36f106bda3b48781f",
+    "m3-edge-086-manual-apply": "011158b40b5c4a938b9a8e0a3ab411bcdcfa0d30f6d93d65c896e32c1e02a54a",
+    "m3-edge-087-manual-tin-menu": "9f7f995a31242225e9dbb50b0ef29dd10c8fe78f6efede021e98532f17ce2af7",
+    "m3-edge-088-manual-slot-picker": "58cb6aa54e865520b6101c1de090b7914731586c8441046831431baa75cc6510",
+    "m3-edge-089-occupied-before-1": "1bd7a08b7321da18c3a8d4ea23e6fcf7866346a338491a8f11d36030d634a56e",
+    "m3-edge-090-occupied-target-1": "bed1b79612a64e1dfa88db88efcfd85bdcadff9781b477b76eda3153cac39336",
+    "m3-edge-091-occupied-rejected-1": "71d0693a1a11d6fec4c720dab7f7c7a20cca2061fe47d93ca4fcdec632add6ac",
+    "m3-edge-092-occupied-before-2": "7f0e6997258b013572fd30e41b6935717ada6cd1170f8c72d5ac9268677fa51e",
+    "m3-edge-093-occupied-target-2": "bf7e90d3d5bd584e632391a7b3c2bbc30c5ce5d8905858966e645a719eb81bef",
+    "m3-edge-094-occupied-rejected-2": "82bdf0bc99f448b3bf6df964f1c44e86fd25a9dee1226939144e4f5370e0f036"
+  },
+  "saveState": {
+    "path": "analysis/duel-reference/summon-baseline.ppst",
+    "sha256": "85f9d30459e9be824b174bafe1d744f0df6fea11f34507db93aced40c8d46caf"
+  },
+  "occupiedSaveState": {
+    "path": "analysis/duel-reference/m3-occupied-picker.ppst",
+    "sha256": "c756448998d24d8d09d2907acb7ca0e1357d6982fb3229dcdb183e98f5842817"
+  },
+  "staticEvidence": {
+    "path": "analysis/duel-reference/DuelEngineVerified/static-export.json",
+    "sha256": "6652586515c984362b998d9b18e7f1305b1dfae677fafa4dba2904a12101fc65"
+  },
+  "cardInputEvidence": {
+    "path": "analysis/e99cff5774856e16329b94c9ff48f9eb0c6bc61ff1127882d0785ca4221bd707/stage4bVerified/cardinfo_jpn-cardinfo-list.json",
+    "sha256": "51029775c9527240ef4fad6b87624e5053d66414279adbbed940f4276777eeab"
+  },
+  "reproduction": "Load the immutable summon anchor. Inspect the eligible Tin Goldfish menu before summoning Krebons. Summon Krebons to zone 2, then inspect Tin Goldfish again; repeat after restoring the anchor. For occupied placement, restore the separate turn-three Main2 manual-placement anchor, move from free zone 3 to occupied zone 2 and confirm; repeat after restoring that anchor. Retained input transcripts record the controller sequence.",
+  "limitations": [
+    "No illegal normal-summon/placement command or native error return was invoked in the original game: its UI prevented the action.",
+    "The C# NormalSummonLimitReached and MonsterZoneOccupied errors are implementation-specific results, not measured PSP error codes.",
+    "Input captures include diagnostic navigation; only the named eligible/action-unavailable frames support the UI observation.",
+    "The state comparison covers LP, hand/deck counts, monster IDs, active player, turn and phase, not hidden state, deck identity/order, timing or effects.",
+    "Player fields at +0x20/+0x24/+0x28 are retained as unclassified raw values, not certified summon counters.",
+    "Draw/deck-out, battle destruction and LP-defeat scenarios are outside this fixture."
+  ]
+}

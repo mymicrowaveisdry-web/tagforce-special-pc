@@ -6,6 +6,10 @@ public static class MainMenuEntry
     public const double GameFramesPerSecond = 29.97;
     /// <summary>The step where focus appears and the menu starts accepting input.</summary>
     public const int ReadyFrame = 34;
+
+    /// <summary>Whole game frames in <paramref name="time"/>. TimeSpan keeps whole ticks, so a time built from an exact frame count can
+    /// fall a few ticks short; the tolerance (far below one frame) keeps it on that frame.</summary>
+    public static int FramesIn(TimeSpan time) => (int)Math.Floor(time.TotalSeconds * GameFramesPerSecond + 1e-4);
     private const int FirstBarFrame = 18, FirstLabelFrame = 22, HeaderStartFrame = 19, HeaderFrames = 5, TitleHalfFrame = 23;
     private const float HeaderHeight = 32;
 

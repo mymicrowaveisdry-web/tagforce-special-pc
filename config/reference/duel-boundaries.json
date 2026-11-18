@@ -1,0 +1,1498 @@
+{
+  "schemaVersion": 1,
+  "sourceIsoSha256": "e99cff5774856e16329b94c9ff48f9eb0c6bc61ff1127882d0785ca4221bd707",
+  "moduleSha256": "ee0e50c12d78e28ebb9f91625e556d131a84a1729e06359ca5c045bf911085c0",
+  "repeatCount": 2,
+  "scope": "Bounded canonical-state comparisons; controlled boundary inputs are explicitly separated from natural battle.",
+  "scenarios": [
+    {
+      "id": "last-draw",
+      "repeatCount": 2,
+      "before": {
+        "activePlayer": 1,
+        "turnNumber": 2,
+        "phase": "Draw",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 35,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              6151,
+              7747
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 1,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              4842,
+              4909,
+              4815,
+              4818,
+              4028
+            ]
+          }
+        ]
+      },
+      "after": {
+        "activePlayer": 1,
+        "turnNumber": 2,
+        "phase": "Standby",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 35,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              6151,
+              7747
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 6,
+            "deckCount": 0,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              4842,
+              4909,
+              4815,
+              4818,
+              4028,
+              4664
+            ]
+          }
+        ]
+      },
+      "captures": [
+        [
+          "m3-draw-003-last-before",
+          "m3-draw-004-last-after"
+        ],
+        [
+          "m3-draw-006-last-before-repeat",
+          "m3-draw-007-last-after-repeat"
+        ]
+      ]
+    },
+    {
+      "id": "empty-draw",
+      "repeatCount": 2,
+      "before": {
+        "activePlayer": 1,
+        "turnNumber": 2,
+        "phase": "Draw",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 35,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              6151,
+              7747
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 0,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              4842,
+              4909,
+              4815,
+              4818,
+              4028
+            ]
+          }
+        ]
+      },
+      "after": {
+        "activePlayer": 1,
+        "turnNumber": 2,
+        "phase": "Draw",
+        "endLatchRaw": 1,
+        "outcomeRaw": 1,
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 35,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              6151,
+              7747
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 0,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              4842,
+              4909,
+              4815,
+              4818,
+              4028
+            ]
+          }
+        ]
+      },
+      "captures": [
+        [
+          "m3-draw-009-empty-before",
+          "m3-draw-011-empty-after"
+        ],
+        [
+          "m3-draw-013-empty-before-repeat",
+          "m3-draw-014-empty-after-repeat"
+        ]
+      ]
+    },
+    {
+      "id": "monster-battle",
+      "repeatCount": 2,
+      "before": {
+        "activePlayer": 1,
+        "turnNumber": 4,
+        "phase": "Battle",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              9979,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              6151,
+              7747,
+              7716
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 33,
+            "monsterCardIds": [
+              0,
+              0,
+              6109,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              4815
+            ],
+            "handCardIds": [
+              4842,
+              4818,
+              4028,
+              4664
+            ]
+          }
+        ]
+      },
+      "after": {
+        "activePlayer": 1,
+        "turnNumber": 4,
+        "phase": "Battle",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7800,
+            "handCount": 4,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              9979
+            ],
+            "handCardIds": [
+              9979,
+              6151,
+              7747,
+              7716
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 33,
+            "monsterCardIds": [
+              0,
+              0,
+              6109,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              4815
+            ],
+            "handCardIds": [
+              4842,
+              4818,
+              4028,
+              4664
+            ]
+          }
+        ]
+      },
+      "captures": [
+        [
+          "m3-battle-028-before-damage",
+          "m3-battle-034-after-exact"
+        ],
+        [
+          "m3-battle-031-before-repeat",
+          "m3-battle-036-after-exact-repeat"
+        ]
+      ]
+    },
+    {
+      "id": "lp-defeat",
+      "repeatCount": 2,
+      "before": {
+        "activePlayer": 0,
+        "turnNumber": 3,
+        "phase": "Battle",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              6151,
+              7747,
+              7716
+            ]
+          },
+          {
+            "lifePoints": 800,
+            "handCount": 4,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              4842,
+              4818,
+              4028,
+              4664
+            ]
+          }
+        ]
+      },
+      "after": {
+        "activePlayer": 0,
+        "turnNumber": 3,
+        "phase": "Battle",
+        "endLatchRaw": 1,
+        "outcomeRaw": 1,
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              6151,
+              7747,
+              7716
+            ]
+          },
+          {
+            "lifePoints": 0,
+            "handCount": 4,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              4842,
+              4818,
+              4028,
+              4664
+            ]
+          }
+        ]
+      },
+      "captures": [
+        [
+          "m3-lethal-002-before",
+          "m3-lethal-008-post-store"
+        ],
+        [
+          "m3-lethal-010-before-repeat",
+          "m3-lethal-013-after-repeat"
+        ]
+      ]
+    }
+  ],
+  "snapshots": {
+    "m3-draw-003-last-before": {
+      "projection": {
+        "activePlayer": 1,
+        "turnNumber": 2,
+        "phase": "Draw",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 35,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              6151,
+              7747
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 1,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              4842,
+              4909,
+              4815,
+              4818,
+              4028
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "7d49f8f1f9c31f5353ac21085ba9b35ebefd41023a27b744e7bb4992be8a9beb",
+        "vram.bin": "9b09497a27fc09ddf078a2390a55a5d35cd72061fc4a1b6c34387b42decaa366",
+        "observation.json": "7ae779797c185d455e54df0b9a463fe22dde1f3a92b7c4b5fc5b769496bb58cc",
+        "transcript.json": "1e0d55e458e12c700f67238956e217739f036b7fb4851015c741ffa651beb67b",
+        "frame-0.png": "e1d2f5a4a043f21cf24dcb6580409d638e12668e6fff68219d54bcd6218fee2e",
+        "frame-88000.png": "a06759bba651265501be0f6515661ebb7c31f57ab33f7ec38577aeb138519fc5"
+      },
+      "activeDeckHeadCardId": 4664
+    },
+    "m3-draw-004-last-after": {
+      "projection": {
+        "activePlayer": 1,
+        "turnNumber": 2,
+        "phase": "Standby",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 35,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              6151,
+              7747
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 6,
+            "deckCount": 0,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              4842,
+              4909,
+              4815,
+              4818,
+              4028,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "a873e3328453cace75ba296dbaec39d9638d1d525ed84c68d8b4726c4e0c785d",
+        "vram.bin": "888b58fd7c047c547b3c86fee99138f459978f1dbd93a0d878e4bba183b8a81c",
+        "observation.json": "662fd7d8e80e153edf14216e3e1a816b75db71442ee71ddadd5312c4742f21d5",
+        "transcript.json": "0653991a9b9dcc565a399dcd2a709f9627309698bab3c9aa77fa98e9df35b717",
+        "frame-0.png": "478c9addb34cc8c267355eef0cf8a8b1b0049fed9d8b8242afaa395e25a824eb",
+        "frame-88000.png": "f4c38556630fc0205c188a697003d91ec0106e92afd043c9cf71b615db8ecfcb"
+      }
+    },
+    "m3-draw-006-last-before-repeat": {
+      "projection": {
+        "activePlayer": 1,
+        "turnNumber": 2,
+        "phase": "Draw",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 35,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              6151,
+              7747
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 1,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              4842,
+              4909,
+              4815,
+              4818,
+              4028
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "7d49f8f1f9c31f5353ac21085ba9b35ebefd41023a27b744e7bb4992be8a9beb",
+        "vram.bin": "9b09497a27fc09ddf078a2390a55a5d35cd72061fc4a1b6c34387b42decaa366",
+        "observation.json": "b1f0af4652c29a7d5682501d2cd6d3960f52da72e78a7749aab55dcad895ec50",
+        "transcript.json": "1e0d55e458e12c700f67238956e217739f036b7fb4851015c741ffa651beb67b",
+        "frame-0.png": "e1d2f5a4a043f21cf24dcb6580409d638e12668e6fff68219d54bcd6218fee2e",
+        "frame-88000.png": "a06759bba651265501be0f6515661ebb7c31f57ab33f7ec38577aeb138519fc5"
+      },
+      "activeDeckHeadCardId": 4664
+    },
+    "m3-draw-007-last-after-repeat": {
+      "projection": {
+        "activePlayer": 1,
+        "turnNumber": 2,
+        "phase": "Standby",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 35,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              6151,
+              7747
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 6,
+            "deckCount": 0,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              4842,
+              4909,
+              4815,
+              4818,
+              4028,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "a873e3328453cace75ba296dbaec39d9638d1d525ed84c68d8b4726c4e0c785d",
+        "vram.bin": "888b58fd7c047c547b3c86fee99138f459978f1dbd93a0d878e4bba183b8a81c",
+        "observation.json": "5a56b29025381573c20511f401b444529ae904a5bfa328dc45d518af6816aadc",
+        "transcript.json": "2af8074a746b473cc15460742b4cab15a0e3248b004daed618490069b892ab65",
+        "frame-0.png": "478c9addb34cc8c267355eef0cf8a8b1b0049fed9d8b8242afaa395e25a824eb",
+        "frame-88000.png": "f4c38556630fc0205c188a697003d91ec0106e92afd043c9cf71b615db8ecfcb"
+      }
+    },
+    "m3-draw-009-empty-before": {
+      "projection": {
+        "activePlayer": 1,
+        "turnNumber": 2,
+        "phase": "Draw",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 35,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              6151,
+              7747
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 0,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              4842,
+              4909,
+              4815,
+              4818,
+              4028
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "4b83cc8e90100f9bbf9dbe6ceb0cf84f6986dd460db5c3150348dee428562d37",
+        "vram.bin": "9b09497a27fc09ddf078a2390a55a5d35cd72061fc4a1b6c34387b42decaa366",
+        "observation.json": "c4d7f411d300746660f8ec0ec720c39406f2e47a5d89d63a82589584e5135d23",
+        "transcript.json": "2cbef94fd030ddfb9a20d092d4fb5f12d6a656f8a2afe6971a3103b1cc973b83",
+        "frame-0.png": "e1d2f5a4a043f21cf24dcb6580409d638e12668e6fff68219d54bcd6218fee2e",
+        "frame-88000.png": "a06759bba651265501be0f6515661ebb7c31f57ab33f7ec38577aeb138519fc5"
+      }
+    },
+    "m3-draw-011-empty-after": {
+      "projection": {
+        "activePlayer": 1,
+        "turnNumber": 2,
+        "phase": "Draw",
+        "endLatchRaw": 1,
+        "outcomeRaw": 1,
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 35,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              6151,
+              7747
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 0,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              4842,
+              4909,
+              4815,
+              4818,
+              4028
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "060fbb23bfa4fa961b3568be058aa9441de460338771d6086e4f86da9b2f0156",
+        "vram.bin": "9a3fbe312e91b42adf49013de2bce2a253f9a252a9c6396621ea4876fbf13832",
+        "observation.json": "845d5784f12deb12494c17ee49adfae4705dc214250d04299a13c490b6212fdb",
+        "transcript.json": "c6ffdf6583f22e20c8a2dea669409d0503e76e322407a9b55e8e213fa050e25a",
+        "frame-0.png": "1de5fc159ed9620808d85f38997bb59630622fc1231ec30da93864ed972295f2",
+        "frame-88000.png": "567eabdca8c7c5b1a610bf5bdea8af920772ac4cf54005250b51906306bf9efb"
+      }
+    },
+    "m3-draw-013-empty-before-repeat": {
+      "projection": {
+        "activePlayer": 1,
+        "turnNumber": 2,
+        "phase": "Draw",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 35,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              6151,
+              7747
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 0,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              4842,
+              4909,
+              4815,
+              4818,
+              4028
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "4b83cc8e90100f9bbf9dbe6ceb0cf84f6986dd460db5c3150348dee428562d37",
+        "vram.bin": "9b09497a27fc09ddf078a2390a55a5d35cd72061fc4a1b6c34387b42decaa366",
+        "observation.json": "5654d2dadbf39496b540070c5e387ebe81cd56f2a2175910d71e065afe6eacb9",
+        "transcript.json": "2cbef94fd030ddfb9a20d092d4fb5f12d6a656f8a2afe6971a3103b1cc973b83",
+        "frame-0.png": "e1d2f5a4a043f21cf24dcb6580409d638e12668e6fff68219d54bcd6218fee2e",
+        "frame-88000.png": "a06759bba651265501be0f6515661ebb7c31f57ab33f7ec38577aeb138519fc5"
+      }
+    },
+    "m3-draw-014-empty-after-repeat": {
+      "projection": {
+        "activePlayer": 1,
+        "turnNumber": 2,
+        "phase": "Draw",
+        "endLatchRaw": 1,
+        "outcomeRaw": 1,
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 35,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              6151,
+              7747
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 0,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              4842,
+              4909,
+              4815,
+              4818,
+              4028
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "94038b02d90710723698cc81a32c9dbd6b10b58c042578e45116f3952e20bd09",
+        "vram.bin": "cb78200a16dd7c93f8bf9af48e45d4972f2e22c91d9d604a9a0840c75306e083",
+        "observation.json": "9b3117761b0294deb9b7e7b6e2e5528f5621b1df93b1f64b331ddf6dd7e98548",
+        "transcript.json": "dab75133b4b2ba7d55f2e772e0d4eca01f513ae581e3d34f98de02266894228d",
+        "frame-0.png": "5474a46d43cc9ccfcfe3b9af4690a1a38fc5b8dd809966fe4711d4356f9a8240",
+        "frame-88000.png": "2c637a981ca4c25fcfa9ca07775d33043018e085f5f1914c7bb612b71dd867e1"
+      }
+    },
+    "m3-battle-028-before-damage": {
+      "projection": {
+        "activePlayer": 1,
+        "turnNumber": 4,
+        "phase": "Battle",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              9979,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              6151,
+              7747,
+              7716
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 33,
+            "monsterCardIds": [
+              0,
+              0,
+              6109,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              4815
+            ],
+            "handCardIds": [
+              4842,
+              4818,
+              4028,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "4d9ca2e2659fcca009ab2246953c91b0c0fcc8c0fbe5e74585d1d2b5c8bc8246",
+        "vram.bin": "a544321079bb31760109ae0d32ed7918a7aa79989cd75b52a496a2d3b95ae197",
+        "observation.json": "734388f7e96292efd0d7b0e41833db35deb3264e704f6fcc41da1028a60d822d",
+        "transcript.json": "8b0b483dfb3f042520dd26da42a5e5965937f7742cb01a41fa1173d1fbab4dfd",
+        "frame-0.png": "76826b4d606d7d4cab7cac0a6cd8e1b056039f2d6b6f6c995fea66533fea6e85",
+        "frame-88000.png": "588bcb7e05d7c6cbdb1832584098c0a58fa6ec4f98fe6186c542a535906e33e4"
+      }
+    },
+    "m3-battle-034-after-exact": {
+      "projection": {
+        "activePlayer": 1,
+        "turnNumber": 4,
+        "phase": "Battle",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7800,
+            "handCount": 4,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              9979
+            ],
+            "handCardIds": [
+              9979,
+              6151,
+              7747,
+              7716
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 33,
+            "monsterCardIds": [
+              0,
+              0,
+              6109,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              4815
+            ],
+            "handCardIds": [
+              4842,
+              4818,
+              4028,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "24858c561ae5fc07c8f2b97d50d5991c88b5ae61464141079faaf297eeccf8ca",
+        "vram.bin": "9541ed514daebf204f03c2bb47b000d92274966784abc122f958b5f855671bc8",
+        "observation.json": "a577fe11ad9eae4174c915a50b1610ad7ea6c754612de8b7c7e0768309f14e61",
+        "transcript.json": "33cf76d7830eaca905241d15a805b4d0c53a4df8f2a72900771d77dda341a665",
+        "frame-0.png": "80bcfe2f95430cf2edace064d93da9a2f831a3b3ca8420af63138b63f1a649d3",
+        "frame-88000.png": "4c15f8b49572a15385476d315a6b4457e4cc96aac864b01bdf80f3796d200ee7"
+      }
+    },
+    "m3-battle-031-before-repeat": {
+      "projection": {
+        "activePlayer": 1,
+        "turnNumber": 4,
+        "phase": "Battle",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              9979,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              6151,
+              7747,
+              7716
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 33,
+            "monsterCardIds": [
+              0,
+              0,
+              6109,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              4815
+            ],
+            "handCardIds": [
+              4842,
+              4818,
+              4028,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "4d9ca2e2659fcca009ab2246953c91b0c0fcc8c0fbe5e74585d1d2b5c8bc8246",
+        "vram.bin": "a544321079bb31760109ae0d32ed7918a7aa79989cd75b52a496a2d3b95ae197",
+        "observation.json": "fa8e5539b6a9b6c82d7e331ecc48d283730426bb6c520d40972fb67f3303c283",
+        "transcript.json": "8b0b483dfb3f042520dd26da42a5e5965937f7742cb01a41fa1173d1fbab4dfd",
+        "frame-0.png": "76826b4d606d7d4cab7cac0a6cd8e1b056039f2d6b6f6c995fea66533fea6e85",
+        "frame-88000.png": "588bcb7e05d7c6cbdb1832584098c0a58fa6ec4f98fe6186c542a535906e33e4"
+      }
+    },
+    "m3-battle-036-after-exact-repeat": {
+      "projection": {
+        "activePlayer": 1,
+        "turnNumber": 4,
+        "phase": "Battle",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 7800,
+            "handCount": 4,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              9979
+            ],
+            "handCardIds": [
+              9979,
+              6151,
+              7747,
+              7716
+            ]
+          },
+          {
+            "lifePoints": 8000,
+            "handCount": 4,
+            "deckCount": 33,
+            "monsterCardIds": [
+              0,
+              0,
+              6109,
+              0,
+              0
+            ],
+            "graveyardCardIds": [
+              4815
+            ],
+            "handCardIds": [
+              4842,
+              4818,
+              4028,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "246f53e2c58438a8662f032d87be61533d169ce70cf55bbfc873d7d493b0f445",
+        "vram.bin": "9541ed514daebf204f03c2bb47b000d92274966784abc122f958b5f855671bc8",
+        "observation.json": "a58ddab5e37806162989dedeac687ce55909712d82fe15e27df8d7b34f66a148",
+        "transcript.json": "11ca1736a0cc3ca50b81befb422c1bd082b4583a43d6895ff086a94f4bb10348",
+        "frame-0.png": "80bcfe2f95430cf2edace064d93da9a2f831a3b3ca8420af63138b63f1a649d3",
+        "frame-88000.png": "4c15f8b49572a15385476d315a6b4457e4cc96aac864b01bdf80f3796d200ee7"
+      }
+    },
+    "m3-lethal-002-before": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 3,
+        "phase": "Battle",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              6151,
+              7747,
+              7716
+            ]
+          },
+          {
+            "lifePoints": 800,
+            "handCount": 4,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              4842,
+              4818,
+              4028,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "e7fc5e46d0e516386146d9a5f99937c08cc19b9fe20b9d4cbb6dd32f5a7e5301",
+        "vram.bin": "a92cf0503d79558fc997dbfe8b3c07ddc87c3821cbdf698e2497617104924bcc",
+        "observation.json": "8326833b5f2106e322a3e9727fd7ad3a44767323b5a9232a6b59d39c94e6a775",
+        "transcript.json": "536a96316b4b1e2e0356f76e864efbcdb3654422ee678eb653eacc7e66b1c5b8",
+        "frame-0.png": "833226f0a4be151d94f0b5a869598015935f13b613bf923ef0f49fb3cf02c111",
+        "frame-88000.png": "1f21d3a272525644f0e91aa98d1f787678e0b74cd3aad3c16127acf668ebe46b"
+      }
+    },
+    "m3-lethal-008-post-store": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 3,
+        "phase": "Battle",
+        "endLatchRaw": 1,
+        "outcomeRaw": 1,
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              6151,
+              7747,
+              7716
+            ]
+          },
+          {
+            "lifePoints": 0,
+            "handCount": 4,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              4842,
+              4818,
+              4028,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "bc51d0d73355d69f43744eae1a65b8fb3b50599076a477be3c059b059503fd5a",
+        "vram.bin": "4087a4384f16550bfd32b6e65552a8b90098da69b8677487a9ec023b37d6f698",
+        "observation.json": "b5c7a9eb710d7823555f99a95769b5bccd0fd25beccbe27c8d96000ad4e18c7d",
+        "transcript.json": "e1afd93a061896e2311d0d8ad78f7a6623feecffb1338400f6b90a0a4eed8e00",
+        "frame-0.png": "621090e5cf57fa7aa0eebbdc58866c1b4cbefbb7926283d9028930b0252a95d8",
+        "frame-88000.png": "7d7932e1889beae95ff31169c53cf62bce84522301d623d2864248645256b73f"
+      }
+    },
+    "m3-lethal-010-before-repeat": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 3,
+        "phase": "Battle",
+        "endLatchRaw": 0,
+        "outcomeRaw": 0,
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              6151,
+              7747,
+              7716
+            ]
+          },
+          {
+            "lifePoints": 800,
+            "handCount": 4,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              4842,
+              4818,
+              4028,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "e7fc5e46d0e516386146d9a5f99937c08cc19b9fe20b9d4cbb6dd32f5a7e5301",
+        "vram.bin": "a92cf0503d79558fc997dbfe8b3c07ddc87c3821cbdf698e2497617104924bcc",
+        "observation.json": "2ba140667670eaa49a382ac8baf939c0208e4e2334be584b014192b642e70464",
+        "transcript.json": "536a96316b4b1e2e0356f76e864efbcdb3654422ee678eb653eacc7e66b1c5b8",
+        "frame-0.png": "833226f0a4be151d94f0b5a869598015935f13b613bf923ef0f49fb3cf02c111",
+        "frame-88000.png": "1f21d3a272525644f0e91aa98d1f787678e0b74cd3aad3c16127acf668ebe46b"
+      }
+    },
+    "m3-lethal-013-after-repeat": {
+      "projection": {
+        "activePlayer": 0,
+        "turnNumber": 3,
+        "phase": "Battle",
+        "endLatchRaw": 1,
+        "outcomeRaw": 1,
+        "players": [
+          {
+            "lifePoints": 8000,
+            "handCount": 5,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              7716,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              9979,
+              9979,
+              6151,
+              7747,
+              7716
+            ]
+          },
+          {
+            "lifePoints": 0,
+            "handCount": 4,
+            "deckCount": 34,
+            "monsterCardIds": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "graveyardCardIds": [],
+            "handCardIds": [
+              4842,
+              4818,
+              4028,
+              4664
+            ]
+          }
+        ]
+      },
+      "evidence": {
+        "ram.bin": "f84cb8f2dd892ef474b3af0b0bf629ebb48eab3da98c031feb341658b3822692",
+        "vram.bin": "2e217fc0c585cd81376e8294a93fc0f37b8eedf3f8daf655e35819e3b6795c05",
+        "observation.json": "c07331a9d9e4f58abc27a2b0a8ae21a38a67af0a15fb6261e739967cc00da16f",
+        "transcript.json": "a5f7fbaf53085960b089467df9162b3b1bbb2553f86b3b889749485b27c8c965",
+        "frame-0.png": "0e0533709099cc70be359b12f53003447fdeb3dd412c8c725700d53456257654",
+        "frame-88000.png": "02cbbe0d4e62bc3e8a5ca4ba3ea3c9b63d97782ee94eaaeb93f9b2b5969a406f"
+      }
+    }
+  },
+  "controlledSetups": {
+    "m3-draw-002-last-setup": {
+      "setupSha256": "013c3600696f2ec98fc1dca91a72fb329e044b22ff75892677e95369b8d2ee5f",
+      "transcriptSha256": "986c7e15d9f80fe5b8f9ddd224d0f0f5f43994c3b012b118754fc7f8ad5fd719",
+      "anchor": {
+        "path": "analysis/duel-reference/m3-draw-start.ppst",
+        "sha256": "06c3fc6f8e2c005f2015a894d85e95edcc195d8cdfb0be2069308e089718a0fa"
+      }
+    },
+    "m3-draw-005-last-setup-repeat": {
+      "setupSha256": "013c3600696f2ec98fc1dca91a72fb329e044b22ff75892677e95369b8d2ee5f",
+      "transcriptSha256": "986c7e15d9f80fe5b8f9ddd224d0f0f5f43994c3b012b118754fc7f8ad5fd719",
+      "anchor": {
+        "path": "analysis/duel-reference/m3-draw-start.ppst",
+        "sha256": "06c3fc6f8e2c005f2015a894d85e95edcc195d8cdfb0be2069308e089718a0fa"
+      }
+    },
+    "m3-draw-008-empty-setup": {
+      "setupSha256": "c122bd7eef09e4a3e5ac3098262328b0f02f01c44a9b4855b906682a19d62251",
+      "transcriptSha256": "aa0b5f81723ecdb6e00ad52841876020045a2754a84db560a87accfdc3b8f74f",
+      "anchor": {
+        "path": "analysis/duel-reference/m3-draw-start.ppst",
+        "sha256": "06c3fc6f8e2c005f2015a894d85e95edcc195d8cdfb0be2069308e089718a0fa"
+      }
+    },
+    "m3-draw-012-empty-setup-repeat": {
+      "setupSha256": "c122bd7eef09e4a3e5ac3098262328b0f02f01c44a9b4855b906682a19d62251",
+      "transcriptSha256": "aa0b5f81723ecdb6e00ad52841876020045a2754a84db560a87accfdc3b8f74f",
+      "anchor": {
+        "path": "analysis/duel-reference/m3-draw-start.ppst",
+        "sha256": "06c3fc6f8e2c005f2015a894d85e95edcc195d8cdfb0be2069308e089718a0fa"
+      }
+    },
+    "m3-lethal-001-setup": {
+      "setupSha256": "7cb24d28dfb816b72eec8c41856c5def14ca6afe074008f457a55fc30e26dbed",
+      "transcriptSha256": "cb3d8e77261a1526380dadad320376c07a8eaeacdf3a9841e818bbcece0e1361",
+      "anchor": {
+        "path": "analysis/duel-reference/m3-attack-baseline.ppst",
+        "sha256": "b29dff3e99271a6c9177eec3b26aaf692d581b40db324d3829f2bea29a5039da"
+      }
+    },
+    "m3-lethal-009-setup-repeat": {
+      "setupSha256": "7cb24d28dfb816b72eec8c41856c5def14ca6afe074008f457a55fc30e26dbed",
+      "transcriptSha256": "cb3d8e77261a1526380dadad320376c07a8eaeacdf3a9841e818bbcece0e1361",
+      "anchor": {
+        "path": "analysis/duel-reference/m3-attack-baseline.ppst",
+        "sha256": "b29dff3e99271a6c9177eec3b26aaf692d581b40db324d3829f2bea29a5039da"
+      }
+    }
+  },
+  "battleInput": {
+    "attackerCardId": 6109,
+    "attackerZone": 2,
+    "attackerAttack": 1000,
+    "attackerDefense": 700,
+    "defenderCardId": 9979,
+    "defenderZone": 3,
+    "defenderAttack": 800,
+    "defenderDefense": 2000,
+    "evidence": "Manually reviewed m3-battle-028-before-damage frame-88000.png: both cards face-up attack; Graceful Dice already resolved."
+  },
+  "battleAnchor": {
+    "path": "analysis/duel-reference/m3-damage-store.ppst",
+    "sha256": "a4523b503108056b3f29a3b58da4a2fada9abf0ae5189027b5c79267594ccb45"
+  },
+  "battleObserverEvidence": {
+    "m3-battle-027-watch": {
+      "watch.json": "184e2981f891b315cb7545677308c45cd1de67d4bd84439a57fa08b4f01eeb2b",
+      "transcript.json": "0922113d8735dbba1f3289b098aa08b4bb2d0450ace69d365c3794e9a4d2c30a"
+    },
+    "m3-battle-033-destroy-exact": {
+      "watch.json": "72451080140b9abbda0cd0d81fafe09a2844018dc15d2c19f164d6771ed8335d",
+      "transcript.json": "7fe9f28c0bd3a2ccc4ae19502dabb4c79de5db65700d3c428175e554fa338b8c"
+    },
+    "m3-battle-035-destroy-exact-repeat": {
+      "watch.json": "e90d1538ea508338059834224c4c46c37e55ae395099cec14847c0aa178d3779",
+      "transcript.json": "0114bc78ecfb70a919a8500bfbd79551bc52d8b5208c6be3aa779fe7737f45b0"
+    }
+  },
+  "staticEvidence": {
+    "path": "analysis/duel-reference/DuelEngineVerified/static-export.json",
+    "sha256": "6652586515c984362b998d9b18e7f1305b1dfae677fafa4dba2904a12101fc65"
+  },
+  "outcomeUi": {
+    "empty-draw": "win result screen; opponent Deck empty (original wording kept private)",
+    "lp-defeat": "win result screen; opponent LP 0 (original wording kept private)",
+    "method": "Manual review of the named after-capture frames; not OCR."
+  },
+  "reproduction": [
+    "Restore m3-draw-start.ppst paused; run prepare_duel_boundary with last-draw/empty-draw, player 1, expected 35. Capture before. Resume original code to Standby for last draw, or duel-end display for empty draw. Restore and repeat.",
+    "Restore m3-attack-baseline.ppst paused; prepare low-lp, player 1, expected 8000. Confirm Attack with Circle; decline optional activation with Right, Circle. Resume through canonical LP store and win display. Restore and repeat.",
+    "Natural battle: turn-one Krebons, turn-three Tin Goldfish in attack position, decline effects, end turn. Opponent summons Chick and resolves Graceful Dice. Replay the retained damage-store anchor (Dice rolled 2) twice; watch zone 3 destruction and step original instructions until Tin reaches its graveyard."
+  ],
+  "limitations": [
+    "Deck and lethal-LP inputs use one canonical RAM-field write per setup. They were not reached naturally. Inactive deck-tail entries and presentation mirrors remain unchanged.",
+    "The lethal run UI LP number animates from the unmodified presentation mirror (8000 to 6800); only canonical LP and the explicit original-game win message support defeat.",
+    "Monster battle starts at the original damage-store instruction after the game calculated damage. It validates the retained combat input and resulting damage/destruction, not attack declaration or response windows.",
+    "Early watch-tool transcripts omit raw resume/step requests; CPU before/after records, watch reports and RAM snapshots retain the observations. The current helper logs those requests.",
+    "The combat C# test substitutes already observed current stats; it does not reproduce Graceful Dice, its RNG, Monster Reborn, effect resolution or AI.",
+    "C# draw/LP tests reach their boundaries through legal synthetic command sequences; native turn numbers, hand/deck contents and unrelated cards are excluded from those comparisons.",
+    "Raw outcome fields are retained as measurements for these two wins, not a universal decoded result enum. No native bytes are matched."
+  ]
+}

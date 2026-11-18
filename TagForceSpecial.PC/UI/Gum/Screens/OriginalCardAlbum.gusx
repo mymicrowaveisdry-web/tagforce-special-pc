@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScreenSave xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Name>OriginalCardAlbum</Name>
+  <State>
+    <Name>Default</Name>
+    <Variable Type="float" Name="Layer.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Layer.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Layer.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">480</Value>
+    </Variable>
+    <Variable Type="float" Name="Layer.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">272</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Layer.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="GeneralUnitType" Name="Layer.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Layer.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Layer.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Layer.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Layer.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="TextureAddress" Name="Layer.TextureAddress" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="Layer.TextureLeft" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="Layer.TextureTop" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="Layer.TextureWidth" SetsValue="true">
+      <Value xsi:type="xsd:int">480</Value>
+    </Variable>
+    <Variable Type="int" Name="Layer.TextureHeight" SetsValue="true">
+      <Value xsi:type="xsd:int">272</Value>
+    </Variable>
+  </State>
+  <Instance Name="Layer" BaseType="Sprite" />
+</ScreenSave>

@@ -50,7 +50,9 @@ internal static class PresentationResourceDecoder
         }
         string hash = Convert.ToHexStringLower(SHA256.HashData(input));
         if (request.Conversion == PresentationConversion.Stored) return new(input, hash, null, null, []);
-        var texture = new GimTextureDecoder().Decode(input, request.PaletteLevel);
+        var texture = request.Conversion == PresentationConversion.CardThumbnailRgba ? CardThumbnailDecoder.Decode(input)
+            : request.Frame is { } frame ? new GimTextureDecoder().DecodeFrame(input, frame)
+            : new GimTextureDecoder().Decode(input, request.PaletteLevel);
         return new(texture.Rgba, hash, texture.Width, texture.Height, texture.Diagnostics);
     }
 }

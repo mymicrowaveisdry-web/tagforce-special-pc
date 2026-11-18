@@ -5,7 +5,7 @@ using TagForceSpecial.Effects;
 
 namespace TagForceSpecial.PC.Decks;
 
-public enum DeckFilter { All, Monster, Spell }
+public enum DeckFilter { All, Monster, Spell, Trap }
 
 /// <summary>Editable ordered card IDs only; no live-duel instances or state references.</summary>
 public sealed class DeckDraft
@@ -26,22 +26,40 @@ public sealed class DeckDraft
     public int Count(uint id, DeckSection? section = null) => section is { } s ? sections[s].Count(c => c == id) : sections.Values.Sum(cards => cards.Count(c => c == id));
     public bool Add(uint id)
     {
-        if (!PlayablePreview.Rules.ContainsKey(id) || sections[Section].Count >= 100) return false;
+        if (!ConfirmedCardPool.Contains(id) || !Catalog.Cards.Any(c => c.GameCardId == id) || sections[Section].Count >= 100) return false;
         sections[Section].Add(id); return true; // Invalid drafts are visible/saveable; launch remains gated.
     }
     public bool Remove(uint id) => sections[Section].Remove(id);
     public void Clear() { foreach (var section in sections.Values) section.Clear(); }
-    public IReadOnlyList<CardDefinition> VisibleCards() => Array.AsReadOnly(PlayablePreview.Cards
-        .Select(c => Catalog[c.CardId]).Where(c => c.Name.Contains(Search, StringComparison.OrdinalIgnoreCase) ||
-            c.GameCardId.ToString(System.Globalization.CultureInfo.InvariantCulture).Contains(Search, StringComparison.Ordinal))
-        .Where(c => Filter == DeckFilter.All || PlayablePreview.Rules[c.GameCardId].Category == (Filter == DeckFilter.Monster ? CardCategory.Monster : CardCategory.Spell))
-        .OrderBy(c => c.Name, StringComparer.Ordinal).ToArray());
+    /// <summary>Restores a section's exact card order (Deck Edit undo and reset); cards are not re-validated.</summary>
+    public void ReplaceSection(DeckSection section, IEnumerable<uint> cards) { sections[section].Clear(); sections[section].AddRange(cards); }
+    /// <summary>Confirmed pool cards present in this catalog, matching the search and the card-kind filter, by name.</summary>
+    public IReadOnlyList<CardDefinition> VisibleCards()
+    {
+        var known = Catalog.Cards.ToDictionary(c => c.GameCardId);
+        return Array.AsReadOnly(ConfirmedCardPool.CardIds.Where(known.ContainsKey).Select(id => known[id])
+            .Where(c => c.Name.Contains(Search, StringComparison.OrdinalIgnoreCase) ||
+                c.GameCardId.ToString(System.Globalization.CultureInfo.InvariantCulture).Contains(Search, StringComparison.Ordinal))
+            .Where(c => Filter switch
+            {
+                DeckFilter.Monster => ConfirmedCardPool.Category(c.GameCardId) == CardCategory.Monster,
+                DeckFilter.Spell => ConfirmedCardPool.Category(c.GameCardId) == CardCategory.Spell,
+                DeckFilter.Trap => ConfirmedCardPool.Category(c.GameCardId) == CardCategory.Trap,
+                _ => true
+            })
+            .OrderBy(c => c.Name, StringComparer.Ordinal).ToArray());
+    }
+    /// <summary>The draft's cards; a preview-regulation deck moves to the confirmed pool regulation, others keep theirs.</summary>
     public DeckDefinition Snapshot(string? revision = null)
     {
         if (string.IsNullOrWhiteSpace(Name) || Name.Length > 48 || Name.Any(char.IsControl)) throw new InvalidDataException("Use a deck name of 1 to 48 characters.");
-        return new(Name, revision ?? identity.Revision, identity.OwnerId, identity.CatalogId, identity.CatalogRevision,
+        return ConfirmedCardPool.AdoptPreview(new(Name, revision ?? identity.Revision, identity.OwnerId, identity.CatalogId, identity.CatalogRevision,
             identity.SourceBuild, identity.PolicyId, identity.PolicyRevision, sections[DeckSection.Main],
-            sections[DeckSection.Extra], sections[DeckSection.Side], identity.SchemaVersion);
+            sections[DeckSection.Extra], sections[DeckSection.Side], identity.SchemaVersion));
     }
-    public DeckValidation Validate() => DeckValidator.Validate(Snapshot(), Catalog, InitialDeckPolicy.Create(), InitialDeckPolicy.ExampleCollection());
+    public DeckValidation Validate()
+    {
+        var deck = Snapshot();
+        return DeckValidator.Validate(deck, Catalog, ConfirmedCardPool.PolicyFor(deck, Catalog), ConfirmedCardPool.CollectionFor(deck));
+    }
 }

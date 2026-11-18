@@ -69,8 +69,14 @@ public sealed partial class TitleFlowVisuals : IDisposable
         return value;
     }
 
-    public TitleFlowVisuals(GraphicsDevice device, OriginalScreenAssetResolver assets, byte[]? fontFile)
+    public const string CardTextFontSha256 = PgfTextRenderer.CardTextFontSha256;
+    /// <summary>Card-face text renderer (system ltn0), or null when that font was not imported.</summary>
+    private readonly PgfTextRenderer? cardTextRenderer;
+
+    public TitleFlowVisuals(GraphicsDevice device, OriginalScreenAssetResolver assets, byte[]? fontFile, byte[]? cardTextFont = null)
     {
+        cardTextRenderer = cardTextFont is null ? null
+            : new(device, cardTextFont, (texture, quad, color) => DrawQuad(texture, quad, 0, 0, true, color), PgfTextRenderer.CardTextFontSha256);
         this.device = device;
         profile = LoadProfile();
         foreach (var frame in profile.Frames) frames.Add(frame.Id, frame);
@@ -85,7 +91,9 @@ public sealed partial class TitleFlowVisuals : IDisposable
         textRenderer = new(device, fontFile, (texture, quad, color) => DrawQuad(texture, quad, 0, 0, true, color));
         Layer = new(device, 480, 272, false, SurfaceFormat.Color, DepthFormat.Depth24Stencil8);
         InitializeMainMenu();
+        InitializeDeckMenu();
         InitializeOptions(assets);
+        InitializeDeckEdit(assets);
         effect = new(device) { VertexColorEnabled = true, Projection = Matrix.CreateOrthographicOffCenter(0, 480, 272, 0, 0, 1) };
         alpha = new()
         {
@@ -121,12 +129,62 @@ public sealed partial class TitleFlowVisuals : IDisposable
                 _ = Source(text.Source, text.Offset, text.Start, text.Chars);
         }
         foreach (var level in profile.LevelNames) _ = Source(level.Source, level.Offset, level.Start, level.Chars);
+        foreach (var label in submenuProfiles.Values.SelectMany(p => p.Rows).Select(r => r.Label)) _ = Source(label.Source, label.Offset, label.Start, label.Chars);
     }
 
     private string Source(string source, int offset, int start, int chars) => TitleFlowText.Read(source switch
     {
-        "eboot" => eboot, "title-menu" => titleMenu, _ => throw new InvalidDataException("Unknown text source.")
+        "eboot" => eboot, "title-menu" => titleMenu, "deck" => deckArchive,
+        "album" => albumArchive ?? throw new InvalidDataException("The Card Album archive is not in this import."),
+        "cardinfo" => cardInfoArchive ?? throw new InvalidDataException("The card info archive is not in this import."),
+        _ => throw new InvalidDataException("Unknown text source.")
     }, offset, start, chars);
+
+    // Helpers other screens (the Card Album) draw with, so they share this layer's textures, font and measured-draw rules.
+    private byte[]? albumArchive, cardInfoArchive;
+
+    /// <summary>Runs <paramref name="draw"/> with <paramref name="target"/> bound, restoring the previous target and default states.</summary>
+    public void Within(RenderTarget2D target, Action draw) => WithTarget(target, draw);
+    public void DrawFlow(FlowDraw draw) => DrawMeasured(draw);
+    public void DrawRun(FlowText run) => DrawMeasuredText(Source(run.Source, run.Offset, run.Start, run.Chars), run);
+    public void DrawText(string value, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha, int alpha = 255) =>
+        DrawLine(value, x, y, scaleX, scaleY, color, shadowAlpha, null, alpha);
+    public float MeasureText(string value, float scaleX) => TextWidth(value, scaleX);
+    /// <summary>Text in the card-text font (ltn0), whose advances the card detail uses (measured: 37 of 37 captured characters); the title
+    /// font stands in when it is not imported.</summary>
+    public void DrawCardFontText(string value, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha) =>
+        (cardTextRenderer ?? textRenderer).DrawLine(value, x, y, scaleX, scaleY, color, shadowAlpha);
+    public float MeasureCardFontText(string value, float scaleX) => (cardTextRenderer ?? textRenderer).TextWidth(value, scaleX);
+    public bool HasCardFont => cardTextRenderer is not null;
+    public IReadOnlyList<string> WrapText(string text, float width, float scaleX) => Wrap(text, width, scaleX);
+
+    /// <summary>Adds imported textures under their asset keys (pinned to the original uploads) and the archive the album's labels come from.</summary>
+    public void UseAlbumAssets(OriginalScreenAssetResolver assets, IEnumerable<string> keys, string archiveKey, string cardInfoKey)
+    {
+        foreach (string key in keys.Where(k => !textures.ContainsKey(k))) textures.AddBorrowed(key, assets.Resolve(key).Texture);
+        albumArchive ??= assets.ResolveBytes(archiveKey);
+        cardInfoArchive ??= assets.ResolveBytes(cardInfoKey);
+    }
+
+    /// <summary>The whole message at a source offset (UTF-16 up to its terminator), normalized like other source text.</summary>
+    public string Message(string source, int offset)
+    {
+        byte[] blob = source switch { "cardinfo" => cardInfoArchive, "album" => albumArchive, "deck" => deckArchive, "eboot" => eboot, "title-menu" => titleMenu, _ => null }
+            ?? throw new InvalidDataException("Unknown or missing text source " + source + ".");
+        if (offset < 0 || offset >= blob.Length || offset % 2 != 0) throw new InvalidDataException("Invalid text reference.");
+        int end = offset;
+        while (end + 1 < blob.Length && (blob[end] != 0 || blob[end + 1] != 0)) end += 2;
+        return TitleFlowText.Normalize(System.Text.Encoding.Unicode.GetString(blob, offset, end - offset));
+    }
+
+    public Texture2D Texture(string key) => textures[key];
+
+    /// <summary>The stored original bytes behind a text source ("eboot", "cardinfo"), for readers of other data in the same files.</summary>
+    public byte[] SourceBytes(string source) => source switch { "eboot" => eboot, "cardinfo" => cardInfoArchive, _ => null }
+        ?? throw new InvalidDataException("Unknown or missing source " + source + ".");
+
+    /// <summary>Adds a measured EBOOT texture (decoded from the stored EBOOT and checked against its recorded pixel hash).</summary>
+    public void UseEbootTexture(FlowEbootTexture source) { if (!textures.ContainsKey(source.Key)) textures.AddEmbedded(source); }
 
     public void Render(string frameId, int buttonFocus = 0, int menuFocus = 0, string? name = null, DuelistLevelChoice level = DuelistLevelChoice.FirstTimer, int? menuBackgroundFrame = null)
     {
@@ -261,13 +319,14 @@ public sealed partial class TitleFlowVisuals : IDisposable
         run.X.Length == value.Length ? run.X : null);
     private void DrawAdvanced(string value, FlowText run) => DrawLine(value, run.X[0], run.Y, run.ScaleX, run.ScaleY, run.Color, run.ShadowAlpha);
 
-    private void DrawLine(string value, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha, float[]? measuredX = null) =>
-        textRenderer.DrawLine(value, x, y, scaleX, scaleY, color, shadowAlpha, measuredX);
+    private void DrawLine(string value, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha, float[]? measuredX = null, int alpha = 255) =>
+        textRenderer.DrawLine(value, x, y, scaleX, scaleY, color, shadowAlpha, measuredX, alpha);
 
     public void Dispose()
     {
         textures.Dispose(); textRenderer.Dispose();
         MainMenuBackground.Dispose(); MainMenuLabels.Dispose();
+        foreach (var labels in submenuLabels.Values) labels.Dispose();
         OptionsBackground.Dispose(); OptionsStatic.Dispose(); OptionsText.Dispose(); OptionsPieces.Dispose();
         DialogText?.Dispose(); DialogPieces?.Dispose();
         foreach (var back in dialogBacks.Values) back.Dispose();

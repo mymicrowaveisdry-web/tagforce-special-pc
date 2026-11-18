@@ -4,25 +4,27 @@ using System.Text.Json;
 using TagForceSpecial.Effects;
 using TagForceSpecial.PC.DuelUI;
 using TagForceSpecial.PC.DuelUI.Input;
-using TagForceSpecial.PC.Import;
+using TagForceSpecial.Import.Installed;
+using TagForceSpecial.Import.Storage;
 using TagForceSpecial.PC.Rendering;
 using TagForceSpecial.PC.Screens;
 
 namespace TagForceSpecial.PC.Game;
 
-public enum ScreenId { Title, PcTools, DeckSelection, Setup, Duel, Result, Controls, Paused, DeckEditor, SavedDecks, Preferences, AssetDiagnostics, TitleStartMenu, TitleFlow }
+public enum ScreenId { Title, PcTools, DeckSelection, Duel = 4, Result, Controls, Paused, DeckEditor, SavedDecks, Preferences, AssetDiagnostics, TitleStartMenu, TitleFlow }
 
 public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
 {
     private readonly GraphicsDeviceManager graphics;
     private readonly HostOptions options;
     private readonly GameThreadGuard graphicsThread = new();
-    private readonly TagForceSpecial.PC.App.Input.PspInputMapper input = new();
+    private readonly TagForceSpecial.PC.App.Input.InputMapper input = new();
     private SpriteRenderer renderer = null!;
     private RenderTarget2D canvas = null!;
     private SpriteBatch presenter = null!;
     private DuelController? duel;
     private int menuIndex, choiceIndex, inspectIndex = -1, smokeCommands, frames;
+    private int smokeUpdatedFrame = -1;
     private bool captured, capturedResult, savedReplay, smokeFinished;
     private double opponentAt;
     private string setupMessage = "Local game data is required to start a duel.";
@@ -63,25 +65,30 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
 
     private bool StartDuel(int variant)
     {
-        if (options.CachePath is null && setup?.Cache is null)
+        if (options.CachePath is null && setup?.Game is null)
         {
-            setupMessage = "Select your original ISO in Local Game Setup, then prepare a deck.";
-            screen = ScreenId.Setup;
+            setupMessage = "Select your original ISO in the importer workbench, then prepare a deck.";
+            screen = ScreenId.PcTools;
             return false;
         }
-        var validation = options.CachePath is null ? null : GameCache.Validate(options.CachePath);
-        var cache = validation?.Cache ?? (options.CachePath is null ? setup?.Cache : null);
+        InstalledGame? cache = setup?.Game;
+        if (options.CachePath is { } catalogPath)
+        {
+            // --cache names a directory holding a pinned catalog/ package, such as a catalog stage output.
+            try { cache = InstalledGame.FromCatalogDirectory(catalogPath); }
+            catch (Exception e) when (PrivateStorage.Recoverable(e)) { cache = null; }
+        }
         if (cache is null)
         {
-            setupMessage = "Game data could not be verified. Rebuild it in Local Game Setup.";
-            screen = ScreenId.Setup;
+            setupMessage = "Game data could not be verified. Rebuild it in the importer workbench.";
+            screen = ScreenId.PcTools;
             return false;
         }
         try { duel = SupportedDuelFactory.Create(cache, variant, CurrentSeed); }
         catch (InvalidDataException error)
         {
             setupMessage = error.Message;
-            screen = ScreenId.Setup;
+            screen = ScreenId.PcTools;
             return false;
         }
         screen = ScreenId.Duel;
@@ -90,11 +97,29 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
         return true;
     }
 
+    /// <summary>Where the 480 x 272 picture sits in the window (letterboxed); the mouse maps through it.</summary>
+    private Rendering.CanvasRect PictureRect() => PspViewport.Fit(GraphicsDevice.PresentationParameters.BackBufferWidth,
+        GraphicsDevice.PresentationParameters.BackBufferHeight, options.PixelExact || setup?.Preferences.IntegerScaling == true);
+
+    /// <summary>Player input: saved key bindings, typing keys muted while a text field has focus, and the mouse over the picture.</summary>
+    private App.Input.InputFrame PollPlayer()
+    {
+        input.TextEntry = titleFlow?.Editing == true || editor?.EditingText is not null;
+        return input.Poll(IsActive, PictureRect());
+    }
+
     protected override void Update(GameTime gameTime)
     {
+        // The presentation smoke scripts input and checks one step per drawn frame; MonoGame's catch-up updates after a slow frame would
+        // advance animations (and repeat a scripted press) without a matching draw, so the smoke simulates exactly one update per draw.
+        if (options.PresentationSmoke)
+        {
+            if (smokeUpdatedFrame == frames) return;
+            smokeUpdatedFrame = frames;
+        }
         PollSetupTask();
         var frame = options.PresentationSmoke ? PresentationSmokeInput()
-            : options.RealtimeWalkRoot is not null ? RealtimeWalkInput(gameTime) : input.Poll(IsActive);
+            : options.RealtimeWalkRoot is not null ? RealtimeWalkInput(gameTime) : PollPlayer();
         navigationTime = gameTime;
         // Input is ignored while a fade runs; the change at black may also move to another screen.
         bool fading = screenFade.Active;
@@ -102,7 +127,7 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
         if (fading) frame = default;
         // F12 is a host utility shortcut.
         if (frame.UtilityRequested && screen is ScreenId.Title or ScreenId.TitleStartMenu or ScreenId.PcTools or ScreenId.TitleFlow)
-        { utilityReturn = screen; screen = ScreenId.Setup; return; }
+        { utilityReturn = screen; screen = ScreenId.PcTools; return; }
         if (options.Smoke)
         {
             RunSetupSmoke();
@@ -154,8 +179,7 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
         if (options.RealtimeWalkRoot is not null) CheckRealtimeWalkFrame(gameTime);
         GraphicsDevice.SetRenderTarget(null);
         GraphicsDevice.Clear(Color.Black);
-        var target = PspViewport.Fit(GraphicsDevice.PresentationParameters.BackBufferWidth,
-            GraphicsDevice.PresentationParameters.BackBufferHeight, options.PixelExact || setup?.Preferences.IntegerScaling == true);
+        var target = PictureRect();
         presenter.Begin(samplerState: SamplerState.PointClamp);
         presenter.Draw(canvas, new Rectangle(target.X, target.Y, target.Width, target.Height), Color.White);
         presenter.End();

@@ -7,7 +7,7 @@ namespace TagForceSpecial.PC.App.Screens.Title;
 /// <summary>Owns the pinned PGF glyph atlas, metrics, shadows and authored fallback text on the game thread.</summary>
 internal sealed class PgfTextRenderer : IDisposable
 {
-    internal const string RequiredFontSha256 = "250babd8a242d7eaaa84284c78d5e2273b29e61d0d8c01b65414e3248d7c1164";
+    internal const string RequiredFontSha256 = TagForceSpecial.Import.Resources.GameFonts.MenuSha256;
     private const int CellSize = 30, CellPitch = 32, BaselineRow = 24, GlyphLeft = 7;
     private const char Bullet = '\u25CF';
     private readonly Action<Texture2D, FlowQuad, Color> drawGlyph;
@@ -19,19 +19,29 @@ internal sealed class PgfTextRenderer : IDisposable
     internal bool OriginalFontAvailable => font is not null;
     internal List<(string Text, int X, int Y, Color Color)> FallbackLines { get; } = [];
 
-    internal PgfTextRenderer(GraphicsDevice device, byte[]? fontFile, Action<Texture2D, FlowQuad, Color> drawGlyph)
+    /// <summary>FTT-NewRodin Pro Latin (system ltn0): Deck Edit's card-face text, whose recorded glyph steps equal its advances x 0.2.</summary>
+    internal const string CardTextFontSha256 = TagForceSpecial.Import.Resources.GameFonts.CardSha256;
+
+    internal PgfTextRenderer(GraphicsDevice device, byte[]? fontFile, Action<Texture2D, FlowQuad, Color> drawGlyph, string requiredSha256 = RequiredFontSha256)
     {
         this.drawGlyph = drawGlyph;
         if (fontFile is not null)
         {
             var parsed = new PgfFont(fontFile);
-            if (parsed.Sha256 != RequiredFontSha256) throw new InvalidDataException("PSP font file differs from the pinned system font.");
+            if (parsed.Sha256 != requiredSha256) throw new InvalidDataException("PSP font file differs from the pinned system font.");
             font = parsed;
             atlas = new(device, 512, 512);
         }
     }
 
-    internal void DrawLine(string value, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha, float[]? measuredX = null)
+    /// <summary>Width of a line using the PSP font's own advances; without the font, half a glyph cell per character.</summary>
+    internal float TextWidth(string value, float scaleX)
+    {
+        if (font is null) return value.Length * CellSize * scaleX / 2;
+        return value.Sum(c => font.Glyph(c)?.AdvanceH26_6 / 64f * scaleX ?? CellSize * scaleX / 2);
+    }
+
+    internal void DrawLine(string value, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha, float[]? measuredX = null, int alpha = 255)
     {
         if (font is null || atlas is null)
         {
@@ -40,7 +50,7 @@ internal sealed class PgfTextRenderer : IDisposable
         }
         foreach (char c in value) EnsureGlyph(c);
         if (atlasDirty) { atlas.SetData(atlasPixels); atlasDirty = false; }
-        var main = new Color((color) & 255, (color >> 8) & 255, (color >> 16) & 255, 255);
+        var main = new Color((color) & 255, (color >> 8) & 255, (color >> 16) & 255, alpha);
         // Measured shadow: two copies at (+0,+1) and (+1,+1) beneath the opaque text.
         if (shadowAlpha > 0)
         {

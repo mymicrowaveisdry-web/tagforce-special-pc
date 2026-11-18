@@ -25,15 +25,7 @@ PARAM.SFO, UMD_DATA, EBOOT, DuelEng, cardinfo and the card archive each have pin
 lengths/hashes. Only success returns a read-only source handle, which stays open
 while importing. A final source hash check precedes publication.
 
-`Import.GameCache.Create` requires that handle and the already converted catalog
-package. It stages mapped raw cardinfo/cardh files and the catalog in a unique
-sibling directory, validates every output, then publishes by directory rename.
-The cache stores the card archive unchanged; texture/audio conversion remains separate.
-Interactive ISO setup is provided by `SetupStore`, which generates the input package directly from the ISO. No original executable becomes a runtime
-dependency or cache artifact. Existing caches are not overwritten. Cancellation
-and failure leave no completed destination. Valid caches can be reused without
-reopening the ISO after their trusted profile and artifacts validate.
-
+The shared `TagForceSpecial.Import` pipeline converts the pinned catalog, imports presentation and recipes, records validation, and atomically publishes `import/active.json`. `GameDataStore` loads only this layout through `InstalledGameReader`; the previous layout is no longer consumed. Generated outputs are reused after their artifacts and trusted profile pins validate. See [importer architecture](../docs/importer/ARCHITECTURE.md) and [usage](../docs/importer/USER_GUIDE.md).
 Validation rejects wrong source/schema/mapping/conversion identities, missing,
 changed or unexpected files and links. Expected hashes come from the profile,
 so rewriting a cache's own checksums cannot bless altered content. Diagnostics
@@ -65,8 +57,10 @@ not active save/DLC or story-unlock regulation. EBOOT SHA-256 is
 `8087681f81f87a87471591752b3c0c9bc3cec48ffff15a115a1e2525f670c975`.
 The 152-entry candidate at file `0xd27e0` has table SHA-256
 `ea2aa9fa9c493a82374d0b64ed7628f7e5906f69178d3533c5e0c45afba09009`;
-none of the selected 14 IDs occurs. This is bounded policy evidence, not new
-runtime PSP verification. Unknown overrides and other card restrictions remain
+none of the selected 14 IDs occurs. `tfsp-confirmed-card-pool/1` applies that
+table (63 Forbidden, 68 Limited, 21 Semi-Limited) to every confirmed pool card;
+see `BuiltInRestrictions`. This is bounded policy evidence, not new runtime PSP
+verification. Unknown overrides and other card restrictions remain
 unresolved rather than inferred from names or packed kind codes.
 
 Results are `Legal`, `Illegal` or `Indeterminate`; only `Legal` passes. Unknown

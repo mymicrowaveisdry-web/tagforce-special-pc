@@ -3,19 +3,29 @@ using TagForceSpecial.Assets.Presentation;
 using TagForceSpecial.PC.App.Input;
 using TagForceSpecial.PC.App.Screens;
 using TagForceSpecial.PC.App.Screens.Title;
+using TagForceSpecial.Import.Storage;
 using TagForceSpecial.PC.Setup;
+using TagForceSpecial.PC.Decks;
+using TagForceSpecial.Effects;
 
 namespace TagForceSpecial.PC.Game;
 
 public sealed partial class GameLoop
 {
-    private const string FontFile = "fonts/psp-latin.pgf";
+    private const string FontFile = TagForceSpecial.Import.Resources.GameFonts.MenuFile, CardTextFontFile = TagForceSpecial.Import.Resources.GameFonts.CardFile;
     private TitleFlow? titleFlow;
     private TitleFlowVisuals? flowVisuals;
     private PlayerProfileStore? profiles;
     private bool smokeProfile;
     private string? renderedFlowKey;
     private int renderedMenuFrame = -1, renderedOptionsFrame = -1;
+    private string? renderedDeckEditKey;
+    private int renderedRecipeRevision = -1;
+    private RecipeViewerSession? renderedRecipeSession;
+    private RecipeSelection? lastRecipeSelection;
+    private App.Screens.Album.CardAlbumScreen? cardAlbumScreen;
+    private App.Screens.Album.CardAlbumSession? renderedAlbumSession;
+    private int renderedAlbumRevision = -1;
     private readonly ScreenFade screenFade = new();
 
     /// <summary>The flow is presented only when every source texture and text reference validates.</summary>
@@ -25,23 +35,27 @@ public sealed partial class GameLoop
         try
         {
             ImportPspFont();
-            string path = setup.Storage.PathFor(FontFile);
+            TagForceSpecial.Import.Resources.GameFonts.Ensure(setup.Storage, setup.Game?.Manifest?.Source.Path);
+            string path = setup.Storage.PathFor(FontFile), cardPath = setup.Storage.PathFor(CardTextFontFile);
             byte[]? font = File.Exists(path) ? File.ReadAllBytes(path) : null;
-            var next = new TitleFlowVisuals(GraphicsDevice, screenAssets, font);
+            byte[]? cardFont = File.Exists(cardPath) ? File.ReadAllBytes(cardPath) : null;
+            var next = new TitleFlowVisuals(GraphicsDevice, screenAssets, font, cardFont);
             try
             {
                 next.ValidateText(); gum.BindFlowLayer(next.Layer); next.RenderMainMenuLabels(); gum.BindMainMenu(next);
+                next.RenderSubmenuLabels(); gum.BindSubmenus(next); gum.BindDeckEdit(next.DeckEditLayer);
                 next.RenderOptionsLayers(); next.RenderDialogLayers(); gum.BindOptions(next);
             }
             catch { next.Dispose(); throw; }
+            cardAlbumScreen?.Dispose(); cardAlbumScreen = null;
             flowVisuals?.Dispose();
             flowVisuals = next;
             profiles = new(setup.Storage);
             titleFlow = new(new FlowHost(this), Environment.UserName, instantTransitions: options.PixelExact);
-            if (font is null) Console.Error.WriteLine("TITLE_FLOW_FONT_MISSING text uses the authored fallback; pass --psp-font once.");
+            if (font is null) Console.Error.WriteLine("TITLE_FLOW_FONT_MISSING select a local PSP font folder in the importer.");
             return true;
         }
-        catch (Exception e) when (e is InvalidDataException or KeyNotFoundException || SetupStore.Recoverable(e))
+        catch (Exception e) when (e is InvalidDataException or KeyNotFoundException || PrivateStorage.Recoverable(e))
         {
             setupMessage = "Original title assets need a validated title presentation import.";
             Console.Error.WriteLine("TITLE_FLOW_PENDING " + e.Message);
@@ -51,13 +65,19 @@ public sealed partial class GameLoop
 
     private void ImportPspFont()
     {
-        if (options.PspFontPath is not { } source || setup is null) return;
-        byte[] bytes = File.ReadAllBytes(source);
-        if (new PgfFont(bytes).Sha256 != TitleFlowVisuals.RequiredFontSha256)
-            throw new InvalidDataException("The selected file is not the pinned PSP Latin system font.");
-        string target = setup.Storage.PathFor(FontFile);
-        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-        File.WriteAllBytes(target, bytes);
+        if (setup is null) return;
+        Import(options.PspFontPath, TitleFlowVisuals.RequiredFontSha256, FontFile, "The selected file is not the pinned PSP Latin system font.");
+        Import(options.PspCardFontPath, TitleFlowVisuals.CardTextFontSha256, CardTextFontFile, "The selected file is not the pinned PSP card-text font (ltn0).");
+
+        void Import(string? source, string sha256, string file, string error)
+        {
+            if (source is null) return;
+            byte[] bytes = File.ReadAllBytes(source);
+            if (new PgfFont(bytes).Sha256 != sha256) throw new InvalidDataException(error);
+            string target = setup.Storage.PathFor(file);
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.WriteAllBytes(target, bytes);
+        }
     }
 
     private bool ProfilePresent => options.PresentationSmoke ? smokeProfile : profiles?.Present == true;
@@ -68,6 +88,8 @@ public sealed partial class GameLoop
         renderedFlowKey = null;
         screen = ScreenId.TitleFlow;
     }
+
+    private UI.TitleFlowPointer? flowPointer;
 
     private static string? FrameFor(TitleFlowStep step) => step switch
     {
@@ -101,7 +123,7 @@ public sealed partial class GameLoop
     private void DrawTransitionOverlay()
     {
         int alpha = screenFade.Alpha;
-        if (activeScreen == ScreenId.TitleFlow && titleFlow is { Step: TitleFlowStep.MainMenu or TitleFlowStep.MainMenuUnavailable or TitleFlowStep.Options } flow)
+        if (activeScreen == ScreenId.TitleFlow && titleFlow is { Step: TitleFlowStep.MainMenu or TitleFlowStep.MainMenuUnavailable or TitleFlowStep.Options or TitleFlowStep.DeckMenu or TitleFlowStep.DatabaseMenu } flow)
             alpha = Math.Max(alpha, MainMenuEntry.OverlayAlpha(MainMenuEntryFrame(flow)));
         if (alpha == 0) return;
         renderer.Begin();
@@ -117,9 +139,20 @@ public sealed partial class GameLoop
         // After the entry sequence only the background frame can change what the layer holds.
         int key = frame * 64 + Math.Min(entry, MainMenuEntry.ReadyFrame);
         if (key != renderedMenuFrame) { visuals.RenderMainMenuBackground(frame, entry); renderedMenuFrame = key; }
-        gum.UpdateMainMenu(flow.MenuFocus, visuals.MainMenuMotion.ScalarsAt(frame).Pulse, entry);
+        // Measured: after the submenu closes, the menu's focus pulse restarts on the submenu's curve; exact runs hold its first value.
+        int pulse = flow.MenuFocusRestartFrame is { } restart
+            ? flow.ClosedSubmenuProfile.PulseSinceFocus(options.PixelExact ? 0 : restart) : visuals.MainMenuMotion.ScalarsAt(frame).Pulse;
+        gum.UpdateMainMenu(flow.MenuFocus, pulse, entry, flow.Submenu is { } dimming ? dimming.Profile.MenuDim : 255);
         gum.ShowMainMenuNotice(flow.Step == TitleFlowStep.MainMenuUnavailable ? flow.FocusedDestination : null);
-        visuals.SetMainMenuFallback(flow.MenuFocus);
+        if (flow.Submenu is { } submenu)
+        {
+            // Exact runs fix the submenu's own frame as well as the background's.
+            int subFrame = options.PixelExact ? options.DeckMenuFrame ?? submenu.Profile.ReadyFrame : submenu.Frame;
+            gum.UpdateSubmenu(submenu.Kind, submenu.Profile, submenu.Focus, subFrame, submenu.FocusVisible(subFrame));
+            gum.ShowSubmenuNotice(submenu.Kind, submenu.NoticeOpen ? submenu.Focused : null);
+            visuals.SetSubmenuFallback(submenu.Kind, submenu.FocusVisible(subFrame) ? submenu.Focus : null);
+        }
+        else visuals.SetMainMenuFallback(flow.MenuFocus);
     }
 
     private void RefreshOptions(TitleFlow flow, TitleFlowVisuals visuals)
@@ -138,12 +171,66 @@ public sealed partial class GameLoop
         visuals.SetOptionsFallback(session.Values, session.Focus);
     }
 
+    private void RefreshDeckEdit(TitleFlow flow, TitleFlowVisuals visuals, DeckEditSession edit)
+    {
+        gum.Show("OriginalMainMenu", false); gum.Show("OriginalDeckMenu", false); gum.Show("OriginalDatabaseMenu", false); gum.Show("OriginalTitleFlow", false);
+        if (edit.Prompt == DeckEditPrompt.SaveQuestion)
+        {
+            // Observed after OK: "Save all contents acquired so far?" over the bare animated background, as from Options.
+            int bare = MainMenuFrame(flow, visuals);
+            if (bare * 64 != renderedOptionsFrame) { visuals.RenderOptionsBackground(bare, 0); renderedOptionsFrame = bare * 64; }
+            gum.Show("OriginalOptions", true);
+            gum.ShowOptionsDialog(null);
+            gum.ShowOptionsSaveQuestion(edit.PromptFocus, visuals.OptionsProfile.Rows.Length, visuals.OptionsProfile.Groups.Length);
+            renderedDeckEditKey = null;
+            return;
+        }
+        gum.Show("OriginalOptions", false);
+        gum.Show("OriginalDeckEdit", true);
+        edit.Menus.HoldPulse = options.PixelExact;
+        // PC-authored notice for rows the PC does not recreate; its title is the row's own source label.
+        gum.ShowDeckEditNotice(edit.Menus.Notice is { } notice ? visuals.DeckEditMenuLabel(notice.Popup, notice.Row) : null,
+            "Not recreated on the PC yet: its original screen or data is not available here. Nothing was changed.");
+        string key = $"{edit.Tab}/{edit.Cursor}/{edit.Scroll}/{edit.Prompt}/{edit.PromptFocus}/{edit.Count(DeckEditTab.Deck)}/{edit.Count(DeckEditTab.Extra)}/{edit.Count(DeckEditTab.Side)}/{edit.Count(DeckEditTab.Trunk)}/{edit.Menus.Signature}/{edit.Query.Signature}";
+        if (key == renderedDeckEditKey) return;
+        visuals.RenderDeckEdit(edit, edit.Draft.Name);
+        renderedDeckEditKey = key;
+    }
+
     private void RefreshFlow()
     {
         if (titleFlow is null || flowVisuals is null) return;
-        bool menu = titleFlow.Step is TitleFlowStep.MainMenu or TitleFlowStep.MainMenuUnavailable;
+        bool menu = titleFlow.Step is TitleFlowStep.MainMenu or TitleFlowStep.MainMenuUnavailable or TitleFlowStep.DeckMenu or TitleFlowStep.DatabaseMenu;
         bool optionsScreen = titleFlow.Step == TitleFlowStep.Options && titleFlow.Options is not null;
         gum.Show("OriginalMainMenu", menu);
+        gum.Show("OriginalDeckMenu", titleFlow.Submenu?.Kind == SubmenuKind.Deck);
+        gum.Show("OriginalDatabaseMenu", titleFlow.Submenu?.Kind == SubmenuKind.Database);
+        gum.Show("OriginalDeckEdit", false);
+        gum.Show("OriginalRecipeViewer", false);
+        gum.Show("OriginalCardAlbum", false);
+        if (titleFlow.Step == TitleFlowStep.CardAlbum && titleFlow.CardAlbum is { } album && cardAlbumScreen is { } albumScreen)
+        {
+            if (!ReferenceEquals(renderedAlbumSession, album) || renderedAlbumRevision != album.Revision)
+            {
+                albumScreen.Renderer.Render(album);
+                gum.BindCardAlbum(albumScreen.Renderer.Layer);
+                renderedAlbumSession = album; renderedAlbumRevision = album.Revision;
+            }
+            gum.Show("OriginalCardAlbum", true);
+            return;
+        }
+        if (titleFlow.Step == TitleFlowStep.RecipeViewer && titleFlow.Recipes is { } recipes && setup?.Game is { } recipeCache)
+        {
+            if (!ReferenceEquals(renderedRecipeSession, recipes) || renderedRecipeRevision != recipes.Revision)
+            {
+                flowVisuals.RenderRecipes(recipes, recipeCache.Catalog.Catalog);
+                gum.BindRecipes(flowVisuals.RecipeLayer!);
+                renderedRecipeSession = recipes; renderedRecipeRevision = recipes.Revision;
+            }
+            gum.Show("OriginalRecipeViewer", true);
+            return;
+        }
+        if (titleFlow.Step == TitleFlowStep.DeckEdit && titleFlow.DeckEdit is { } edit) { RefreshDeckEdit(titleFlow, flowVisuals, edit); return; }
         gum.Show("OriginalOptions", optionsScreen);
         string? frame = FrameFor(titleFlow.Step);
         gum.Show("OriginalTitleFlow", frame is not null);
@@ -227,6 +314,54 @@ public sealed partial class GameLoop
         {
             if (!owner.options.PresentationSmoke) owner.profiles!.Save(name, level, options);
         }
+        /// <summary>Deck Edit works on the native draft (the same one the PC deck tools edit). The Trunk is the supported card pool.
+        /// Presentation checks start each visit from a fresh built-in deck so repeated cycles stay identical, and never save.</summary>
+        public DeckEditSession? OpenDeckEdit()
+        {
+            if (owner.setup?.Game?.Catalog.Catalog is not { } catalog || owner.flowVisuals is null) return null;
+            DeckDraft draft;
+            if (owner.options.PresentationSmoke) draft = new(catalog, InitialOpponentDecks.Create(0));
+            else if (owner.editor is { } editor) { editor.EnsureDraft(); draft = editor.Draft!; }
+            else return null;
+            var known = catalog.Cards.ToDictionary(c => c.GameCardId);
+            return new DeckEditSession(draft, ConfirmedCardPool.CardIds.Where(known.ContainsKey).Select(id => known[id]),
+                owner.flowVisuals.DeckEditProfile.VisibleRows);
+        }
+        public RecipeViewerSession? OpenRecipeViewer()
+        {
+            if (owner.setup?.Game is not { } game) return null;
+            try
+            {
+                // The importer's recipe stage output, or a prepared library passed with --recipe-reference.
+                string? root = owner.options.RecipeReferenceRoot ?? game.RecipeRoot;
+                var source = root is null ? null : Recipes.RecipeCatalog.Open(new PrivateStorage(root), game.Catalog.Catalog);
+                return source is null ? null : new RecipeViewerSession(source);
+            }
+            catch (Exception e) when (PrivateStorage.Recoverable(e))
+            { Console.Error.WriteLine("RECIPE_SOURCE_PENDING " + e.Message); return null; }
+        }
+        public void CloseRecipeViewer(RecipeSelection? selection) => owner.lastRecipeSelection = selection;
+        /// <summary>The captured binder package comes from --album-reference, else the data root's private album-reference folder (so an
+        /// importer launch finds it); the collection from the data root's collection file when present.</summary>
+        public App.Screens.Album.CardAlbumSession? OpenCardAlbum()
+        {
+            if (owner.setup?.Game?.Catalog.Catalog is not { } catalog || owner.flowVisuals is null) return null;
+            string local = owner.setup.Storage.PathFor(App.Screens.Album.CardAlbumScreen.ReferenceFolder);
+            string? binder = owner.options.AlbumReferenceRoot
+                ?? (File.Exists(Path.Combine(local, App.Screens.Album.CardAlbumBinder.FileName)) ? local : null);
+            owner.cardAlbumScreen ??= App.Screens.Album.CardAlbumScreen.TryCreate(owner.GraphicsDevice, owner.flowVisuals, owner.screenAssets, catalog, binder);
+            // The detail's Main/Side counters read the same deck Deck Edit edits (presentation checks: the fresh built-in deck).
+            DeckDraft? draft = null;
+            if (owner.options.PresentationSmoke) draft = new(catalog, InitialOpponentDecks.Create(0));
+            else if (owner.editor is { } editor) { editor.EnsureDraft(); draft = editor.Draft; }
+            Func<uint, (int Main, int Side)>? inDeck = draft is null ? null
+                : id => (draft.Count(id, Core.Decks.DeckSection.Main) + draft.Count(id, Core.Decks.DeckSection.Extra), draft.Count(id, Core.Decks.DeckSection.Side));
+            return owner.cardAlbumScreen?.Open(owner.setup.Storage.PathFor(App.Screens.Album.CardAlbumScreen.CollectionFile), inDeck);
+        }
+        public void SaveDeckEdit(DeckEditSession session)
+        {
+            if (!owner.options.PresentationSmoke && owner.editor is { } editor && ReferenceEquals(session.Draft, editor.Draft)) editor.Save();
+        }
     }
 
     private void LeaveFlowIfDone(ScreenContext context)
@@ -245,9 +380,10 @@ public sealed partial class GameLoop
             owner.renderedFlowKey = null;
             owner.RefreshFlow();
         }
-        public void HandleInput(PspInputFrame input)
+        public void HandleInput(InputFrame input)
         {
             var flow = owner.titleFlow!;
+            if (owner.flowVisuals is { } visuals) input = (owner.flowPointer ??= new(owner.gum)).Translate(flow, visuals, input, FrameFor(flow.Step));
             flow.Handle(input);
             if (flow.PendingStep is { } pending)
                 // Dialogs hold briefly after confirming. The title has its own fade-in; the menu's entry sequence includes one.
@@ -272,6 +408,11 @@ public sealed partial class GameLoop
         {
             owner.gum.Show("OriginalTitleFlow", false);
             owner.gum.Show("OriginalMainMenu", false);
+            owner.gum.Show("OriginalDeckMenu", false);
+            owner.gum.Show("OriginalDatabaseMenu", false);
+            owner.gum.Show("OriginalDeckEdit", false);
+            owner.gum.Show("OriginalRecipeViewer", false);
+            owner.gum.Show("OriginalCardAlbum", false);
             owner.renderedMenuFrame = -1;
         }
     }

@@ -6,7 +6,7 @@ using TagForceSpecial.Core.Views;
 using TagForceSpecial.Effects;
 using TagForceSpecial.PC.DuelUI;
 using TagForceSpecial.PC.Game;
-using TagForceSpecial.PC.Import;
+using TagForceSpecial.Import.Installed;
 using static TagForceSpecial.Tests.NormalSpellTests;
 
 namespace TagForceSpecial.Tests;
@@ -327,9 +327,8 @@ public sealed class OpponentTests
     public void ActualValidatedCacheDeckSelectionRunsTheSameSupportedPcSession()
     {
         string root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../.."));
-        var cache = GameCache.Validate(Path.Combine(root, "analysis/stage13/cache/english-2.1-v1"));
-        Assert.True(cache.IsValid);
-        var c = SupportedDuelFactory.Create(cache.Cache!, 2, 7);
+        var cache = InstalledGame.FromCatalogDirectory(Path.Combine(root, "analysis/stage13/cache/english-2.1-v1"));
+        var c = SupportedDuelFactory.Create(cache, 2, 7);
         for (int i = 0; i < 6000 && c.View.Outcome is null; i++)
             Assert.True(c.View.Choices.Count > 0 ? c.Choose(c.View.Revision, 0) : c.StepOpponent());
         Assert.Equal(PlayerId.One, c.View.Outcome?.Winner);

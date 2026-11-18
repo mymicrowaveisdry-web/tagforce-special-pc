@@ -3,9 +3,6 @@ using System.Text.Json;
 using TagForceSpecial.Assets;
 using TagForceSpecial.Tools;
 
-if (args.Length > 0 && args[0] == "presentation-import") return PresentationCommands.Run(args[1..], Console.Out, Console.Error);
-if (args.Length > 0 && args[0] == "presentation-check") return PresentationCommands.Check(args[1..], Console.Out, Console.Error);
-if (args.Length > 0 && args[0] == "presentation-title-import") return PresentationCommands.ImportTitle(args[1..], Console.Out, Console.Error);
 if (args.Length == 1 && args[0] == "presentation-reference-cases")
 {
     Console.WriteLine(JsonSerializer.Serialize(new
@@ -18,6 +15,7 @@ if (args.Length == 1 && args[0] == "presentation-reference-cases")
     return 0;
 }
 
+if (args.Length > 0 && args[0] is "import" or "import-check" or "import-clean-legacy" or "import-clean-stages") return ImportCommands.Run(args[0], args[1..], Console.Out, Console.Error);
 if (args.Length > 0 && args[0] == "progress") return ProjectProgress.Run(args[1..], Console.Out, Console.Error);
 if (args.Length > 0 && args[0] == "research-check") return ResearchValidation.Run(args[1..], Console.Out, Console.Error);
 if (args.Length > 0 && args[0] == "card-support") return CardSupportInventory.Run(args[1..], Console.Out, Console.Error);
@@ -27,7 +25,7 @@ if (args.Length > 0 && args[0] == "opponent-acceptance") return OpponentAcceptan
 if (args.Length > 0 && args[0] is "catalog-import" or "catalog-check") return CardCatalogCommands.Run(args[0], args[1..], Console.Out, Console.Error);
 if (args.Length > 0 && args[0] is "native-archetype-import" or "native-archetype-check") return NativeArchetypeCommands.Run(args[0], args[1..], Console.Out, Console.Error);
 if (args.Length > 0 && args[0] is "archetype-load" or "archetype-classic" or "archetype-package" or "archetype-package-native") return ArchetypePackageCommands.Run(args[0], args[1..], Console.Out, Console.Error);
-if (args.Length > 0 && args[0] is "source-check" or "cache-create" or "cache-check" or "deck-check" or "foundation-examples")
+if (args.Length > 0 && args[0] is "source-check" or "deck-check" or "foundation-examples")
     return FoundationCommands.Run(args[0], args[1..], Console.Out, Console.Error);
 
 if (args.Length == 1 && args[0] == "duel-demo") return SyntheticDuelDemo.Run(Console.Out);

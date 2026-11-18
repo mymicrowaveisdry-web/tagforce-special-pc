@@ -9,7 +9,7 @@ namespace TagForceSpecial.Tests;
 public sealed class PresentationInfrastructureTests
 {
     private static ScreenRouter Router() => new(nav => new(new(), nav, () => new(false), _ => { }, () => null));
-    private static readonly PspInputFrame Confirm = new(PspAction.Cross, PspAction.Cross);
+    private static readonly InputFrame Confirm = new(InputAction.Confirm, InputAction.Confirm);
 
     [Fact]
     public void ModalOwnsInputAndSimulationAndRestoresParentFocus()
@@ -79,15 +79,15 @@ public sealed class PresentationInfrastructureTests
     [Fact]
     public void KeyboardAndPadShareAnActionEdgeAndRefocusDoesNotConfirm()
     {
-        var mapper = new PspInputMapper();
+        var mapper = new InputMapper();
         mapper.Poll(new(), new(), true);
-        Assert.True(mapper.Poll(new(Keys.Enter), new(), true).IsPressed(PspAction.Cross));
+        Assert.True(mapper.Poll(new(Keys.Enter), new(), true).IsPressed(InputAction.Confirm));
         var heldPad = new GamePadState(Vector2.Zero, Vector2.Zero, 0, 0, Buttons.A);
-        Assert.False(mapper.Poll(new(Keys.Enter), heldPad, true).IsPressed(PspAction.Cross));
+        Assert.False(mapper.Poll(new(Keys.Enter), heldPad, true).IsPressed(InputAction.Confirm));
         mapper.Poll(new(), heldPad, false);
-        Assert.Equal(PspAction.None, mapper.Poll(new(Keys.Enter), heldPad, true).Pressed);
+        Assert.Equal(InputAction.None, mapper.Poll(new(Keys.Enter), heldPad, true).Pressed);
         mapper.Poll(new(), new(), true);
-        Assert.True(mapper.Poll(new(), heldPad, true).IsPressed(PspAction.Cross));
+        Assert.True(mapper.Poll(new(), heldPad, true).IsPressed(InputAction.Confirm));
     }
 
     [Fact]
@@ -123,12 +123,12 @@ public sealed class PresentationInfrastructureTests
     {
         public string ScreenId => id;
         public string? Focus { get; set; }
-        public Action<PspInputFrame>? Input { get; set; }
+        public Action<InputFrame>? Input { get; set; }
         public int InputCount, Updates, Enters, Exits;
         public bool Active;
         public string LastDraw = "";
         public void OnEnter(ScreenContext context, ScreenArguments arguments) { Active = true; Enters++; }
-        public void HandleInput(PspInputFrame input) { InputCount++; Input?.Invoke(input); }
+        public void HandleInput(InputFrame input) { InputCount++; Input?.Invoke(input); }
         public void Update(TimeSpan simulationDelta, TimeSpan presentationTime) => Updates++;
         public void Draw(ScreenDrawContext draw) => LastDraw = $"{id}/{Focus}/{draw.PresentationTime.Ticks}";
         public void OnExit() { Active = false; Exits++; }

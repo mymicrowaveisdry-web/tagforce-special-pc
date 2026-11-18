@@ -33,7 +33,10 @@
   <ScreenReference Name="NativePreferences" />
   <ScreenReference Name="OriginalOptions" />
   <ScreenReference Name="OriginalDeckMenu" />
+  <ScreenReference Name="OriginalDatabaseMenu" />
+  <ScreenReference Name="OriginalCardAlbum" />
   <ScreenReference Name="OriginalDeckEdit" />
+  <ScreenReference Name="OriginalRecipeViewer" />
   <ScreenReference Name="OriginalFreeDuel" />
   <ScreenReference Name="OriginalStorySelection" />
   <ScreenReference Name="OriginalStoryDialogue" />
@@ -45,6 +48,10 @@
   <ComponentReference Name="OriginalScrollBar" />
   <ComponentReference Name="OriginalTextBox" />
   <ComponentReference Name="OriginalStatusPanel" />
+  <ComponentReference Name="CardInfoPanel" />
+  <ComponentReference Name="DeckCounts" />
+  <ComponentReference Name="DeckSectionTabs" />
+  <ComponentReference Name="DeckCardList" />
   <StandardElementReference Name="Circle" />
   <StandardElementReference Name="Component" />
   <StandardElementReference Name="Container" />

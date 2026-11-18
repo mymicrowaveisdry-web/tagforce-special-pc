@@ -20,7 +20,8 @@ public sealed class GumPresentation : IDisposable
         var project = gum.Initialize(device, Path.Combine(AppContext.BaseDirectory, "UI/Gum/GumProject.gumx"))
             ?? throw new InvalidDataException("Gum project did not load.");
         gum.CanvasWidth = 480; gum.CanvasHeight = 272;
-        foreach (string name in new[] { "OriginalTitle", "OriginalTitleStartMenu", "OriginalTitleFlow", "OriginalMainMenu", "OriginalOptions", "NativeToolsMenu", "NativePreferences" })
+        // Root order is draw order: the submenus sit over the Main Menu.
+        foreach (string name in new[] { "OriginalTitle", "OriginalTitleStartMenu", "OriginalTitleFlow", "OriginalMainMenu", "OriginalDeckMenu", "OriginalDatabaseMenu", "OriginalDeckEdit", "OriginalRecipeViewer", "OriginalCardAlbum", "OriginalOptions", "NativeToolsMenu", "NativePreferences" })
         {
             var root = project.Screens.Single(s => s.Name == name).ToGraphicalUiElement();
             root.Visible = false;
@@ -29,11 +30,14 @@ public sealed class GumPresentation : IDisposable
         }
         noticeShade = new Texture2D(device, 1, 1);
         noticeShade.SetData([Color.White]);
-        var shade = MainMenuSprite(roots["OriginalMainMenu"], "NoticeShade");
-        shade.Texture = noticeShade;
-        shade.TextureAddress = Gum.Managers.TextureAddress.Custom;
-        shade.SourceRectangle = new Rectangle(0, 0, 1, 1);
-        shade.BlendState = Microsoft.Xna.Framework.Graphics.BlendState.NonPremultiplied;
+        foreach (string screen in new[] { "OriginalMainMenu", "OriginalDeckMenu", "OriginalDatabaseMenu", "OriginalDeckEdit" })
+        {
+            var shade = MainMenuSprite(roots[screen], "NoticeShade");
+            shade.Texture = noticeShade;
+            shade.TextureAddress = Gum.Managers.TextureAddress.Custom;
+            shade.SourceRectangle = new Rectangle(0, 0, 1, 1);
+            shade.BlendState = Microsoft.Xna.Framework.Graphics.BlendState.NonPremultiplied;
+        }
     }
     private static Gum.GueDeriving.SpriteRuntime MainMenuSprite(GraphicalUiElement parent, string name) =>
         parent.GetGraphicalUiElementByName(name) as Gum.GueDeriving.SpriteRuntime
@@ -67,17 +71,21 @@ public sealed class GumPresentation : IDisposable
             label.BlendState = Microsoft.Xna.Framework.Graphics.BlendState.AlphaBlend;
         }
     }
-    /// <summary>Focus comes from the application's flow state; Gum holds no selection of its own.</summary>
-    public void UpdateMainMenu(int focus, int pulse, int entryFrame)
+    /// <summary>Focus comes from the application's flow state; Gum holds no selection of its own. While the Deck Menu is open the
+    /// menu is drawn without focus and tinted by the measured <paramref name="dim"/> (255 = undimmed), bars and labels alike.</summary>
+    public void UpdateMainMenu(int focus, int pulse, int entryFrame, int dim = 255)
     {
         var root = roots["OriginalMainMenu"];
         for (int i = 0; i < App.Screens.Title.TitleFlow.MainMenuRows; i++)
         {
             var bar = root.GetGraphicalUiElementByName("Bar" + i)!;
-            bool focused = i == focus && App.Screens.Title.MainMenuEntry.FocusVisible(entryFrame);
+            bool focused = i == focus && dim == 255 && App.Screens.Title.MainMenuEntry.FocusVisible(entryFrame);
             int barAlpha = App.Screens.Title.MainMenuEntry.BarAlpha(i, entryFrame);
             foreach (string piece in new[] { "BaseLeft", "BaseCenter", "BaseRight" })
-                MainMenuSprite(bar, piece).Alpha = barAlpha;
+            {
+                var sprite = MainMenuSprite(bar, piece);
+                sprite.Alpha = barAlpha; sprite.Red = dim; sprite.Green = dim; sprite.Blue = dim;
+            }
             foreach (string piece in new[] { "FocusLeft", "FocusCenter", "FocusRight" })
             {
                 var sprite = MainMenuSprite(bar, piece);
@@ -88,7 +96,94 @@ public sealed class GumPresentation : IDisposable
             var label = MainMenuSprite(bar, "Label");
             label.Visible = App.Screens.Title.MainMenuEntry.LabelVisible(i, entryFrame);
             label.SourceRectangle = App.Screens.Title.TitleFlowVisuals.MenuLabelSource(i, focused);
+            // Premultiplied layer: scaling RGB only greys the white text and leaves its black shadow and alpha, as measured.
+            label.Red = dim; label.Green = dim; label.Blue = dim;
         }
+    }
+
+    /// <summary>Binds each submenu's bars to the panel atlas (their own measured base pieces) and its label layer.</summary>
+    public void BindSubmenus(App.Screens.Title.TitleFlowVisuals visuals)
+    {
+        foreach (var kind in Enum.GetValues<App.Screens.Title.SubmenuKind>())
+        {
+            var root = roots[App.Screens.Title.Submenus.GumScreen(kind)];
+            for (int i = 0; i < visuals.SubmenuProfileOf(kind).Rows.Length; i++)
+            {
+                var bar = root.GetGraphicalUiElementByName("Bar" + i) ?? throw new InvalidDataException($"Missing {kind} submenu bar {i}.");
+                foreach (var (piece, source) in visuals.SubmenuBarPieces(kind)) Bind(MainMenuSprite(bar, piece), visuals.MenuPanel, source, false);
+                Bind(MainMenuSprite(bar, "Label"), visuals.SubmenuLabels(kind), App.Screens.Title.TitleFlowVisuals.MenuLabelSource(i, false), true);
+            }
+        }
+    }
+
+    /// <summary>Opening alphas, labels and focus follow the submenu's own frame; focus comes from the flow's submenu session.</summary>
+    public void UpdateSubmenu(App.Screens.Title.SubmenuKind kind, App.Screens.Title.SubmenuProfile profile, int focus, int frame, bool focusVisible)
+    {
+        var root = roots[App.Screens.Title.Submenus.GumScreen(kind)];
+        int pulse = profile.PulseAt(frame);
+        for (int i = 0; i < profile.Rows.Length; i++)
+        {
+            var bar = root.GetGraphicalUiElementByName("Bar" + i)!;
+            bool focused = i == focus && focusVisible;
+            foreach (string piece in new[] { "BaseLeft", "BaseCenter", "BaseRight" }) MainMenuSprite(bar, piece).Alpha = profile.BarAlpha(i, frame);
+            foreach (string piece in new[] { "FocusLeft", "FocusCenter", "FocusRight" })
+            {
+                var sprite = MainMenuSprite(bar, piece);
+                sprite.Visible = focused;
+                // Measured as on the Main Menu: the pulse is written to the material colour and its alpha.
+                if (focused) { sprite.Red = pulse; sprite.Green = pulse; sprite.Blue = pulse; sprite.Alpha = pulse; }
+            }
+            var label = MainMenuSprite(bar, "Label");
+            label.Visible = profile.LabelVisible(i, frame);
+            label.SourceRectangle = App.Screens.Title.TitleFlowVisuals.MenuLabelSource(i, focused);
+        }
+    }
+
+    /// <summary>Deck Edit regions (screen px) shown by the components; the layer itself holds the whole measured screen.</summary>
+    public static IReadOnlyList<(string Instance, Rectangle Region)> DeckEditRegions { get; } =
+    [
+        ("Info", new(0, 0, 147, 272)), ("Counts", new(96, 0, 384, 23)), ("Tabs", new(146, 20, 286, 22)), ("List", new(147, 36, 333, 236))
+    ];
+
+    /// <summary>Binds the Deck Edit layer and the CardInfoPanel, DeckCounts, DeckSectionTabs and DeckCardList components to their regions.</summary>
+    public void BindDeckEdit(RenderTarget2D layer)
+    {
+        var root = roots["OriginalDeckEdit"];
+        Bind(MainMenuSprite(root, "Layer"), layer, new Rectangle(0, 0, 480, 272), true);
+        foreach (var (instance, region) in DeckEditRegions)
+        {
+            var component = root.GetGraphicalUiElementByName(instance) ?? throw new InvalidDataException("Missing Deck Edit component " + instance + ".");
+            Bind(MainMenuSprite(component, "View"), layer, region, true);
+        }
+    }
+
+    /// <summary>The Card Album is drawn whole into its own layer; Gum only shows it.</summary>
+    public void BindCardAlbum(RenderTarget2D layer) => Bind(MainMenuSprite(roots["OriginalCardAlbum"], "Layer"), layer, new Rectangle(0, 0, 480, 272), true);
+
+    public void BindRecipes(RenderTarget2D layer)
+    {
+        var root = roots["OriginalRecipeViewer"];
+        Bind(MainMenuSprite(root, "Layer"), layer, new Rectangle(0, 0, 480, 272), true);
+        foreach (var (instance, region) in new (string, Rectangle)[] {
+            ("Info", new(0, 0, 147, 272)), ("List", new(147, 36, 148, 236)),
+            ("Tabs", new(147, 18, 148, 18)), ("Counts", new(296, 0, 184, 272)) })
+        {
+            var component = root.GetGraphicalUiElementByName(instance)!;
+            var view = MainMenuSprite(component, "View");
+            view.Width = region.Width; view.Height = region.Height;
+            Bind(view, layer, region, true);
+        }
+    }
+
+    /// <summary>Authored PC notice for a destination that is not recreated yet; never presented as an original dialog.</summary>
+    public void ShowSubmenuNotice(App.Screens.Title.SubmenuKind kind, App.Screens.Title.SubmenuDestination? destination)
+    {
+        string screen = App.Screens.Title.Submenus.GumScreen(kind);
+        var notice = roots[screen].GetGraphicalUiElementByName("Notice") ?? throw new InvalidDataException($"Missing {kind} submenu notice.");
+        notice.Visible = destination is not null;
+        if (destination is null) return;
+        BindText(screen, "NoticeTitle", destination.Label);
+        BindText(screen, "NoticeBody", destination.Notice);
     }
     private static void Bind(Gum.GueDeriving.SpriteRuntime sprite, Texture2D texture, Rectangle source, bool premultiplied)
     {
@@ -230,6 +325,37 @@ public sealed class GumPresentation : IDisposable
         var shade = MainMenuSprite(root, "NoticeShade");
         shade.Red = 12; shade.Green = 18; shade.Blue = 32; shade.Alpha = 235;
     }
+    /// <summary>PC notice over Deck Edit for a menu row the PC does not recreate; null hides it.</summary>
+    public void ShowDeckEditNotice(string? title, string body)
+    {
+        var root = roots["OriginalDeckEdit"];
+        var notice = root.GetGraphicalUiElementByName("Notice") ?? throw new InvalidDataException("Missing Deck Edit notice.");
+        notice.Visible = title is not null;
+        if (title is null) return;
+        BindText("OriginalDeckEdit", "NoticeTitle", title);
+        BindText("OriginalDeckEdit", "NoticeBody", body);
+    }
+    /// <summary>Whether a visible element (dotted path from the screen root, e.g. "Row3.ArrowLeft") contains the canvas point.</summary>
+    public bool Hit(string screenName, string path, Rendering.CanvasPoint? point)
+    {
+        if (point is not { } at || !roots.TryGetValue(screenName, out var root) || !root.Visible) return false;
+        GraphicalUiElement? element = root;
+        foreach (string part in path.Split('.'))
+        {
+            element = element?.GetGraphicalUiElementByName(part);
+            if (element is null || !element.Visible) return false;
+        }
+        return at.X >= element!.AbsoluteLeft && at.X < element.AbsoluteRight && at.Y >= element.AbsoluteTop && at.Y < element.AbsoluteBottom;
+    }
+
+    /// <summary>The first n in [0, count) whose element "{prefix}{n}{suffix}" contains the point.</summary>
+    public int? HitIndex(string screenName, string prefix, int count, Rendering.CanvasPoint? point, string suffix = "")
+    {
+        for (int i = 0; i < count; i++)
+            if (Hit(screenName, prefix + i.ToString(System.Globalization.CultureInfo.InvariantCulture) + suffix, point)) return i;
+        return null;
+    }
+
     public void Show(string name, bool visible) { if (roots.TryGetValue(name, out var root)) root.Visible = visible; }
     public void BindTitleLayers(App.Screens.Title.OriginalTitleVisuals visuals)
     {

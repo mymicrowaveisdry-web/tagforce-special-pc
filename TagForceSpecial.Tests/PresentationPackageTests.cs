@@ -21,8 +21,8 @@ public class PresentationPackageTests
         };
         var registry = OpenSemantic(fixture, package, entry);
         Assert.Null(registry.VerifiedReferenceScope(reference.AssetKey));
-        Assert.Equal("decoded-unverified", Assert.Single(TagForceSpecial.PC.Import.AssetDiagnostics.Inspect(registry,
-            [new TagForceSpecial.PC.Import.AssetRequirement(reference.Screen, reference.AssetKey)])).Status);
+        Assert.Equal("decoded-unverified", Assert.Single(TagForceSpecial.Import.Validation.AssetRequirements.Inspect(registry,
+            [new TagForceSpecial.Import.Validation.AssetRequirement(reference.Screen, reference.AssetKey)])).Status);
     }
 
     [Fact]
@@ -49,8 +49,8 @@ public class PresentationPackageTests
         var package = fixture.Create(new PresentationResourceRequest("title/pixel", SourcePath,
             Conversion: PresentationConversion.Stored));
         var registry = OpenSemantic(fixture, package, SemanticEntry(package, fixture) with { Status = "stored" });
-        var rows = TagForceSpecial.PC.Import.AssetDiagnostics.Inspect(registry,
-            [new TagForceSpecial.PC.Import.AssetRequirement("title", "title.logo")]);
+        var rows = TagForceSpecial.Import.Validation.AssetRequirements.Inspect(registry,
+            [new TagForceSpecial.Import.Validation.AssetRequirement("title", "title.logo")]);
         Assert.Equal("unresolved", Assert.Single(rows).Status);
     }
 
@@ -76,56 +76,17 @@ public class PresentationPackageTests
     }
 
     [Fact]
-    public void PresentationGenerationsRetainPreviousPublicationAndDoNotActivateGameplay()
-    {
-        using var fixture = new Fixture();
-        var storage = new TagForceSpecial.PC.Setup.PrivateStorage(Path.Combine(fixture.Root, "app-cache"));
-        var store = new TagForceSpecial.PC.Import.PresentationCacheStore(storage, [fixture.Profile]);
-        using var source = fixture.Open();
-        var requests = new[] { new PresentationResourceRequest("title/pixel", SourcePath) };
-        store.Publish(source, Scope, requests, package => [SemanticEntry(package, fixture)]);
-        byte[] active = File.ReadAllBytes(storage.PathFor("presentation/active.json"));
-        Assert.Equal(12, store.OpenActive()!.Resolve("title.logo").Content[0]);
-        Assert.Contains("integrity-only", File.ReadAllText(store.SignOffActiveIntegrity()));
-        Assert.Throws<InvalidDataException>(() => store.Publish(source, Scope, requests, package =>
-            [SemanticEntry(package, fixture) with { Source = SemanticEntry(package, fixture).Source with { Offset = 1 } }]));
-        Assert.Equal(active, File.ReadAllBytes(storage.PathFor("presentation/active.json")));
-        store.Publish(source, Scope, requests, package => [SemanticEntry(package, fixture)]);
-        Assert.Equal(3, Directory.GetDirectories(storage.PathFor("presentation/generations")).Length);
-        Assert.False(File.Exists(storage.PathFor("preferences.json")));
-        Assert.False(Directory.Exists(storage.PathFor("caches")));
-    }
-
-    [Fact]
-    public void PresentationGenerationRejectsTamperingAndUnregisteredSourceProfiles()
-    {
-        using var fixture = new Fixture();
-        var storage = new TagForceSpecial.PC.Setup.PrivateStorage(Path.Combine(fixture.Root, "app-cache"));
-        using var source = fixture.Open();
-        var requests = new[] { new PresentationResourceRequest("title/pixel", SourcePath) };
-        var defaultStore = new TagForceSpecial.PC.Import.PresentationCacheStore(storage);
-        Assert.Throws<InvalidDataException>(() => defaultStore.Publish(source, Scope, requests, package => [SemanticEntry(package, fixture)]));
-        var store = new TagForceSpecial.PC.Import.PresentationCacheStore(storage, [fixture.Profile]);
-        store.Publish(source, Scope, requests, package => [SemanticEntry(package, fixture)]);
-        string mapping = Directory.GetFiles(storage.PathFor("presentation/generations"), "mapping.json", SearchOption.AllDirectories).Single();
-        File.AppendAllText(mapping, " ");
-        Assert.Throws<InvalidDataException>(() => store.OpenActive());
-        File.Delete(mapping);
-        Assert.Throws<FileNotFoundException>(() => store.OpenActive());
-    }
-
-    [Fact]
     public void PresentationDiagnosticsSeparateMissingDecodedUnresolvedAndInvalid()
     {
         using var fixture = new Fixture(); var package = fixture.Create();
         var registry = OpenSemantic(fixture, package, SemanticEntry(package, fixture));
-        var needs = new[] { new TagForceSpecial.PC.Import.AssetRequirement("title", "title.logo"), new("title", "title.absent") };
-        var rows = TagForceSpecial.PC.Import.AssetDiagnostics.Inspect(registry, needs);
+        var needs = new[] { new TagForceSpecial.Import.Validation.AssetRequirement("title", "title.logo"), new("title", "title.absent") };
+        var rows = TagForceSpecial.Import.Validation.AssetRequirements.Inspect(registry, needs);
         Assert.Equal(new[] { "decoded-unverified", "missing" }, rows.Select(r => r.Status));
         Assert.Equal(SourcePath, rows[0].Source);
         Assert.DoesNotContain(rows, row => row.Status == "verified");
         File.Delete(Directory.GetFiles(Path.Combine(package.DirectoryPath, "blobs")).Single());
-        Assert.Equal("invalid", TagForceSpecial.PC.Import.AssetDiagnostics.Inspect(registry, needs)[0].Status);
+        Assert.Equal("invalid", TagForceSpecial.Import.Validation.AssetRequirements.Inspect(registry, needs)[0].Status);
     }
 
     [Fact]

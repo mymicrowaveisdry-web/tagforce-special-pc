@@ -40,5 +40,6 @@ new timing comparisons remain deferred. Synthetic tests do not establish full PS
 | [Effects](TagForceSpecial.Effects/README.md) | Reviewed card families and effect definitions |
 | [AI](TagForceSpecial.AI/README.md) | Seeded policy, bounded stepping and replays |
 | [PC](TagForceSpecial.PC/README.md) | MonoGame host with authorized player views |
+| [Workbench](docs/importer/USER_GUIDE.md) | Windows WPF importer, asset inspection and evidence analysis |
 | [Tools](TagForceSpecial.Tools/README.md) | Demo, imports and local research commands |
 | `TagForceSpecial.Tests` | Synthetic and optional PSP reference tests |

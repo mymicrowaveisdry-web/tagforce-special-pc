@@ -10,26 +10,27 @@ internal static class CpjArtworkSourceReader
     internal const string HeaderSha256 = "c089d458a2d40b2adc8464e3fa4efa172331f668d9fa713bf8934627ad836b04";
     internal const int HeaderOffset = 1538280;
 
-    public static SelectedPresentationSource Read(ValidatedGameSource source, Iso9660Source iso,
+    public static SelectedPresentationSource Read(ValidatedGameSource source, IGameFiles files,
         PresentationResourceRequest request)
     {
         if (source.Profile.Fingerprint != GameBuildProfile.English21.Fingerprint || request.CardId is not > 0 || request.MemberName is not null)
             throw new InvalidDataException("CPJ requires the registered exact source profile and an explicit nonzero card ID.");
-        var file = iso.Find(request.SourcePath) ?? throw new InvalidDataException("Missing CPJ archive.");
-        using var archive = new SourceSlice(source.Image, file.Offset, file.Length);
+        var file = files.Find(request.SourcePath) ?? throw new InvalidDataException("Missing CPJ archive.");
+        using var archive = files.OpenRead(file);
         var index = new CardImageIndexReader().ReadIndex(archive);
         if (index.Signature != "CPJ") throw new InvalidDataException("Full artwork requires a CPJ signature, never a thumbnail alias.");
         var slot = index.Entries.SingleOrDefault(e => e.CardId == request.CardId)
             ?? throw new KeyNotFoundException("Missing full-art card ID.");
         if (slot.StoredSlotBytes > PresentationPackage.MaximumResourceBytes) throw new InvalidDataException("Oversized CPJ slot.");
-        string archiveHash = GameSourceValidator.Hash(source.Image, file.Offset, file.Length);
-        source.Image.Position = file.Offset + slot.Offset;
-        byte[] bytes = new byte[checked((int)slot.StoredSlotBytes)]; source.Image.ReadExactly(bytes);
-        var boot = iso.Find(HeaderSource) ?? throw new InvalidDataException("Missing JPEG header source.");
-        if (GameSourceValidator.Hash(source.Image, boot.Offset, boot.Length) != BootSha256 || HeaderOffset + 160 > boot.Length)
+        string archiveHash = GameSourceValidator.Hash(archive, 0, file.Length);
+        archive.Position = slot.Offset;
+        byte[] bytes = new byte[checked((int)slot.StoredSlotBytes)]; archive.ReadExactly(bytes);
+        var boot = files.Find(HeaderSource) ?? throw new InvalidDataException("Missing JPEG header source.");
+        using var bootStream = files.OpenRead(boot);
+        if (GameSourceValidator.Hash(bootStream, 0, boot.Length) != BootSha256 || HeaderOffset + 160 > boot.Length)
             throw new InvalidDataException("JPEG header source hash/bounds mismatch.");
-        source.Image.Position = boot.Offset + HeaderOffset;
-        byte[] header = new byte[160]; source.Image.ReadExactly(header);
+        bootStream.Position = HeaderOffset;
+        byte[] header = new byte[160]; bootStream.ReadExactly(header);
         for (int i = 0; i < header.Length; i++) header[i] ^= 92;
         if (Convert.ToHexStringLower(SHA256.HashData(header)) != HeaderSha256)
             throw new InvalidDataException("JPEG header identity mismatch.");
