@@ -318,11 +318,13 @@ public sealed class CardAlbumRenderer : IDisposable
             }
     }
 
-    /// <summary>Monsters: the star and "x" with the level above the strip (inferred: Rank and Link use the same marker; "x" is the drawn glyph).</summary>
+    /// <summary>Monsters: the star and "x" with the level above the strip; Xyz monsters show the rank star (measured on Pit Boss; "x" is the
+    /// drawn glyph).</summary>
     private void DrawLevel(CardDefinition card)
     {
         if (card.Codes?.RawKind is 13 or 14 or null || card.Statistics.Level == 0) return;
-        visuals.DrawFlow(Quad(profile.LevelStar.Rect, profile.LevelStar.Uv));
+        var star = card.Codes.RawKind is 22 or 23 ? profile.RankStar : profile.LevelStar;
+        visuals.DrawFlow(Quad(star.Rect, star.Uv));
         var t = profile.LevelText;
         string text = "x" + card.Statistics.Level.ToString(CultureInfo.InvariantCulture);
         float[] x = text.Length == t.X.Length ? t.X : [.. t.X, .. Enumerable.Range(1, text.Length - t.X.Length).Select(i => t.X[^1] + i * (t.X[^1] - t.X[0]))];
@@ -334,7 +336,7 @@ public sealed class CardAlbumRenderer : IDisposable
         [[uv[0], uv[1]], [uv[2], uv[1]], [uv[0], uv[3]], [uv[0], uv[3]], [uv[2], uv[1]], [uv[2], uv[3]]],
         [255, 255, 255, 255], null, null, false, false, false, false, false);
 
-    /// <summary>Name lines (yellow), the bracketed type line (green), then card text.</summary>
+    /// <summary>Name lines (yellow), the bracketed type line (green), then card text, in the card-text font (measured: its advances).</summary>
     private void DrawInfo(CardDefinition card)
     {
         var t = profile.InfoText;
@@ -342,11 +344,11 @@ public sealed class CardAlbumRenderer : IDisposable
             .Concat(Wrap(card.Description, t.Width, t.ScaleX).Select(l => (l, t.TextColor))).Take(t.Lines).ToList();
         for (int i = 0; i < lines.Count; i++)
             if (lines[i].Item1.Length > 0)
-                visuals.DrawText(lines[i].Item1, t.X, t.FirstY + i * t.LineHeight, t.ScaleX, t.ScaleY, lines[i].Item2, t.ShadowAlpha);
+                visuals.DrawCardFontText(lines[i].Item1, t.X, t.FirstY + i * t.LineHeight, t.ScaleX, t.ScaleY, lines[i].Item2, t.ShadowAlpha);
     }
 
-    /// <summary>Greedy wrap at the measured width; measured on the album: a line may also break after a hyphen ("face-" / "up").</summary>
-    internal List<string> Wrap(string text, float width, float scaleX)
+    /// <summary>Greedy wrap with the card-text font's advances; measured on the album: a line may also break after a hyphen ("face-" / "up").</summary>
+    private List<string> Wrap(string text, float width, float scaleX)
     {
         var lines = new List<string>();
         foreach (string paragraph in text.Split('\n'))
@@ -359,7 +361,7 @@ public sealed class CardAlbumRenderer : IDisposable
                 {
                     string glue = line.Length == 0 || i > 0 ? "" : " ";
                     string next = line + glue + parts[i];
-                    if (line.Length > 0 && visuals.MeasureText(next, scaleX) > width) { lines.Add(line); line = parts[i]; }
+                    if (line.Length > 0 && visuals.MeasureCardFontText(next, scaleX) > width) { lines.Add(line); line = parts[i]; }
                     else line = next;
                 }
             }

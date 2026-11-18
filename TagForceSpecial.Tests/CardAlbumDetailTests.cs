@@ -78,6 +78,24 @@ public class CardAlbumDetailTests
         Assert.Equal((CardAlbumFocus.Pocket, true, 1), (s.Focus, s.RightPage, s.Pocket));
     }
 
+    [Fact]
+    public void TheGlintDoesNotAdvanceWhileTheDetailIsOpen()
+    {
+        uint[] cards = Enumerable.Range(1, 40).Select(i => (uint)i).ToArray();
+        var s = new CardAlbumSession(cards, CardAlbumCollection.ReferenceAllObtained(cards));
+        s.UseDetail(id => new CardAlbumDetail(id, default, _ => 0));
+        for (int i = 0; i < 5; i++) s.Update(OneFrame);
+        int before = s.GlintFrame;
+        s.Handle(new(InputAction.Confirm, InputAction.Confirm));
+        for (int i = 0; i < 30; i++) s.Update(OneFrame);
+        s.Handle(new(InputAction.Back, InputAction.Back));
+        s.Update(OneFrame); s.Update(OneFrame);
+        Assert.Null(s.Detail);
+        Assert.Equal(before, s.GlintFrame);
+        s.Update(OneFrame);
+        Assert.Equal(before + 1, s.GlintFrame);
+    }
+
     [Theory]
     [InlineData(3, 48, 0)]    // Destroy monster
     [InlineData(21, 48, 32)]  // Return card

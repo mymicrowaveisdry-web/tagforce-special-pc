@@ -37,7 +37,8 @@ public sealed class CardAlbumSession
     public int BarButton { get; private set; }
     public CardAlbumTurn? Turn { get; private set; }
     public bool Flipping => flipTarget >= 0;
-    /// <summary>Game frames since the album opened, for the info strip's glint loop (inferred: the loop starts with the album).</summary>
+    /// <summary>Album game frames for the info strip's glint loop (inferred: the loop starts with the album). Measured: it does not advance
+    /// while the card detail is open (same phase after closing whatever the time spent in the detail).</summary>
     public int GlintFrame { get; private set; }
     /// <summary>Bumped whenever anything drawn changes, so the host can skip re-rendering.</summary>
     public int Revision { get; private set; }
@@ -131,7 +132,7 @@ public sealed class CardAlbumSession
 
     public void Update(TimeSpan delta)
     {
-        glintClock += delta;
+        if (Detail is null) glintClock += delta;
         if (MainMenuEntry.FramesIn(glintClock) is var glint && glint != GlintFrame) { GlintFrame = glint; Revision++; }
         if (Detail is { Closing: true } && ++detailCloseUpdates >= 2) { Detail = null; Revision++; }
         if (JumpFrame is int jump)

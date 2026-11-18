@@ -55,7 +55,7 @@ public sealed record CardAlbumProfile(int SchemaVersion, string BuildId, string 
     FlowDraw[] Panel, FlowText Title, FlowText CompleteLabel, CardAlbumGlyphs Percent, FlowDraw Hand, float[][] HandRight, float[] HandEdge,
     Dictionary<string, float[]> HandLeftMeasured, float[][] HandBar, CardAlbumCounter Counter, CardAlbumPercent PercentCells, CardAlbumInfoText InfoText,
     CardAlbumTypeLine TypeLine, float[] AttributeIconRect, float[] TypeIconRect, Dictionary<string, float[]> TypeIconExtra,
-    CardAlbumIcon LevelStar, CardAlbumGlyphs LevelText, int[] InfoScissor, CardAlbumCardBack CardBack, CardAlbumPageJump PageJump, CardAlbumGlint Glint)
+    CardAlbumIcon LevelStar, CardAlbumIcon RankStar, CardAlbumGlyphs LevelText, int[] InfoScissor, CardAlbumCardBack CardBack, CardAlbumPageJump PageJump, CardAlbumGlint Glint)
 {
     private const float LeftColumnPitch = 45;
 
