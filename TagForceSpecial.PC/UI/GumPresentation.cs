@@ -20,8 +20,8 @@ public sealed class GumPresentation : IDisposable
         var project = gum.Initialize(device, Path.Combine(AppContext.BaseDirectory, "UI/Gum/GumProject.gumx"))
             ?? throw new InvalidDataException("Gum project did not load.");
         gum.CanvasWidth = 480; gum.CanvasHeight = 272;
-        // Root order is draw order: the Deck Menu submenu sits over the Main Menu.
-        foreach (string name in new[] { "OriginalTitle", "OriginalTitleStartMenu", "OriginalTitleFlow", "OriginalMainMenu", "OriginalDeckMenu", "OriginalDeckEdit", "OriginalRecipeViewer", "OriginalOptions", "NativeToolsMenu", "NativePreferences" })
+        // Root order is draw order: the submenus sit over the Main Menu.
+        foreach (string name in new[] { "OriginalTitle", "OriginalTitleStartMenu", "OriginalTitleFlow", "OriginalMainMenu", "OriginalDeckMenu", "OriginalDatabaseMenu", "OriginalDeckEdit", "OriginalRecipeViewer", "OriginalOptions", "NativeToolsMenu", "NativePreferences" })
         {
             var root = project.Screens.Single(s => s.Name == name).ToGraphicalUiElement();
             root.Visible = false;
@@ -30,7 +30,7 @@ public sealed class GumPresentation : IDisposable
         }
         noticeShade = new Texture2D(device, 1, 1);
         noticeShade.SetData([Color.White]);
-        foreach (string screen in new[] { "OriginalMainMenu", "OriginalDeckMenu", "OriginalDeckEdit" })
+        foreach (string screen in new[] { "OriginalMainMenu", "OriginalDeckMenu", "OriginalDatabaseMenu", "OriginalDeckEdit" })
         {
             var shade = MainMenuSprite(roots[screen], "NoticeShade");
             shade.Texture = noticeShade;
@@ -101,22 +101,25 @@ public sealed class GumPresentation : IDisposable
         }
     }
 
-    /// <summary>Binds the three submenu bars to the panel atlas (their own measured base pieces) and the submenu label layer.</summary>
-    public void BindDeckMenu(App.Screens.Title.TitleFlowVisuals visuals)
+    /// <summary>Binds each submenu's bars to the panel atlas (their own measured base pieces) and its label layer.</summary>
+    public void BindSubmenus(App.Screens.Title.TitleFlowVisuals visuals)
     {
-        var root = roots["OriginalDeckMenu"];
-        for (int i = 0; i < visuals.DeckMenuProfile.Rows.Length; i++)
+        foreach (var kind in Enum.GetValues<App.Screens.Title.SubmenuKind>())
         {
-            var bar = root.GetGraphicalUiElementByName("Bar" + i) ?? throw new InvalidDataException("Expected three Deck Menu bars.");
-            foreach (var (piece, source) in visuals.DeckMenuBarPieces) Bind(MainMenuSprite(bar, piece), visuals.MenuPanel, source, false);
-            Bind(MainMenuSprite(bar, "Label"), visuals.DeckMenuLabels, App.Screens.Title.TitleFlowVisuals.MenuLabelSource(i, false), true);
+            var root = roots[App.Screens.Title.Submenus.GumScreen(kind)];
+            for (int i = 0; i < visuals.SubmenuProfileOf(kind).Rows.Length; i++)
+            {
+                var bar = root.GetGraphicalUiElementByName("Bar" + i) ?? throw new InvalidDataException($"Missing {kind} submenu bar {i}.");
+                foreach (var (piece, source) in visuals.SubmenuBarPieces(kind)) Bind(MainMenuSprite(bar, piece), visuals.MenuPanel, source, false);
+                Bind(MainMenuSprite(bar, "Label"), visuals.SubmenuLabels(kind), App.Screens.Title.TitleFlowVisuals.MenuLabelSource(i, false), true);
+            }
         }
     }
 
-    /// <summary>Opening alphas, labels and focus follow the submenu's own frame; focus comes from the flow's Deck Menu session.</summary>
-    public void UpdateDeckMenu(App.Screens.Title.DeckMenuProfile profile, int focus, int frame, bool focusVisible)
+    /// <summary>Opening alphas, labels and focus follow the submenu's own frame; focus comes from the flow's submenu session.</summary>
+    public void UpdateSubmenu(App.Screens.Title.SubmenuKind kind, App.Screens.Title.SubmenuProfile profile, int focus, int frame, bool focusVisible)
     {
-        var root = roots["OriginalDeckMenu"];
+        var root = roots[App.Screens.Title.Submenus.GumScreen(kind)];
         int pulse = profile.PulseAt(frame);
         for (int i = 0; i < profile.Rows.Length; i++)
         {
@@ -170,14 +173,14 @@ public sealed class GumPresentation : IDisposable
     }
 
     /// <summary>Authored PC notice for a destination that is not recreated yet; never presented as an original dialog.</summary>
-    public void ShowDeckMenuNotice(App.Screens.Title.DeckMenuDestination? destination)
+    public void ShowSubmenuNotice(App.Screens.Title.SubmenuKind kind, App.Screens.Title.SubmenuDestination? destination)
     {
-        var root = roots["OriginalDeckMenu"];
-        var notice = root.GetGraphicalUiElementByName("Notice") ?? throw new InvalidDataException("Missing Deck Menu notice.");
+        string screen = App.Screens.Title.Submenus.GumScreen(kind);
+        var notice = roots[screen].GetGraphicalUiElementByName("Notice") ?? throw new InvalidDataException($"Missing {kind} submenu notice.");
         notice.Visible = destination is not null;
         if (destination is null) return;
-        BindText("OriginalDeckMenu", "NoticeTitle", destination.Label);
-        BindText("OriginalDeckMenu", "NoticeBody", destination.Notice);
+        BindText(screen, "NoticeTitle", destination.Label);
+        BindText(screen, "NoticeBody", destination.Notice);
     }
     private static void Bind(Gum.GueDeriving.SpriteRuntime sprite, Texture2D texture, Rectangle source, bool premultiplied)
     {

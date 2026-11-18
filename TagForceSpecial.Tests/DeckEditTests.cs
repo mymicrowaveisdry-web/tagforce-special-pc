@@ -189,8 +189,8 @@ public class DeckEditTests
         Assert.NotNull(flow.DeckEdit);
         Press(flow, InputAction.Back); Press(flow, InputAction.Confirm); Press(flow, InputAction.Right); Press(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.DeckMenu, flow.Step);
-        Assert.Equal(0, flow.DeckMenu!.Focus);
-        Assert.True(flow.DeckMenu.Ready);
+        Assert.Equal(0, flow.Submenu!.Focus);
+        Assert.True(flow.Submenu.Ready);
         Assert.Equal(0, host.Saves);
         Press(flow, InputAction.Confirm);
         Press(flow, InputAction.Back); Press(flow, InputAction.Confirm); Press(flow, InputAction.Confirm);
@@ -203,7 +203,7 @@ public class DeckEditTests
         var flow = OnDeckEditRow(new Host(catalog: false));
         Press(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.DeckMenu, flow.Step);
-        Assert.True(flow.DeckMenu!.NoticeOpen);
+        Assert.True(flow.Submenu!.NoticeOpen);
         Assert.Equal(DeckMenuDestinations.DeckEditCore, DeckMenuDestinations.All[0].Status);
     }
 }

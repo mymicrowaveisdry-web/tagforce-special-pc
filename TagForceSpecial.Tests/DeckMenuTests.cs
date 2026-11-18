@@ -43,7 +43,7 @@ public class DeckMenuTests
     [Fact]
     public void ProfileHoldsTheMeasuredSubmenu()
     {
-        var profile = DeckMenuProfile.LoadEmbedded();
+        var profile = SubmenuProfile.LoadEmbedded(SubmenuKind.Deck);
         Assert.Equal(new[] { "deck-edit", "partner-deck-edit", "recipe-viewer" }, profile.Rows.Select(r => r.Id));
         // Labels are read from title_menu_j.ehp at runtime, from the same table as the Main Menu's own labels.
         Assert.Equal(new[] { 5239420, 5239440, 5239476 }, profile.Rows.Select(r => r.Label.Offset));
@@ -60,7 +60,7 @@ public class DeckMenuTests
     [Fact]
     public void OpeningFadesRowsInOneFrameApartThenShowsLabelsAndFocus()
     {
-        var profile = DeckMenuProfile.LoadEmbedded();
+        var profile = SubmenuProfile.LoadEmbedded(SubmenuKind.Deck);
         // Measured from frame-stepped dumps: frame 0 only dims the menu; bars are drawn from frame 1 at alpha 0.
         Assert.Equal(new[] { 0, 0, 63, 127, 191, 255, 255 }, Enumerable.Range(0, 7).Select(f => profile.BarAlpha(0, f)));
         Assert.Equal(new[] { 0, 0, 0, 63, 127, 191, 255 }, Enumerable.Range(0, 7).Select(f => profile.BarAlpha(1, f)));
@@ -78,13 +78,13 @@ public class DeckMenuTests
         var flow = OpenSubmenu(out var host);
         Assert.Equal(TitleFlowStep.DeckMenu, flow.Step);
         Assert.True(flow.MainMenuDimmed);
-        Assert.Equal(0, flow.DeckMenu!.Focus);
+        Assert.Equal(0, flow.Submenu!.Focus);
         Assert.Equal(DeckMenuRow, flow.MenuFocus);
         Tap(flow, InputAction.Back);
         Assert.Equal(TitleFlowStep.MainMenu, flow.Step);
         Assert.Equal(DeckMenuRow, flow.MenuFocus);
         Assert.False(flow.MainMenuDimmed);
-        Assert.Null(flow.DeckMenu);
+        Assert.Null(flow.Submenu);
         Assert.Equal(0, host.Saves);
     }
 
@@ -92,7 +92,7 @@ public class DeckMenuTests
     public void PressesWrapAndButtonsWithoutAnObservedRoleDoNothing()
     {
         var flow = OpenSubmenu(out _);
-        var session = flow.DeckMenu!;
+        var session = flow.Submenu!;
         Tap(flow, InputAction.Down); Assert.Equal(1, session.Focus);
         Tap(flow, InputAction.Down); Assert.Equal(2, session.Focus);
         Tap(flow, InputAction.Down); Assert.Equal(0, session.Focus);
@@ -112,7 +112,7 @@ public class DeckMenuTests
     public void EveryDestinationShowsAPcNoticeAndReturnsToItsRow(InputAction leave)
     {
         var flow = OpenSubmenu(out var host);
-        var session = flow.DeckMenu!;
+        var session = flow.Submenu!;
         for (int row = 0; row < DeckMenuDestinations.All.Count; row++)
         {
             Tap(flow, InputAction.Confirm);
@@ -153,7 +153,7 @@ public class DeckMenuTests
         Tap(flow, InputAction.Back);
         Tap(flow, InputAction.Confirm);
         Assert.Equal(TitleFlowStep.DeckMenu, flow.Step);
-        Assert.Equal(0, flow.DeckMenu!.Focus);
+        Assert.Equal(0, flow.Submenu!.Focus);
     }
 
     [Fact]
@@ -165,10 +165,10 @@ public class DeckMenuTests
         Tap(flow, InputAction.Down);
         Tap(flow, InputAction.Back);
         Assert.Equal(TitleFlowStep.DeckMenu, flow.Step);
-        Assert.Equal(0, flow.DeckMenu!.Focus);
+        Assert.Equal(0, flow.Submenu!.Focus);
         flow.Update(OneFrame);
         Tap(flow, InputAction.Down);
-        Assert.Equal(1, flow.DeckMenu.Focus);
+        Assert.Equal(1, flow.Submenu.Focus);
     }
 
     [Fact]
@@ -178,7 +178,7 @@ public class DeckMenuTests
         var profile = flow.DeckMenuProfile;
         flow.Update(OneFrame * (profile.ReadyFrame + 1));
         Tap(flow, InputAction.Back);
-        var session = flow.DeckMenu!;
+        var session = flow.Submenu!;
         Assert.True(session.Closing);
         Assert.False(session.FocusVisible(session.Frame));
         Assert.True(flow.MainMenuDimmed);
@@ -211,11 +211,11 @@ public class DeckMenuTests
         var down = new InputFrame(InputAction.None, InputAction.Down);
         flow.Handle(new(InputAction.Down, InputAction.Down));
         for (int i = 0; i < 120; i++) { flow.Update(OneFrame); flow.Handle(down); }
-        Assert.Equal(2, flow.DeckMenu!.Focus);
+        Assert.Equal(2, flow.Submenu!.Focus);
         flow.Handle(new(InputAction.None, InputAction.None));
         var up = new InputFrame(InputAction.None, InputAction.Up);
         flow.Handle(new(InputAction.Up, InputAction.Up));
         for (int i = 0; i < 120; i++) { flow.Update(OneFrame); flow.Handle(up); }
-        Assert.Equal(0, flow.DeckMenu.Focus);
+        Assert.Equal(0, flow.Submenu.Focus);
     }
 }

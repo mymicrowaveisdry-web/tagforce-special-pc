@@ -40,7 +40,7 @@ public sealed partial class GameLoop
             try
             {
                 next.ValidateText(); gum.BindFlowLayer(next.Layer); next.RenderMainMenuLabels(); gum.BindMainMenu(next);
-                next.RenderDeckMenuLabels(); gum.BindDeckMenu(next); gum.BindDeckEdit(next.DeckEditLayer);
+                next.RenderSubmenuLabels(); gum.BindSubmenus(next); gum.BindDeckEdit(next.DeckEditLayer);
                 next.RenderOptionsLayers(); next.RenderDialogLayers(); gum.BindOptions(next);
             }
             catch { next.Dispose(); throw; }
@@ -119,7 +119,7 @@ public sealed partial class GameLoop
     private void DrawTransitionOverlay()
     {
         int alpha = screenFade.Alpha;
-        if (activeScreen == ScreenId.TitleFlow && titleFlow is { Step: TitleFlowStep.MainMenu or TitleFlowStep.MainMenuUnavailable or TitleFlowStep.Options or TitleFlowStep.DeckMenu } flow)
+        if (activeScreen == ScreenId.TitleFlow && titleFlow is { Step: TitleFlowStep.MainMenu or TitleFlowStep.MainMenuUnavailable or TitleFlowStep.Options or TitleFlowStep.DeckMenu or TitleFlowStep.DatabaseMenu } flow)
             alpha = Math.Max(alpha, MainMenuEntry.OverlayAlpha(MainMenuEntryFrame(flow)));
         if (alpha == 0) return;
         renderer.Begin();
@@ -137,16 +137,16 @@ public sealed partial class GameLoop
         if (key != renderedMenuFrame) { visuals.RenderMainMenuBackground(frame, entry); renderedMenuFrame = key; }
         // Measured: after the submenu closes, the menu's focus pulse restarts on the submenu's curve; exact runs hold its first value.
         int pulse = flow.MenuFocusRestartFrame is { } restart
-            ? flow.DeckMenuProfile.PulseSinceFocus(options.PixelExact ? 0 : restart) : visuals.MainMenuMotion.ScalarsAt(frame).Pulse;
-        gum.UpdateMainMenu(flow.MenuFocus, pulse, entry, flow.MainMenuDimmed ? flow.DeckMenuProfile.MenuDim : 255);
+            ? flow.ClosedSubmenuProfile.PulseSinceFocus(options.PixelExact ? 0 : restart) : visuals.MainMenuMotion.ScalarsAt(frame).Pulse;
+        gum.UpdateMainMenu(flow.MenuFocus, pulse, entry, flow.Submenu is { } dimming ? dimming.Profile.MenuDim : 255);
         gum.ShowMainMenuNotice(flow.Step == TitleFlowStep.MainMenuUnavailable ? flow.FocusedDestination : null);
-        if (flow.DeckMenu is { } deckMenu)
+        if (flow.Submenu is { } submenu)
         {
             // Exact runs fix the submenu's own frame as well as the background's.
-            int deckFrame = options.PixelExact ? options.DeckMenuFrame ?? flow.DeckMenuProfile.ReadyFrame : deckMenu.Frame;
-            gum.UpdateDeckMenu(flow.DeckMenuProfile, deckMenu.Focus, deckFrame, deckMenu.FocusVisible(deckFrame));
-            gum.ShowDeckMenuNotice(deckMenu.NoticeOpen ? deckMenu.Focused : null);
-            visuals.SetDeckMenuFallback(flow.MenuFocus, deckMenu.FocusVisible(deckFrame) ? deckMenu.Focus : null);
+            int subFrame = options.PixelExact ? options.DeckMenuFrame ?? submenu.Profile.ReadyFrame : submenu.Frame;
+            gum.UpdateSubmenu(submenu.Kind, submenu.Profile, submenu.Focus, subFrame, submenu.FocusVisible(subFrame));
+            gum.ShowSubmenuNotice(submenu.Kind, submenu.NoticeOpen ? submenu.Focused : null);
+            visuals.SetSubmenuFallback(submenu.Kind, submenu.FocusVisible(subFrame) ? submenu.Focus : null);
         }
         else visuals.SetMainMenuFallback(flow.MenuFocus);
     }
@@ -169,7 +169,7 @@ public sealed partial class GameLoop
 
     private void RefreshDeckEdit(TitleFlow flow, TitleFlowVisuals visuals, DeckEditSession edit)
     {
-        gum.Show("OriginalMainMenu", false); gum.Show("OriginalDeckMenu", false); gum.Show("OriginalTitleFlow", false);
+        gum.Show("OriginalMainMenu", false); gum.Show("OriginalDeckMenu", false); gum.Show("OriginalDatabaseMenu", false); gum.Show("OriginalTitleFlow", false);
         if (edit.Prompt == DeckEditPrompt.SaveQuestion)
         {
             // Observed after OK: "Save all contents acquired so far?" over the bare animated background, as from Options.
@@ -196,10 +196,11 @@ public sealed partial class GameLoop
     private void RefreshFlow()
     {
         if (titleFlow is null || flowVisuals is null) return;
-        bool menu = titleFlow.Step is TitleFlowStep.MainMenu or TitleFlowStep.MainMenuUnavailable or TitleFlowStep.DeckMenu;
+        bool menu = titleFlow.Step is TitleFlowStep.MainMenu or TitleFlowStep.MainMenuUnavailable or TitleFlowStep.DeckMenu or TitleFlowStep.DatabaseMenu;
         bool optionsScreen = titleFlow.Step == TitleFlowStep.Options && titleFlow.Options is not null;
         gum.Show("OriginalMainMenu", menu);
-        gum.Show("OriginalDeckMenu", titleFlow.DeckMenu is not null);
+        gum.Show("OriginalDeckMenu", titleFlow.Submenu?.Kind == SubmenuKind.Deck);
+        gum.Show("OriginalDatabaseMenu", titleFlow.Submenu?.Kind == SubmenuKind.Database);
         gum.Show("OriginalDeckEdit", false);
         gum.Show("OriginalRecipeViewer", false);
         if (titleFlow.Step == TitleFlowStep.RecipeViewer && titleFlow.Recipes is { } recipes && setup?.Game is { } recipeCache)
@@ -375,6 +376,7 @@ public sealed partial class GameLoop
             owner.gum.Show("OriginalTitleFlow", false);
             owner.gum.Show("OriginalMainMenu", false);
             owner.gum.Show("OriginalDeckMenu", false);
+            owner.gum.Show("OriginalDatabaseMenu", false);
             owner.gum.Show("OriginalDeckEdit", false);
             owner.gum.Show("OriginalRecipeViewer", false);
             owner.renderedMenuFrame = -1;

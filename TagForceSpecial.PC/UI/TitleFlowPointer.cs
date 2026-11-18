@@ -19,9 +19,9 @@ public sealed class TitleFlowPointer(GumPresentation gum)
                 return PointerTargets.Apply(input, gum.HitIndex("OriginalMainMenu", "Bar", TitleFlow.MainMenuRows, at), flow.MenuFocus, flow.PointMenu);
             case TitleFlowStep.MainMenuUnavailable:
                 return PointerTargets.Clicks(input);
-            case TitleFlowStep.DeckMenu when flow.DeckMenu is { } menu:
+            case TitleFlowStep.DeckMenu or TitleFlowStep.DatabaseMenu when flow.Submenu is { } menu:
                 if (menu.NoticeOpen) return PointerTargets.Clicks(input);
-                return PointerTargets.Apply(input, menu.Ready ? gum.HitIndex("OriginalDeckMenu", "Bar", menu.Rows, at) : null, menu.Focus, menu.SetFocus);
+                return PointerTargets.Apply(input, menu.Ready ? gum.HitIndex(Submenus.GumScreen(menu.Kind), "Bar", menu.Rows, at) : null, menu.Focus, menu.SetFocus);
             case TitleFlowStep.Options when flow.Options is { } options:
                 return Options(input, options);
             case TitleFlowStep.OptionsSaveQuestion:

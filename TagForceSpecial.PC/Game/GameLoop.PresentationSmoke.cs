@@ -63,6 +63,7 @@ public sealed partial class GameLoop
             Press(Keys.Up, $"MainMenu/0/{row}");
             if (MainMenuDestinations.All[row].Route == MainMenuRoute.Options) { OptionsRoute(Press); continue; }
             if (MainMenuDestinations.All[row].Route == MainMenuRoute.DeckMenu) { DeckMenuRoute(Press, Hold, row, deckEdit, recipes); continue; }
+            if (MainMenuDestinations.All[row].Route == MainMenuRoute.DatabaseMenu) { DatabaseMenuRoute(Press, Hold, row); continue; }
             Press(Keys.Enter, $"MainMenuUnavailable/0/{row}"); Press(Keys.Escape, $"MainMenu/0/{row}");
             Press(Keys.Enter, $"MainMenuUnavailable/0/{row}"); Press(Keys.Enter, $"MainMenu/0/{row}");
         }
@@ -112,6 +113,29 @@ public sealed partial class GameLoop
         Press(Keys.Enter, "SystemSavePrompt/0/6"); Press(Keys.Enter, "SystemSaveDone/0/6"); Press(Keys.Escape, "MainMenu/0/6");
         Press(Keys.Enter, "Options/L/0/1"); Press(Keys.Left, "Options/L/0/0"); Press(Keys.Enter, "OptionsSaveQuestion/0/6"); Press(Keys.Right, "OptionsSaveQuestion/1/6");
         Press(Keys.Enter, "MainMenu/0/6");
+    }
+
+    /// <summary>Database submenu over the dimmed Main Menu: press wrap both ways, ignored buttons, every row's PC notice with both exits
+    /// keeping focus, back to the menu row, focus reset on reopening, and hold-to-clamp both ways.</summary>
+    private static void DatabaseMenuRoute(Action<Keys, string, string?> press, Action<Keys, int, string> hold, int menuRow)
+    {
+        void Press(Keys key, string expected) => press(key, expected, null);
+        int last = DatabaseMenuDestinations.All.Count - 1;
+        string Open(int focus) => $"DatabaseMenu/L/{focus}/{menuRow}";
+        Press(Keys.Enter, Open(0));
+        Press(Keys.Up, Open(last)); Press(Keys.Down, Open(0));
+        foreach (var ignored in new[] { Keys.Left, Keys.Right, Keys.Tab, Keys.Space, Keys.Q, Keys.E, Keys.F1, Keys.F2 }) Press(ignored, Open(0));
+        for (int focus = 0; focus <= last; focus++)
+        {
+            if (focus > 0) Press(Keys.Down, Open(focus));
+            Press(Keys.Enter, $"DatabaseMenu/N/{focus}/{menuRow}"); Press(Keys.Escape, Open(focus));
+            Press(Keys.Enter, $"DatabaseMenu/N/{focus}/{menuRow}"); Press(Keys.Enter, Open(focus));
+        }
+        Press(Keys.Escape, $"MainMenu/0/{menuRow}");
+        Press(Keys.Enter, Open(0));
+        hold(Keys.Down, HoldDraws, Open(last));
+        hold(Keys.Up, HoldDraws, Open(0));
+        Press(Keys.Escape, $"MainMenu/0/{menuRow}");
     }
 
     /// <summary>Deck Menu over the dimmed Main Menu: every row, press wrap both ways, ignored buttons, each destination's PC notice with
@@ -229,8 +253,8 @@ public sealed partial class GameLoop
             $"Recipe/{recipes.Kind}/{recipes.Cursor}/{recipes.Modal}/{recipes.Sort}/{recipes.Inverse}",
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.DeckEdit, DeckEdit: { } edit } =>
             $"DeckEdit/{edit.Tab}/{edit.Cursor}/{edit.Prompt}/{edit.PromptFocus}/{MenuState(edit.Menus)}/{edit.Count(DeckEditTab.Deck)}/{edit.Count(DeckEditTab.Trunk)}",
-        ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.DeckMenu, DeckMenu: { } deck } flow =>
-            $"DeckMenu/{(deck.NoticeOpen ? "N" : "L")}/{deck.Focus}/{flow.MenuFocus}",
+        ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.DeckMenu or TitleFlowStep.DatabaseMenu, Submenu: { } sub } flow =>
+            $"{flow.Step}/{(sub.NoticeOpen ? "N" : "L")}/{sub.Focus}/{flow.MenuFocus}",
         ScreenId.TitleFlow when titleFlow is { } flow => $"{flow.Step}/{flow.ButtonFocus}/{flow.MenuFocus}",
         _ => activeScreen.ToString()
     };
@@ -245,7 +269,7 @@ public sealed partial class GameLoop
             throw new InvalidOperationException($"Presentation route/focus mismatch at frame {frames}, step {step}: expected {expected}, got {label}.");
         if (duel is not null || smokeCommands != 0 || router!.ModalDepth != 0)
             throw new InvalidOperationException("Presentation navigation changed gameplay or modal ownership.");
-        if (gum.RootCount != 10 || gum.AttachedRootCount != 10 || originalTitle?.Layers.Count != 11)
+        if (gum.RootCount != 11 || gum.AttachedRootCount != 11 || originalTitle?.Layers.Count != 11)
             throw new InvalidOperationException("Presentation root/layer count changed.");
         presentationTextureCount ??= gum.CachedTextureCount;
         if (gum.CachedTextureCount != presentationTextureCount)

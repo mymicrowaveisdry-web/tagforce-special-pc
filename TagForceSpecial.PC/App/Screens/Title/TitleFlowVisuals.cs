@@ -129,6 +129,7 @@ public sealed partial class TitleFlowVisuals : IDisposable
                 _ = Source(text.Source, text.Offset, text.Start, text.Chars);
         }
         foreach (var level in profile.LevelNames) _ = Source(level.Source, level.Offset, level.Start, level.Chars);
+        foreach (var label in submenuProfiles.Values.SelectMany(p => p.Rows).Select(r => r.Label)) _ = Source(label.Source, label.Offset, label.Start, label.Chars);
     }
 
     private string Source(string source, int offset, int start, int chars) => TitleFlowText.Read(source switch
@@ -276,6 +277,7 @@ public sealed partial class TitleFlowVisuals : IDisposable
     {
         textures.Dispose(); textRenderer.Dispose();
         MainMenuBackground.Dispose(); MainMenuLabels.Dispose();
+        foreach (var labels in submenuLabels.Values) labels.Dispose();
         OptionsBackground.Dispose(); OptionsStatic.Dispose(); OptionsText.Dispose(); OptionsPieces.Dispose();
         DialogText?.Dispose(); DialogPieces?.Dispose();
         foreach (var back in dialogBacks.Values) back.Dispose();

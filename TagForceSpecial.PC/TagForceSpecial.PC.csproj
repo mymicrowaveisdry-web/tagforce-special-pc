@@ -34,6 +34,7 @@
     <EmbeddedResource Include="App\Screens\Title\main-menu-animation.json" />
     <EmbeddedResource Include="App\Screens\Title\options-frame.json" />
     <EmbeddedResource Include="App\Screens\Title\deck-menu-frame.json" />
+    <EmbeddedResource Include="App\Screens\Title\database-menu-frame.json" />
     <EmbeddedResource Include="App\Screens\Title\deck-edit-frame.json" />
     <EmbeddedResource Include="App\Screens\Title\deck-edit-menu-frame.json" />
   </ItemGroup>
