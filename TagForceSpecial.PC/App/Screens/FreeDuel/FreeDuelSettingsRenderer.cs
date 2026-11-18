@@ -12,6 +12,8 @@ public sealed class FreeDuelSettingsRenderer : IDisposable
     private readonly GraphicsDevice device;
     private readonly TitleFlowVisuals visuals;
     public FreeDuelSettingsProfile Profile { get; }
+    /// <summary>The VERSUS screen drawn into the same layer after Next.</summary>
+    public FreeDuelVersusRenderer Versus { get; }
     public RenderTarget2D Layer { get; }
     /// <summary>Things drawn from inference rather than measurement; reported, never hidden.</summary>
     public IReadOnlyList<string> Gaps { get; } = Array.AsReadOnly(new[]
@@ -21,9 +23,9 @@ public sealed class FreeDuelSettingsRenderer : IDisposable
         "full-width parentheses in music titles are not drawn (the Latin card font has no glyph; Japanese system font not imported)"
     });
 
-    public FreeDuelSettingsRenderer(GraphicsDevice device, TitleFlowVisuals visuals, FreeDuelSettingsProfile profile)
+    public FreeDuelSettingsRenderer(GraphicsDevice device, TitleFlowVisuals visuals, FreeDuelSettingsProfile profile, FreeDuelVersusProfile versus)
     {
-        this.device = device; this.visuals = visuals; Profile = profile;
+        this.device = device; this.visuals = visuals; Profile = profile; Versus = new(device, visuals, versus);
         Layer = new(device, 480, 272, false, SurfaceFormat.Color, DepthFormat.Depth24Stencil8, 0, RenderTargetUsage.PreserveContents);
     }
 
@@ -33,8 +35,9 @@ public sealed class FreeDuelSettingsRenderer : IDisposable
         try
         {
             var profile = FreeDuelSettingsProfile.LoadEmbedded();
-            visuals.UseTextures(assets, profile.AssetKeys().Where(k => !k.StartsWith("title.eboot.", StringComparison.Ordinal)));
-            return new(device, visuals, profile);
+            var versus = FreeDuelVersusProfile.LoadEmbedded();
+            visuals.UseTextures(assets, profile.AssetKeys().Concat(versus.AssetKeys()).Where(k => !k.StartsWith("title.eboot.", StringComparison.Ordinal)));
+            return new(device, visuals, profile, versus);
         }
         catch (Exception e) when (e is InvalidDataException or KeyNotFoundException or IOException or System.Text.Json.JsonException)
         {
@@ -43,8 +46,10 @@ public sealed class FreeDuelSettingsRenderer : IDisposable
         }
     }
 
-    /// <summary>A new visit: every opening starts on the first step with Normal Duel focused (measured).</summary>
-    public FreeDuelSettingsSession NewSession() => new(Profile.StepProfile(FreeDuelStep.Music).Rows.Length, Profile.VisibleRows);
+    /// <summary>A new visit: every opening starts on the first step with Normal Duel focused (measured). The player side shows the PC
+    /// profile's name and the PC's current deck (owner decision).</summary>
+    public FreeDuelSession NewSession(string playerName, string playerDeck) =>
+        new(new(Profile.StepProfile(FreeDuelStep.Music).Rows.Length, Profile.VisibleRows), playerName, playerDeck);
 
     /// <param name="backgroundFrame">Main Menu background animation frame.</param>
     /// <param name="pulseFrame">Game frames since the highlight appeared.</param>

@@ -133,8 +133,13 @@ public sealed partial class GameLoop
         Press(Keys.Escape, F("LifePoints", 0)); Press(Keys.Escape, F("Rules", 1)); Press(Keys.Up, F("Rules", 0)); Press(Keys.Enter, F("Music", 0));
         Press(Keys.Up, F("Music", 43, 38)); Press(Keys.Down, F("Music", 0));
         for (int row = 1; row <= 6; row++) Press(Keys.Down, F("Music", row, Math.Max(0, row - 5)));
-        Press(Keys.Enter, F("Confirm", 0)); Press(Keys.Enter, F("Confirm", 0, notice: true)); Press(Keys.Escape, F("Confirm", 0));
-        Press(Keys.Escape, F("Music", 6, 1)); Press(Keys.Escape, F("Rules", 0)); Press(Keys.Escape, F("Ending", 0)); Press(Keys.Escape, F("Format", 0));
+        Press(Keys.Enter, F("Confirm", 0)); Press(Keys.Escape, F("Music", 6, 1)); Press(Keys.Enter, F("Confirm", 0));
+        // VERSUS: Down cycle, Up, Right/Left to and from Start Duel, notices on Start Duel and □ on the player's deck, Back to the reset first step.
+        static string V(string focus, bool notice = false) => $"FreeDuelVs/{focus}{(notice ? "/N" : "")}";
+        Press(Keys.Enter, V("OpponentName")); Press(Keys.Down, V("OpponentDeck")); Press(Keys.Down, V("PlayerDeck")); Press(Keys.Down, V("Start"));
+        Press(Keys.Down, V("OpponentName")); Press(Keys.Up, V("Start")); Press(Keys.Left, V("OpponentName")); Press(Keys.Right, V("Start"));
+        Press(Keys.Enter, V("Start", true)); Press(Keys.Escape, V("Start")); Press(Keys.Up, V("PlayerDeck"));
+        Press(Keys.Space, V("PlayerDeck", true)); Press(Keys.Enter, V("PlayerDeck")); Press(Keys.Escape, F("Format", 0));
         Press(Keys.Escape, $"MainMenu/0/{menuRow}");
     }
 
@@ -307,7 +312,9 @@ public sealed partial class GameLoop
             $"Recipe/{recipes.Kind}/{recipes.Cursor}/{recipes.Modal}/{recipes.Sort}/{recipes.Inverse}",
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.DeckEdit, DeckEdit: { } edit } =>
             $"DeckEdit/{edit.Tab}/{edit.Cursor}/{edit.Prompt}/{edit.PromptFocus}/{MenuState(edit.Menus)}/{edit.Count(DeckEditTab.Deck)}/{edit.Count(DeckEditTab.Trunk)}",
-        ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.FreeDuelSettings, FreeDuel: { } fd } =>
+        ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.FreeDuelSettings, FreeDuel: { Versus: { } vs } } =>
+            $"FreeDuelVs/{vs.Focus}{(vs.NoticeOpen ? "/N" : "")}",
+        ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.FreeDuelSettings, FreeDuel: { Settings: var fd } } =>
             $"FreeDuel/{fd.Step}/{fd.Focus}/{fd.Top}{(fd.NoticeOpen ? "/N" : "")}",
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.CardAlbum, CardAlbum: { } album } =>
             $"CardAlbum/{album.View}/{album.Focus}/{(album.RightPage ? "R" : "L")}/{album.Pocket}/{album.BarButton}{(album.JumpOpen ? $"/J{album.JumpRow}{album.JumpColumn}" : "")}{(album.Detail is { Closing: false } d ? $"/D{(int)d.Tab}" : "")}",

@@ -1,6 +1,6 @@
 namespace TagForceSpecial.Assets.Presentation;
 
-/// <summary>Generated pins (analysis/reconstruction/phase8_pins.py): title_menu_j.ehp textures of the Free Duel settings screen whose
+/// <summary>Generated pins (analysis/reconstruction/phase8_pins.py): title_menu_j.ehp textures of the Free Duel settings and versus screens whose
 /// decoded pixels equal the textures the original uploads (Phase 8 GE dumps). Pixels only; layout is measured separately.</summary>
 public static class FreeDuelReferenceResources
 {
@@ -21,6 +21,26 @@ public static class FreeDuelReferenceResources
         new("free-duel", "title.flow.trnsmt02", "phase8.free-duel.trnsmt02.native-v1",
             "PSP_GAME/USRDIR/title_menu/title_menu_j.ehp", "trnsmt02.gim", 5914480, 34000,
             "65b75fc41086e181aaee5ebcea3cc332098123230739f443884f4ce76d7c0e47", "d138c86f9ffc4079827cfc3c7824c0ecf6c1a38a9161194fc2298960e7234ceb",
-            "396980955f2381545ef4f24c94b2295f593079f7db39fa04dfd645b55d2f5952", 256, 256)
+            "396980955f2381545ef4f24c94b2295f593079f7db39fa04dfd645b55d2f5952", 256, 256),
+        new("free-duel", "title.flow.d-menu01", "phase8.free-duel.d-menu01.native-v1",
+            "PSP_GAME/USRDIR/title_menu/title_menu_j.ehp", "d_menu01.gim", 482144, 66768,
+            "65b75fc41086e181aaee5ebcea3cc332098123230739f443884f4ce76d7c0e47", "76f776d07703d6e7b0a461073c12a68122b4d5157d3207891427492748f990ff",
+            "5df43365d46489d3cd43cee2412b7f5bfad07991a15748da829a06cea64aeec5", 256, 256),
+        new("free-duel", "title.flow.mdl-bup01", "phase8.free-duel.mdl-bup01.native-v1",
+            "PSP_GAME/USRDIR/title_menu/title_menu_j.ehp", "mdl_bup01.gim", 3106560, 263376,
+            "65b75fc41086e181aaee5ebcea3cc332098123230739f443884f4ce76d7c0e47", "2a787d63296f3acf51e083b417460f898405d44287b28cc673359962791af597",
+            "d91e46e17da35934bfe65c5c4f136b4e7099c810928406565cdec3e64dee0006", 512, 512),
+        new("free-duel", "title.flow.d-menu-vs010001", "phase8.free-duel.d-menu-vs010001.native-v1",
+            "PSP_GAME/USRDIR/title_menu/title_menu_j.ehp", "d_menu_vs010001.gim", 1078512, 8464,
+            "65b75fc41086e181aaee5ebcea3cc332098123230739f443884f4ce76d7c0e47", "7ebb2d60c984af917e8277ebdf4ded7c91e1c9117162a9eb41b8729a167f18a6",
+            "743aaaf289fe93b76cc1566c8e4cf643bcdfc996ae65e06752eadcd77e9b9fdd", 256, 64),
+        new("free-duel", "title.flow.d-menu-vs010006", "phase8.free-duel.d-menu-vs010006.native-v1",
+            "PSP_GAME/USRDIR/title_menu/title_menu_j.ehp", "d_menu_vs010006.gim", 1095440, 16656,
+            "65b75fc41086e181aaee5ebcea3cc332098123230739f443884f4ce76d7c0e47", "f9924c2b7b53328e04b39f3096b69db657b11bd326acbeaab7fd396c1ae710bf",
+            "ee79206532de838a5d9e67d2569b500fea9d3e7ec2fcfae5f68a238f50b1fbe8", 256, 128),
+        new("free-duel", "title.flow.d-menu-vs010012", "phase8.free-duel.d-menu-vs010012.native-v1",
+            "PSP_GAME/USRDIR/title_menu/title_menu_j.ehp", "d_menu_vs010012.gim", 1128752, 16656,
+            "65b75fc41086e181aaee5ebcea3cc332098123230739f443884f4ce76d7c0e47", "f886239c2a2bae04b3cb696af1288f4dfafe623d41d7e71c6136f12f492fa49c",
+            "67b05d3f842b57eeb19777d927735d77a175aabad8747517bc8e9da5e9bd1a55", 256, 128)
     });
 }

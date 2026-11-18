@@ -201,18 +201,19 @@ public sealed partial class GameLoop
     }
 
     /// <summary>Re-renders only when the session, the background frame or the pulse value changed; the notice is the PC's own.</summary>
-    private void RefreshFreeDuel(TitleFlow flow, TitleFlowVisuals visuals, App.Screens.FreeDuel.FreeDuelSettingsSession session,
+    private void RefreshFreeDuel(TitleFlow flow, TitleFlowVisuals visuals, App.Screens.FreeDuel.FreeDuelSession session,
         App.Screens.FreeDuel.FreeDuelSettingsRenderer view)
     {
-        int background = MainMenuFrame(flow, visuals), pulse = options.PixelExact ? 0 : session.Frame;
+        int background = MainMenuFrame(flow, visuals), pulse = options.PixelExact ? 0 : session.Settings.Frame;
         int pulseValue = view.Profile.FocusPulse[pulse % view.Profile.FocusPulse.Length];
         if (renderedFreeDuel != (session, session.Revision, background, pulseValue))
         {
-            view.Render(session, background, pulse);
+            if (session.Versus is null) view.Render(session.Settings, background, pulse);
+            else view.Versus.Render(view.Layer, session, background);
             gum.BindFreeDuel(view.Layer);
             renderedFreeDuel = (session, session.Revision, background, pulseValue);
         }
-        gum.ShowFreeDuelNotice(session.NoticeOpen ? view.NoticeTitle(session) : null);
+        gum.ShowFreeDuelNotice(!session.NoticeOpen ? null : session.Versus is null ? view.NoticeTitle(session.Settings) : view.Versus.NoticeTitle(session));
         gum.Show("OriginalFreeDuel", true);
     }
 
@@ -380,11 +381,13 @@ public sealed partial class GameLoop
                 : id => (draft.Count(id, Core.Decks.DeckSection.Main) + draft.Count(id, Core.Decks.DeckSection.Extra), draft.Count(id, Core.Decks.DeckSection.Side));
             return owner.cardAlbumScreen?.Open(owner.setup.Storage.PathFor(App.Screens.Album.CardAlbumScreen.CollectionFile), inDeck);
         }
-        public App.Screens.FreeDuel.FreeDuelSettingsSession? OpenFreeDuel()
+        public App.Screens.FreeDuel.FreeDuelSession? OpenFreeDuel()
         {
             if (owner.flowVisuals is null) return null;
             owner.freeDuelRenderer ??= App.Screens.FreeDuel.FreeDuelSettingsRenderer.TryCreate(owner.GraphicsDevice, owner.flowVisuals, owner.screenAssets);
-            return owner.freeDuelRenderer?.NewSession();
+            DeckDraft? draft = null;
+            if (!owner.options.PresentationSmoke && owner.editor is { } editor) { editor.EnsureDraft(); draft = editor.Draft; }
+            return owner.freeDuelRenderer?.NewSession(owner.titleFlow?.Name ?? "", draft?.Name ?? Effects.InitialOpponentDecks.Names[0]);
         }
         public void SaveDeckEdit(DeckEditSession session)
         {

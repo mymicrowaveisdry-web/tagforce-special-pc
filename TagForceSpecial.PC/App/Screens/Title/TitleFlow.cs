@@ -34,7 +34,7 @@ public interface ITitleFlowHost
     void CloseRecipeViewer(RecipeSelection? selection) { }
     Album.CardAlbumSession? OpenCardAlbum() => null;
     /// <summary>The Free Duel settings screen, or null when its measured assets are not imported (the row then keeps its notice).</summary>
-    FreeDuelScreen.FreeDuelSettingsSession? OpenFreeDuel() => null;
+    FreeDuelScreen.FreeDuelSession? OpenFreeDuel() => null;
 }
 
 /// <summary>Observed Continue/New Game routes (config/reference/title-flow.json) and Main Menu/Options/Deck Menu routes (main-menu.json,
@@ -48,7 +48,7 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
     private DeckEditSession? pendingDeckEdit;
     private RecipeViewerSession? pendingRecipes;
     private Album.CardAlbumSession? pendingAlbum;
-    private FreeDuelScreen.FreeDuelSettingsSession? pendingFreeDuel;
+    private FreeDuelScreen.FreeDuelSession? pendingFreeDuel;
     private int returnSubmenuFocus;
     private bool submenuSettled;
     public const int NameLimit = 8;
@@ -95,7 +95,7 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
     public RecipeViewerSession? Recipes { get; private set; }
     /// <summary>The Card Album while <see cref="TitleFlowStep.CardAlbum"/> is active.</summary>
     public Album.CardAlbumSession? CardAlbum { get; private set; }
-    public FreeDuelScreen.FreeDuelSettingsSession? FreeDuel { get; private set; }
+    public FreeDuelScreen.FreeDuelSession? FreeDuel { get; private set; }
     /// <summary>Measured: the Main Menu is dimmed, without focus, for as long as the submenu is drawn, including its close frames.</summary>
     public bool MainMenuDimmed => Step is TitleFlowStep.DeckMenu or TitleFlowStep.DatabaseMenu;
     /// <summary>Game frames since the Main Menu focus reappeared after the submenu closed; measured, its pulse restarts there.
@@ -202,11 +202,8 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
         }
         if (Step == TitleFlowStep.FreeDuelSettings)
         {
-            // Measured: Back from the first step returns to the Main Menu on Free Duel, replaying its entry; Next waits for the versus screen.
-            var outcome = FreeDuel!.Handle(input);
-            if (outcome == FreeDuelScreen.FreeDuelSettingsOutcome.Close)
-                EnterFaded(TitleFlowStep.MainMenu, keepMenuFocus: true, replayEntry: true, lead: 0);
-            else if (outcome == FreeDuelScreen.FreeDuelSettingsOutcome.Next) FreeDuel.ShowNotice();
+            // Measured: Back from the first settings step returns to the Main Menu on Free Duel, replaying its entry.
+            if (FreeDuel!.Handle(input)) EnterFaded(TitleFlowStep.MainMenu, keepMenuFocus: true, replayEntry: true, lead: 0);
             return;
         }
         if (Step == TitleFlowStep.RecipeViewer)
