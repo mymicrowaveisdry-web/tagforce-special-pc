@@ -208,7 +208,8 @@ public sealed partial class GameLoop
         int pulseValue = view.Profile.FocusPulse[pulse % view.Profile.FocusPulse.Length];
         if (renderedFreeDuel != (session, session.Revision, background, pulseValue))
         {
-            if (session.Versus is null) view.Render(session.Settings, background, pulse);
+            if (session.Picker is { } picker) view.Picker.Render(view.Layer, picker, background);
+            else if (session.Versus is null) view.Render(session.Settings, background, pulse);
             else view.Versus.Render(view.Layer, session, background);
             gum.BindFreeDuel(view.Layer);
             renderedFreeDuel = (session, session.Revision, background, pulseValue);

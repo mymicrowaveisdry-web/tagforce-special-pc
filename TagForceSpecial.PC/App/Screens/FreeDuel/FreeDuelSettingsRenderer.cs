@@ -14,6 +14,9 @@ public sealed class FreeDuelSettingsRenderer : IDisposable
     public FreeDuelSettingsProfile Profile { get; }
     /// <summary>The VERSUS screen drawn into the same layer after Next.</summary>
     public FreeDuelVersusRenderer Versus { get; }
+    /// <summary>The character picker drawn into the same layer while open.</summary>
+    public FreeDuelPickerRenderer Picker { get; }
+    private readonly int defaultOpponent;
     public RenderTarget2D Layer { get; }
     /// <summary>Things drawn from inference rather than measurement; reported, never hidden.</summary>
     public IReadOnlyList<string> Gaps { get; } = Array.AsReadOnly(new[]
@@ -23,9 +26,13 @@ public sealed class FreeDuelSettingsRenderer : IDisposable
         "full-width parentheses in music titles are not drawn (the Latin card font has no glyph; Japanese system font not imported)"
     });
 
-    public FreeDuelSettingsRenderer(GraphicsDevice device, TitleFlowVisuals visuals, FreeDuelSettingsProfile profile, FreeDuelVersusProfile versus)
+    public FreeDuelSettingsRenderer(GraphicsDevice device, TitleFlowVisuals visuals, FreeDuelSettingsProfile profile, FreeDuelVersusProfile versus,
+        FreeDuelPickerProfile roster)
     {
-        this.device = device; this.visuals = visuals; Profile = profile; Versus = new(device, visuals, versus);
+        this.device = device; this.visuals = visuals; Profile = profile; Versus = new(device, visuals, versus, roster); Picker = new(device, visuals, roster);
+        // Measured default opponent: the character whose name the VERSUS capture shows (Aki Izayoi).
+        defaultOpponent = Array.FindIndex(roster.Characters, c => c.Name.Source == versus.DefaultOpponent.Name.Source && c.Name.Offset == versus.DefaultOpponent.Name.Offset);
+        if (defaultOpponent < 0) throw new InvalidDataException("The measured default opponent is not in the roster.");
         Layer = new(device, 480, 272, false, SurfaceFormat.Color, DepthFormat.Depth24Stencil8, 0, RenderTargetUsage.PreserveContents);
     }
 
@@ -36,8 +43,11 @@ public sealed class FreeDuelSettingsRenderer : IDisposable
         {
             var profile = FreeDuelSettingsProfile.LoadEmbedded();
             var versus = FreeDuelVersusProfile.LoadEmbedded();
-            visuals.UseTextures(assets, profile.AssetKeys().Concat(versus.AssetKeys()).Where(k => !k.StartsWith("title.eboot.", StringComparison.Ordinal)));
-            return new(device, visuals, profile, versus);
+            var roster = FreeDuelPickerProfile.LoadEmbedded();
+            visuals.UseTextures(assets, profile.AssetKeys().Concat(versus.AssetKeys()).Concat(roster.AssetKeys())
+                .Concat(["title.flow.mdl-bup11", "title.flow.mdl-bup21", "title.flow.mdl-bup31"]).Where(k => !k.StartsWith("title.eboot.", StringComparison.Ordinal)));
+            visuals.UseCharaList(assets, Assets.Presentation.FreeDuelReferenceResources.CharaListKey);
+            return new(device, visuals, profile, versus, roster);
         }
         catch (Exception e) when (e is InvalidDataException or KeyNotFoundException or IOException or System.Text.Json.JsonException)
         {
@@ -49,7 +59,7 @@ public sealed class FreeDuelSettingsRenderer : IDisposable
     /// <summary>A new visit: every opening starts on the first step with Normal Duel focused (measured). The player side shows the PC
     /// profile's name and the PC's current deck (owner decision).</summary>
     public FreeDuelSession NewSession(string playerName, string playerDeck) =>
-        new(new(Profile.StepProfile(FreeDuelStep.Music).Rows.Length, Profile.VisibleRows), playerName, playerDeck);
+        new(new(Profile.StepProfile(FreeDuelStep.Music).Rows.Length, Profile.VisibleRows), playerName, playerDeck, Picker.Profile, defaultOpponent);
 
     /// <param name="backgroundFrame">Main Menu background animation frame.</param>
     /// <param name="pulseFrame">Game frames since the highlight appeared.</param>

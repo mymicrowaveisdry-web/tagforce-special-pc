@@ -40,60 +40,83 @@ public sealed record FreeDuelVersusProfile(int SchemaVersion, string BuildId, st
 
 /// <summary>Observed VERSUS input: Down goes opponent name → opponent deck → player deck (measured), then Start Duel (inferred) and back to the
 /// name (measured); Up reverses; Right jumps to Start Duel (measured), Left from it returns to the name (inferred). Back returns to the settings'
-/// first step (measured). Choosing a part, Start Duel and □ show a PC notice until their screens exist.</summary>
+/// first step (measured). Confirm on the name opens the character picker and □ there picks a random character; the decks, Start Duel and
+/// □ on the player's deck show a PC notice until their screens exist.</summary>
 public sealed class FreeDuelVersusSession
 {
+    public enum Outcome { None, Back, OpenPicker, RandomCharacter }
     public FreeDuelVersusFocus Focus { get; private set; }
     public bool NoticeOpen { get; private set; }
     public int Revision { get; private set; }
 
-    /// <summary>True when Back leaves the screen.</summary>
-    public bool Handle(InputFrame input)
+    public Outcome Handle(InputFrame input)
     {
         var (focus, notice) = (Focus, NoticeOpen);
-        bool back = HandleInput(input);
-        if ((focus, notice) != (Focus, NoticeOpen)) Revision++;
-        return back;
+        var outcome = HandleInput(input);
+        if ((focus, notice) != (Focus, NoticeOpen) || outcome == Outcome.RandomCharacter) Revision++;
+        return outcome;
     }
 
-    private bool HandleInput(InputFrame input)
+    /// <summary>Redraws after the opponent changed (a pick returned).</summary>
+    public void Touch() => Revision++;
+
+    private Outcome HandleInput(InputFrame input)
     {
         if (NoticeOpen)
         {
             if (input.IsPressed(InputAction.Confirm) || input.IsPressed(InputAction.Back)) NoticeOpen = false;
-            return false;
+            return Outcome.None;
         }
         const int parts = 4;
         if (input.IsPressed(InputAction.Down)) Focus = (FreeDuelVersusFocus)(((int)Focus + 1) % parts);
         else if (input.IsPressed(InputAction.Up)) Focus = (FreeDuelVersusFocus)(((int)Focus + parts - 1) % parts);
         else if (input.IsPressed(InputAction.Right)) Focus = FreeDuelVersusFocus.Start;
         else if (input.IsPressed(InputAction.Left) && Focus == FreeDuelVersusFocus.Start) Focus = FreeDuelVersusFocus.OpponentName;
-        else if (input.IsPressed(InputAction.Back)) return true;
-        else if (input.IsPressed(InputAction.Confirm) || input.IsPressed(InputAction.Switch) && Focus is FreeDuelVersusFocus.OpponentName or FreeDuelVersusFocus.PlayerDeck)
-            NoticeOpen = true;
-        return false;
+        else if (input.IsPressed(InputAction.Back)) return Outcome.Back;
+        else if (input.IsPressed(InputAction.Confirm) && Focus == FreeDuelVersusFocus.OpponentName) return Outcome.OpenPicker;
+        else if (input.IsPressed(InputAction.Switch) && Focus == FreeDuelVersusFocus.OpponentName) return Outcome.RandomCharacter;
+        else if (input.IsPressed(InputAction.Confirm) || input.IsPressed(InputAction.Switch) && Focus == FreeDuelVersusFocus.PlayerDeck) NoticeOpen = true;
+        return Outcome.None;
     }
 }
 
 /// <summary>A Free Duel visit: the settings screen, then VERSUS once Next is chosen. Back from VERSUS returns to the settings' first step
 /// with nothing chosen (measured).</summary>
-public sealed class FreeDuelSession(FreeDuelSettingsSession settings, string playerName, string playerDeck)
+public sealed class FreeDuelSession(FreeDuelSettingsSession settings, string playerName, string playerDeck, FreeDuelPickerProfile? roster = null,
+    int defaultOpponent = 0, Random? random = null)
 {
+    private readonly Random random = random ?? new Random();
     public FreeDuelSettingsSession Settings => settings;
     public FreeDuelVersusSession? Versus { get; private set; }
+    /// <summary>The character picker while open over VERSUS.</summary>
+    public FreeDuelPickerSession? Picker { get; private set; }
+    /// <summary>Roster index of the opponent character (the measured default until a pick).</summary>
+    public int Opponent { get; private set; } = defaultOpponent;
     public string PlayerName => playerName;
     public string PlayerDeck => playerDeck;
     public bool NoticeOpen => Versus?.NoticeOpen ?? settings.NoticeOpen;
-    public int Revision => settings.Revision * 1000 + (Versus?.Revision ?? -1) + (Versus is null ? 0 : 500);
+    public int Revision => settings.Revision * 100000 + (Versus?.Revision ?? -1) * 100 + (Versus is null ? 0 : 50) + (Picker?.Revision ?? -1) * 7 + Opponent * 13 + (Picker is null ? 0 : 3);
 
     public void Update(TimeSpan delta) => settings.Update(delta);
 
     /// <summary>True when Back from the settings' first step leaves Free Duel.</summary>
     public bool Handle(InputFrame input)
     {
+        if (Picker is { } picker)
+        {
+            var picked = picker.Handle(input);
+            if (picked == FreeDuelPickerSession.Outcome.Picked) Opponent = picker.FocusedCharacter;
+            if (picked != FreeDuelPickerSession.Outcome.None) { Picker = null; Versus!.Touch(); }
+            return false;
+        }
         if (Versus is { } versus)
         {
-            if (versus.Handle(input)) { Versus = null; settings.Reset(); }
+            switch (versus.Handle(input))
+            {
+                case FreeDuelVersusSession.Outcome.Back: Versus = null; settings.Reset(); break;
+                case FreeDuelVersusSession.Outcome.OpenPicker when roster is not null: Picker = new(roster, Opponent); break;
+                case FreeDuelVersusSession.Outcome.RandomCharacter when roster is not null: Opponent = random.Next(roster.Characters.Length); break;
+            }
             return false;
         }
         var outcome = settings.Handle(input);

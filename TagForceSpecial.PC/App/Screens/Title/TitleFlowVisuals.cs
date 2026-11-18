@@ -137,11 +137,12 @@ public sealed partial class TitleFlowVisuals : IDisposable
         "eboot" => eboot, "title-menu" => titleMenu, "deck" => deckArchive,
         "album" => albumArchive ?? throw new InvalidDataException("The Card Album archive is not in this import."),
         "cardinfo" => cardInfoArchive ?? throw new InvalidDataException("The card info archive is not in this import."),
+        "charalist" => charaListArchive ?? throw new InvalidDataException("The character list archive is not in this import."),
         _ => throw new InvalidDataException("Unknown text source.")
     }, offset, start, chars);
 
     // Helpers other screens (the Card Album) draw with, so they share this layer's textures, font and measured-draw rules.
-    private byte[]? albumArchive, cardInfoArchive;
+    private byte[]? albumArchive, cardInfoArchive, charaListArchive;
 
     /// <summary>Runs <paramref name="draw"/> with <paramref name="target"/> bound, restoring the previous target and default states.</summary>
     public void Within(RenderTarget2D target, Action draw) => WithTarget(target, draw);
@@ -166,6 +167,9 @@ public sealed partial class TitleFlowVisuals : IDisposable
         cardInfoArchive ??= assets.ResolveBytes(cardInfoKey);
     }
 
+    /// <summary>Loads a stored archive used only as a text source (Free Duel: "charalist", the character list archive).</summary>
+    public void UseCharaList(OriginalScreenAssetResolver assets, string key) => charaListArchive ??= assets.ResolveBytes(key);
+
     /// <summary>Adds imported textures under their asset keys (pinned to the original uploads) when not loaded yet.</summary>
     public void UseTextures(OriginalScreenAssetResolver assets, IEnumerable<string> keys)
     {
@@ -175,7 +179,7 @@ public sealed partial class TitleFlowVisuals : IDisposable
     /// <summary>The whole message at a source offset (UTF-16 up to its terminator), normalized like other source text.</summary>
     public string Message(string source, int offset)
     {
-        byte[] blob = source switch { "cardinfo" => cardInfoArchive, "album" => albumArchive, "deck" => deckArchive, "eboot" => eboot, "title-menu" => titleMenu, _ => null }
+        byte[] blob = source switch { "cardinfo" => cardInfoArchive, "charalist" => charaListArchive, "album" => albumArchive, "deck" => deckArchive, "eboot" => eboot, "title-menu" => titleMenu, _ => null }
             ?? throw new InvalidDataException("Unknown or missing text source " + source + ".");
         if (offset < 0 || offset >= blob.Length || offset % 2 != 0) throw new InvalidDataException("Invalid text reference.");
         int end = offset;

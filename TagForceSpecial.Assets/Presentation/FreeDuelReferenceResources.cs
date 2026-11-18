@@ -1,9 +1,12 @@
 namespace TagForceSpecial.Assets.Presentation;
 
-/// <summary>Generated pins (analysis/reconstruction/phase8_pins.py): title_menu_j.ehp textures of the Free Duel settings and versus screens whose
-/// decoded pixels equal the textures the original uploads (Phase 8 GE dumps). Pixels only; layout is measured separately.</summary>
+/// <summary>Generated pins (analysis/reconstruction/phase8_pins.py): title_menu_j.ehp and database/charalist.ehp textures of the Free Duel
+/// screens whose decoded pixels equal the textures the original uploads (Phase 8 GE dumps). Pixels only; layout is measured separately.</summary>
 public static class FreeDuelReferenceResources
 {
+    /// <summary>Stored whole: the character list archive, read for team and series tab names by offset.</summary>
+    public const string CharaListKey = "title.source.charalist", CharaListPath = "PSP_GAME/USRDIR/database/charalist.ehp";
+
     public static IReadOnlyList<PresentationReferenceCase> Cases { get; } = Array.AsReadOnly(new PresentationReferenceCase[]
     {
         new("free-duel", "title.flow.b-menu-bar00001", "phase8.free-duel.b-menu-bar00001.native-v1",
@@ -41,6 +44,54 @@ public static class FreeDuelReferenceResources
         new("free-duel", "title.flow.d-menu-vs010012", "phase8.free-duel.d-menu-vs010012.native-v1",
             "PSP_GAME/USRDIR/title_menu/title_menu_j.ehp", "d_menu_vs010012.gim", 1128752, 16656,
             "65b75fc41086e181aaee5ebcea3cc332098123230739f443884f4ce76d7c0e47", "f886239c2a2bae04b3cb696af1288f4dfafe623d41d7e71c6136f12f492fa49c",
-            "67b05d3f842b57eeb19777d927735d77a175aabad8747517bc8e9da5e9bd1a55", 256, 128)
+            "67b05d3f842b57eeb19777d927735d77a175aabad8747517bc8e9da5e9bd1a55", 256, 128),
+        new("free-duel", "title.flow.sml-bup01", "phase8.free-duel.sml-bup01.native-v1",
+            "PSP_GAME/USRDIR/title_menu/title_menu_j.ehp", "sml_bup01.gim", 4018112, 263376,
+            "65b75fc41086e181aaee5ebcea3cc332098123230739f443884f4ce76d7c0e47", "d7d574ea286c1c202eb8febdf16c41e9832c471479e4dd3ca87738f0c199a512",
+            "f25ffb30d6499063e2c9568d8183280b14833cbc95716f328fe69dd67e1456a4", 512, 512),
+        new("free-duel", "title.flow.sml-bup11", "phase8.free-duel.sml-bup11.native-v1",
+            "PSP_GAME/USRDIR/title_menu/title_menu_j.ehp", "sml_bup11.gim", 4808240, 132304,
+            "65b75fc41086e181aaee5ebcea3cc332098123230739f443884f4ce76d7c0e47", "c9ebf7a27b7e3ad62dae45a54bdeb35f6df840d262992b56a16d8be0d47226cb",
+            "0977881870915cc3cf72a97b2b58135cf30a4b19b0ee502e6f5c17a47aa27513", 512, 256),
+        new("free-duel", "title.flow.mdl-bup11", "phase8.free-duel.mdl-bup11.native-v1",
+            "PSP_GAME/USRDIR/title_menu/title_menu_j.ehp", "mdl_bup11.gim", 3369936, 263376,
+            "65b75fc41086e181aaee5ebcea3cc332098123230739f443884f4ce76d7c0e47", "6ed2313c8e0f6e69263956a86217f399e42300787f4fdff0addfd045ab09d115",
+            "16a720e13728128f75da8ba4973ce975011b0d0a1ef45e274a65c5a5fc41b6a1", 512, 512),
+        new("free-duel", "title.flow.mdl-bup21", "phase8.free-duel.mdl-bup21.native-v1",
+            "PSP_GAME/USRDIR/title_menu/title_menu_j.ehp", "mdl_bup21.gim", 3633312, 263376,
+            "65b75fc41086e181aaee5ebcea3cc332098123230739f443884f4ce76d7c0e47", "db650fc067b91a66bec4a0fbba837b65e251714b3f8390b6ba33431ac68cb4b6",
+            "e69d8d14fe350bcc6e6dcad5b01fc647205c8b5af15f6b9868936bbbf55173a2", 512, 512),
+        new("free-duel", "title.flow.mdl-bup31", "phase8.free-duel.mdl-bup31.native-v1",
+            "PSP_GAME/USRDIR/title_menu/title_menu_j.ehp", "mdl_bup31.gim", 3896688, 34000,
+            "65b75fc41086e181aaee5ebcea3cc332098123230739f443884f4ce76d7c0e47", "818ee837a69e775e2039899512cdf97c420879d07c39e1b5031a511760d18a0d",
+            "6b3722d4aea5086ebc0d94282732456e1a9ab9475640007605781a98310f9309", 512, 64),
+        new("free-duel", "title.flow.probrem-tab01", "phase8.free-duel.probrem-tab01.native-v1",
+            "PSP_GAME/USRDIR/title_menu/title_menu_j.ehp", "probrem_tab01.gim", 3966624, 8464,
+            "65b75fc41086e181aaee5ebcea3cc332098123230739f443884f4ce76d7c0e47", "235579cdab0e1fe3162d55e03588d75c4f5e0fb1379a84b1f8273f996f148dc1",
+            "3d30348d84ad40d2fc895aad7083392e351a8746692ed3643f384236f119c249", 128, 128),
+        new("free-duel", "title.flow.parts", "phase8.free-duel.parts.native-v1",
+            "PSP_GAME/USRDIR/database/charalist.ehp", "parts.gim", 3044000, 34000,
+            "4bd8e2e3006c6dea19f3634a5d8564b94a375b9eb9c2b2fa4de8502d35903ea5", "ce4e394a10ba2154efa5346f1d05f0def9e5717980f26c8e1ef3fa8f27772c9f",
+            "829bd7fe20d51740a090ab928a6dff06f20a07e952891bb9108b3f64ea339c45", 256, 128),
+        new("free-duel", "title.flow.sddb-01", "phase8.free-duel.sddb-01.native-v1",
+            "PSP_GAME/USRDIR/database/charalist.ehp", "sddb_01.gim", 3078000, 66768,
+            "4bd8e2e3006c6dea19f3634a5d8564b94a375b9eb9c2b2fa4de8502d35903ea5", "e5ecbf937fdca2334964d24080d79bbf0de228de0638dcb73a4a5a83a7e136ba",
+            "ea960a3e7559a0de681399ad044b5edc96571ff96e2fc61267384e699ebf2050", 256, 256),
+        new("free-duel", "title.flow.sddb-02", "phase8.free-duel.sddb-02.native-v1",
+            "PSP_GAME/USRDIR/database/charalist.ehp", "sddb_02.gim", 3144768, 66768,
+            "4bd8e2e3006c6dea19f3634a5d8564b94a375b9eb9c2b2fa4de8502d35903ea5", "65b9fdde768138cf70ec85f311b60d5956520a3c40c0dfd0bf772b2cf59bc6d1",
+            "8a8983ded36549a161a0fc52f1eda193b012dfb1f09fd65665b9d8ba34dda9db", 256, 256),
+        new("free-duel", "title.flow.sddb-03", "phase8.free-duel.sddb-03.native-v1",
+            "PSP_GAME/USRDIR/database/charalist.ehp", "sddb_03.gim", 3211536, 66768,
+            "4bd8e2e3006c6dea19f3634a5d8564b94a375b9eb9c2b2fa4de8502d35903ea5", "7d34f963e89088f16ad920af05e7a22ec8f6f368325b78c5d2298047ba1a434c",
+            "212f42209ad36ab021c65ec0b5a83992bd804d2fa3a08018462095113241b03a", 256, 256),
+        new("free-duel", "title.flow.sddb-04", "phase8.free-duel.sddb-04.native-v1",
+            "PSP_GAME/USRDIR/database/charalist.ehp", "sddb_04.gim", 3278304, 66768,
+            "4bd8e2e3006c6dea19f3634a5d8564b94a375b9eb9c2b2fa4de8502d35903ea5", "892149166500bce1f6bb0f2b2c3ee2ef4eeca400c13629cae020340eaf6d3f3d",
+            "7043e3a5cd2181928aee5e6983b46b999904f62ab5fe7c7d862a04e53722dc0e", 256, 256),
+        new("free-duel", "title.flow.sddb-05", "phase8.free-duel.sddb-05.native-v1",
+            "PSP_GAME/USRDIR/database/charalist.ehp", "sddb_05.gim", 3345072, 66768,
+            "4bd8e2e3006c6dea19f3634a5d8564b94a375b9eb9c2b2fa4de8502d35903ea5", "f9561df6bb1ccd960e52e1dbff7f5d6d4844574341d20fdb2a1b60902d1b8deb",
+            "4dc4f16eeabfa46fe22eb4bc50895104f368b137c6920979cd87a6bd555f96f4", 256, 256)
     });
 }

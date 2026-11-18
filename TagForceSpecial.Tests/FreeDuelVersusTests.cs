@@ -6,7 +6,7 @@ namespace TagForceSpecial.Tests;
 public sealed class FreeDuelVersusTests
 {
     private static void Tap(FreeDuelSession s, InputAction action) => s.Handle(new(action, action));
-    private static bool TapVersus(FreeDuelVersusSession s, InputAction action) => s.Handle(new(action, action));
+    private static FreeDuelVersusSession.Outcome TapVersus(FreeDuelVersusSession s, InputAction action) => s.Handle(new(action, action));
 
     private static FreeDuelSession AtVersus()
     {
@@ -40,17 +40,20 @@ public sealed class FreeDuelVersusTests
     }
 
     [Theory]
-    [InlineData(0, true)]
-    [InlineData(1, false)]
-    [InlineData(2, true)]
-    [InlineData(3, false)]
-    public void SquareOnlyActsOnTheOpponentNameAndThePlayerDeck(int downs, bool notice)
+    [InlineData(0, FreeDuelVersusSession.Outcome.RandomCharacter, false)]
+    [InlineData(1, FreeDuelVersusSession.Outcome.None, false)]
+    [InlineData(2, FreeDuelVersusSession.Outcome.None, true)]
+    [InlineData(3, FreeDuelVersusSession.Outcome.None, false)]
+    public void SquarePicksARandomCharacterOnTheNameAndShowsANoticeOnThePlayerDeck(int downs, FreeDuelVersusSession.Outcome expected, bool notice)
     {
         var v = new FreeDuelVersusSession();
         for (int i = 0; i < downs; i++) TapVersus(v, InputAction.Down);
-        TapVersus(v, InputAction.Switch);
+        Assert.Equal(expected, TapVersus(v, InputAction.Switch));
         Assert.Equal(notice, v.NoticeOpen);
     }
+
+    [Fact]
+    public void ConfirmOnTheOpponentNameOpensThePicker() => Assert.Equal(FreeDuelVersusSession.Outcome.OpenPicker, TapVersus(new FreeDuelVersusSession(), InputAction.Confirm));
 
     [Fact]
     public void ConfirmShowsANoticeThatKeepsFocusAndBackReturnsToTheResetFirstStep()

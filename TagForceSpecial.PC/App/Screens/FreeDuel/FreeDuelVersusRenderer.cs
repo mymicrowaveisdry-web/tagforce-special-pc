@@ -7,14 +7,13 @@ namespace TagForceSpecial.PC.App.Screens.FreeDuel;
 
 /// <summary>Draws the Normal Duel VERSUS screen from its measured profile into the Free Duel layer. Owner decision (18 Nov 2026): the
 /// opponent's deck slot names the PC's own deck, labelled as such; the opponent character's name and portrait imply no character AI.</summary>
-public sealed class FreeDuelVersusRenderer(GraphicsDevice device, TitleFlowVisuals visuals, FreeDuelVersusProfile profile)
+public sealed class FreeDuelVersusRenderer(GraphicsDevice device, TitleFlowVisuals visuals, FreeDuelVersusProfile profile, FreeDuelPickerProfile roster)
 {
     /// <summary>PC-authored label of the deck the deterministic PC opponent plays (the INITIAL PREVIEW deck).</summary>
     public static string PcDeckLabel => "PC: " + Effects.InitialOpponentDecks.Names[0];
     public FreeDuelVersusProfile Profile => profile;
     public IReadOnlyList<string> Gaps { get; } = Array.AsReadOnly(new[]
     {
-        "default opponent fixed to the measured Aki Izayoi until the character picker exists",
         "VERSUS streak drawn at its measured pose (its animation is not measured)",
         "the □ glyph in the hint is not in the Latin card font"
     });
@@ -33,7 +32,7 @@ public sealed class FreeDuelVersusRenderer(GraphicsDevice device, TitleFlowVisua
         Draw(start ? p.StartActive : p.StartIdle);
         string lp = session.Settings.Settings!.StartingLifePoints.ToString("00000", CultureInfo.InvariantCulture);
         Draw(p.PlayerPortrait); visuals.DrawFlow(p.PlayerBust); visuals.DrawFlow(p.PlayerLpBadge); Digits(p.PlayerLpDigits, lp);
-        Draw(p.OpponentPortrait); visuals.DrawFlow(p.OpponentBust with { Uv = p.DefaultOpponent.BustUv }); visuals.DrawFlow(p.OpponentLpBadge);
+        Draw(p.OpponentPortrait); visuals.DrawFlow(Bust(p.OpponentBust, roster.Characters[session.Opponent].Bust)); visuals.DrawFlow(p.OpponentLpBadge);
         Digits(p.OpponentLpDigits, lp);
         Draw(p.PlayerNamePanel); Draw(p.OpponentNamePanel); Draw(p.PlayerDeckPanel); Draw(p.OpponentDeckPanel);
         switch (versus.Focus)
@@ -42,7 +41,7 @@ public sealed class FreeDuelVersusRenderer(GraphicsDevice device, TitleFlowVisua
             case FreeDuelVersusFocus.OpponentDeck: Draw(p.Focus.OpponentDeck); break;
             case FreeDuelVersusFocus.PlayerDeck: Draw(p.Focus.PlayerDeck); break;
         }
-        Line(Text(p.DefaultOpponent.Name), t.OpponentName);
+        Line(Text(roster.Characters[session.Opponent].Name), t.OpponentName);
         Line(PcDeckLabel, t.OpponentDeck);
         Line(session.PlayerName, t.PlayerName);
         Line(session.PlayerDeck, t.PlayerDeck);
@@ -56,11 +55,24 @@ public sealed class FreeDuelVersusRenderer(GraphicsDevice device, TitleFlowVisua
     /// <summary>Title of the PC notice: the focused part's own text.</summary>
     public string NoticeTitle(FreeDuelSession session) => session.Versus!.Focus switch
     {
-        FreeDuelVersusFocus.OpponentName => Text(profile.DefaultOpponent.Name),
+        FreeDuelVersusFocus.OpponentName => Text(roster.Characters[session.Opponent].Name),
         FreeDuelVersusFocus.OpponentDeck => PcDeckLabel,
         FreeDuelVersusFocus.PlayerDeck => session.PlayerDeck,
         _ => Text(new(profile.Text.Start.Source, profile.Text.Start.Offset, profile.Text.Start.Start, profile.Text.Start.Chars))
     };
+
+    /// <summary>Measured: busts are 64-pixel cells, 8 per row, 64 per atlas mdl_bup01 / 11 / 21 / 31 (Aki 16, Rinko Aomi 184, Mai Zenba 196 checked).</summary>
+    private static FlowDraw Bust(FlowDraw d, int bust)
+    {
+        int atlas = bust / 64, cell = bust % 64;
+        float height = atlas == 3 ? 64 : 512; // mdl_bup31 is 512 x 64 (one row); the others 512 x 512
+        float u0 = cell % 8 / 8f, v0 = cell / 8 * 64 / height, minU = d.Uv.Min(q => q[0]), minV = d.Uv.Min(q => q[1]);
+        return d with
+        {
+            AssetKey = $"title.flow.mdl-bup{atlas}1",
+            Uv = d.Uv.Select(q => new[] { q[0] - minU + u0, (q[1] - minV) * 512 / height + v0 }).ToArray()
+        };
+    }
 
     private void Digits(FlowDraw[] cells, string value)
     {

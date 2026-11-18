@@ -136,7 +136,14 @@ public sealed partial class GameLoop
         Press(Keys.Enter, F("Confirm", 0)); Press(Keys.Escape, F("Music", 6, 1)); Press(Keys.Enter, F("Confirm", 0));
         // VERSUS: Down cycle, Up, Right/Left to and from Start Duel, notices on Start Duel and □ on the player's deck, Back to the reset first step.
         static string V(string focus, bool notice = false) => $"FreeDuelVs/{focus}{(notice ? "/N" : "")}";
-        Press(Keys.Enter, V("OpponentName")); Press(Keys.Down, V("OpponentDeck")); Press(Keys.Down, V("PlayerDeck")); Press(Keys.Down, V("Start"));
+        Press(Keys.Enter, V("OpponentName"));
+        // Character picker: opens on Aki (5D's, No.076 on top), Down, Right = next page, E/Q tabs with each tab's own cursor, Q wraps through GX,
+        // Up wraps to GX's last row, Back cancels (still Aki), then a pick of Jack Atlas.
+        static string K(int series, int focus, int top) => $"FreeDuelPick/{series}/{focus}/{top}";
+        Press(Keys.Enter, K(3, 1, 1)); Press(Keys.Down, K(3, 2, 1)); Press(Keys.Right, K(3, 5, 5)); Press(Keys.E, K(4, 0, 0)); Press(Keys.Q, K(3, 5, 5));
+        Press(Keys.Q, K(2, 0, 0)); Press(Keys.Up, K(2, 32, 29)); Press(Keys.Escape, V("OpponentName"));
+        Press(Keys.Enter, K(3, 1, 1)); Press(Keys.Down, K(3, 2, 1)); Press(Keys.Enter, V("OpponentName"));
+        Press(Keys.Down, V("OpponentDeck")); Press(Keys.Down, V("PlayerDeck")); Press(Keys.Down, V("Start"));
         Press(Keys.Down, V("OpponentName")); Press(Keys.Up, V("Start")); Press(Keys.Left, V("OpponentName")); Press(Keys.Right, V("Start"));
         Press(Keys.Enter, V("Start", true)); Press(Keys.Escape, V("Start")); Press(Keys.Up, V("PlayerDeck"));
         Press(Keys.Space, V("PlayerDeck", true)); Press(Keys.Enter, V("PlayerDeck")); Press(Keys.Escape, F("Format", 0));
@@ -312,6 +319,8 @@ public sealed partial class GameLoop
             $"Recipe/{recipes.Kind}/{recipes.Cursor}/{recipes.Modal}/{recipes.Sort}/{recipes.Inverse}",
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.DeckEdit, DeckEdit: { } edit } =>
             $"DeckEdit/{edit.Tab}/{edit.Cursor}/{edit.Prompt}/{edit.PromptFocus}/{MenuState(edit.Menus)}/{edit.Count(DeckEditTab.Deck)}/{edit.Count(DeckEditTab.Trunk)}",
+        ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.FreeDuelSettings, FreeDuel: { Picker: { } pick } } =>
+            $"FreeDuelPick/{pick.Series}/{pick.Focus}/{pick.Top}",
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.FreeDuelSettings, FreeDuel: { Versus: { } vs } } =>
             $"FreeDuelVs/{vs.Focus}{(vs.NoticeOpen ? "/N" : "")}",
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.FreeDuelSettings, FreeDuel: { Settings: var fd } } =>
