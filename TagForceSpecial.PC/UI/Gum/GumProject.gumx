@@ -34,6 +34,7 @@
   <ScreenReference Name="OriginalOptions" />
   <ScreenReference Name="OriginalDeckMenu" />
   <ScreenReference Name="OriginalDatabaseMenu" />
+  <ScreenReference Name="OriginalCardAlbum" />
   <ScreenReference Name="OriginalDeckEdit" />
   <ScreenReference Name="OriginalRecipeViewer" />
   <ScreenReference Name="OriginalFreeDuel" />

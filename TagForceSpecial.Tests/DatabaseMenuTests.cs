@@ -118,7 +118,7 @@ public class DatabaseMenuTests
             DatabaseMenuDestinations.All.Select(d => d.Label));
         Assert.All(DatabaseMenuDestinations.All, d =>
         {
-            Assert.Equal(MainMenuDestinations.SurfaceOnly, d.Status);
+            Assert.Equal(d.Id == "card-album" ? DatabaseMenuDestinations.CardAlbumStatus : MainMenuDestinations.SurfaceOnly, d.Status);
             Assert.False(string.IsNullOrWhiteSpace(d.Notice));
             Assert.False(string.IsNullOrWhiteSpace(d.OriginalBehavior));
             Assert.False(string.IsNullOrWhiteSpace(d.OriginalReturn));

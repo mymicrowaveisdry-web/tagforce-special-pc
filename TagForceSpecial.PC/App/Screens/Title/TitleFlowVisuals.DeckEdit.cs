@@ -54,7 +54,31 @@ public sealed partial class TitleFlowVisuals
         if (textures.TryGetValue(key, out var existing)) return existing;
         // Thumbnails are decoded from the disc slot but not pixel-verified; a card without one shows no art.
         try { var texture = deckAssets!.ResolveUnverified(key).Texture; textures.AddBorrowed(key, texture); return texture; }
-        catch (Exception e) when (e is KeyNotFoundException or InvalidDataException) { return null; }
+        catch (Exception e) when (e is KeyNotFoundException or InvalidDataException) { return StoredThumbnail(cardId, key); }
+    }
+
+    private Dictionary<uint, (long Offset, long Bytes)>? storedThumbnailSlots;
+    private byte[]? storedThumbnails;
+
+    /// <summary>Any card's thumbnail from the stored cardh_j.cip, when the import holds it (the Card Album needs every card, not only the pool).</summary>
+    private Texture2D? StoredThumbnail(uint cardId, string key)
+    {
+        try
+        {
+            if (storedThumbnails is null)
+            {
+                storedThumbnails = deckAssets!.ResolveBytes(Assets.Presentation.CardAlbumResources.ArtKey);
+                using var stream = new MemoryStream(storedThumbnails, writable: false);
+                storedThumbnailSlots = new Assets.CardImageIndexReader().ReadIndex(stream).Entries.ToDictionary(e => e.CardId, e => (e.Offset, e.StoredSlotBytes));
+            }
+        }
+        catch (Exception e) when (e is KeyNotFoundException or InvalidDataException) { storedThumbnails = []; storedThumbnailSlots = []; }
+        if (!storedThumbnailSlots!.TryGetValue(cardId, out var slot)) return null;
+        var decoded = Assets.Presentation.CardThumbnailDecoder.Decode(storedThumbnails!.AsSpan(checked((int)slot.Offset), checked((int)slot.Bytes)));
+        var texture = new Texture2D(device, decoded.Width, decoded.Height);
+        texture.SetData(decoded.Rgba);
+        textures.AddOwned(key, texture);
+        return texture;
     }
 
     private static FlowDraw Shifted(FlowDraw draw, float dx, float dy) =>
@@ -152,13 +176,22 @@ public sealed partial class TitleFlowVisuals
     private void DrawPreview(CardDefinition card)
     {
         var p = DeckEditProfile;
-        var c = p.Card;
-        ComposeCard(card);
-        // The composed card is shown unscaled at the recorded composite box.
-        DrawQuad(cardLayer, new(c.Composite[0], c.Composite[1], c.Composite[2], c.Composite[3], 0, 0,
-            (c.Composite[2] - c.Composite[0]) / c.BufferWidth, (c.Composite[3] - c.Composite[1]) / c.BufferHeight, [255, 255, 255, 255], false), 0, 0, false);
+        DrawCardComposite(card);
         foreach (var draw in p.Preview.Statics) DrawMeasured(draw);
-        var f = p.Fields;
+        DrawCardStats(card);
+        // Name (cyan) then card text (white). The bracketed type line (green) needs type names not yet mapped from source; omitted.
+        var lines = p.Fields.PreviewLines;
+        var wrapped = Wrap(card.Name, lines.Width, lines.ScaleX).Select(l => (l, lines.NameColor))
+            .Concat(Wrap(card.Description, lines.Width, lines.ScaleX).Select(l => (l, lines.TextColor))).ToList();
+        int fit = (int)((272 - lines.FirstY) / lines.LineHeight);
+        for (int i = 0; i < Math.Min(fit, wrapped.Count); i++)
+            DrawLine(wrapped[i].l, lines.X, lines.FirstY + i * lines.LineHeight, lines.ScaleX, lines.ScaleY, wrapped[i].Item2, lines.ShadowAlpha);
+    }
+
+    /// <summary>The monster ATK/DEF line on the strip under the preview card (the same place in Deck Edit and the Card Album).</summary>
+    public void DrawCardStats(CardDefinition card)
+    {
+        var f = DeckEditProfile.Fields;
         if (card.Codes?.RawKind is not (13 or 14) && card.Statistics is { } stats)
         {
             string slash = DeckText(f.PreviewSlash);
@@ -167,13 +200,15 @@ public sealed partial class TitleFlowVisuals
             DrawField(f.PreviewDefenseLabel, DeckText(f.PreviewDefenseLabel.Source!) + slash);
             DrawField(f.PreviewDefense, Stat(stats.Defense));
         }
-        // Name (cyan) then card text (white). The bracketed type line (green) needs type names not yet mapped from source; omitted.
-        var lines = p.Fields.PreviewLines;
-        var wrapped = Wrap(card.Name, lines.Width, lines.ScaleX).Select(l => (l, lines.NameColor))
-            .Concat(Wrap(card.Description, lines.Width, lines.ScaleX).Select(l => (l, lines.TextColor))).ToList();
-        int fit = (int)((272 - lines.FirstY) / lines.LineHeight);
-        for (int i = 0; i < Math.Min(fit, wrapped.Count); i++)
-            DrawLine(wrapped[i].l, lines.X, lines.FirstY + i * lines.LineHeight, lines.ScaleX, lines.ScaleY, wrapped[i].Item2, lines.ShadowAlpha);
+    }
+
+    /// <summary>Composes the preview card and shows it unscaled at the recorded composite box (the same in Deck Edit and the Card Album).</summary>
+    public void DrawCardComposite(CardDefinition card)
+    {
+        var c = DeckEditProfile.Card;
+        ComposeCard(card);
+        DrawQuad(cardLayer, new(c.Composite[0], c.Composite[1], c.Composite[2], c.Composite[3], 0, 0,
+            (c.Composite[2] - c.Composite[0]) / c.BufferWidth, (c.Composite[3] - c.Composite[1]) / c.BufferHeight, [255, 255, 255, 255], false), 0, 0, false);
     }
 
     /// <summary>Draws the preview card into its offscreen buffer in card coordinates, as the original does before showing it.</summary>

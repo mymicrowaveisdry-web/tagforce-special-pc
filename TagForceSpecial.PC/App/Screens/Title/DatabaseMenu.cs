@@ -5,13 +5,14 @@ namespace TagForceSpecial.PC.App.Screens.Title;
 public static class DatabaseMenuDestinations
 {
     private const string NotBuilt = "This screen has not been recreated in the PC version yet.";
+    public const string CardAlbumStatus = "original Card Album binder, controls and preview from a private captured package (--album-reference); without it the PC notice shows; card detail, Page Jump overlay, type line and panel icons not recreated yet";
 
     public static IReadOnlyList<SubmenuDestination> All { get; } = Array.AsReadOnly(new SubmenuDestination[]
     {
         new("list-of-duelists", "List of Duelists", MainMenuDestinations.SurfaceOnly,
             "Duelist list grouped by series tabs (DM, GX, 5D's, ZEXAL, ARC-V) with per-duelist records",
             "Back returns here with List of Duelists focused", "not scheduled", NotBuilt),
-        new("card-album", "Card Album", MainMenuDestinations.SurfaceOnly,
+        new("card-album", "Card Album", CardAlbumStatus,
             "Binder of every card except Tokens in name order, 3x3 pockets per page; unowned cards show an empty pocket",
             "Back fades out and returns here with Card Album focused", "Phase 7", NotBuilt),
         new("photo-gallery", "Photo Gallery", MainMenuDestinations.SurfaceOnly,

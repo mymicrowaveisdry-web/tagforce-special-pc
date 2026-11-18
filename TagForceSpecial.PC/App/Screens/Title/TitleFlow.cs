@@ -9,7 +9,7 @@ public enum TitleFlowStep
     RulesQuestion, ConfidenceQuestion, DuelistLevel, CreateQuestion, SystemSavePrompt, SystemSaveDone,
     MainMenu, MainMenuUnavailable, QuitQuestion, ExitToTitle,
     Options, OptionsSaveQuestion,
-    DeckMenu, DeckEdit, RecipeViewer, DatabaseMenu
+    DeckMenu, DeckEdit, RecipeViewer, DatabaseMenu, CardAlbum
 }
 
 public enum DuelistLevelChoice { FirstTimer, BeenThere, BringItOn }
@@ -31,6 +31,7 @@ public interface ITitleFlowHost
     void SaveDeckEdit(DeckEditSession session) { }
     RecipeViewerSession? OpenRecipeViewer() => null;
     void CloseRecipeViewer(RecipeSelection? selection) { }
+    Album.CardAlbumSession? OpenCardAlbum() => null;
 }
 
 /// <summary>Observed Continue/New Game routes (config/reference/title-flow.json) and Main Menu/Options/Deck Menu routes (main-menu.json,
@@ -43,6 +44,7 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
     private TimeSpan? sinceSubmenuClosed;
     private DeckEditSession? pendingDeckEdit;
     private RecipeViewerSession? pendingRecipes;
+    private Album.CardAlbumSession? pendingAlbum;
     private int returnSubmenuFocus;
     private bool submenuSettled;
     public const int NameLimit = 8;
@@ -87,6 +89,8 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
     /// <summary>The Deck Edit core screen while <see cref="TitleFlowStep.DeckEdit"/> is active.</summary>
     public DeckEditSession? DeckEdit { get; private set; }
     public RecipeViewerSession? Recipes { get; private set; }
+    /// <summary>The Card Album while <see cref="TitleFlowStep.CardAlbum"/> is active.</summary>
+    public Album.CardAlbumSession? CardAlbum { get; private set; }
     /// <summary>Measured: the Main Menu is dimmed, without focus, for as long as the submenu is drawn, including its close frames.</summary>
     public bool MainMenuDimmed => Step is TitleFlowStep.DeckMenu or TitleFlowStep.DatabaseMenu;
     /// <summary>Game frames since the Main Menu focus reappeared after the submenu closed; measured, its pulse restarts there.
@@ -131,6 +135,7 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
     {
         menuClock += delta;
         if (sinceSubmenuClosed is { } since) sinceSubmenuClosed = since + delta;
+        if (Step == TitleFlowStep.CardAlbum) { CardAlbum?.Update(delta); return; }
         if (Submenu is { } submenu)
         {
             submenu.Update(delta);
@@ -182,6 +187,13 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
         if (Step == TitleFlowStep.Options) { HandleOptions(input); return; }
         if (Submenu is not null) { HandleSubmenu(input); return; }
         if (Step == TitleFlowStep.DeckEdit) { HandleDeckEdit(input); return; }
+        if (Step == TitleFlowStep.CardAlbum)
+        {
+            // Measured: Back fades out and returns to the Database submenu with Card Album focused.
+            if (CardAlbum!.Handle(input) == Album.CardAlbumOutcome.Close)
+            { submenuSettled = true; returnSubmenuFocus = 1; EnterFaded(TitleFlowStep.DatabaseMenu, keepMenuFocus: true, lead: 0); }
+            return;
+        }
         if (Step == TitleFlowStep.RecipeViewer)
         {
             if (Recipes!.Handle(input))
@@ -231,7 +243,13 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
         var menu = Submenu!;
         var outcome = menu.Handle(input);
         if (outcome == SubmenuOutcome.Closing && instantTransitions) ReturnFromSubmenu();
-        if (outcome != SubmenuOutcome.Notice || menu.Kind != SubmenuKind.Deck) return;
+        if (outcome != SubmenuOutcome.Notice) return;
+        if (menu.Kind == SubmenuKind.Database)
+        {
+            if (menu.Focused.Id == "card-album" && host.OpenCardAlbum() is { } album)
+            { menu.CloseNotice(); pendingAlbum = album; EnterFaded(TitleFlowStep.CardAlbum, keepMenuFocus: true, lead: 0); }
+            return;
+        }
         // Deck Edit is recreated; its row opens the screen when the host can build a session, and otherwise keeps the PC notice.
         if (menu.Focused.Id == "deck-edit" && host.OpenDeckEdit() is { } session)
         {
@@ -406,6 +424,8 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
         pendingDeckEdit = null;
         Recipes = next == TitleFlowStep.RecipeViewer ? pendingRecipes : null;
         pendingRecipes = null;
+        CardAlbum = next == TitleFlowStep.CardAlbum ? pendingAlbum : null;
+        pendingAlbum = null;
         sinceSubmenuClosed = null;
     }
 

@@ -1,0 +1,76 @@
+namespace TagForceSpecial.Assets.Presentation;
+
+/// <summary>Generated pins (analysis/reconstruction/phase7_pins.py): database/cardalbum.ehp textures whose decoded pixels equal the
+/// textures the original Card Album uploads (Phase 7 GE dumps). Pixels only; layout and geometry are measured separately.</summary>
+public static class CardAlbumReferenceResources
+{
+    public const string Archive = CardAlbumResources.Archive;
+    public const string ArchiveSha256 = "b696abefb9caefb49b3ba8c652425eda25b0049ec101e008abb089a9add4e592";
+
+    public static IReadOnlyList<PresentationReferenceCase> Cases { get; } = Array.AsReadOnly(new PresentationReferenceCase[]
+    {
+        new("card-album", "album.binder.album-cursor", "phase7.card-album.album-cursor.native-v1",
+            Archive, "album_cursor.gim", 76144, 8464, ArchiveSha256,
+            "283da52329c2219bfe91484bc221b5ff830ca52178c12ed95a7d88b791d3fda0", "f5971b16655c77b4fbca6390ddaa900206f53e4d55c27640bc579e3a5d26b570", 128, 128),
+        new("card-album", "album.binder.cover-size-green", "phase7.card-album.cover-size-green.native-v1",
+            Archive, "cover_size_green.gim", 272208, 66768, ArchiveSha256,
+            "fe7d0a60fcdd27f50495da3afb297e43214643d8e0345e161d3cb993b882820b", "442fa4501eafd876e7f04dfc5b3de147df36c19c0a5d27a9d90ecb0018a83a4c", 256, 256),
+        new("card-album", "album.binder.dmy-card00", "phase7.card-album.dmy-card00.native-v1",
+            Archive, "dmy_card00.gim", 347440, 5328, ArchiveSha256,
+            "d24019eeb051967f9bb239c2924b69379e8b5c8874ed07fa814eb27362c5aa5a", "f79c4d022d7c17dc7af1b02d380c9612117cb9d2d913cfd69390b170e7ae47bc", 64, 64),
+        new("card-album", "album.binder.dmy-card01", "phase7.card-album.dmy-card01.native-v1",
+            Archive, "dmy_card01.gim", 352768, 2320, ArchiveSha256,
+            "fa1bf5432f24185f2b4d5b506a1d900f7ec8cbdd01ef550f853237ea6800a399", "02b6f422c0010ff58d142c0cb6b71299bfc9655aad39cde43e8cd9cafc9c46dc", 64, 64),
+        new("card-album", "album.binder.dmy-card02", "phase7.card-album.dmy-card02.native-v1",
+            Archive, "dmy_card02.gim", 355088, 2320, ArchiveSha256,
+            "2674d776b2e4eefd0f18b888fae415d3987b85c02f6d36067e4d05293f7d4455", "97bf15ce96773882a16dbd48ea4bcc263d1a44e0705b5736a4f5f47f749f362b", 64, 64),
+        new("card-album", "album.binder.kankyou", "phase7.card-album.kankyou.native-v1",
+            Archive, "kankyou.gim", 697200, 5328, ArchiveSha256,
+            "15e83a5759a594b968a518c26b16cfc1c4ca3fcbb254b0473e8c9e1c8e013411", "b4cb5249eb5c9b27474779f31e25d572cedb75b2d5300ea46f45bf6387109c30", 64, 64),
+        new("card-album", "album.binder.sheet01", "phase7.card-album.sheet01.native-v1",
+            Archive, "sheet01.gim", 777504, 8464, ArchiveSha256,
+            "8b36ee2eb5878758a6c2eacedf5fa376b5d113b19ac10db49104f955e9f63985", "1d65677b2b1ad62750d29f916ec5927054ba35a621943388f22a1508a64f0cae", 128, 128),
+        new("card-album", "album.ui.bg", "phase7.card-album.bg.native-v1",
+            Archive, "bg.gim", 139632, 65808, ArchiveSha256,
+            "e66e90173bb50d73c9bc3f7d1ea842a6c0cffe3b22c63640b9121b1e5d478638", "b2f2f3481d644903f086693801747eecb5db8cffb589dd1237208d3b21eb227d", 512, 256),
+        new("card-album", "album.ui.hand", "phase7.card-album.hand.native-v1",
+            Archive, "hand.gim", 424928, 16656, ArchiveSha256,
+            "6957adb56a7a5a92eff5983d35caf5a79b5ced8efac57394adffe8495af947c1", "4468083d075ec918d42c140fb7d6ad2a818bdb6bc60db376a56bee4aec379680", 128, 256),
+        new("card-album", "album.ui.misc", "phase7.card-album.misc.native-v1",
+            Archive, "misc.gim", 709216, 2320, ArchiveSha256,
+            "095fb7d322bcf47c5990746659a8bcf8442b648f8c7745b708a39dd0b2382e2a", "21d736c490af7dfdc60e25e8582de1695d672dd40c35463261f47006abca739b", 64, 64),
+        new("card-album", "album.ui.skipmenu0001", "phase7.card-album.skipmenu0001.native-v1",
+            Archive, "skipmenu0001.gim", 800000, 400, ArchiveSha256,
+            "7efe3e29b0f171536267f05af42aacf3b70335239e82824cfe34d7ecfbae8539", "993419ddb3d20512e9600a899da710cdc990d0c5927678d6e2bd41d8f97eb5e2", 8, 8),
+        new("card-album", "album.ui.skipmenu0002", "phase7.card-album.skipmenu0002.native-v1",
+            Archive, "skipmenu0002.gim", 800400, 784, ArchiveSha256,
+            "66dd2c5d07c32f22074feea305031b9bc1f1e247427f4a26a1d1cf63b2a070a1", "f2434c9c32cdea56cae233e8f293586208e1aaab58e6cb324707ed43d588c95c", 16, 32),
+        new("card-album", "album.ui.skipmenu0003", "phase7.card-album.skipmenu0003.native-v1",
+            Archive, "skipmenu0003.gim", 801184, 784, ArchiveSha256,
+            "55f7eb5352e4d9c2fd285a5feed6b3b5505bfd5aabf26c3d54806f36879cc605", "5fc1d3d7a42bbe7f4599179d5bb7f6a4be54ab646e5607d0dc79342cff34cdd4", 16, 32),
+        new("card-album", "album.ui.skipmenu0004", "phase7.card-album.skipmenu0004.native-v1",
+            Archive, "skipmenu0004.gim", 801968, 2320, ArchiveSha256,
+            "d7130366f81077e15d641c921b4f691d73cf81ec90f0cfcd4c433d52ce2776a2", "78a7c7c2f7805b4fdbea6fb6efd59b6cfc5822ffd0043b2c9de09b5fe4c8ee90", 128, 32),
+        new("card-album", "album.ui.skipmenu0005", "phase7.card-album.skipmenu0005.native-v1",
+            Archive, "skipmenu0005.gim", 804288, 784, ArchiveSha256,
+            "6a59844d9a9cdc297a41753134f064af8ae0ce99e5139fedecd78ec4e1ab1f24", "442108d8770214f9db4946c02f66d52e677fb9db7059b8e67e4b2adc12da0d2f", 32, 32),
+        new("card-album", "album.ui.skipmenu0006", "phase7.card-album.skipmenu0006.native-v1",
+            Archive, "skipmenu0006.gim", 805072, 784, ArchiveSha256,
+            "a0a7794b66c6862ef20d13958eaf8c6e5f8b9c5a2938b01fb32f78e42c43286c", "e692f2294770618efd7749feaf873b1f15fdf35203c21c8cb5a073cfc29479ee", 16, 32),
+        new("card-album", "album.ui.skipmenu0007", "phase7.card-album.skipmenu0007.native-v1",
+            Archive, "skipmenu0007.gim", 805856, 784, ArchiveSha256,
+            "2a145f05cc3108fdf3dd4d51b8f12a848bcebf274ea18a7c54f579061c921536", "ecf007f029a95d79d6e56b53b2d14b562380afec5f08a131de2c49050b9e25d3", 16, 32),
+        new("card-album", "album.ui.skipmenu0008", "phase7.card-album.skipmenu0008.native-v1",
+            Archive, "skipmenu0008.gim", 806640, 400, ArchiveSha256,
+            "32bf409a7dda9fa79e8eb9e6b839229ca9048a84a1ed63559f23e53e40409df7", "e86e729be29c0f8af54f518ead9935719a065ae05998cc02e37144c636f53da3", 8, 8),
+        new("card-album", "album.ui.skipmenu0010", "phase7.card-album.skipmenu0010.native-v1",
+            Archive, "skipmenu0010.gim", 807040, 784, ArchiveSha256,
+            "32178271839a526e939dfe73d8162106a63e96bedde49b6db3f774d21fcd879e", "c7faf4b386394ca7edc417a5e96887c1d5c13bd23aefce10e779e31d207c6e76", 32, 32),
+        new("card-album", "album.ui.skipmenu0012", "phase7.card-album.skipmenu0012.native-v1",
+            Archive, "skipmenu0012.gim", 807824, 784, ArchiveSha256,
+            "2cb82bd946791fb438448bd47a4e218e5d8c636e2613009799efd938c673524e", "634f5cdac965deb412c48f389f3964e021479a41b4d3e58728756a831b0db217", 32, 32),
+        new("card-album", "album.ui.skipmenu0014", "phase7.card-album.skipmenu0014.native-v1",
+            Archive, "skipmenu0014.gim", 808608, 784, ArchiveSha256,
+            "dbdea3ebe826bb18a7625dd56d8e05e3b3e7fdd91c41175f39fb2671372756cb", "3d95efb77f3aadd86493f000ec45ae236988df2ed0c11207b7b505129a89c1df", 32, 32)
+    });
+}

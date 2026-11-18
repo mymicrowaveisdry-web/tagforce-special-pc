@@ -21,7 +21,7 @@ public sealed class GumPresentation : IDisposable
             ?? throw new InvalidDataException("Gum project did not load.");
         gum.CanvasWidth = 480; gum.CanvasHeight = 272;
         // Root order is draw order: the submenus sit over the Main Menu.
-        foreach (string name in new[] { "OriginalTitle", "OriginalTitleStartMenu", "OriginalTitleFlow", "OriginalMainMenu", "OriginalDeckMenu", "OriginalDatabaseMenu", "OriginalDeckEdit", "OriginalRecipeViewer", "OriginalOptions", "NativeToolsMenu", "NativePreferences" })
+        foreach (string name in new[] { "OriginalTitle", "OriginalTitleStartMenu", "OriginalTitleFlow", "OriginalMainMenu", "OriginalDeckMenu", "OriginalDatabaseMenu", "OriginalDeckEdit", "OriginalRecipeViewer", "OriginalCardAlbum", "OriginalOptions", "NativeToolsMenu", "NativePreferences" })
         {
             var root = project.Screens.Single(s => s.Name == name).ToGraphicalUiElement();
             root.Visible = false;
@@ -156,6 +156,9 @@ public sealed class GumPresentation : IDisposable
             Bind(MainMenuSprite(component, "View"), layer, region, true);
         }
     }
+
+    /// <summary>The Card Album is drawn whole into its own layer; Gum only shows it.</summary>
+    public void BindCardAlbum(RenderTarget2D layer) => Bind(MainMenuSprite(roots["OriginalCardAlbum"], "Layer"), layer, new Rectangle(0, 0, 480, 272), true);
 
     public void BindRecipes(RenderTarget2D layer)
     {

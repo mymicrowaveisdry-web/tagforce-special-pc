@@ -23,6 +23,9 @@ public sealed partial class GameLoop
     private int renderedRecipeRevision = -1;
     private RecipeViewerSession? renderedRecipeSession;
     private RecipeSelection? lastRecipeSelection;
+    private App.Screens.Album.CardAlbumScreen? cardAlbumScreen;
+    private App.Screens.Album.CardAlbumSession? renderedAlbumSession;
+    private int renderedAlbumRevision = -1;
     private readonly ScreenFade screenFade = new();
 
     /// <summary>The flow is presented only when every source texture and text reference validates.</summary>
@@ -44,6 +47,7 @@ public sealed partial class GameLoop
                 next.RenderOptionsLayers(); next.RenderDialogLayers(); gum.BindOptions(next);
             }
             catch { next.Dispose(); throw; }
+            cardAlbumScreen?.Dispose(); cardAlbumScreen = null;
             flowVisuals?.Dispose();
             flowVisuals = next;
             profiles = new(setup.Storage);
@@ -203,6 +207,18 @@ public sealed partial class GameLoop
         gum.Show("OriginalDatabaseMenu", titleFlow.Submenu?.Kind == SubmenuKind.Database);
         gum.Show("OriginalDeckEdit", false);
         gum.Show("OriginalRecipeViewer", false);
+        gum.Show("OriginalCardAlbum", false);
+        if (titleFlow.Step == TitleFlowStep.CardAlbum && titleFlow.CardAlbum is { } album && cardAlbumScreen is { } albumScreen)
+        {
+            if (!ReferenceEquals(renderedAlbumSession, album) || renderedAlbumRevision != album.Revision)
+            {
+                albumScreen.Renderer.Render(album);
+                gum.BindCardAlbum(albumScreen.Renderer.Layer);
+                renderedAlbumSession = album; renderedAlbumRevision = album.Revision;
+            }
+            gum.Show("OriginalCardAlbum", true);
+            return;
+        }
         if (titleFlow.Step == TitleFlowStep.RecipeViewer && titleFlow.Recipes is { } recipes && setup?.Game is { } recipeCache)
         {
             if (!ReferenceEquals(renderedRecipeSession, recipes) || renderedRecipeRevision != recipes.Revision)
@@ -325,6 +341,14 @@ public sealed partial class GameLoop
             { Console.Error.WriteLine("RECIPE_SOURCE_PENDING " + e.Message); return null; }
         }
         public void CloseRecipeViewer(RecipeSelection? selection) => owner.lastRecipeSelection = selection;
+        /// <summary>The captured binder package comes from --album-reference; the collection from the data root's collection file when present.</summary>
+        public App.Screens.Album.CardAlbumSession? OpenCardAlbum()
+        {
+            if (owner.setup?.Game?.Catalog.Catalog is not { } catalog || owner.flowVisuals is null) return null;
+            owner.cardAlbumScreen ??= App.Screens.Album.CardAlbumScreen.TryCreate(owner.GraphicsDevice, owner.flowVisuals, owner.screenAssets, catalog,
+                owner.options.AlbumReferenceRoot);
+            return owner.cardAlbumScreen?.Open(owner.setup.Storage.PathFor(App.Screens.Album.CardAlbumScreen.CollectionFile));
+        }
         public void SaveDeckEdit(DeckEditSession session)
         {
             if (!owner.options.PresentationSmoke && owner.editor is { } editor && ReferenceEquals(session.Draft, editor.Draft)) editor.Save();
@@ -379,6 +403,7 @@ public sealed partial class GameLoop
             owner.gum.Show("OriginalDatabaseMenu", false);
             owner.gum.Show("OriginalDeckEdit", false);
             owner.gum.Show("OriginalRecipeViewer", false);
+            owner.gum.Show("OriginalCardAlbum", false);
             owner.renderedMenuFrame = -1;
         }
     }

@@ -24,6 +24,7 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
     private SpriteBatch presenter = null!;
     private DuelController? duel;
     private int menuIndex, choiceIndex, inspectIndex = -1, smokeCommands, frames;
+    private int smokeUpdatedFrame = -1;
     private bool captured, capturedResult, savedReplay, smokeFinished;
     private double opponentAt;
     private string setupMessage = "Local game data is required to start a duel.";
@@ -109,6 +110,13 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
 
     protected override void Update(GameTime gameTime)
     {
+        // The presentation smoke scripts input and checks one step per drawn frame; MonoGame's catch-up updates after a slow frame would
+        // advance animations (and repeat a scripted press) without a matching draw, so the smoke simulates exactly one update per draw.
+        if (options.PresentationSmoke)
+        {
+            if (smokeUpdatedFrame == frames) return;
+            smokeUpdatedFrame = frames;
+        }
         PollSetupTask();
         var frame = options.PresentationSmoke ? PresentationSmokeInput()
             : options.RealtimeWalkRoot is not null ? RealtimeWalkInput(gameTime) : PollPlayer();

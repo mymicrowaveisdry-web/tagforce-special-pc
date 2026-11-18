@@ -134,8 +134,47 @@ public sealed partial class TitleFlowVisuals : IDisposable
 
     private string Source(string source, int offset, int start, int chars) => TitleFlowText.Read(source switch
     {
-        "eboot" => eboot, "title-menu" => titleMenu, "deck" => deckArchive, _ => throw new InvalidDataException("Unknown text source.")
+        "eboot" => eboot, "title-menu" => titleMenu, "deck" => deckArchive,
+        "album" => albumArchive ?? throw new InvalidDataException("The Card Album archive is not in this import."),
+        "cardinfo" => cardInfoArchive ?? throw new InvalidDataException("The card info archive is not in this import."),
+        _ => throw new InvalidDataException("Unknown text source.")
     }, offset, start, chars);
+
+    // Helpers other screens (the Card Album) draw with, so they share this layer's textures, font and measured-draw rules.
+    private byte[]? albumArchive, cardInfoArchive;
+
+    /// <summary>Runs <paramref name="draw"/> with <paramref name="target"/> bound, restoring the previous target and default states.</summary>
+    public void Within(RenderTarget2D target, Action draw) => WithTarget(target, draw);
+    public void DrawFlow(FlowDraw draw) => DrawMeasured(draw);
+    public void DrawRun(FlowText run) => DrawMeasuredText(Source(run.Source, run.Offset, run.Start, run.Chars), run);
+    public void DrawText(string value, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha, int alpha = 255) =>
+        DrawLine(value, x, y, scaleX, scaleY, color, shadowAlpha, null, alpha);
+    public float MeasureText(string value, float scaleX) => TextWidth(value, scaleX);
+    public IReadOnlyList<string> WrapText(string text, float width, float scaleX) => Wrap(text, width, scaleX);
+
+    /// <summary>Adds imported textures under their asset keys (pinned to the original uploads) and the archive the album's labels come from.</summary>
+    public void UseAlbumAssets(OriginalScreenAssetResolver assets, IEnumerable<string> keys, string archiveKey, string cardInfoKey)
+    {
+        foreach (string key in keys.Where(k => !textures.ContainsKey(k))) textures.AddBorrowed(key, assets.Resolve(key).Texture);
+        albumArchive ??= assets.ResolveBytes(archiveKey);
+        cardInfoArchive ??= assets.ResolveBytes(cardInfoKey);
+    }
+
+    /// <summary>The whole message at a source offset (UTF-16 up to its terminator), normalized like other source text.</summary>
+    public string Message(string source, int offset)
+    {
+        byte[] blob = source switch { "cardinfo" => cardInfoArchive, "album" => albumArchive, "deck" => deckArchive, "eboot" => eboot, "title-menu" => titleMenu, _ => null }
+            ?? throw new InvalidDataException("Unknown or missing text source " + source + ".");
+        if (offset < 0 || offset >= blob.Length || offset % 2 != 0) throw new InvalidDataException("Invalid text reference.");
+        int end = offset;
+        while (end + 1 < blob.Length && (blob[end] != 0 || blob[end + 1] != 0)) end += 2;
+        return TitleFlowText.Normalize(System.Text.Encoding.Unicode.GetString(blob, offset, end - offset));
+    }
+
+    public Texture2D Texture(string key) => textures[key];
+
+    /// <summary>Adds a measured EBOOT texture (decoded from the stored EBOOT and checked against its recorded pixel hash).</summary>
+    public void UseEbootTexture(FlowEbootTexture source) { if (!textures.ContainsKey(source.Key)) textures.AddEmbedded(source); }
 
     public void Render(string frameId, int buttonFocus = 0, int menuFocus = 0, string? name = null, DuelistLevelChoice level = DuelistLevelChoice.FirstTimer, int? menuBackgroundFrame = null)
     {
