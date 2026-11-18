@@ -36,6 +36,7 @@
     <EmbeddedResource Include="App\Screens\Title\deck-menu-frame.json" />
     <EmbeddedResource Include="App\Screens\Title\database-menu-frame.json" />
     <EmbeddedResource Include="App\Screens\Album\card-album-frame.json" />
+    <EmbeddedResource Include="App\Screens\Album\card-album-detail.json" />
     <EmbeddedResource Include="App\Screens\Title\deck-edit-frame.json" />
     <EmbeddedResource Include="App\Screens\Title\deck-edit-menu-frame.json" />
   </ItemGroup>

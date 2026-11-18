@@ -15,7 +15,8 @@ public sealed partial class GameLoop
     // Built on first use, after setup: Deck Edit is only reachable when the data root holds a card cache.
     private (Keys? Key, string Expected)[]? presentationSteps;
     private (Keys? Key, string Expected)[] PresentationSteps => presentationSteps ??= BuildPresentationSteps(setup?.Game is not null,
-        options.RecipeReferenceRoot is not null || setup?.Game?.RecipeRoot is not null, options.AlbumReferenceRoot is not null && setup?.Game is not null);
+        options.RecipeReferenceRoot is not null || setup?.Game?.RecipeRoot is not null, setup?.Game is not null && (options.AlbumReferenceRoot is not null ||
+            File.Exists(Path.Combine(setup.Storage.PathFor(CardAlbumScreen.ReferenceFolder), CardAlbumBinder.FileName))));
     private readonly Dictionary<int, string> presentationHashes = [];
     private byte[]? presentationPixels;
     private int? presentationTextureCount;
@@ -150,7 +151,9 @@ public sealed partial class GameLoop
         // Mid-turn poses depend on where the press lands in the game-frame clock, so only the settled view is asserted (F2 is ignored).
         void Turn(Keys key, string settled) { press(key, AnyState, AnyState); wait(TurnWait); Press(Keys.F2, settled); }
         Press(Keys.Enter, A(0, "Pocket", true, 0));
-        Press(Keys.Right, A(0, "Pocket", true, 1)); Press(Keys.Right, A(0, "Pocket", true, 2));
+        // Card detail on the first card: Confirm opens it, Right/Left cycle the three tabs (wrapping), Back returns to the same pocket.
+        foreach (var (key, tab) in new[] { (Keys.Enter, 0), (Keys.Right, 1), (Keys.Right, 2), (Keys.Right, 0), (Keys.Left, 2) }) Press(key, A(0, "Pocket", true, 0) + "/D" + tab);
+        Press(Keys.Escape, A(0, "Pocket", true, 0)); Press(Keys.Right, A(0, "Pocket", true, 1)); Press(Keys.Right, A(0, "Pocket", true, 2));
         Press(Keys.Right, A(0, "Edge", true, 2)); Press(Keys.Left, A(0, "Pocket", true, 2));
         Press(Keys.Down, A(0, "Pocket", true, 5)); Press(Keys.Down, A(0, "Pocket", true, 8));
         Press(Keys.Down, A(0, "Bar", true, 8, 3)); Press(Keys.Right, A(0, "Bar", true, 8, 4)); Press(Keys.Up, A(0, "Pocket", true, 8, 4));
@@ -164,6 +167,7 @@ public sealed partial class GameLoop
         // Confirming "A" closes the overlay, plays the arrival and lands on the first "A" card (captured: view 1, left page, pocket 2).
         Press(Keys.Tab, A(0, "Bar", true, 8, 0) + "/J00"); Press(Keys.Right, A(0, "Bar", true, 8, 0) + "/J01");
         Turn(Keys.Enter, A(1, "Pocket", false, 2, 0));
+        Press(Keys.Enter, A(1, "Pocket", false, 2, 0) + "/D0"); Press(Keys.Escape, A(1, "Pocket", false, 2, 0));
         Press(Keys.Escape, $"DatabaseMenu/L/1/{menuRow}");
     }
 
@@ -283,7 +287,7 @@ public sealed partial class GameLoop
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.DeckEdit, DeckEdit: { } edit } =>
             $"DeckEdit/{edit.Tab}/{edit.Cursor}/{edit.Prompt}/{edit.PromptFocus}/{MenuState(edit.Menus)}/{edit.Count(DeckEditTab.Deck)}/{edit.Count(DeckEditTab.Trunk)}",
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.CardAlbum, CardAlbum: { } album } =>
-            $"CardAlbum/{album.View}/{album.Focus}/{(album.RightPage ? "R" : "L")}/{album.Pocket}/{album.BarButton}{(album.JumpOpen ? $"/J{album.JumpRow}{album.JumpColumn}" : "")}",
+            $"CardAlbum/{album.View}/{album.Focus}/{(album.RightPage ? "R" : "L")}/{album.Pocket}/{album.BarButton}{(album.JumpOpen ? $"/J{album.JumpRow}{album.JumpColumn}" : "")}{(album.Detail is { Closing: false } d ? $"/D{(int)d.Tab}" : "")}",
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.DeckMenu or TitleFlowStep.DatabaseMenu, Submenu: { } sub } flow =>
             $"{flow.Step}/{(sub.NoticeOpen ? "N" : "L")}/{sub.Focus}/{flow.MenuFocus}",
         ScreenId.TitleFlow when titleFlow is { } flow => $"{flow.Step}/{flow.ButtonFocus}/{flow.MenuFocus}",

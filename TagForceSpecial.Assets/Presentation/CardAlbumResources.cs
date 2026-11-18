@@ -39,7 +39,9 @@ public static class CardAlbumResources
             ("album.ui.skipmenu0008", "skipmenu0008.gim", null, null, "Bottom bar part"),
             ("album.ui.skipmenu0010", "skipmenu0010.gim", null, null, "Bottom bar part"),
             ("album.ui.skipmenu0012", "skipmenu0012.gim", null, null, "Bottom bar part"),
-            ("album.ui.skipmenu0014", "skipmenu0014.gim", null, null, "Bottom bar part")
+            ("album.ui.skipmenu0014", "skipmenu0014.gim", null, null, "Bottom bar part"),
+            ("album.ui.detail-bg", "detail_bg.gim", null, null, "Card detail background"),
+            ("album.ui.ocglist-j", "ocglist_j.gim", null, null, "Card detail Pack List rows and rarity badges")
         });
 
     /// <summary>Asset key for a binder texture named by its archive member.</summary>

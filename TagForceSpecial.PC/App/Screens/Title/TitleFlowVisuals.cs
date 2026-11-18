@@ -150,6 +150,12 @@ public sealed partial class TitleFlowVisuals : IDisposable
     public void DrawText(string value, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha, int alpha = 255) =>
         DrawLine(value, x, y, scaleX, scaleY, color, shadowAlpha, null, alpha);
     public float MeasureText(string value, float scaleX) => TextWidth(value, scaleX);
+    /// <summary>Text in the card-text font (ltn0), whose advances the card detail uses (measured: 37 of 37 captured characters); the title
+    /// font stands in when it is not imported.</summary>
+    public void DrawCardFontText(string value, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha) =>
+        (cardTextRenderer ?? textRenderer).DrawLine(value, x, y, scaleX, scaleY, color, shadowAlpha);
+    public float MeasureCardFontText(string value, float scaleX) => (cardTextRenderer ?? textRenderer).TextWidth(value, scaleX);
+    public bool HasCardFont => cardTextRenderer is not null;
     public IReadOnlyList<string> WrapText(string text, float width, float scaleX) => Wrap(text, width, scaleX);
 
     /// <summary>Adds imported textures under their asset keys (pinned to the original uploads) and the archive the album's labels come from.</summary>
@@ -172,6 +178,10 @@ public sealed partial class TitleFlowVisuals : IDisposable
     }
 
     public Texture2D Texture(string key) => textures[key];
+
+    /// <summary>The stored original bytes behind a text source ("eboot", "cardinfo"), for readers of other data in the same files.</summary>
+    public byte[] SourceBytes(string source) => source switch { "eboot" => eboot, "cardinfo" => cardInfoArchive, _ => null }
+        ?? throw new InvalidDataException("Unknown or missing source " + source + ".");
 
     /// <summary>Adds a measured EBOOT texture (decoded from the stored EBOOT and checked against its recorded pixel hash).</summary>
     public void UseEbootTexture(FlowEbootTexture source) { if (!textures.ContainsKey(source.Key)) textures.AddEmbedded(source); }

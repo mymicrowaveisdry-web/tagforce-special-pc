@@ -341,13 +341,22 @@ public sealed partial class GameLoop
             { Console.Error.WriteLine("RECIPE_SOURCE_PENDING " + e.Message); return null; }
         }
         public void CloseRecipeViewer(RecipeSelection? selection) => owner.lastRecipeSelection = selection;
-        /// <summary>The captured binder package comes from --album-reference; the collection from the data root's collection file when present.</summary>
+        /// <summary>The captured binder package comes from --album-reference, else the data root's private album-reference folder (so an
+        /// importer launch finds it); the collection from the data root's collection file when present.</summary>
         public App.Screens.Album.CardAlbumSession? OpenCardAlbum()
         {
             if (owner.setup?.Game?.Catalog.Catalog is not { } catalog || owner.flowVisuals is null) return null;
-            owner.cardAlbumScreen ??= App.Screens.Album.CardAlbumScreen.TryCreate(owner.GraphicsDevice, owner.flowVisuals, owner.screenAssets, catalog,
-                owner.options.AlbumReferenceRoot);
-            return owner.cardAlbumScreen?.Open(owner.setup.Storage.PathFor(App.Screens.Album.CardAlbumScreen.CollectionFile));
+            string local = owner.setup.Storage.PathFor(App.Screens.Album.CardAlbumScreen.ReferenceFolder);
+            string? binder = owner.options.AlbumReferenceRoot
+                ?? (File.Exists(Path.Combine(local, App.Screens.Album.CardAlbumBinder.FileName)) ? local : null);
+            owner.cardAlbumScreen ??= App.Screens.Album.CardAlbumScreen.TryCreate(owner.GraphicsDevice, owner.flowVisuals, owner.screenAssets, catalog, binder);
+            // The detail's Main/Side counters read the same deck Deck Edit edits (presentation checks: the fresh built-in deck).
+            DeckDraft? draft = null;
+            if (owner.options.PresentationSmoke) draft = new(catalog, InitialOpponentDecks.Create(0));
+            else if (owner.editor is { } editor) { editor.EnsureDraft(); draft = editor.Draft; }
+            Func<uint, (int Main, int Side)>? inDeck = draft is null ? null
+                : id => (draft.Count(id, Core.Decks.DeckSection.Main) + draft.Count(id, Core.Decks.DeckSection.Extra), draft.Count(id, Core.Decks.DeckSection.Side));
+            return owner.cardAlbumScreen?.Open(owner.setup.Storage.PathFor(App.Screens.Album.CardAlbumScreen.CollectionFile), inDeck);
         }
         public void SaveDeckEdit(DeckEditSession session)
         {

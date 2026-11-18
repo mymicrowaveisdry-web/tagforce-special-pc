@@ -61,6 +61,14 @@ public sealed class CardAlbumSession
     /// <summary>Sets the measured close/arrival timing (frames of the turn pose and in all).</summary>
     public void UseJumpTiming(int turnFrame, int length) { jumpTurnFrame = turnFrame; jumpLength = length; }
 
+    /// <summary>The card detail over the album, while open (Confirm on an owned card).</summary>
+    public CardAlbumDetail? Detail { get; private set; }
+    private Func<uint, CardAlbumDetail>? openDetail;
+    private int detailCloseUpdates;
+
+    /// <summary>Builds the detail for a card (counts and tab heights come from the screen); without it Confirm only reports the request.</summary>
+    public void UseDetail(Func<uint, CardAlbumDetail> factory) => openDetail = factory;
+
     /// <param name="initials">Page Jump letter of each album position ('*' for names not starting with a letter); defaults to '*'.</param>
     public CardAlbumSession(IReadOnlyList<uint> order, CardAlbumCollection collection, IReadOnlyList<char>? initials = null)
     {
@@ -125,6 +133,7 @@ public sealed class CardAlbumSession
     {
         glintClock += delta;
         if (MainMenuEntry.FramesIn(glintClock) is var glint && glint != GlintFrame) { GlintFrame = glint; Revision++; }
+        if (Detail is { Closing: true } && ++detailCloseUpdates >= 2) { Detail = null; Revision++; }
         if (JumpFrame is int jump)
         {
             jumpClock += delta;
@@ -154,6 +163,7 @@ public sealed class CardAlbumSession
     {
         int held = (input.Held & (InputAction.PreviousPage | InputAction.NextPage)) switch { InputAction.PreviousPage => -1, InputAction.NextPage => 1, _ => 0 };
         if (held != heldTurn) { heldTurn = 0; repeat.Restart(); }
+        if (Detail is { } detail) { if (detail.Handle(input)) Revision++; return CardAlbumOutcome.None; }
         if (Turn is not null || Flipping || JumpFrame is not null) return CardAlbumOutcome.None;
         if (JumpOpen) { HandleJump(input); return CardAlbumOutcome.None; }
         if (input.IsPressed(InputAction.Back)) return CardAlbumOutcome.Close;
@@ -196,7 +206,12 @@ public sealed class CardAlbumSession
             else if (RightPage && PageExists(false)) Move(false, row * 3 + 2);
             // Inferred: the left page's outer column has no edge target (only the right edge was observed).
         }
-        else if (input.IsPressed(InputAction.Confirm) && FocusedPosition is int p && Collection.Owns(Order[p])) return CardAlbumOutcome.DetailRequested;
+        else if (input.IsPressed(InputAction.Confirm) && FocusedPosition is int p && Collection.Owns(Order[p]))
+        {
+            // Measured: the detail replaces the album at once; Back returns with the cursor unchanged.
+            if (openDetail is not null) { Detail = openDetail(Order[p]); detailCloseUpdates = 0; Revision++; }
+            return CardAlbumOutcome.DetailRequested;
+        }
         return CardAlbumOutcome.None;
     }
 

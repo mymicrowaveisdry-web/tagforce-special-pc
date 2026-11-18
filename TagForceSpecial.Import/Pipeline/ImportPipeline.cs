@@ -17,7 +17,7 @@ public static class ImportPipeline
     public static readonly IReadOnlyList<(string Id, string Name)> Stages =
     [
         (SourceStage.Id, "Recognize source"), (InventoryStage.Id, "Scan files"), (CatalogStage.Id, "Convert card catalog"), (PresentationStage.Id, "Decode presentation"),
-        (FontStage.Id, "Install PSP fonts"), (RecipeStage.Id, "Import recipes"), (ValidationStage.Id, "Validate"), (PublishStage.Id, "Publish")
+        (FontStage.Id, "Install PSP fonts"), (AlbumReferenceStage.Id, "Install Card Album binder"), (RecipeStage.Id, "Import recipes"), (ValidationStage.Id, "Validate"), (PublishStage.Id, "Publish")
     ];
 
     public static ImportManifest Run(ImportRequest request, IProgress<ImportProgress>? progress = null,
@@ -79,6 +79,8 @@ public static class ImportPipeline
             });
             session.Run(FontStage.Id, _ => source is null ? new(StageStatus.Skipped, "Requires a supported source.") :
                 FontStage.Run(storage, request.SourcePath, request.Options.FontDirectory, cancellation));
+            session.Run(AlbumReferenceStage.Id, _ => source is null ? new(StageStatus.Skipped, "Requires a supported source.") :
+                AlbumReferenceStage.Run(storage, request.SourcePath, source.Profile.BuildId, cancellation));
             session.Run(RecipeStage.Id, report =>
             {
                 if (!request.Options.Recipes) return new(StageStatus.Skipped, "Not selected.");

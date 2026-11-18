@@ -30,12 +30,14 @@ public sealed class CardAlbumRenderer : IDisposable
     private static readonly RasterizerState Scissored = new() { CullMode = CullMode.None, ScissorTestEnable = true };
     public RenderTarget2D Layer { get; }
     public CardAlbumProfile Profile => profile;
+    /// <summary>The card detail drawn instead of the album while open.</summary>
+    public CardAlbumDetailRenderer? Detail { get; set; }
     private VertexPositionColorTexture[] blended = [];
     /// <summary>Things this renderer cannot draw from measured data yet; reported, never substituted.</summary>
     public IReadOnlyList<string> Gaps { get; } = Array.AsReadOnly(new[]
     {
-        "card detail screen",
-        "fast-flip, mid-turn and Page Jump arrival pockets show faces at once (owner decision)"
+        "fast-flip, mid-turn and Page Jump arrival pockets show faces at once (owner decision)",
+        "card detail: characters outside the Latin fonts (for example the star in names and full-width dashes in pack names) are not drawn"
     });
 
     public CardAlbumRenderer(GraphicsDevice device, TitleFlowVisuals visuals, CardAlbumBinder binder, CardAlbumProfile profile, CardFaceSource faces, CardCatalog catalog)
@@ -52,6 +54,7 @@ public sealed class CardAlbumRenderer : IDisposable
         // Measured 2D draws include rotated sprites with reversed winding; never inherit culling left by other renderers (Gum's sprites).
         device.RasterizerState = RasterizerState.CullNone;
         device.DepthStencilState = DepthStencilState.None;
+        if (session.Detail is { } open && Detail is not null) { Detail.Draw(open); return; }
         foreach (var draw in profile.Background) visuals.DrawFlow(draw);
         DrawBinder(session);
         foreach (var draw in profile.Header) visuals.DrawFlow(draw);
@@ -242,7 +245,7 @@ public sealed class CardAlbumRenderer : IDisposable
 
     /// <summary>"[Type/Suffix]" for monsters, "[Spell/Kind]" or "[Trap/Kind]" (no kind for Normal) from cardinfo_jpn.ehp words; null when a
     /// code has no word.</summary>
-    private string? TypeLine(CardDefinition card)
+    internal string? TypeLine(CardDefinition card)
     {
         var w = profile.TypeLine;
         if (card.Codes is not { } codes) return null;
@@ -269,7 +272,15 @@ public sealed class CardAlbumRenderer : IDisposable
     /// <summary>Attribute icon, then the monster type or Spell/Trap kind icon, from the Deck Edit icon tables (same icon01 cells).</summary>
     private void DrawIcons(CardDefinition card)
     {
-        if (card.Codes is not { } codes) return;
+        var (attribute, type) = IconCells(card);
+        if (attribute is not null) visuals.DrawFlow(Quad(profile.AttributeIconRect, attribute));
+        if (type is not null) visuals.DrawFlow(Quad(profile.TypeIconRect, type));
+    }
+
+    /// <summary>icon01 cells of the attribute and of the monster type or Spell/Trap kind (the album preview and the detail use the same).</summary>
+    internal (float[]? Attribute, float[]? Type) IconCells(CardDefinition card)
+    {
+        if (card.Codes is not { } codes) return (null, null);
         var tables = visuals.DeckEditProfile.Tables;
         float[]? Cell(string table, string key) =>
             tables.TryGetValue(table, out var t) && t.TryGetValue(key, out var e) ? e.EnumerateArray().Select(v => v.GetSingle()).ToArray() : null;
@@ -278,8 +289,7 @@ public sealed class CardAlbumRenderer : IDisposable
             ? Cell("spellTrapIcon", $"{codes.RawKind}:{codes.Icon}")
             : Cell("typeIcon", codes.Type.ToString(CultureInfo.InvariantCulture))
               ?? (profile.TypeIconExtra.TryGetValue(codes.Type.ToString(CultureInfo.InvariantCulture), out var extra) ? extra : null);
-        if (attribute is not null) visuals.DrawFlow(Quad(profile.AttributeIconRect, attribute));
-        if (type is not null) visuals.DrawFlow(Quad(profile.TypeIconRect, type));
+        return (attribute, type);
     }
 
     /// <summary>Page Jump overlay over everything else, as drawn last in the original frame. <paramref name="fade"/> scales the label,
@@ -319,7 +329,7 @@ public sealed class CardAlbumRenderer : IDisposable
         for (int i = 0; i < text.Length; i++) visuals.DrawText(text[i].ToString(), x[i], t.Y, t.ScaleX, t.ScaleY, t.Color, t.ShadowAlpha);
     }
 
-    private static FlowDraw Quad(float[] r, float[] uv) => new("deck.all.icon01", 3,
+    internal static FlowDraw Quad(float[] r, float[] uv) => new("deck.all.icon01", 3,
         [[r[0], r[1]], [r[2], r[1]], [r[0], r[3]], [r[0], r[3]], [r[2], r[1]], [r[2], r[3]]],
         [[uv[0], uv[1]], [uv[2], uv[1]], [uv[0], uv[3]], [uv[0], uv[3]], [uv[2], uv[1]], [uv[2], uv[3]]],
         [255, 255, 255, 255], null, null, false, false, false, false, false);
@@ -336,7 +346,7 @@ public sealed class CardAlbumRenderer : IDisposable
     }
 
     /// <summary>Greedy wrap at the measured width; measured on the album: a line may also break after a hyphen ("face-" / "up").</summary>
-    private List<string> Wrap(string text, float width, float scaleX)
+    internal List<string> Wrap(string text, float width, float scaleX)
     {
         var lines = new List<string>();
         foreach (string paragraph in text.Split('\n'))
@@ -358,7 +368,7 @@ public sealed class CardAlbumRenderer : IDisposable
         return lines;
     }
 
-    private static FlowDraw Shift(FlowDraw draw, float dx, float dy) =>
+    internal static FlowDraw Shift(FlowDraw draw, float dx, float dy) =>
         draw with { Points = draw.Points.Select(p => new[] { p[0] + dx, p[1] + dy }).ToArray() };
 
     public void Dispose()
