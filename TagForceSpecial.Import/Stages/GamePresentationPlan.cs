@@ -4,7 +4,7 @@ using TagForceSpecial.Effects;
 
 namespace TagForceSpecial.Import.Stages;
 
-/// <summary>The presentation resources the PC game reads: pinned title, title-flow, Options and Deck Edit (deck/all_j.ehp) textures,
+/// <summary>The presentation resources the PC game reads: pinned title, title-flow, Options and Deck Edit (deck/all_j.ehp) textures, Card Album binder textures,
 /// the two source files holding prompt text and dialog textures, and thumbnails for the confirmed card pool. PSP saves are not imported.</summary>
 public static class GamePresentationPlan
 {
@@ -12,6 +12,7 @@ public static class GamePresentationPlan
     public const string SupplementEvidenceId = "phase62.deck-edit.supplement-unverified-v1";
     /// <summary>Decoded from the disc slot with the measured zero tail; not pixel-verified.</summary>
     public const string ThumbnailEvidenceId = "phase62.cardh.gpu-input-bytes-v1";
+    public const string AlbumEvidenceId = "phase7.card-album.binder-unverified-v1";
     private const string StoredEvidenceId = "phase3.flow.source-bytes.native-v1";
 
     public static IReadOnlyList<PresentationReferenceCase> Required { get; } = Array.AsReadOnly(
@@ -22,7 +23,8 @@ public static class GamePresentationPlan
     [
         (TitleFlowReferenceResources.EbootKey, TitleFlowReferenceResources.EbootPath),
         (TitleFlowReferenceResources.TitleMenuKey, TitleFlowReferenceResources.TitleMenuPath),
-        (DeckEditResources.ArchiveKey, DeckEditReferenceResources.Archive)
+        (DeckEditResources.ArchiveKey, DeckEditReferenceResources.Archive),
+        (CardAlbumResources.FacesKey, CardFaceSource.SourcePath)
     ];
     public static IReadOnlyList<uint> ThumbnailCards => ConfirmedCardPool.CardIds;
 
@@ -31,6 +33,8 @@ public static class GamePresentationPlan
                 c.Frame is null ? c.PaletteLevel : null, EhpReadMode.InspectStoredRanges, Frame: c.Frame))
             .Concat(StoredSources.Select(s => new PresentationResourceRequest(s.Key, s.Path, null, PresentationConversion.Stored)))
             .Concat(DeckEditResources.Supplements.Select(s => new PresentationResourceRequest(s.AssetKey, DeckEditReferenceResources.Archive, s.Member,
+                PresentationConversion.GimRgba, s.PaletteLevel, EhpReadMode.InspectStoredRanges, Frame: s.Frame)))
+            .Concat(CardAlbumResources.Supplements.Select(s => new PresentationResourceRequest(s.AssetKey, CardAlbumResources.Archive, s.Member,
                 PresentationConversion.GimRgba, s.PaletteLevel, EhpReadMode.InspectStoredRanges, Frame: s.Frame)))
             .Concat(ThumbnailCards.Select(id => new PresentationResourceRequest(CardArtworkProvider.ThumbnailKey(id), CardThumbnailDecoder.SourcePath,
                 null, PresentationConversion.CardThumbnailRgba, CardId: id)));
@@ -47,10 +51,11 @@ public static class GamePresentationPlan
 
         return StoredSources.Select(s => Entry(s.Key, package.Resources[s.Key], null, StoredEvidenceId, false))
             .Concat(Required.Select(c => Entry(c.AssetKey, package.Resources[c.AssetKey], [0, 0, c.Width, c.Height], c.EvidenceId, true)))
-            .Concat(DeckEditResources.Supplements.Select(s =>
+            .Concat(DeckEditResources.Supplements.Concat(CardAlbumResources.Supplements).Select(s =>
             {
                 var r = package.Resources[s.AssetKey];
-                return Entry(s.AssetKey, r, [0, 0, r.Width!.Value, r.Height!.Value], SupplementEvidenceId, true);
+                return Entry(s.AssetKey, r, [0, 0, r.Width!.Value, r.Height!.Value], s.AssetKey.StartsWith("album.", StringComparison.Ordinal)
+                    ? AlbumEvidenceId : SupplementEvidenceId, true);
             }))
             .Concat(ThumbnailCards.Select(id =>
             {
