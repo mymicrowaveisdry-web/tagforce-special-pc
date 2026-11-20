@@ -67,7 +67,7 @@ public sealed partial class DuelEngine
         IEnumerable<EffectDefinition>? effectDefinitions = null, ulong? shuffleSeed = null, IEnumerable<RuleLockProfile>? ruleLocks = null, IEnumerable<BattleAbilityProfile>? battleAbilities = null,
         IEnumerable<DestructionReplacementProfile>? destructionReplacements = null, IEnumerable<GraveyardRedirectProfile>? graveyardRedirects = null,
         IEnumerable<DamageRuleProfile>? damageRules = null, IEnumerable<MonsterStatProfile>? monsterStats = null,
-        ICardArchetypeResolver? archetypeResolver = null)
+        ICardArchetypeResolver? archetypeResolver = null, int startingLifePoints = DuelSetup.DefaultLifePoints)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(rules);
@@ -137,7 +137,7 @@ public sealed partial class DuelEngine
         definitionDecisions = EffectDefinitionRegistration.Decisions(definitionList, triggerEffects, StepFilters);
         bool IsMonster(uint id) => this.rules.TryGetValue(id, out var rule) && rule.Category == CardCategory.Monster;
         State = DuelSetup.InitialState(knownIds, this.rules, playerOneDeck, playerTwoDeck, startingPlayer,
-            playerOneExtraDeck, playerTwoExtraDeck, shuffleSeed);
+            playerOneExtraDeck, playerTwoExtraDeck, shuffleSeed, startingLifePoints);
     }
 
     private bool IsTokenId(uint id) => rules.TryGetValue(id, out var rule) && rule.IsToken;
