@@ -18,7 +18,7 @@ public sealed class FreeDuelStartRenderer(GraphicsDevice device, TitleFlowVisual
         "the CPU's hand and turn-order choice are random (the original's rule is not decoded)"
     });
 
-    public void Render(RenderTarget2D layer, FreeDuelSession session, FreeDuelStartSession start, int backgroundFrame) => visuals.Within(layer, () =>
+    public void Render(RenderTarget2D layer, FreeDuelSession session, FreeDuelStartSession start, int backgroundFrame, int animationFrame) => visuals.Within(layer, () =>
     {
         device.Clear(ClearOptions.Target | ClearOptions.DepthBuffer | ClearOptions.Stencil, Color.Black, 1, 0);
         device.RasterizerState = RasterizerState.CullNone;
@@ -28,7 +28,7 @@ public sealed class FreeDuelStartRenderer(GraphicsDevice device, TitleFlowVisual
         Draw(p.Particles);
         if (start.Step is FreeDuelStartStep.Intro or FreeDuelStartStep.Ready)
         {
-            Draw(p.IntroStreak);
+            FreeDuelLightning.Draw(visuals, animationFrame, centerY: 174);
             Draw(p.IntroHeader);
             versus.DrawBody(session, p.IntroShift);
             return;

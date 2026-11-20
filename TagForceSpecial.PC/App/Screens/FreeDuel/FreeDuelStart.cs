@@ -10,15 +10,15 @@ public sealed record FreeDuelStartPrompts(FlowTextSource ChooseCard, FlowTextSou
 /// <summary>The measured duel start (free-duel-start-frame.json: numbers, asset keys and source offsets only): rock-paper-scissors hand and
 /// reveal, the turn-order buttons and the intro card. Hand cards are 80-pixel cells of jnk_card01 (Rock, Scissors, Paper; the opponent's row
 /// below); the WIN / LOSE / DRAW labels are 80-pixel cells (DRAW measured, WIN and LOSE by the atlas). The intro is the VERSUS body moved down
-/// <see cref="IntroShift"/> pixels with its own streak and header.</summary>
+/// <see cref="IntroShift"/> pixels with its own header.</summary>
 public sealed record FreeDuelStartProfile(int SchemaVersion, string BuildId, string Scope, FlowDraw[] Particles, FlowDraw[] Frame, FlowDraw PlayerBust,
     FlowDraw OpponentBust, FlowDraw[] Hand, FlowDraw[] HandFocus, float HandRaise, FlowDraw[] OpponentBacks, FlowDraw RevealPlayer, FlowDraw RevealOpponent,
     FlowDraw LabelPlayer, FlowDraw LabelOpponent, float CardCellWidth, float LabelCellWidth, float AtlasWidth, FlowDraw[] FirstButton, FlowDraw[] SecondDark,
-    FlowDraw[] SecondLight, FlowDraw[] IntroStreak, FlowDraw[] IntroHeader, float IntroShift, FreeDuelStartTexts Text, FreeDuelStartPrompts Prompts)
+    FlowDraw[] SecondLight, FlowDraw[] IntroHeader, float IntroShift, FreeDuelStartTexts Text, FreeDuelStartPrompts Prompts)
 {
     public IEnumerable<string> AssetKeys() => Particles.Concat(Frame).Append(PlayerBust).Append(OpponentBust).Concat(Hand).Concat(HandFocus)
         .Concat(OpponentBacks).Append(RevealPlayer).Append(RevealOpponent).Append(LabelPlayer).Append(LabelOpponent).Concat(FirstButton)
-        .Concat(SecondDark).Concat(SecondLight).Concat(IntroStreak).Concat(IntroHeader).Select(d => d.AssetKey).OfType<string>().Distinct(StringComparer.Ordinal);
+        .Concat(SecondDark).Concat(SecondLight).Concat(IntroHeader).Select(d => d.AssetKey).OfType<string>().Distinct(StringComparer.Ordinal);
 
     public static FreeDuelStartProfile LoadEmbedded()
     {

@@ -18,18 +18,17 @@ public sealed class FreeDuelVersusRenderer(GraphicsDevice device, TitleFlowVisua
     public FreeDuelVersusProfile Profile => profile;
     public IReadOnlyList<string> Gaps { get; } = Array.AsReadOnly(new[]
     {
-        "VERSUS streak drawn at its measured pose (its animation is not measured)",
         "the □ glyph in the hint is not in the Latin card font"
     });
 
-    public void Render(RenderTarget2D layer, FreeDuelSession session, int backgroundFrame) => visuals.Within(layer, () =>
+    public void Render(RenderTarget2D layer, FreeDuelSession session, int backgroundFrame, int animationFrame) => visuals.Within(layer, () =>
     {
         device.Clear(ClearOptions.Target | ClearOptions.DepthBuffer | ClearOptions.Stencil, Color.Black, 1, 0);
         device.RasterizerState = RasterizerState.CullNone;
         device.DepthStencilState = DepthStencilState.None;
         var p = profile; var versus = session.Versus!; var t = p.Text;
         visuals.DrawMenuBackdrop(backgroundFrame);
-        Draw(p.Streak);
+        FreeDuelLightning.Draw(visuals, animationFrame, centerY: 149);
         Draw(p.Header);
         Run(t.Header);
         bool start = versus.Focus == FreeDuelVersusFocus.Start;

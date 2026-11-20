@@ -27,7 +27,7 @@ public sealed partial class GameLoop
     private App.Screens.Album.CardAlbumSession? renderedAlbumSession;
     private int renderedAlbumRevision = -1;
     private App.Screens.FreeDuel.FreeDuelSettingsRenderer? freeDuelRenderer;
-    private (object? Session, int Revision, int Background, int Pulse) renderedFreeDuel;
+    private (object? Session, int Revision, int Background, int Frame) renderedFreeDuel;
     private readonly ScreenFade screenFade = new();
 
     /// <summary>The flow is presented only when every source texture and text reference validates.</summary>
@@ -200,21 +200,20 @@ public sealed partial class GameLoop
         renderedDeckEditKey = key;
     }
 
-    /// <summary>Re-renders only when the session, the background frame or the pulse value changed; the notice is the PC's own.</summary>
+    /// <summary>Refreshes the Free Duel layer when its session or animation frame changes.</summary>
     private void RefreshFreeDuel(TitleFlow flow, TitleFlowVisuals visuals, App.Screens.FreeDuel.FreeDuelSession session,
         App.Screens.FreeDuel.FreeDuelSettingsRenderer view)
     {
-        int background = MainMenuFrame(flow, visuals), pulse = options.PixelExact ? 0 : session.Settings.Frame;
-        int pulseValue = view.Profile.FocusPulse[pulse % view.Profile.FocusPulse.Length];
-        if (renderedFreeDuel != (session, session.Revision, background, pulseValue))
+        int background = MainMenuFrame(flow, visuals), frame = options.PixelExact ? 0 : session.Settings.Frame;
+        if (renderedFreeDuel != (session, session.Revision, background, frame))
         {
-            if (session.Start is { } start) view.Start.Render(view.Layer, session, start, background);
+            if (session.Start is { } start) view.Start.Render(view.Layer, session, start, background, frame);
             else if (session.DeckPicker is { } deckPicker) view.Decks.Render(view.Layer, deckPicker, background);
             else if (session.Picker is { } picker) view.Picker.Render(view.Layer, picker, background);
-            else if (session.Versus is null) view.Render(session.Settings, background, pulse);
-            else view.Versus.Render(view.Layer, session, background);
+            else if (session.Versus is null) view.Render(session.Settings, background, frame);
+            else view.Versus.Render(view.Layer, session, background, frame);
             gum.BindFreeDuel(view.Layer);
-            renderedFreeDuel = (session, session.Revision, background, pulseValue);
+            renderedFreeDuel = (session, session.Revision, background, frame);
         }
         gum.ShowFreeDuelNotice(!session.NoticeOpen ? null : session.DeckPicker is { } open ? view.Decks.NoticeTitle(open)
             : session.Versus is null ? view.NoticeTitle(session.Settings) : view.Versus.NoticeTitle(session),

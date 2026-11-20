@@ -14,13 +14,13 @@ public sealed record FreeDuelDefaultOpponent(FlowTextSource Name, float[][] Bust
 
 /// <summary>The measured Normal Duel VERSUS screen (free-duel-versus-frame.json: numbers, asset keys and source offsets only). Portraits are
 /// cells of the bust atlas; LP digits are cells of d_menu01 (digit d at <see cref="DigitU0"/> + d × <see cref="DigitStep"/>; 0 and 8 measured).</summary>
-public sealed record FreeDuelVersusProfile(int SchemaVersion, string BuildId, string Scope, FlowDraw[] Streak, FlowDraw[] Header, FlowDraw[] StartIdle,
+public sealed record FreeDuelVersusProfile(int SchemaVersion, string BuildId, string Scope, FlowDraw[] Header, FlowDraw[] StartIdle,
     FlowDraw[] StartActive, FlowDraw[] PlayerPortrait, FlowDraw PlayerBust, FlowDraw PlayerLpBadge, FlowDraw[] PlayerLpDigits, FlowDraw[] OpponentPortrait,
     FlowDraw OpponentBust, FlowDraw OpponentLpBadge, FlowDraw[] OpponentLpDigits, FlowDraw[] PlayerNamePanel, FlowDraw[] OpponentNamePanel,
     FlowDraw[] PlayerDeckPanel, FlowDraw[] OpponentDeckPanel, FreeDuelVersusFocusFrames Focus, float DigitU0, float DigitStep, FreeDuelVersusTexts Text,
     FlowTextSource DeckHint, FreeDuelDefaultOpponent DefaultOpponent)
 {
-    public IEnumerable<string> AssetKeys() => Streak.Concat(Header).Concat(StartIdle).Concat(StartActive).Concat(PlayerPortrait).Append(PlayerBust)
+    public IEnumerable<string> AssetKeys() => Header.Concat(StartIdle).Concat(StartActive).Concat(PlayerPortrait).Append(PlayerBust)
         .Append(PlayerLpBadge).Concat(PlayerLpDigits).Concat(OpponentPortrait).Append(OpponentBust).Append(OpponentLpBadge).Concat(OpponentLpDigits)
         .Concat(PlayerNamePanel).Concat(OpponentNamePanel).Concat(PlayerDeckPanel).Concat(OpponentDeckPanel)
         .Concat(Focus.OpponentName).Concat(Focus.OpponentDeck).Concat(Focus.PlayerDeck).Select(d => d.AssetKey).OfType<string>().Distinct(StringComparer.Ordinal);
