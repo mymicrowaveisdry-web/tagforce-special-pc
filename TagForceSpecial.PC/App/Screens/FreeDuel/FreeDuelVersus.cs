@@ -40,13 +40,14 @@ public sealed record FreeDuelVersusProfile(int SchemaVersion, string BuildId, st
 
 /// <summary>Observed VERSUS input: Down goes opponent name → opponent deck → player deck (measured), then Start Duel (inferred) and back to the
 /// name (measured); Up reverses; Right jumps to Start Duel (measured), Left from it returns to the name (inferred). Back returns to the settings'
-/// first step (measured). Confirm on the name opens the character picker and □ there picks a random character; the decks, Start Duel and
-/// □ on the player's deck show a PC notice until their screens exist.</summary>
+/// first step (measured). Confirm on the name opens the character picker and □ there picks a random character, on a deck its deck picker,
+/// on Start Duel rock-paper-scissors; □ on the player's deck shows a PC notice.</summary>
 public sealed class FreeDuelVersusSession
 {
-    public enum Outcome { None, Back, OpenPicker, RandomCharacter, OpenOpponentDecks, OpenPlayerDecks }
+    public enum Outcome { None, Back, OpenPicker, RandomCharacter, OpenOpponentDecks, OpenPlayerDecks, StartDuel }
     public FreeDuelVersusFocus Focus { get; private set; }
     public bool NoticeOpen { get; private set; }
+    public string? NoticeMessage { get; private set; }
     public int Revision { get; private set; }
 
     public Outcome Handle(InputFrame input)
@@ -60,11 +61,18 @@ public sealed class FreeDuelVersusSession
     /// <summary>Redraws after the opponent changed (a pick returned).</summary>
     public void Touch() => Revision++;
 
+    /// <summary>Opens the PC notice (used while a duel cannot start).</summary>
+    public void ShowNotice(string message) { NoticeOpen = true; NoticeMessage = message; Revision++; }
+
     private Outcome HandleInput(InputFrame input)
     {
         if (NoticeOpen)
         {
-            if (input.IsPressed(InputAction.Confirm) || input.IsPressed(InputAction.Back)) NoticeOpen = false;
+            if (input.IsPressed(InputAction.Confirm) || input.IsPressed(InputAction.Back))
+            {
+                NoticeOpen = false;
+                NoticeMessage = null;
+            }
             return Outcome.None;
         }
         const int parts = 4;
@@ -76,6 +84,7 @@ public sealed class FreeDuelVersusSession
         else if (input.IsPressed(InputAction.Confirm) && Focus == FreeDuelVersusFocus.OpponentName) return Outcome.OpenPicker;
         else if (input.IsPressed(InputAction.Confirm) && Focus == FreeDuelVersusFocus.OpponentDeck) return Outcome.OpenOpponentDecks;
         else if (input.IsPressed(InputAction.Confirm) && Focus == FreeDuelVersusFocus.PlayerDeck) return Outcome.OpenPlayerDecks;
+        else if (input.IsPressed(InputAction.Confirm) && Focus == FreeDuelVersusFocus.Start) return Outcome.StartDuel;
         else if (input.IsPressed(InputAction.Switch) && Focus == FreeDuelVersusFocus.OpponentName) return Outcome.RandomCharacter;
         else if (input.IsPressed(InputAction.Confirm) || input.IsPressed(InputAction.Switch) && Focus == FreeDuelVersusFocus.PlayerDeck) NoticeOpen = true;
         return Outcome.None;
@@ -94,18 +103,40 @@ public sealed class FreeDuelSession(FreeDuelSettingsSession settings, string pla
     public FreeDuelVersusSession? Versus { get; private set; }
     /// <summary>The character picker while open over VERSUS.</summary>
     public FreeDuelPickerSession? Picker { get; private set; }
+    /// <summary>Rock-paper-scissors, turn order and intro after Start Duel.</summary>
+    public FreeDuelStartSession? Start { get; private set; }
     /// <summary>Roster index of the opponent character (the measured default until a pick).</summary>
     public int Opponent { get; private set; } = defaultOpponent;
     public string PlayerName => playerName;
     public string PlayerDeck => playerDeck;
     public bool NoticeOpen => DeckPicker?.NoticeOpen ?? Versus?.NoticeOpen ?? settings.NoticeOpen;
-    public int Revision => settings.Revision * 100000 + (Versus?.Revision ?? -1) * 100 + (Versus is null ? 0 : 50) + (Picker?.Revision ?? -1) * 7 + Opponent * 13 + (Picker is null ? 0 : 3) + (DeckPicker?.Revision ?? -1) * 17 + (DeckPicker is null ? 0 : 5);
+    public int Revision => settings.Revision * 100000 + (Versus?.Revision ?? -1) * 100 + (Versus is null ? 0 : 50) + (Picker?.Revision ?? -1) * 7 + Opponent * 13 + (Picker is null ? 0 : 3) + (DeckPicker?.Revision ?? -1) * 17 + (DeckPicker is null ? 0 : 5)
+        + (Start?.Revision ?? -1) * 31 + (Start is null ? 0 : 11);
 
-    public void Update(TimeSpan delta) => settings.Update(delta);
+    public void Update(TimeSpan delta) { settings.Update(delta); Start?.Update(delta); }
+    internal void BeginStart() => Start = new(random);
+
+    /// <summary>The turn order once the intro has played (the duel can start), then back on VERSUS; null before.</summary>
+    public bool? TakeReadyDuel()
+    {
+        if (Start is not { Step: FreeDuelStartStep.Ready } start) return null;
+        Start = null;
+        return start.PlayerGoesFirst;
+    }
 
     /// <summary>True when Back from the settings' first step leaves Free Duel.</summary>
     public bool Handle(InputFrame input)
     {
+        if (Start is { } start)
+        {
+            if (input.IsPressed(InputAction.Back))
+            {
+                Start = null;
+                Versus!.Touch();
+            }
+            else start.Handle(input);
+            return false;
+        }
         if (DeckPicker is { } deckPicker)
         {
             // Only the PC deck can be picked, so a pick keeps the current choice; either way the list closes.
@@ -130,6 +161,7 @@ public sealed class FreeDuelSession(FreeDuelSettingsSession settings, string pla
                     DeckPicker = new(false, FreeDuelDeckPickerSession.OpponentEntries(decks, Opponent), decks.VisibleRows); break;
                 case FreeDuelVersusSession.Outcome.OpenPlayerDecks when decks is not null:
                     DeckPicker = new(true, FreeDuelDeckPickerSession.PlayerEntries(playerDeck, saved ?? []), decks.VisibleRows); break;
+                case FreeDuelVersusSession.Outcome.StartDuel: BeginStart(); break;
             }
             return false;
         }

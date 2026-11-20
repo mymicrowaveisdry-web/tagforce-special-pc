@@ -35,6 +35,8 @@ public interface ITitleFlowHost
     Album.CardAlbumSession? OpenCardAlbum() => null;
     /// <summary>The Free Duel settings screen, or null when its measured assets are not imported (the row then keeps its notice).</summary>
     FreeDuelScreen.FreeDuelSession? OpenFreeDuel() => null;
+    /// <summary>Starts the Free Duel's duel once its intro has played; false when no duel can start (VERSUS then shows its notice).</summary>
+    bool StartFreeDuel(FreeDuelScreen.FreeDuelSession session, bool playerGoesFirst) => false;
 }
 
 /// <summary>Observed Continue/New Game routes (config/reference/title-flow.json) and Main Menu/Options/Deck Menu routes (main-menu.json,
@@ -119,6 +121,7 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
         Enter(TitleFlowStep.NameEntry);
     }
     public void BeginMainMenu() => Enter(TitleFlowStep.MainMenu);
+    internal void SaveCurrentProfile() => host.SaveProfile(Name, Level, SessionOptions);
 
     public void CommitPending()
     {
@@ -141,7 +144,13 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
         menuClock += delta;
         if (sinceSubmenuClosed is { } since) sinceSubmenuClosed = since + delta;
         if (Step == TitleFlowStep.CardAlbum) { CardAlbum?.Update(delta); return; }
-        if (Step == TitleFlowStep.FreeDuelSettings) { FreeDuel?.Update(delta); return; }
+        if (Step == TitleFlowStep.FreeDuelSettings && FreeDuel is { } freeDuel)
+        {
+            freeDuel.Update(delta);
+            if (freeDuel.TakeReadyDuel() is bool first && !host.StartFreeDuel(freeDuel, first) && !freeDuel.NoticeOpen)
+                freeDuel.Versus?.ShowNotice("Free Duel needs valid local game data and a playable deck.");
+            return;
+        }
         if (Submenu is { } submenu)
         {
             submenu.Update(delta);
@@ -353,7 +362,7 @@ public sealed class TitleFlow(ITitleFlowHost host, string defaultName, bool inst
                 if (ButtonFocus == 0)
                 {
                     if (saveSource == SaveSource.NewGame) host.CreateProfile(Name, Level, SessionOptions);
-                    else host.SaveProfile(Name, Level, SessionOptions);
+                    else SaveCurrentProfile();
                     Enter(TitleFlowStep.SystemSaveDone);
                 }
                 else LeaveSavePrompt();

@@ -163,13 +163,13 @@ public sealed class GumPresentation : IDisposable
     public void BindFreeDuel(RenderTarget2D layer) => Bind(MainMenuSprite(roots["OriginalFreeDuel"], "Layer"), layer, new Rectangle(0, 0, 480, 272), true);
 
     /// <summary>PC notice over the Free Duel settings for rows the PC cannot play yet; its title is the row's own source label.</summary>
-    public void ShowFreeDuelNotice(string? title)
+    public void ShowFreeDuelNotice(string? title, string? message = null)
     {
         var notice = roots["OriginalFreeDuel"].GetGraphicalUiElementByName("Notice") ?? throw new InvalidDataException("Missing Free Duel notice.");
         notice.Visible = title is not null;
         if (title is null) return;
         BindText("OriginalFreeDuel", "NoticeTitle", title);
-        BindText("OriginalFreeDuel", "NoticeBody", "This mode has not been recreated in the PC version yet.");
+        BindText("OriginalFreeDuel", "NoticeBody", message ?? "This mode has not been recreated in the PC version yet.");
     }
 
     public void BindRecipes(RenderTarget2D layer)

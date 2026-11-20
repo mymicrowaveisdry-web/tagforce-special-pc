@@ -27,7 +27,9 @@ public static class GamePresentationPlan
         (CardAlbumResources.ArchiveKey, CardAlbumResources.Archive),
         (CardAlbumResources.ArtKey, CardThumbnailDecoder.SourcePath),
         (CardAlbumResources.CardInfoKey, CardAlbumResources.CardInfoPath),
-        (FreeDuelReferenceResources.CharaListKey, FreeDuelReferenceResources.CharaListPath)
+        (FreeDuelReferenceResources.CharaListKey, FreeDuelReferenceResources.CharaListPath),
+        (FreeDuelReferenceResources.StartKey, FreeDuelReferenceResources.StartPath),
+        (FreeDuelReferenceResources.ResultKey, FreeDuelReferenceResources.ResultPath)
     ];
     public static IReadOnlyList<uint> ThumbnailCards => ConfirmedCardPool.CardIds;
 

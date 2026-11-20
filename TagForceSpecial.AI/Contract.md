@@ -82,9 +82,10 @@ the action category without revealing a private hand card's name.
 ## Replays and acceptance
 
 `DuelReplay` schema 1 records the policy version, seed, action-contract version,
-deck manifest, exact input deck orders, battle mode, accepted command sequence
-and engine outcome. Each entry records before/after revisions, actor, semantic
-key/kind and current decision ID. `ReplayCommands.Apply` resolves that entry
+deck manifest, exact input deck orders, battle mode, nondefault starting player
+or Life Points when present, accepted command sequence and engine outcome.
+Each entry records before/after revisions, actor, semantic key/kind and current
+decision ID. `ReplayCommands.Apply` resolves that entry
 against a fresh authorized legal-action list and rejects unknown, stale or
 ambiguous entries. Reconstruct with the same catalog/profiles and recorded decks;
 human entries record what the user chose and are not claims about policy output.

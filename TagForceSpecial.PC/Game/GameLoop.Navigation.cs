@@ -24,6 +24,7 @@ public sealed partial class GameLoop
     private readonly AnimationScheduler animations = new();
     private readonly Dictionary<ScreenId, int> savedFocus = [];
     private ScreenId activeScreen;
+    private FreeDuelResultSession? freeDuelResult;
     private GameTime navigationTime = new();
     private TimeSpan PresentationTime => options.PixelExact ? TimeSpan.Zero : navigationTime.TotalGameTime;
     private ScreenId screen
@@ -87,11 +88,7 @@ public sealed partial class GameLoop
         Register(ScreenId.DeckSelection, UpdateFreeDuel, DrawFreeDuel,
             pointer: Rows(at => TextRow(at, 40, 84, 23, InitialOpponentDecks.Names.Count, 0)));
         Register(ScreenId.Duel, UpdateDuelInput, DrawDuel, update: UpdateDuelPresentation);
-        Register(ScreenId.Result, b =>
-        {
-            if (b.Back) screen = ScreenId.PcTools;
-            else if (b.Confirm) { if (setup?.Game is not null) OpenEditor(); else screen = ScreenId.DeckSelection; }
-        }, DrawDuel, pointer: f => PointerTargets.Clicks(f));
+        Register(ScreenId.Result, UpdateDuelResult, DrawDuelResult, pointer: DuelResultPointer);
         Register(ScreenId.Paused, UpdatePause, DrawPause, pointer: Rows(at => TextRow(at, 40, 84, 23, 2, 0)));
         if (options.PresentationSmoke && originalTitle is null)
             throw new InvalidOperationException("Presentation smoke requires the validated Phase 3 title generation in --data-root.");
@@ -226,7 +223,52 @@ public sealed partial class GameLoop
             if (duel is not null) duel.Paused = false;
             screen = ScreenId.Duel; opponentAt = navigationTime.TotalGameTime.TotalSeconds + .35;
         }
-        else if (buttons.Confirm) { duel = null; screen = ScreenId.PcTools; }
+        else if (buttons.Confirm)
+        {
+            if (freeDuelResult is not null) screen = ScreenId.Result;
+            else { duel = null; screen = ScreenId.PcTools; }
+        }
+    }
+    private void UpdateDuelResult(GuiButtons buttons)
+    {
+        if (freeDuelResult is not { } result)
+        {
+            if (buttons.Back) screen = ScreenId.PcTools;
+            else if (buttons.Confirm) { if (setup?.Game is not null) OpenEditor(); else screen = ScreenId.DeckSelection; }
+            return;
+        }
+
+        var action = result.Handle(buttons);
+        if (action == FreeDuelResultAction.None) return;
+        if (action == FreeDuelResultAction.SaveAndReturn && !TrySaveFreeDuelProfile(result)) return;
+        duel = null;
+        freeDuelResult = null;
+        if (action == FreeDuelResultAction.Rematch) BeginFlow(flow => flow.FreeDuel!.BeginStart());
+        else BeginFlow(flow => flow.BeginMainMenu());
+    }
+    private bool TrySaveFreeDuelProfile(FreeDuelResultSession result)
+    {
+        try
+        {
+            titleFlow!.SaveCurrentProfile();
+            return true;
+        }
+        catch (Exception error) when (PrivateStorage.Recoverable(error))
+        {
+            result.Notice = "Profile save failed. Retry or return without saving.";
+            return false;
+        }
+    }
+    private InputFrame DuelResultPointer(InputFrame frame)
+    {
+        if (freeDuelResult is not { } result) return PointerTargets.Clicks(frame);
+        return PointerTargets.Apply(frame, FreeDuelResultScreen.HitRow(frame.Pointer.Position), result.Focus, result.PointAt);
+    }
+    private void DrawDuelResult()
+    {
+        if (freeDuelResult is { } result && duel is { } controller)
+            FreeDuelResultScreen.Draw(renderer, controller.View, result);
+        else DrawDuel();
     }
     private void DrawDuel()
     {

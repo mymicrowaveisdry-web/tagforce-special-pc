@@ -18,6 +18,8 @@ public sealed class FreeDuelSettingsRenderer : IDisposable
     public FreeDuelPickerRenderer Picker { get; }
     /// <summary>The deck pickers drawn into the same layer while open.</summary>
     public FreeDuelDecksRenderer Decks { get; }
+    /// <summary>Rock-paper-scissors, turn order and the intro card drawn into the same layer after Start Duel.</summary>
+    public FreeDuelStartRenderer Start { get; }
     private readonly int defaultOpponent;
     public RenderTarget2D Layer { get; }
     /// <summary>Things drawn from inference rather than measurement; reported, never hidden.</summary>
@@ -29,10 +31,11 @@ public sealed class FreeDuelSettingsRenderer : IDisposable
     });
 
     public FreeDuelSettingsRenderer(GraphicsDevice device, TitleFlowVisuals visuals, FreeDuelSettingsProfile profile, FreeDuelVersusProfile versus,
-        FreeDuelPickerProfile roster, FreeDuelDecksProfile decks)
+        FreeDuelPickerProfile roster, FreeDuelDecksProfile decks, FreeDuelStartProfile start)
     {
         this.device = device; this.visuals = visuals; Profile = profile; Versus = new(device, visuals, versus, roster); Picker = new(device, visuals, roster);
         Decks = new(device, visuals, decks);
+        Start = new(device, visuals, start, Versus, roster);
         // Measured default opponent: the character whose name the VERSUS capture shows (Aki Izayoi).
         defaultOpponent = Array.FindIndex(roster.Characters, c => c.Name.Source == versus.DefaultOpponent.Name.Source && c.Name.Offset == versus.DefaultOpponent.Name.Offset);
         if (defaultOpponent < 0) throw new InvalidDataException("The measured default opponent is not in the roster.");
@@ -48,10 +51,12 @@ public sealed class FreeDuelSettingsRenderer : IDisposable
             var versus = FreeDuelVersusProfile.LoadEmbedded();
             var roster = FreeDuelPickerProfile.LoadEmbedded();
             var decks = FreeDuelDecksProfile.LoadEmbedded();
-            visuals.UseTextures(assets, profile.AssetKeys().Concat(versus.AssetKeys()).Concat(roster.AssetKeys()).Concat(decks.AssetKeys())
+            var start = FreeDuelStartProfile.LoadEmbedded();
+            visuals.UseTextures(assets, profile.AssetKeys().Concat(versus.AssetKeys()).Concat(roster.AssetKeys()).Concat(decks.AssetKeys()).Concat(start.AssetKeys())
                 .Concat(["title.flow.mdl-bup11", "title.flow.mdl-bup21", "title.flow.mdl-bup31"]).Where(k => !k.StartsWith("title.eboot.", StringComparison.Ordinal)));
-            visuals.UseCharaList(assets, Assets.Presentation.FreeDuelReferenceResources.CharaListKey);
-            return new(device, visuals, profile, versus, roster, decks);
+            visuals.UseTextSource(assets, "charalist", Assets.Presentation.FreeDuelReferenceResources.CharaListKey);
+            visuals.UseTextSource(assets, "start", Assets.Presentation.FreeDuelReferenceResources.StartKey);
+            return new(device, visuals, profile, versus, roster, decks, start);
         }
         catch (Exception e) when (e is InvalidDataException or KeyNotFoundException or IOException or System.Text.Json.JsonException)
         {
@@ -62,9 +67,10 @@ public sealed class FreeDuelSettingsRenderer : IDisposable
 
     /// <summary>A new visit: every opening starts on the first step with Normal Duel focused (measured). The player side shows the PC
     /// profile's name and the PC's current deck (owner decision).</summary>
-    public FreeDuelSession NewSession(string playerName, string playerDeck, IReadOnlyList<(int Slot, string Name, DateTime Updated)>? saved = null) =>
+    public FreeDuelSession NewSession(string playerName, string playerDeck, IReadOnlyList<(int Slot, string Name, DateTime Updated)>? saved = null,
+        Random? random = null) =>
         new(new(Profile.StepProfile(FreeDuelStep.Music).Rows.Length, Profile.VisibleRows), playerName, playerDeck, Picker.Profile, defaultOpponent,
-            decks: Decks.Profile, saved: saved);
+            random: random, decks: Decks.Profile, saved: saved);
 
     /// <param name="backgroundFrame">Main Menu background animation frame.</param>
     /// <param name="pulseFrame">Game frames since the highlight appeared.</param>

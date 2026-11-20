@@ -208,7 +208,8 @@ public sealed partial class GameLoop
         int pulseValue = view.Profile.FocusPulse[pulse % view.Profile.FocusPulse.Length];
         if (renderedFreeDuel != (session, session.Revision, background, pulseValue))
         {
-            if (session.DeckPicker is { } deckPicker) view.Decks.Render(view.Layer, deckPicker, background);
+            if (session.Start is { } start) view.Start.Render(view.Layer, session, start, background);
+            else if (session.DeckPicker is { } deckPicker) view.Decks.Render(view.Layer, deckPicker, background);
             else if (session.Picker is { } picker) view.Picker.Render(view.Layer, picker, background);
             else if (session.Versus is null) view.Render(session.Settings, background, pulse);
             else view.Versus.Render(view.Layer, session, background);
@@ -216,7 +217,8 @@ public sealed partial class GameLoop
             renderedFreeDuel = (session, session.Revision, background, pulseValue);
         }
         gum.ShowFreeDuelNotice(!session.NoticeOpen ? null : session.DeckPicker is { } open ? view.Decks.NoticeTitle(open)
-            : session.Versus is null ? view.NoticeTitle(session.Settings) : view.Versus.NoticeTitle(session));
+            : session.Versus is null ? view.NoticeTitle(session.Settings) : view.Versus.NoticeTitle(session),
+            session.Versus?.NoticeMessage);
         gum.Show("OriginalFreeDuel", true);
     }
 
@@ -400,7 +402,30 @@ public sealed partial class GameLoop
                     saved = recipes.Records.Where(r => r.Kind == Recipes.RecipeListKind.User).Select(r => (r.Slot, r.Name, r.Updated)).ToArray();
             }
             catch (Exception e) when (PrivateStorage.Recoverable(e)) { Console.Error.WriteLine("RECIPE_SOURCE_PENDING " + e.Message); }
-            return owner.freeDuelRenderer?.NewSession(owner.titleFlow?.Name ?? "", draft?.Name ?? Effects.InitialOpponentDecks.Names[0], saved);
+            return owner.freeDuelRenderer?.NewSession(owner.titleFlow?.Name ?? "", draft?.Name ?? Effects.InitialOpponentDecks.Names[0], saved,
+                random: owner.options.PresentationSmoke ? new Random(37) : null);
+        }
+        public bool StartFreeDuel(App.Screens.FreeDuel.FreeDuelSession session, bool playerGoesFirst)
+        {
+            if (owner.setup?.Game is not { } game || session.Settings.Settings is not { } settings) return false;
+            try
+            {
+                var draft = owner.options.PresentationSmoke ? null : owner.editor?.Draft;
+                var deck = draft?.Snapshot() ?? InitialOpponentDecks.Create(0);
+                var first = playerGoesFirst ? Core.PlayerId.One : Core.PlayerId.Two;
+                owner.duel = SupportedDuelFactory.Create(game, deck, owner.CurrentSeed, first, settings.StartingLifePoints);
+            }
+            catch (InvalidDataException error)
+            {
+                session.Versus?.ShowNotice(error.Message);
+                return false;
+            }
+            owner.freeDuelResult = new();
+            owner.choiceIndex = 0;
+            owner.inspectIndex = -1;
+            owner.opponentAt = owner.navigationTime.TotalGameTime.TotalSeconds + .35;
+            owner.screen = Game.ScreenId.Duel;
+            return true;
         }
         public void SaveDeckEdit(DeckEditSession session)
         {
@@ -457,6 +482,7 @@ public sealed partial class GameLoop
             owner.gum.Show("OriginalDeckEdit", false);
             owner.gum.Show("OriginalRecipeViewer", false);
             owner.gum.Show("OriginalCardAlbum", false);
+            owner.gum.Show("OriginalFreeDuel", false);
             owner.renderedMenuFrame = -1;
         }
     }

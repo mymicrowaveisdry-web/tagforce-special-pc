@@ -59,10 +59,10 @@ public sealed class FreeDuelVersusTests
     public void ConfirmShowsANoticeThatKeepsFocusAndBackReturnsToTheResetFirstStep()
     {
         var s = AtVersus();
-        Tap(s, InputAction.Right); Tap(s, InputAction.Confirm);
+        Tap(s, InputAction.Right); Tap(s, InputAction.Up); Tap(s, InputAction.Switch);
         Assert.True(s.NoticeOpen);
         Tap(s, InputAction.Back);
-        Assert.Equal((false, FreeDuelVersusFocus.Start), (s.NoticeOpen, s.Versus!.Focus));
+        Assert.Equal((false, FreeDuelVersusFocus.PlayerDeck), (s.NoticeOpen, s.Versus!.Focus));
         Assert.False(s.Handle(new(InputAction.Back, InputAction.Back)));
         Assert.Null(s.Versus);
         Assert.Equal((FreeDuelStep.Format, 0), (s.Settings.Step, s.Settings.Focus));

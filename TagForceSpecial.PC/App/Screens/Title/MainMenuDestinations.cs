@@ -13,7 +13,7 @@ public static class MainMenuDestinations
     public const string SurfaceOnly = "surface implemented / feature unavailable";
     public const string DeckMenuSubmenu = "original Deck Menu submenu; its three destinations are not recreated yet and show a PC notice";
     public const string DatabaseMenuSubmenu = "original Database submenu (seven rows; website and downloaded data left out); its destinations are not recreated yet and show a PC notice";
-    public const string FreeDuelSettingsScreen = "original Free Duel settings screen; Tag Duel, CPU Spectator, Match, time limits and the versus screen show a PC notice";
+    public const string FreeDuelSettingsScreen = "Normal Duel, Single, with a supported PC deck; Tag Duel, CPU Spectator, Match and turn limits show a PC notice";
     public const string OptionsScreen = "original Options screen; values are kept and saved with the native profile, and only Duelist Level is applied today";
     public const string NativeProfileSave = "implemented against the native PC profile; original PSP save data is not read or written";
     private const string NotBuilt = "This mode has not been recreated in the PC version yet.";

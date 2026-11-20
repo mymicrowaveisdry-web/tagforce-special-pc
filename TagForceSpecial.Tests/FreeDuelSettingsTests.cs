@@ -61,6 +61,11 @@ public sealed class FreeDuelSettingsTests
         Tap(s, InputAction.Back);
         Assert.Equal((FreeDuelStep.Rules, 1), (s.Step, s.Focus));
         Assert.Equal(0, s.Chosen(FreeDuelStep.Ending));
+        Tap(s, InputAction.Back);
+        Assert.Equal((FreeDuelStep.Ending, 0), (s.Step, s.Focus));
+        Tap(s, InputAction.Back);
+        Assert.Equal((FreeDuelStep.Format, 0), (s.Step, s.Focus));
+        Assert.Equal(FreeDuelSettingsOutcome.Close, Tap(s, InputAction.Back));
     }
 
     [Theory]
@@ -73,6 +78,10 @@ public sealed class FreeDuelSettingsTests
         if (ruleChange) { Tap(s, InputAction.Down); Tap(s, InputAction.Confirm); Tap(s, InputAction.Confirm); }
         Tap(s, InputAction.Confirm);
         Assert.Equal(FreeDuelStep.Music, s.Step);
+        Tap(s, InputAction.Down); Tap(s, InputAction.Confirm);
+        Assert.Equal(FreeDuelStep.Confirm, s.Step);
+        Tap(s, InputAction.Back);
+        Assert.Equal((FreeDuelStep.Music, 1), (s.Step, s.Focus));
         Tap(s, InputAction.Back);
         Assert.Equal(expected, s.Step);
     }

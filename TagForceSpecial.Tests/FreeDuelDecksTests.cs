@@ -60,6 +60,10 @@ public sealed class FreeDuelDecksTests
         for (int i = 0; i < 5; i++) Tap(s, InputAction.Confirm);
         Tap(s, InputAction.Down); Tap(s, InputAction.Confirm);
         Assert.False(s.DeckPicker!.Player);
+        Tap(s, InputAction.Back);
+        Assert.Null(s.DeckPicker);
+        Assert.Equal((Aki, FreeDuelVersusFocus.OpponentDeck), (s.Opponent, s.Versus!.Focus));
+        Tap(s, InputAction.Confirm);
         Tap(s, InputAction.Confirm); // the PC deck
         Assert.Null(s.DeckPicker);
         Tap(s, InputAction.Down); Tap(s, InputAction.Confirm);

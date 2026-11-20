@@ -1,11 +1,14 @@
 namespace TagForceSpecial.Assets.Presentation;
 
-/// <summary>Generated pins (analysis/reconstruction/phase8_pins.py): title_menu_j.ehp and database/charalist.ehp textures of the Free Duel
-/// screens whose decoded pixels equal the textures the original uploads (Phase 8 GE dumps). Pixels only; layout is measured separately.</summary>
+/// <summary>Generated pins (analysis/reconstruction/phase8_pins.py): title_menu_j.ehp, database/charalist.ehp and duel/start_j.ehp textures of
+/// the Free Duel screens whose decoded pixels equal the textures the original uploads (GE dumps). Pixels only; layout is measured separately.</summary>
 public static class FreeDuelReferenceResources
 {
     /// <summary>Stored whole: the character list archive, read for team and series tab names by offset.</summary>
     public const string CharaListKey = "title.source.charalist", CharaListPath = "PSP_GAME/USRDIR/database/charalist.ehp";
+    /// <summary>Stored whole: the duel start and duel result archives, read for their prompts by offset.</summary>
+    public const string StartKey = "title.source.duel-start", StartPath = "PSP_GAME/USRDIR/duel/start/start_j.ehp";
+    public const string ResultKey = "title.source.duel-result", ResultPath = "PSP_GAME/USRDIR/duel/result/result_j.ehp";
 
     public static IReadOnlyList<PresentationReferenceCase> Cases { get; } = Array.AsReadOnly(new PresentationReferenceCase[]
     {
@@ -144,6 +147,90 @@ public static class FreeDuelReferenceResources
         new("free-duel", "title.flow.sddb-05", "phase8.free-duel.sddb-05.native-v1",
             "PSP_GAME/USRDIR/database/charalist.ehp", "sddb_05.gim", 3345072, 66768,
             "4bd8e2e3006c6dea19f3634a5d8564b94a375b9eb9c2b2fa4de8502d35903ea5", "f9561df6bb1ccd960e52e1dbff7f5d6d4844574341d20fdb2a1b60902d1b8deb",
-            "4dc4f16eeabfa46fe22eb4bc50895104f368b137c6920979cd87a6bd555f96f4", 256, 256)
+            "4dc4f16eeabfa46fe22eb4bc50895104f368b137c6920979cd87a6bd555f96f4", 256, 256),
+        new("free-duel", "title.flow.jnk-card01", "phase8.free-duel.jnk-card01.native-v1",
+            "PSP_GAME/USRDIR/duel/start/start_j.ehp", "jnk_card01.gim", 77456, 132304,
+            "8f24f10410a2aa36960bb46e095f2b080b2ab382eedefa0ed09f9a548defe866", "25680e3d7c1cc91cb9717b9067b054df6e817cb988e3a3b504a801aabe6724cd",
+            "f40cb9a9790ed3c2da6af267ebbc101715a02adf2ffe152d9e3c47d4698dd156", 512, 256),
+        new("free-duel", "title.flow.jyanken100001", "phase8.free-duel.jyanken100001.native-v1",
+            "PSP_GAME/USRDIR/duel/start/start_j.ehp", "jyanken100001.gim", 216192, 784,
+            "8f24f10410a2aa36960bb46e095f2b080b2ab382eedefa0ed09f9a548defe866", "3c6e4408882df053819343fbb957831ac33b0b5d909d355bf058e4d9d60336d5",
+            "26fb9605721669f5078e5a7ba1237ac0eb57067012a641f181fe654edace1222", 8, 32),
+        new("free-duel", "title.flow.jyanken100002", "phase8.free-duel.jyanken100002.native-v1",
+            "PSP_GAME/USRDIR/duel/start/start_j.ehp", "jyanken100002.gim", 216976, 784,
+            "8f24f10410a2aa36960bb46e095f2b080b2ab382eedefa0ed09f9a548defe866", "42d75a4359746bd14964c471d7c5ea7cea5ab757bf8168df4e2d2e39f796493e",
+            "73e650732b3e556c9039bee7425fb8ca4bef89bb350269f294c37fa2c09f3787", 32, 32),
+        new("free-duel", "title.flow.jyanken100003", "phase8.free-duel.jyanken100003.native-v1",
+            "PSP_GAME/USRDIR/duel/start/start_j.ehp", "jyanken100003.gim", 217760, 1296,
+            "8f24f10410a2aa36960bb46e095f2b080b2ab382eedefa0ed09f9a548defe866", "25bfe5db3a3c5278e353f71fad6301857c4fb2000a34535a5c56117fbf1e47d7",
+            "9318cb923af699841d435f7d5430edbabb4e2aefce05822fed5289a57c73e18c", 64, 32),
+        new("free-duel", "title.flow.jyanken100004", "phase8.free-duel.jyanken100004.native-v1",
+            "PSP_GAME/USRDIR/duel/start/start_j.ehp", "jyanken100004.gim", 219056, 1296,
+            "8f24f10410a2aa36960bb46e095f2b080b2ab382eedefa0ed09f9a548defe866", "d1aaef7288099b1bdc2355e8c1eacfb22ec44555d131362554c01fcae226d109",
+            "858ea7ff4f3b8e7d2b2b2eafed7ca8d57382d11305bd134c7052e85bd3292ddb", 64, 32),
+        new("free-duel", "title.flow.jyanken100007", "phase8.free-duel.jyanken100007.native-v1",
+            "PSP_GAME/USRDIR/duel/start/start_j.ehp", "jyanken100007.gim", 220352, 784,
+            "8f24f10410a2aa36960bb46e095f2b080b2ab382eedefa0ed09f9a548defe866", "ef34b1140bd2fa99e778e2ac1638882155d56c04f4702d381466bcda9ad0eda5",
+            "ce630a7a1689e474b007d3d7dde3593e1eb4368b6ebd2fb6885e2f7cbe6a9663", 32, 32),
+        new("free-duel", "title.flow.jyanken100008", "phase8.free-duel.jyanken100008.native-v1",
+            "PSP_GAME/USRDIR/duel/start/start_j.ehp", "jyanken100008.gim", 221136, 784,
+            "8f24f10410a2aa36960bb46e095f2b080b2ab382eedefa0ed09f9a548defe866", "6cf0ecd60ff6e49da1f18137d3a0c207e6734723d2d9b36bef68f905c8a4a35c",
+            "97a2addf5fda2568c64df94cd1361a960315e007dbe14a59a552a603e36a4e33", 32, 32),
+        new("free-duel", "title.flow.jyanken100009", "phase8.free-duel.jyanken100009.native-v1",
+            "PSP_GAME/USRDIR/duel/start/start_j.ehp", "jyanken100009.gim", 221920, 784,
+            "8f24f10410a2aa36960bb46e095f2b080b2ab382eedefa0ed09f9a548defe866", "6de16b35a19f35a34f2c919d84e6d63277c59b8e11b13e3a1e1059441117c06b",
+            "4fb09f10d18117fca184402875c5d4edf723f1a4927bcb5ea16ab8a444228f02", 32, 32),
+        new("free-duel", "title.flow.jyanken100013", "phase8.free-duel.jyanken100013.native-v1",
+            "PSP_GAME/USRDIR/duel/start/start_j.ehp", "jyanken100013.gim", 240320, 784,
+            "8f24f10410a2aa36960bb46e095f2b080b2ab382eedefa0ed09f9a548defe866", "72569b5a790c03e8a4a083c9b9fe61a8c9c4f8f48c3f70d4920e6459bf18e70c",
+            "ebbe0cdb394eaf4344070dec36e26eec9f8b54498c6da2ec6d9ddcec82cd4a23", 32, 32),
+        new("free-duel", "title.flow.jyanken100014", "phase8.free-duel.jyanken100014.native-v1",
+            "PSP_GAME/USRDIR/duel/start/start_j.ehp", "jyanken100014.gim", 241104, 784,
+            "8f24f10410a2aa36960bb46e095f2b080b2ab382eedefa0ed09f9a548defe866", "521a2690c3b890ba0af293e658936bb060ba5d365b5cb818dc8b6dc482136497",
+            "b3a755040cdd40191cfbf93f43ed8cc80e2d4394e918970b882ddf79cdba83e4", 32, 32),
+        new("free-duel", "title.flow.jyanken100015", "phase8.free-duel.jyanken100015.native-v1",
+            "PSP_GAME/USRDIR/duel/start/start_j.ehp", "jyanken100015.gim", 241888, 784,
+            "8f24f10410a2aa36960bb46e095f2b080b2ab382eedefa0ed09f9a548defe866", "81a0c115a59c24475afa6c211624a4e4417ee88757007e31b9ff4413eef1acc3",
+            "c57233fd5b60bdf696160896237e6ca954968bf6e09ca0ef030099eca8843c4c", 32, 32),
+        new("free-duel", "title.flow.jyanken100017", "phase8.free-duel.jyanken100017.native-v1",
+            "PSP_GAME/USRDIR/duel/start/start_j.ehp", "jyanken100017.gim", 242672, 17616,
+            "8f24f10410a2aa36960bb46e095f2b080b2ab382eedefa0ed09f9a548defe866", "d1a5ef15627c27103c60112558a5e4d2e93892d00eb9ab81bf0fb9647e5b1681",
+            "fcbdddd5ff4b81a50e302cb43b0f02e4061197a23dabcd2b6a381f5413ca8002", 128, 128),
+        new("free-duel", "title.flow.jyanken20-j0001", "phase8.free-duel.jyanken20-j0001.native-v1",
+            "PSP_GAME/USRDIR/duel/start/start_j.ehp", "jyanken20_j0001.gim", 436176, 2320,
+            "8f24f10410a2aa36960bb46e095f2b080b2ab382eedefa0ed09f9a548defe866", "ec7c3cce65463cd12b67240bbd84e8fd29b1bb8f957fb3d09e588161d6407a2e",
+            "b5ed046843cdc41a38efa89548fa7b5563fef25f20872338fb8b4ff66ae780a1", 128, 32),
+        new("free-duel", "title.flow.jyanken20-j0003", "phase8.free-duel.jyanken20-j0003.native-v1",
+            "PSP_GAME/USRDIR/duel/start/start_j.ehp", "jyanken20_j0003.gim", 438496, 5328,
+            "8f24f10410a2aa36960bb46e095f2b080b2ab382eedefa0ed09f9a548defe866", "fa9fe25f4ebc16c40b507f5618d57056231dbfc4f27f4d5001b7b55cba4607b5",
+            "59d190e0e8a78c3710608179b5fb823334cd9cb88f7e4393f860f1eaaedc8e99", 256, 32),
+        new("free-duel", "title.flow.jyanken20-j0005", "phase8.free-duel.jyanken20-j0005.native-v1",
+            "PSP_GAME/USRDIR/duel/start/start_j.ehp", "jyanken20_j0005.gim", 443824, 2320,
+            "8f24f10410a2aa36960bb46e095f2b080b2ab382eedefa0ed09f9a548defe866", "58d039df78c5c3eb2c87bec8b0a6a5ca749f95512a914dc379a3f258b71ed81f",
+            "8f0679fd1b03b1e3889fb831005f507520ef7fcf9e557ffa4ad2f94058439acc", 128, 32),
+        new("free-duel", "title.flow.jyanken20-j0007", "phase8.free-duel.jyanken20-j0007.native-v1",
+            "PSP_GAME/USRDIR/duel/start/start_j.ehp", "jyanken20_j0007.gim", 446144, 5328,
+            "8f24f10410a2aa36960bb46e095f2b080b2ab382eedefa0ed09f9a548defe866", "0aa6549bbf50aae67a53e150e42e3bcf53f6b1b3963ef05824db02bf635a8e45",
+            "fc06e2f9fbb2e6ac9b02ad412488f4820ff905ffdadb4f9c4cc7efdf5faf7725", 256, 32),
+        new("free-duel", "title.flow.vs-bg01-10001", "phase8.free-duel.vs-bg01-10001.native-v1",
+            "PSP_GAME/USRDIR/duel/start/start_j.ehp", "vs_bg01_10001.gim", 1365696, 400,
+            "8f24f10410a2aa36960bb46e095f2b080b2ab382eedefa0ed09f9a548defe866", "b17582fed7231ab17a4225f56d473e67554489efeeac8d6e032218a3d18480a1",
+            "17260db8056fba19fa3791adcdd9d8da725455e365c855d111198c377d981052", 8, 8),
+        new("free-duel", "title.flow.vs-bg01-10003", "phase8.free-duel.vs-bg01-10003.native-v1",
+            "PSP_GAME/USRDIR/duel/start/start_j.ehp", "vs_bg01_10003.gim", 1366096, 5328,
+            "8f24f10410a2aa36960bb46e095f2b080b2ab382eedefa0ed09f9a548defe866", "9f6ce21e62a744fa4ca35cdd0ccf623f9e58761a37bb1ba1bfd12dd500ce8741",
+            "1b568ce8b6880b292dbed6a732ad31ec7ecb7811874b7fc7e4b4a83a895626e5", 256, 32),
+        new("free-duel", "title.flow.vs-bg01-20001", "phase8.free-duel.vs-bg01-20001.native-v1",
+            "PSP_GAME/USRDIR/duel/start/start_j.ehp", "vs_bg01_20001.gim", 1444368, 2256,
+            "8f24f10410a2aa36960bb46e095f2b080b2ab382eedefa0ed09f9a548defe866", "32053ffab06c66c886520511e21a5441e74a97db4cc9a06daa0339a72e709d58",
+            "bcfd35c6c01aec48b95d9ee92a75c589dccc19118d8c7aa80d5cb17f02967e79", 128, 16),
+        new("free-duel", "title.flow.vs-time10001", "phase8.free-duel.vs-time10001.native-v1",
+            "PSP_GAME/USRDIR/duel/start/start_j.ehp", "vs_time10001.gim", 1456208, 2256,
+            "8f24f10410a2aa36960bb46e095f2b080b2ab382eedefa0ed09f9a548defe866", "92276f265f0e2704b05252d4b41a17fbcebdcbe0a5bb4d6a6742fa7aa9c83e9c",
+            "39049fcdfd405fa643ead9f08ec0ec79c4e37f47658568ac246b3b6f24c29446", 128, 16),
+        new("free-duel", "title.flow.d-menu-vs010009", "phase8.free-duel.d-menu-vs010009.native-v1",
+            "PSP_GAME/USRDIR/title_menu/title_menu_j.ehp", "d_menu_vs010009.gim", 1112096, 16656,
+            "65b75fc41086e181aaee5ebcea3cc332098123230739f443884f4ce76d7c0e47", "d3f922bea11beb454e4d2bec6ff7638df5bea4a8463b11af93308192187a4af4",
+            "30bfafa8737fc52b35d705914fd0ff4d4e05a34a3ae4f884ad245ad03657a1c0", 256, 128)
     });
 }
