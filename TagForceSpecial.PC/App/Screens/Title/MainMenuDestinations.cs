@@ -1,6 +1,6 @@
 namespace TagForceSpecial.PC.App.Screens.Title;
 
-public enum MainMenuRoute { Unavailable, NativeSave, Options, DeckMenu, DatabaseMenu }
+public enum MainMenuRoute { Unavailable, NativeSave, Options, DeckMenu, DatabaseMenu, FreeDuel }
 
 /// <summary>
 /// One Main Menu row: its original behavior (<paramref name="OriginalBehavior"/>) and what the PC offers (<paramref
@@ -13,6 +13,7 @@ public static class MainMenuDestinations
     public const string SurfaceOnly = "surface implemented / feature unavailable";
     public const string DeckMenuSubmenu = "original Deck Menu submenu; its three destinations are not recreated yet and show a PC notice";
     public const string DatabaseMenuSubmenu = "original Database submenu (seven rows; website and downloaded data left out); its destinations are not recreated yet and show a PC notice";
+    public const string FreeDuelSettingsScreen = "Normal Duel, Single, with a supported PC deck; Tag Duel, CPU Spectator, Match and turn limits show a PC notice";
     public const string OptionsScreen = "original Options screen; values are kept and saved with the native profile, and only Duelist Level is applied today";
     public const string NativeProfileSave = "implemented against the native PC profile; original PSP save data is not read or written";
     private const string NotBuilt = "This mode has not been recreated in the PC version yet.";
@@ -20,7 +21,7 @@ public static class MainMenuDestinations
     public static IReadOnlyList<MainMenuDestination> All { get; } = Array.AsReadOnly(new MainMenuDestination[]
     {
         new("story", "Story Mode", MainMenuRoute.Unavailable, SurfaceOnly, "Arc selection screen; Back returns with focus kept", "10-11", NotBuilt),
-        new("free-duel", "Free Duel", MainMenuRoute.Unavailable, SurfaceOnly, "Duel format screen; Back returns with focus kept", "8", NotBuilt),
+        new("free-duel", "Free Duel", MainMenuRoute.FreeDuel, FreeDuelSettingsScreen, "Duel settings screen; Back returns with focus kept", "8", NotBuilt),
         new("network", "Network Mode", MainMenuRoute.Unavailable, SurfaceOnly, "PSP ad hoc notice; only its OK button closes it", "multiplayer",
             "This mode needs multiplayer, which has not been built for the PC version yet."),
         new("duel-puzzle", "Duel Puzzle", MainMenuRoute.Unavailable, SurfaceOnly, "Duel Mission list; Back asks whether to save", "12", NotBuilt),

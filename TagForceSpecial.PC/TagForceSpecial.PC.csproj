@@ -37,6 +37,11 @@
     <EmbeddedResource Include="App\Screens\Title\database-menu-frame.json" />
     <EmbeddedResource Include="App\Screens\Album\card-album-frame.json" />
     <EmbeddedResource Include="App\Screens\Album\card-album-detail.json" />
+    <EmbeddedResource Include="App\Screens\FreeDuel\free-duel-settings-frame.json" />
+    <EmbeddedResource Include="App\Screens\FreeDuel\free-duel-versus-frame.json" />
+    <EmbeddedResource Include="App\Screens\FreeDuel\free-duel-picker-frame.json" />
+    <EmbeddedResource Include="App\Screens\FreeDuel\free-duel-decks-frame.json" />
+    <EmbeddedResource Include="App\Screens\FreeDuel\free-duel-start-frame.json" />
     <EmbeddedResource Include="App\Screens\Title\deck-edit-frame.json" />
     <EmbeddedResource Include="App\Screens\Title\deck-edit-menu-frame.json" />
   </ItemGroup>

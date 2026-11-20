@@ -26,6 +26,8 @@ public sealed partial class GameLoop
     private App.Screens.Album.CardAlbumScreen? cardAlbumScreen;
     private App.Screens.Album.CardAlbumSession? renderedAlbumSession;
     private int renderedAlbumRevision = -1;
+    private App.Screens.FreeDuel.FreeDuelSettingsRenderer? freeDuelRenderer;
+    private (object? Session, int Revision, int Background, int Frame) renderedFreeDuel;
     private readonly ScreenFade screenFade = new();
 
     /// <summary>The flow is presented only when every source texture and text reference validates.</summary>
@@ -48,6 +50,7 @@ public sealed partial class GameLoop
             }
             catch { next.Dispose(); throw; }
             cardAlbumScreen?.Dispose(); cardAlbumScreen = null;
+            freeDuelRenderer?.Dispose(); freeDuelRenderer = null;
             flowVisuals?.Dispose();
             flowVisuals = next;
             profiles = new(setup.Storage);
@@ -197,6 +200,27 @@ public sealed partial class GameLoop
         renderedDeckEditKey = key;
     }
 
+    /// <summary>Refreshes the Free Duel layer when its session or animation frame changes.</summary>
+    private void RefreshFreeDuel(TitleFlow flow, TitleFlowVisuals visuals, App.Screens.FreeDuel.FreeDuelSession session,
+        App.Screens.FreeDuel.FreeDuelSettingsRenderer view)
+    {
+        int background = MainMenuFrame(flow, visuals), frame = options.PixelExact ? 0 : session.Settings.Frame;
+        if (renderedFreeDuel != (session, session.Revision, background, frame))
+        {
+            if (session.Start is { } start) view.Start.Render(view.Layer, session, start, background, frame);
+            else if (session.DeckPicker is { } deckPicker) view.Decks.Render(view.Layer, deckPicker, background);
+            else if (session.Picker is { } picker) view.Picker.Render(view.Layer, picker, background);
+            else if (session.Versus is null) view.Render(session.Settings, background, frame);
+            else view.Versus.Render(view.Layer, session, background, frame);
+            gum.BindFreeDuel(view.Layer);
+            renderedFreeDuel = (session, session.Revision, background, frame);
+        }
+        gum.ShowFreeDuelNotice(!session.NoticeOpen ? null : session.DeckPicker is { } open ? view.Decks.NoticeTitle(open)
+            : session.Versus is null ? view.NoticeTitle(session.Settings) : view.Versus.NoticeTitle(session),
+            session.Versus?.NoticeMessage);
+        gum.Show("OriginalFreeDuel", true);
+    }
+
     private void RefreshFlow()
     {
         if (titleFlow is null || flowVisuals is null) return;
@@ -208,6 +232,9 @@ public sealed partial class GameLoop
         gum.Show("OriginalDeckEdit", false);
         gum.Show("OriginalRecipeViewer", false);
         gum.Show("OriginalCardAlbum", false);
+        gum.Show("OriginalFreeDuel", false);
+        if (titleFlow.Step == TitleFlowStep.FreeDuelSettings && titleFlow.FreeDuel is { } freeDuel && freeDuelRenderer is { } freeDuelView)
+        { RefreshFreeDuel(titleFlow, flowVisuals, freeDuel, freeDuelView); return; }
         if (titleFlow.Step == TitleFlowStep.CardAlbum && titleFlow.CardAlbum is { } album && cardAlbumScreen is { } albumScreen)
         {
             if (!ReferenceEquals(renderedAlbumSession, album) || renderedAlbumRevision != album.Revision)
@@ -358,6 +385,47 @@ public sealed partial class GameLoop
                 : id => (draft.Count(id, Core.Decks.DeckSection.Main) + draft.Count(id, Core.Decks.DeckSection.Extra), draft.Count(id, Core.Decks.DeckSection.Side));
             return owner.cardAlbumScreen?.Open(owner.setup.Storage.PathFor(App.Screens.Album.CardAlbumScreen.CollectionFile), inDeck);
         }
+        public App.Screens.FreeDuel.FreeDuelSession? OpenFreeDuel()
+        {
+            if (owner.flowVisuals is null) return null;
+            owner.freeDuelRenderer ??= App.Screens.FreeDuel.FreeDuelSettingsRenderer.TryCreate(owner.GraphicsDevice, owner.flowVisuals, owner.screenAssets);
+            DeckDraft? draft = null;
+            if (!owner.options.PresentationSmoke && owner.editor is { } editor) { editor.EnsureDraft(); draft = editor.Draft; }
+            // The player's original save recipes (User list of the recipe import), shown greyed in the player's deck picker.
+            IReadOnlyList<(int, string, DateTime)>? saved = null;
+            try
+            {
+                string? root = owner.options.RecipeReferenceRoot ?? owner.setup?.Game?.RecipeRoot;
+                if (root is not null && owner.setup?.Game?.Catalog.Catalog is { } catalog
+                    && Recipes.RecipeCatalog.Open(new PrivateStorage(root), catalog) is { } recipes)
+                    saved = recipes.Records.Where(r => r.Kind == Recipes.RecipeListKind.User).Select(r => (r.Slot, r.Name, r.Updated)).ToArray();
+            }
+            catch (Exception e) when (PrivateStorage.Recoverable(e)) { Console.Error.WriteLine("RECIPE_SOURCE_PENDING " + e.Message); }
+            return owner.freeDuelRenderer?.NewSession(owner.titleFlow?.Name ?? "", draft?.Name ?? Effects.InitialOpponentDecks.Names[0], saved,
+                random: owner.options.PresentationSmoke ? new Random(37) : null);
+        }
+        public bool StartFreeDuel(App.Screens.FreeDuel.FreeDuelSession session, bool playerGoesFirst)
+        {
+            if (owner.setup?.Game is not { } game || session.Settings.Settings is not { } settings) return false;
+            try
+            {
+                var draft = owner.options.PresentationSmoke ? null : owner.editor?.Draft;
+                var deck = draft?.Snapshot() ?? InitialOpponentDecks.Create(0);
+                var first = playerGoesFirst ? Core.PlayerId.One : Core.PlayerId.Two;
+                owner.duel = SupportedDuelFactory.Create(game, deck, owner.CurrentSeed, first, settings.StartingLifePoints);
+            }
+            catch (InvalidDataException error)
+            {
+                session.Versus?.ShowNotice(error.Message);
+                return false;
+            }
+            owner.freeDuelResult = new();
+            owner.choiceIndex = 0;
+            owner.inspectIndex = -1;
+            owner.opponentAt = owner.navigationTime.TotalGameTime.TotalSeconds + .35;
+            owner.screen = Game.ScreenId.Duel;
+            return true;
+        }
         public void SaveDeckEdit(DeckEditSession session)
         {
             if (!owner.options.PresentationSmoke && owner.editor is { } editor && ReferenceEquals(session.Draft, editor.Draft)) editor.Save();
@@ -413,6 +481,7 @@ public sealed partial class GameLoop
             owner.gum.Show("OriginalDeckEdit", false);
             owner.gum.Show("OriginalRecipeViewer", false);
             owner.gum.Show("OriginalCardAlbum", false);
+            owner.gum.Show("OriginalFreeDuel", false);
             owner.renderedMenuFrame = -1;
         }
     }

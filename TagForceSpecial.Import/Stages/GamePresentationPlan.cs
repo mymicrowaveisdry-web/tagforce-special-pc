@@ -16,7 +16,7 @@ public static class GamePresentationPlan
 
     public static IReadOnlyList<PresentationReferenceCase> Required { get; } = Array.AsReadOnly(
         TitleReferenceResources.Cases.Concat(TitleFlowReferenceResources.Cases).Concat(OptionsReferenceResources.Cases)
-            .Concat(DeckEditReferenceResources.Cases).Concat(CardAlbumReferenceResources.Cases)
+            .Concat(DeckEditReferenceResources.Cases).Concat(CardAlbumReferenceResources.Cases).Concat(FreeDuelReferenceResources.Cases)
             .Concat(PresentationReferenceCases.Cases.Where(c => c.AssetKey == "title.source.press-start0002")).ToArray());
     public static IReadOnlyList<(string Key, string Path)> StoredSources { get; } =
     [
@@ -26,7 +26,10 @@ public static class GamePresentationPlan
         (CardAlbumResources.FacesKey, CardFaceSource.SourcePath),
         (CardAlbumResources.ArchiveKey, CardAlbumResources.Archive),
         (CardAlbumResources.ArtKey, CardThumbnailDecoder.SourcePath),
-        (CardAlbumResources.CardInfoKey, CardAlbumResources.CardInfoPath)
+        (CardAlbumResources.CardInfoKey, CardAlbumResources.CardInfoPath),
+        (FreeDuelReferenceResources.CharaListKey, FreeDuelReferenceResources.CharaListPath),
+        (FreeDuelReferenceResources.StartKey, FreeDuelReferenceResources.StartPath),
+        (FreeDuelReferenceResources.ResultKey, FreeDuelReferenceResources.ResultPath)
     ];
     public static IReadOnlyList<uint> ThumbnailCards => ConfirmedCardPool.CardIds;
 

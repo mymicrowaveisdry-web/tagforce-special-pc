@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json.Serialization;
 using TagForceSpecial.Core;
 using TagForceSpecial.Core.Views;
 
@@ -13,6 +14,10 @@ public sealed record DuelReplay(string PolicyVersion, uint Seed, string DeckMani
 {
     public int SchemaVersion => 1;
     public string ActionContractVersion => DuelActionSource.ContractVersion;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public PlayerId StartingPlayer { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int? StartingLifePoints { get; init; }
     public string CommandDigest() => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(
         string.Join("\n", Steps.Select(s => $"{s.BeforeRevision}|{s.AfterRevision}|{s.Player}|{s.ActionKey}|{s.DecisionId}")))));
 }

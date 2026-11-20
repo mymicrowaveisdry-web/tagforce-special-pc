@@ -60,7 +60,8 @@ public static class ConfirmedCardPool
     /// Loads every family into one engine for two decks. The catalog must come from the reviewed source build and hold every
     /// deck card; family metadata was reviewed against that build, so a full per-family check is left to the family tests.
     /// </summary>
-    public static DuelEngine CreateEngine(CardCatalog catalog, DeckDefinition first, DeckDefinition second, ulong shuffleSeed)
+    public static DuelEngine CreateEngine(CardCatalog catalog, DeckDefinition first, DeckDefinition second, ulong shuffleSeed,
+        PlayerId startingPlayer = PlayerId.One, int startingLifePoints = 8000)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         if (catalog.Source.ContainerSha256 is { } hash && hash != TfspCardMetadata.CardInfoSha256)
@@ -68,7 +69,8 @@ public static class ConfirmedCardPool
         var known = catalog.Cards.Select(c => c.GameCardId).ToHashSet();
         if (first.Entries().Concat(second.Entries()).Any(e => !known.Contains(e.CardId) || !Contains(e.CardId)))
             throw new ArgumentException("Both decks must hold only confirmed pool cards present in the catalog.");
-        return CardPool.CreateEngine(catalog, first.Main, second.Main, first.Extra, second.Extra, shuffleSeed);
+        return CardPool.CreateEngine(catalog, first.Main, second.Main, first.Extra, second.Extra, shuffleSeed, startingPlayer,
+            startingLifePoints: startingLifePoints);
     }
 
     /// <summary>The copy group of each pool card: its catalog name, so alt styles count together; a card missing from the catalog stands alone.</summary>

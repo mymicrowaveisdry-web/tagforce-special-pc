@@ -5,6 +5,9 @@ namespace TagForceSpecial.Core;
 /// <summary>Validates card classifications and constructs immutable initial players with bounded, stable instance allocation.</summary>
 internal static class DuelSetup
 {
+    /// <summary>Standard starting Life Points; a duel may start with another positive amount (Free Duel's rule change).</summary>
+    internal const int DefaultLifePoints = 8000, MaximumStartingLifePoints = 99_999;
+
     internal static FrozenDictionary<uint, DuelCardRules> Rules(IReadOnlyDictionary<uint, DuelCardRules> rules, IReadOnlySet<uint> knownIds)
     {
         foreach (var (id, profile) in rules)
@@ -25,8 +28,10 @@ internal static class DuelSetup
 
     internal static DuelState InitialState(IReadOnlySet<uint> knownIds, IReadOnlyDictionary<uint, DuelCardRules> rules,
         IEnumerable<uint> playerOneDeck, IEnumerable<uint> playerTwoDeck, PlayerId startingPlayer,
-        IEnumerable<uint>? playerOneExtraDeck, IEnumerable<uint>? playerTwoExtraDeck, ulong? shuffleSeed)
+        IEnumerable<uint>? playerOneExtraDeck, IEnumerable<uint>? playerTwoExtraDeck, ulong? shuffleSeed, int startingLifePoints = DefaultLifePoints)
     {
+        if (startingLifePoints is < 1 or > MaximumStartingLifePoints)
+            throw new ArgumentOutOfRangeException(nameof(startingLifePoints), "Starting Life Points must be between 1 and 99,999.");
         bool IsTokenId(uint id) => rules.TryGetValue(id, out var rule) && rule.IsToken;
         int nextInstance = 1;
         DuelPlayerState CreatePlayer(PlayerId id, IEnumerable<uint> ids)
@@ -50,7 +55,7 @@ internal static class DuelSetup
         }
         var firstExtra = CreateExtraDeck(PlayerId.One, playerOneExtraDeck);
         var secondExtra = CreateExtraDeck(PlayerId.Two, playerTwoExtraDeck);
-        return new([first.With(extraDeck: firstExtra), second.With(extraDeck: secondExtra)], startingPlayer,
+        return new([first.With(extraDeck: firstExtra, lifePoints: startingLifePoints), second.With(extraDeck: secondExtra, lifePoints: startingLifePoints)], startingPlayer,
             bookkeeping: new(nextInstance, shuffleSeed is { } seed ? DuelRandomState.FromSeed(seed) : null));
     }
     internal static FrozenDictionary<string, DecisionSequence> Decisions(IEnumerable<DecisionSequence>? decisionSequences, IReadOnlySet<uint> knownIds)

@@ -65,6 +65,7 @@ public sealed partial class GameLoop
             Press(Keys.Up, $"MainMenu/0/{row}");
             if (MainMenuDestinations.All[row].Route == MainMenuRoute.Options) { OptionsRoute(Press); continue; }
             if (MainMenuDestinations.All[row].Route == MainMenuRoute.DeckMenu) { DeckMenuRoute(Press, Hold, row, deckEdit, recipes); continue; }
+            if (MainMenuDestinations.All[row].Route == MainMenuRoute.FreeDuel) { FreeDuelRoute(Press, row); continue; }
             if (MainMenuDestinations.All[row].Route == MainMenuRoute.DatabaseMenu) { DatabaseMenuRoute(Press, Hold, row, album ? frames => { for (int i = 0; i < frames; i++) steps.Add((null, AnyState)); } : null); continue; }
             Press(Keys.Enter, $"MainMenuUnavailable/0/{row}"); Press(Keys.Escape, $"MainMenu/0/{row}");
             Press(Keys.Enter, $"MainMenuUnavailable/0/{row}"); Press(Keys.Enter, $"MainMenu/0/{row}");
@@ -115,6 +116,44 @@ public sealed partial class GameLoop
         Press(Keys.Enter, "SystemSavePrompt/0/6"); Press(Keys.Enter, "SystemSaveDone/0/6"); Press(Keys.Escape, "MainMenu/0/6");
         Press(Keys.Enter, "Options/L/0/1"); Press(Keys.Left, "Options/L/0/0"); Press(Keys.Enter, "OptionsSaveQuestion/0/6"); Press(Keys.Right, "OptionsSaveQuestion/1/6");
         Press(Keys.Enter, "MainMenu/0/6");
+    }
+
+    /// <summary>Free Duel settings: wrap, PC notices on Tag Duel / Match / a time limit (focus kept), the rule-change path and Back to
+    /// Rules, the music list's wrap and scroll, the confirmation and its Next notice, and the Back chain to the Main Menu on Free Duel.</summary>
+    private static void FreeDuelRoute(Action<Keys, string, string?> press, int menuRow)
+    {
+        void Press(Keys key, string expected) => press(key, expected, null);
+        static string F(string step, int focus, int top = 0, bool notice = false) => $"FreeDuel/{step}/{focus}/{top}{(notice ? "/N" : "")}";
+        Press(Keys.Enter, F("Format", 0)); Press(Keys.Up, F("Format", 2)); Press(Keys.Down, F("Format", 0)); Press(Keys.Down, F("Format", 1));
+        Press(Keys.Enter, F("Format", 1, notice: true)); Press(Keys.Down, F("Format", 1, notice: true)); Press(Keys.Escape, F("Format", 1));
+        Press(Keys.Up, F("Format", 0)); Press(Keys.Enter, F("Ending", 0)); Press(Keys.Down, F("Ending", 1));
+        Press(Keys.Enter, F("Ending", 1, notice: true)); Press(Keys.Enter, F("Ending", 1)); Press(Keys.Up, F("Ending", 0));
+        Press(Keys.Enter, F("Rules", 0)); Press(Keys.Down, F("Rules", 1)); Press(Keys.Enter, F("LifePoints", 0)); Press(Keys.Enter, F("TimeLimit", 0));
+        Press(Keys.Down, F("TimeLimit", 1)); Press(Keys.Enter, F("TimeLimit", 1, notice: true)); Press(Keys.Escape, F("TimeLimit", 1));
+        Press(Keys.Escape, F("LifePoints", 0)); Press(Keys.Escape, F("Rules", 1)); Press(Keys.Up, F("Rules", 0)); Press(Keys.Enter, F("Music", 0));
+        Press(Keys.Up, F("Music", 43, 38)); Press(Keys.Down, F("Music", 0));
+        for (int row = 1; row <= 6; row++) Press(Keys.Down, F("Music", row, Math.Max(0, row - 5)));
+        Press(Keys.Enter, F("Confirm", 0)); Press(Keys.Escape, F("Music", 6, 1)); Press(Keys.Enter, F("Confirm", 0));
+        // VERSUS: cycle focus, open Start Duel and cancel, then back out to settings.
+        static string V(string focus, bool notice = false) => $"FreeDuelVs/{focus}{(notice ? "/N" : "")}";
+        Press(Keys.Enter, V("OpponentName"));
+        // Character picker: opens on Aki (5D's, No.076 on top), Down, Right = next page, E/Q tabs with each tab's own cursor, Q wraps through GX,
+        // Up wraps to GX's last row, Back cancels (still Aki), then a pick of Jack Atlas.
+        static string K(int series, int focus, int top) => $"FreeDuelPick/{series}/{focus}/{top}";
+        Press(Keys.Enter, K(3, 1, 1)); Press(Keys.Down, K(3, 2, 1)); Press(Keys.Right, K(3, 5, 5)); Press(Keys.E, K(4, 0, 0)); Press(Keys.Q, K(3, 5, 5));
+        Press(Keys.Q, K(2, 0, 0)); Press(Keys.Up, K(2, 32, 29)); Press(Keys.Escape, V("OpponentName"));
+        Press(Keys.Enter, K(3, 1, 1)); Press(Keys.Down, K(3, 2, 1)); Press(Keys.Enter, V("OpponentName"));
+        // Deck pickers: the PC deck first (selectable), originals greyed with a notice; Jack's list = PC, Partner's Deck, four own decks.
+        static string D(bool player, int focus, int top, bool notice = false) => $"FreeDuelDeck/{(player ? "P" : "O")}/{focus}/{top}{(notice ? "/N" : "")}";
+        Press(Keys.Down, V("OpponentDeck")); Press(Keys.Enter, D(false, 0, 0)); Press(Keys.Down, D(false, 1, 0)); Press(Keys.Enter, D(false, 1, 0, true));
+        Press(Keys.Escape, D(false, 1, 0)); Press(Keys.Up, D(false, 0, 0)); Press(Keys.Up, D(false, 5, 0)); Press(Keys.Down, D(false, 0, 0));
+        Press(Keys.Enter, V("OpponentDeck")); Press(Keys.Down, V("PlayerDeck")); Press(Keys.Enter, D(true, 0, 0)); Press(Keys.Escape, V("PlayerDeck"));
+        Press(Keys.Up, V("OpponentDeck")); Press(Keys.Down, V("PlayerDeck")); Press(Keys.Down, V("Start"));
+        Press(Keys.Down, V("OpponentName")); Press(Keys.Up, V("Start")); Press(Keys.Left, V("OpponentName")); Press(Keys.Right, V("Start"));
+        Press(Keys.Enter, "FreeDuelStart/Choose/Paper"); Press(Keys.Left, "FreeDuelStart/Choose/Scissors");
+        Press(Keys.Enter, "FreeDuelStart/Reveal/Scissors"); Press(Keys.Escape, V("Start")); Press(Keys.Up, V("PlayerDeck"));
+        Press(Keys.Space, V("PlayerDeck", true)); Press(Keys.Enter, V("PlayerDeck")); Press(Keys.Escape, F("Format", 0));
+        Press(Keys.Escape, $"MainMenu/0/{menuRow}");
     }
 
     /// <summary>Database submenu over the dimmed Main Menu: press wrap both ways, ignored buttons, every row's PC notice with both exits
@@ -286,6 +325,16 @@ public sealed partial class GameLoop
             $"Recipe/{recipes.Kind}/{recipes.Cursor}/{recipes.Modal}/{recipes.Sort}/{recipes.Inverse}",
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.DeckEdit, DeckEdit: { } edit } =>
             $"DeckEdit/{edit.Tab}/{edit.Cursor}/{edit.Prompt}/{edit.PromptFocus}/{MenuState(edit.Menus)}/{edit.Count(DeckEditTab.Deck)}/{edit.Count(DeckEditTab.Trunk)}",
+        ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.FreeDuelSettings, FreeDuel.Start: { } start } =>
+            $"FreeDuelStart/{start.Step}/{start.Focus}",
+        ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.FreeDuelSettings, FreeDuel: { DeckPicker: { } deck } } =>
+            $"FreeDuelDeck/{(deck.Player ? "P" : "O")}/{deck.Focus}/{deck.Top}{(deck.NoticeOpen ? "/N" : "")}",
+        ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.FreeDuelSettings, FreeDuel: { Picker: { } pick } } =>
+            $"FreeDuelPick/{pick.Series}/{pick.Focus}/{pick.Top}",
+        ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.FreeDuelSettings, FreeDuel: { Versus: { } vs } } =>
+            $"FreeDuelVs/{vs.Focus}{(vs.NoticeOpen ? "/N" : "")}",
+        ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.FreeDuelSettings, FreeDuel: { Settings: var fd } } =>
+            $"FreeDuel/{fd.Step}/{fd.Focus}/{fd.Top}{(fd.NoticeOpen ? "/N" : "")}",
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.CardAlbum, CardAlbum: { } album } =>
             $"CardAlbum/{album.View}/{album.Focus}/{(album.RightPage ? "R" : "L")}/{album.Pocket}/{album.BarButton}{(album.JumpOpen ? $"/J{album.JumpRow}{album.JumpColumn}" : "")}{(album.Detail is { Closing: false } d ? $"/D{(int)d.Tab}" : "")}",
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.DeckMenu or TitleFlowStep.DatabaseMenu, Submenu: { } sub } flow =>
@@ -304,7 +353,7 @@ public sealed partial class GameLoop
             throw new InvalidOperationException($"Presentation route/focus mismatch at frame {frames}, step {step}: expected {expected}, got {label}.");
         if (duel is not null || smokeCommands != 0 || router!.ModalDepth != 0)
             throw new InvalidOperationException("Presentation navigation changed gameplay or modal ownership.");
-        if (gum.RootCount != 12 || gum.AttachedRootCount != 12 || originalTitle?.Layers.Count != 11)
+        if (gum.RootCount != 13 || gum.AttachedRootCount != 13 || originalTitle?.Layers.Count != 11)
             throw new InvalidOperationException("Presentation root/layer count changed.");
         presentationTextureCount ??= gum.CachedTextureCount;
         if (gum.CachedTextureCount != presentationTextureCount)

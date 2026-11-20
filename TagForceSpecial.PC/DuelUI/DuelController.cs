@@ -14,6 +14,8 @@ public sealed class DuelController
     private readonly List<ReplayEntry> replay = [];
     private readonly IReadOnlyList<uint> firstDeck, secondDeck;
     private readonly bool stagedBattle, replayFromStart;
+    private readonly PlayerId startingPlayer;
+    private readonly int startingLifePoints;
     public DuelView View { get; private set; }
     public string Notice { get; private set; } = "Choose an action";
     public OpponentStatus? LastOpponentStatus { get; private set; }
@@ -30,6 +32,8 @@ public sealed class DuelController
         source = new(engine, catalog);
         driver = new(opponent, seed, opponentStepBudget);
         replayFromStart = engine.State.Revision == 0;
+        startingPlayer = engine.State.ActivePlayer;
+        startingLifePoints = engine.State.GetPlayer(PlayerId.One).LifePoints;
         firstDeck = PlayerProjection.Read(engine.State.GetPlayer(PlayerId.One).Hand.Concat(engine.State.GetPlayer(PlayerId.One).Deck).Select(c => c.GameCardId));
         secondDeck = PlayerProjection.Read(engine.State.GetPlayer(PlayerId.Two).Hand.Concat(engine.State.GetPlayer(PlayerId.Two).Deck).Select(c => c.GameCardId));
         stagedBattle = engine.UsesStagedBattle;
@@ -92,7 +96,11 @@ public sealed class DuelController
         if (!replayFromStart) throw new InvalidOperationException("Replay export requires a session started at revision zero.");
         if (View.Outcome is null) throw new InvalidOperationException("Private replay export is available only after the duel finishes.");
         return new(driver.PolicyVersion, Seed, deckManifest, firstDeck, secondDeck, stagedBattle,
-            PlayerProjection.Read(replay), View.Outcome);
+            PlayerProjection.Read(replay), View.Outcome)
+        {
+            StartingPlayer = startingPlayer,
+            StartingLifePoints = startingLifePoints == 8000 ? null : startingLifePoints
+        };
     }
 
     private void Record(DuelObservation before, LegalAction action, long after)

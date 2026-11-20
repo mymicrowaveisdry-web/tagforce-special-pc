@@ -201,7 +201,7 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
                 canvas.SaveAsPng(output, 480, 272);
                 capturedResult = true;
             }
-            if (!savedReplay && options.ReplayPath is { } replayPath)
+            if (!savedReplay && duel.View.Outcome is not null && options.ReplayPath is { } replayPath)
             {
                 using var output = new FileStream(replayPath, FileMode.CreateNew, FileAccess.Write);
                 var replay = duel.ExportReplay(InitialOpponentDecks.ManifestId);
