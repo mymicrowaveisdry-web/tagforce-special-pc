@@ -70,16 +70,23 @@ public sealed class FreeDuelStartRenderer(GraphicsDevice device, TitleFlowVisual
         foreach (var d in p.HandFocus) visuals.DrawFlow(d with { Points = d.Points.Select(q => new[] { q[0] + dx, q[1] }).ToArray() });
     }
 
-    /// <summary>Measured with Rock against Rock: each card is its hand's cell (opponent's from the red row), with the result label below it.</summary>
+    /// <summary>Each side has its own column, with the result centered beneath the revealed card.</summary>
     private void DrawReveal(FreeDuelStartSession start)
     {
+        const float playerCenter = 160, opponentCenter = 320;
         var p = profile;
         var result = start.Result;
         var opponent = result switch { FreeDuelRpsResult.Win => FreeDuelRpsResult.Lose, FreeDuelRpsResult.Lose => FreeDuelRpsResult.Win, _ => result };
-        visuals.DrawFlow(Cell(p.RevealPlayer, (int)start.PlayerHand * p.CardCellWidth));
-        visuals.DrawFlow(Cell(p.RevealOpponent, (int)start.OpponentHand * p.CardCellWidth));
-        visuals.DrawFlow(Cell(p.LabelPlayer, (int)result * p.LabelCellWidth));
-        visuals.DrawFlow(Cell(p.LabelOpponent, (int)opponent * p.LabelCellWidth));
+        DrawRevealCell(p.RevealPlayer, (int)start.PlayerHand * p.CardCellWidth, playerCenter);
+        DrawRevealCell(p.RevealOpponent, (int)start.OpponentHand * p.CardCellWidth, opponentCenter);
+        DrawRevealCell(p.LabelPlayer, (int)result * p.LabelCellWidth, playerCenter);
+        DrawRevealCell(p.LabelOpponent, (int)opponent * p.LabelCellWidth, opponentCenter);
+    }
+
+    private void DrawRevealCell(FlowDraw draw, float u, float center)
+    {
+        float offset = center - (Left(draw) + draw.Points.Max(point => point[0])) / 2;
+        visuals.DrawFlow(Cell(draw, u) with { Points = draw.Points.Select(point => new[] { point[0] + offset, point[1] }).ToArray() });
     }
 
     /// <summary>Measured: both buttons always draw their dark face; the focused one also draws its light face (hidden on the other).</summary>
