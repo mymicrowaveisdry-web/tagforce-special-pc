@@ -143,7 +143,12 @@ public sealed partial class GameLoop
         Press(Keys.Enter, K(3, 1, 1)); Press(Keys.Down, K(3, 2, 1)); Press(Keys.Right, K(3, 5, 5)); Press(Keys.E, K(4, 0, 0)); Press(Keys.Q, K(3, 5, 5));
         Press(Keys.Q, K(2, 0, 0)); Press(Keys.Up, K(2, 32, 29)); Press(Keys.Escape, V("OpponentName"));
         Press(Keys.Enter, K(3, 1, 1)); Press(Keys.Down, K(3, 2, 1)); Press(Keys.Enter, V("OpponentName"));
-        Press(Keys.Down, V("OpponentDeck")); Press(Keys.Down, V("PlayerDeck")); Press(Keys.Down, V("Start"));
+        // Deck pickers: the PC deck first (selectable), originals greyed with a notice; Jack's list = PC, Partner's Deck, four own decks.
+        static string D(bool player, int focus, int top, bool notice = false) => $"FreeDuelDeck/{(player ? "P" : "O")}/{focus}/{top}{(notice ? "/N" : "")}";
+        Press(Keys.Down, V("OpponentDeck")); Press(Keys.Enter, D(false, 0, 0)); Press(Keys.Down, D(false, 1, 0)); Press(Keys.Enter, D(false, 1, 0, true));
+        Press(Keys.Escape, D(false, 1, 0)); Press(Keys.Up, D(false, 0, 0)); Press(Keys.Up, D(false, 5, 0)); Press(Keys.Down, D(false, 0, 0));
+        Press(Keys.Enter, V("OpponentDeck")); Press(Keys.Down, V("PlayerDeck")); Press(Keys.Enter, D(true, 0, 0)); Press(Keys.Escape, V("PlayerDeck"));
+        Press(Keys.Up, V("OpponentDeck")); Press(Keys.Down, V("PlayerDeck")); Press(Keys.Down, V("Start"));
         Press(Keys.Down, V("OpponentName")); Press(Keys.Up, V("Start")); Press(Keys.Left, V("OpponentName")); Press(Keys.Right, V("Start"));
         Press(Keys.Enter, V("Start", true)); Press(Keys.Escape, V("Start")); Press(Keys.Up, V("PlayerDeck"));
         Press(Keys.Space, V("PlayerDeck", true)); Press(Keys.Enter, V("PlayerDeck")); Press(Keys.Escape, F("Format", 0));
@@ -319,6 +324,8 @@ public sealed partial class GameLoop
             $"Recipe/{recipes.Kind}/{recipes.Cursor}/{recipes.Modal}/{recipes.Sort}/{recipes.Inverse}",
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.DeckEdit, DeckEdit: { } edit } =>
             $"DeckEdit/{edit.Tab}/{edit.Cursor}/{edit.Prompt}/{edit.PromptFocus}/{MenuState(edit.Menus)}/{edit.Count(DeckEditTab.Deck)}/{edit.Count(DeckEditTab.Trunk)}",
+        ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.FreeDuelSettings, FreeDuel: { DeckPicker: { } deck } } =>
+            $"FreeDuelDeck/{(deck.Player ? "P" : "O")}/{deck.Focus}/{deck.Top}{(deck.NoticeOpen ? "/N" : "")}",
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.FreeDuelSettings, FreeDuel: { Picker: { } pick } } =>
             $"FreeDuelPick/{pick.Series}/{pick.Focus}/{pick.Top}",
         ScreenId.TitleFlow when titleFlow is { Step: TitleFlowStep.FreeDuelSettings, FreeDuel: { Versus: { } vs } } =>

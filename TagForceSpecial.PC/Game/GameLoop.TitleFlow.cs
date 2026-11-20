@@ -208,13 +208,15 @@ public sealed partial class GameLoop
         int pulseValue = view.Profile.FocusPulse[pulse % view.Profile.FocusPulse.Length];
         if (renderedFreeDuel != (session, session.Revision, background, pulseValue))
         {
-            if (session.Picker is { } picker) view.Picker.Render(view.Layer, picker, background);
+            if (session.DeckPicker is { } deckPicker) view.Decks.Render(view.Layer, deckPicker, background);
+            else if (session.Picker is { } picker) view.Picker.Render(view.Layer, picker, background);
             else if (session.Versus is null) view.Render(session.Settings, background, pulse);
             else view.Versus.Render(view.Layer, session, background);
             gum.BindFreeDuel(view.Layer);
             renderedFreeDuel = (session, session.Revision, background, pulseValue);
         }
-        gum.ShowFreeDuelNotice(!session.NoticeOpen ? null : session.Versus is null ? view.NoticeTitle(session.Settings) : view.Versus.NoticeTitle(session));
+        gum.ShowFreeDuelNotice(!session.NoticeOpen ? null : session.DeckPicker is { } open ? view.Decks.NoticeTitle(open)
+            : session.Versus is null ? view.NoticeTitle(session.Settings) : view.Versus.NoticeTitle(session));
         gum.Show("OriginalFreeDuel", true);
     }
 
@@ -388,7 +390,17 @@ public sealed partial class GameLoop
             owner.freeDuelRenderer ??= App.Screens.FreeDuel.FreeDuelSettingsRenderer.TryCreate(owner.GraphicsDevice, owner.flowVisuals, owner.screenAssets);
             DeckDraft? draft = null;
             if (!owner.options.PresentationSmoke && owner.editor is { } editor) { editor.EnsureDraft(); draft = editor.Draft; }
-            return owner.freeDuelRenderer?.NewSession(owner.titleFlow?.Name ?? "", draft?.Name ?? Effects.InitialOpponentDecks.Names[0]);
+            // The player's original save recipes (User list of the recipe import), shown greyed in the player's deck picker.
+            IReadOnlyList<(int, string, DateTime)>? saved = null;
+            try
+            {
+                string? root = owner.options.RecipeReferenceRoot ?? owner.setup?.Game?.RecipeRoot;
+                if (root is not null && owner.setup?.Game?.Catalog.Catalog is { } catalog
+                    && Recipes.RecipeCatalog.Open(new PrivateStorage(root), catalog) is { } recipes)
+                    saved = recipes.Records.Where(r => r.Kind == Recipes.RecipeListKind.User).Select(r => (r.Slot, r.Name, r.Updated)).ToArray();
+            }
+            catch (Exception e) when (PrivateStorage.Recoverable(e)) { Console.Error.WriteLine("RECIPE_SOURCE_PENDING " + e.Message); }
+            return owner.freeDuelRenderer?.NewSession(owner.titleFlow?.Name ?? "", draft?.Name ?? Effects.InitialOpponentDecks.Names[0], saved);
         }
         public void SaveDeckEdit(DeckEditSession session)
         {
