@@ -22,6 +22,8 @@ public sealed class SpriteRenderer : IDisposable
     public void End() => batch.End();
     public void Fill(Rectangle rect, Color color, SceneLayer layer = SceneLayer.Field) =>
         batch.Draw(pixel, rect, null, color, 0, Vector2.Zero, SpriteEffects.None, (int)layer / 100f);
+    /// <summary>A full-screen pre-rendered layer beneath every other sprite.</summary>
+    public void Layer(Texture2D layer) => batch.Draw(layer, new Rectangle(0, 0, 480, 272), null, Color.White, 0, Vector2.Zero, SpriteEffects.None, 0f);
     public void Sprite(AtlasRegion sprite, Rectangle target) => batch.Draw(sprite.Texture, target, sprite.Source,
         Color.White, 0, Vector2.Zero, SpriteEffects.None, .3f);
     public void Border(Rectangle rect, Color color, SceneLayer layer = SceneLayer.Cursor)

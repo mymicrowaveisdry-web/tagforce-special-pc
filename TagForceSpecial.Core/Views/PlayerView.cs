@@ -2,8 +2,10 @@ using TagForceSpecial.Cards;
 
 namespace TagForceSpecial.Core.Views;
 
+/// <summary><paramref name="FaceDown"/> marks a card set face-down on the field; its owner still sees its identity, others get a hidden card.</summary>
 public sealed record CardView(int? InstanceId, uint? CardId, string Name, string Description,
-    int? Attack, int? Defense, BattlePosition? Position, bool Hidden);
+    int? Attack, int? Defense, BattlePosition? Position, bool Hidden,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] bool FaceDown = false);
 public sealed record PlayerView(PlayerId Id, int LifePoints, int DeckCount, int ExtraDeckCount,
     IReadOnlyList<CardView> Hand, IReadOnlyList<CardView?> Monsters,
     IReadOnlyList<CardView?> SpellTraps, IReadOnlyList<CardView?> Pendulum,
@@ -21,20 +23,20 @@ public static class PlayerProjection
         return new(player, p.LifePoints, p.Deck.Count, p.ExtraDeck.Count,
             Read(p.Hand.Select(c => Card(c, own || handRevealed, null, catalog))),
             Read(p.MonsterZones.Select(m => m is null ? null : Card(m.Card,
-                own || m.Position != BattlePosition.FaceDownDefense, m.Position, catalog))),
-            Read(p.SpellTrapFields.Select(f => f is null ? null : Card(f.Card, own || f.IsFaceUp, null, catalog))),
-            Read(p.PendulumZones.Select(f => f is null ? null : Card(f.Card, own || f.IsFaceUp, null, catalog))),
+                own || m.Position != BattlePosition.FaceDownDefense, m.Position, catalog, m.Position == BattlePosition.FaceDownDefense))),
+            Read(p.SpellTrapFields.Select(f => f is null ? null : Card(f.Card, own || f.IsFaceUp, null, catalog, !f.IsFaceUp))),
+            Read(p.PendulumZones.Select(f => f is null ? null : Card(f.Card, own || f.IsFaceUp, null, catalog, !f.IsFaceUp))),
             Read(p.Graveyard.Select(c => Card(c, true, null, catalog))),
             Read(p.FaceUpExtraDeck.Select(c => Card(c, true, null, catalog))),
-            p.FieldSpell is { } field ? Card(field.Card, own || field.IsFaceUp, null, catalog) : null);
+            p.FieldSpell is { } field ? Card(field.Card, own || field.IsFaceUp, null, catalog, !field.IsFaceUp) : null);
     }
 
-    internal static CardView Card(CardInstance card, bool visible, BattlePosition? position, CardCatalog catalog)
+    internal static CardView Card(CardInstance card, bool visible, BattlePosition? position, CardCatalog catalog, bool faceDown = false)
     {
         if (!visible) return new(null, null, "Hidden card", "", null, null, position, true);
         var data = catalog[card.GameCardId];
         return new(card.InstanceId, card.GameCardId, data.Name, data.Description,
-            data.Statistics.Attack, data.Statistics.Defense, position, false);
+            data.Statistics.Attack, data.Statistics.Defense, position, false, faceDown);
     }
 
     public static IReadOnlyList<T> Read<T>(IEnumerable<T> source) => Array.AsReadOnly(source.ToArray());

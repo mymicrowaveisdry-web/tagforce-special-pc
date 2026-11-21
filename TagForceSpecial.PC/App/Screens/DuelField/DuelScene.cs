@@ -1,0 +1,86 @@
+using TagForceSpecial.PC.DuelUI;
+using TagForceSpecial.PC.Rendering;
+
+namespace TagForceSpecial.PC.App.Screens.DuelField;
+
+/// <summary>Per-duel presentation choices: the backdrop piece ("default", "tf4", "tf6").</summary>
+public sealed record DuelFieldStyle(string Backdrop = "default");
+
+/// <summary>One frame's presentation input: the authorized view plus the screen's own focus state. It holds no engine reference.</summary>
+public sealed record DuelSceneInput(DuelView View, int Choice, int InspectedCard, string Notice, double Seconds, DuelFieldStyle? Style = null,
+    Func<uint, DuelCardFacts?>? Facts = null);
+
+/// <summary>Composes the duel field from its parts in a fixed draw order.</summary>
+public static class DuelScene
+{
+    /// <summary>Renders the measured field into its layer (when original assets are loaded) and the remaining sprite parts over it.</summary>
+    public static void Draw(SpriteRenderer renderer, DuelFieldVisuals? field, DuelSceneInput input)
+    {
+        var list = Compose(input, field?.Profile);
+        if (field is not null)
+        {
+            field.Render(list.FieldDraws);
+            renderer.Layer(field.Layer);
+        }
+        list.Replay(renderer);
+    }
+
+    /// <summary>Without <paramref name="field"/> (no validated original assets) the PC test visualization is composed instead.</summary>
+    public static DuelDrawList Compose(DuelSceneInput input, DuelFieldProfile? field = null) =>
+        field is null ? ComposeTestVisualization(input) : ComposeOriginal(input, field);
+
+    private static DuelDrawList ComposeOriginal(DuelSceneInput input, DuelFieldProfile field)
+    {
+        var list = new DuelDrawList();
+        var view = input.View;
+        var inspected = CardInspector.Target(view, input.Choice, input.InspectedCard);
+        DuelBoardRenderer.DrawOriginal(list, field, (input.Style ?? new()).Backdrop);
+        PhaseBar.DrawOriginal(list, field, view.Phase);
+        list.FieldPiece(DuelPart.Board, field, "depth.clear");
+        DuelBoardRenderer.DrawPilesOriginal(list, field, view);
+        int? selected = SelectedCard(view, input.Choice);
+        var placed = CardSpriteRenderer.DrawFieldOriginal(list, view, selected);
+        InputFocusOverlay.DrawOriginal(list, field, placed, selected);
+        CardSpriteRenderer.DrawLevels(list, field, placed, input.Facts);
+        DuelHud.DrawOriginal(list, field, view);
+        // Interim sprite parts until their measured replacements exist.
+        DuelHud.DrawLifePoints(list, view);
+        CardInspector.Draw(list, inspected);
+        PromptPresenter.Draw(list, view, input.Choice, input.Notice);
+        DuelEffectLayer.Draw(list, view);
+        return list;
+    }
+
+    private static DuelDrawList ComposeTestVisualization(DuelSceneInput input)
+    {
+        var list = new DuelDrawList();
+        var view = input.View;
+        var inspected = CardInspector.Target(view, input.Choice, input.InspectedCard);
+        DuelBoardRenderer.DrawBackdrop(list);
+        DuelHud.DrawBar(list);
+        PhaseBar.Draw(list, view);
+        DuelHud.DrawLifePoints(list, view);
+        DuelBoardRenderer.DrawSurface(list);
+        DrawSlots(list, DuelSceneLayout.RowSlots(view), inspected, input.Seconds);
+        DuelBoardRenderer.DrawPiles(list, view);
+        DrawSlots(list, DuelSceneLayout.SideSlots(view), inspected, input.Seconds);
+        DuelBoardRenderer.DrawZoneLabels(list);
+        CardInspector.Draw(list, inspected);
+        PromptPresenter.Draw(list, view, input.Choice, input.Notice);
+        DuelEffectLayer.Draw(list, view);
+        return list;
+    }
+
+    /// <summary>The card the selected legal choice refers to, if any.</summary>
+    public static int? SelectedCard(DuelView view, int choice) =>
+        view.Choices.Count > 0 ? view.Choices[Math.Clamp(choice, 0, view.Choices.Count - 1)].FocusInstanceId : null;
+
+    private static void DrawSlots(DuelDrawList list, IEnumerable<DuelSlot> slots, Core.Views.CardView? inspected, double seconds)
+    {
+        foreach (var slot in slots)
+        {
+            CardSpriteRenderer.Draw(list, slot.Card, slot.Rect);
+            InputFocusOverlay.Draw(list, slot.Card, slot.Rect, inspected, seconds);
+        }
+    }
+}

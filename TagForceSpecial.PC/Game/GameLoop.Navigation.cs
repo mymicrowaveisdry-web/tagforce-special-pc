@@ -2,6 +2,7 @@ using Microsoft.Xna.Framework;
 using TagForceSpecial.Effects;
 using TagForceSpecial.PC.App.Input;
 using TagForceSpecial.PC.App.Screens;
+using TagForceSpecial.PC.App.Screens.DuelField;
 using TagForceSpecial.PC.App.Screens.Title;
 using TagForceSpecial.PC.App.Visual;
 using TagForceSpecial.PC.DuelUI.Input;
@@ -94,6 +95,11 @@ public sealed partial class GameLoop
             throw new InvalidOperationException("Presentation smoke requires the validated Phase 3 title generation in --data-root.");
         if (options.TitleLayerCaptureRoot is { } layerRoot)
             (originalTitle ?? throw new InvalidOperationException("Title layer capture requires a validated title generation.")).ExportReviewLayers(layerRoot);
+        if (options.DuelFieldReferenceRoot is { } fieldRoot)
+        {
+            DuelFieldReference.Capture(DuelField() ?? throw new InvalidOperationException("Duel field reference capture requires the imported field textures."), fieldRoot, FieldCardFacts());
+            Console.WriteLine("DUEL_FIELD_REFERENCE " + DuelFieldReference.States.Count); Exit(); return;
+        }
         var initial = activeScreen == ScreenId.Title && originalTitle is null ? ScreenId.PcTools : activeScreen;
         router.GoTo(ScreenName(initial));
     }
@@ -272,7 +278,23 @@ public sealed partial class GameLoop
     }
     private void DrawDuel()
     {
-        if (duel is not null) DuelScreen.Draw(renderer, duel.View, choiceIndex, inspectIndex, duel.Notice, PresentationTime.TotalSeconds);
+        if (duel is not null) DuelScene.Draw(renderer, DuelField(), new(duel.View, choiceIndex, inspectIndex, duel.Notice, PresentationTime.TotalSeconds,
+            Facts: FieldCardFacts()));
+    }
+    /// <summary>Level and Tuner facts of public cards, from the imported catalog.</summary>
+    private Func<uint, DuelCardFacts?>? FieldCardFacts() => setup?.Game?.Catalog.Catalog is { } catalog ? id => DuelCardFacts.From(catalog[id]) : null;
+    private DuelFieldVisuals? duelField;
+    private OriginalScreenAssetResolver? duelFieldAssets;
+    /// <summary>The measured field for the current validated generation, or null when its original textures are not imported.</summary>
+    private DuelFieldVisuals? DuelField()
+    {
+        if (ReferenceEquals(duelFieldAssets, screenAssets)) return duelField;
+        duelField?.Dispose(); duelField = null; duelFieldAssets = screenAssets;
+        if (setup?.Game?.Presentation is null) return null;
+        try { duelField = new(GraphicsDevice, screenAssets); }
+        catch (Exception e) when (e is InvalidDataException or KeyNotFoundException or InvalidOperationException)
+        { Console.Error.WriteLine("DUEL_FIELD_PENDING " + e.Message); }
+        return duelField;
     }
     private void DrawPreferences()
     {

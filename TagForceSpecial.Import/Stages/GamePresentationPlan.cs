@@ -17,7 +17,7 @@ public static class GamePresentationPlan
     public static IReadOnlyList<PresentationReferenceCase> Required { get; } = Array.AsReadOnly(
         TitleReferenceResources.Cases.Concat(TitleFlowReferenceResources.Cases).Concat(OptionsReferenceResources.Cases)
             .Concat(DeckEditReferenceResources.Cases).Concat(CardAlbumReferenceResources.Cases).Concat(FreeDuelReferenceResources.Cases)
-            .Concat(PresentationReferenceCases.Cases.Where(c => c.AssetKey == "title.source.press-start0002")).ToArray());
+            .Concat(DuelFieldReferenceResources.Cases).Concat(PresentationReferenceCases.Cases.Where(c => c.AssetKey == "title.source.press-start0002")).ToArray());
     public static IReadOnlyList<(string Key, string Path)> StoredSources { get; } =
     [
         (TitleFlowReferenceResources.EbootKey, TitleFlowReferenceResources.EbootPath),
