@@ -38,7 +38,8 @@ internal static class DecisionActionCandidates
                 yield return B(new ChooseDecisionTarget(player, decision.DecisionId, target.Player, target.Zone,
                     target.Card.InstanceId, target.IsPendulumZone), ActionKind.ChooseTarget,
                     $"Target P{(int)target.Player + 1} {(target.IsPendulumZone ? "scale" : "zone")} {target.Zone + 1}",
-                    zone: target.IsPendulumZone ? 1 : 0, target: target.Zone, targetPlayer: target.Player);
+                    zone: target.IsPendulumZone ? 1 : 0, target: target.Zone, targetPlayer: target.Player).WithFieldTarget(target.Player,
+                        target.IsPendulumZone ? FieldLocation.PendulumZone : FieldLocation.SpellTrapZone, target.Zone);
             foreach (var field in decision.FieldTargetOptions ?? [])
             {
                 // Graveyard and banished cards are public; field targets never reveal a face-down card.
@@ -47,7 +48,8 @@ internal static class DecisionActionCandidates
                     field.Card.InstanceId), ActionKind.ChooseTarget, zone
                         ? $"Target P{(int)field.Player + 1} {field.Location} {catalog[field.Card.GameCardId].Name}"
                         : $"Target P{(int)field.Player + 1} {field.Location} {field.Zone + 1}",
-                    zone ? field.Card.InstanceId : null, (int)field.Location, field.Zone, targetPlayer: field.Player);
+                    zone ? field.Card.InstanceId : null, (int)field.Location, field.Zone, targetPlayer: field.Player)
+                    .WithFieldTarget(field.Player, field.Location, field.Zone);
             }
             if (decision.CanFinish) yield return B(new FinishDecision(player, decision.DecisionId), ActionKind.FinishChoice, "Done");
             yield break;

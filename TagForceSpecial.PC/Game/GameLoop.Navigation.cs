@@ -99,12 +99,15 @@ public sealed partial class GameLoop
         if (options.DuelFieldReferenceRoot is { } fieldRoot)
         {
             var fieldVisuals = DuelField() ?? throw new InvalidOperationException("Duel field reference capture requires the imported field textures.");
+            var game = setup?.Game ?? throw new InvalidOperationException("Duel field reference capture requires the imported card catalog.");
             DuelFieldReference.Capture(fieldVisuals, fieldRoot, FieldCardFacts());
             DuelFieldReference.CaptureInputWalk(GraphicsDevice, renderer, fieldVisuals, fieldRoot, FieldCardFacts());
             DuelFieldReference.CapturePanels(GraphicsDevice, renderer, fieldVisuals, fieldRoot, FieldCardFacts());
             DuelFieldReference.CaptureDetail(GraphicsDevice, renderer, fieldVisuals, fieldRoot, FieldCardFacts(), DuelCardDetail);
-            DuelFieldReference.CaptureAttack(GraphicsDevice, renderer, fieldVisuals, fieldRoot,
-                setup?.Game?.Catalog.Catalog ?? throw new InvalidOperationException("Attack reference capture requires the imported card catalog."));
+            DuelFieldReference.CaptureAttack(GraphicsDevice, renderer, fieldVisuals, fieldRoot, game.Catalog.Catalog);
+            DuelFieldReference.CaptureAttack(GraphicsDevice, renderer, fieldVisuals, fieldRoot, game.Catalog.Catalog, 1, 3, "attack-off-centre.png");
+            DuelFieldPresentationReference.Capture(GraphicsDevice, renderer, fieldVisuals, fieldRoot, game);
+            DuelFieldReference.CaptureDecisions(GraphicsDevice, renderer, fieldVisuals, fieldRoot, FieldCardFacts());
             Console.WriteLine("DUEL_FIELD_REFERENCE " + DuelFieldReference.States.Count); Exit(); return;
         }
         var initial = activeScreen == ScreenId.Title && originalTitle is null ? ScreenId.PcTools : activeScreen;
@@ -205,10 +208,16 @@ public sealed partial class GameLoop
     }
     private DuelFieldInput? duelInput;
     private DuelController? duelInputOwner;
+    private DuelFieldPresentation duelFieldPresentation = null!;
     /// <summary>The input session of the current duel; a new duel starts a new one.</summary>
     private DuelFieldInput DuelInput(DuelController controller)
     {
-        if (!ReferenceEquals(duelInputOwner, controller)) { duelInput = new() { DetailFactory = DuelCardDetail }; duelInputOwner = controller; }
+        if (!ReferenceEquals(duelInputOwner, controller))
+        {
+            duelInput = new() { DetailFactory = DuelCardDetail };
+            duelFieldPresentation = new(PresentationTime, !options.PixelExact);
+            duelInputOwner = controller;
+        }
         return duelInput!;
     }
     private App.Screens.Album.CardAlbumDetailRenderer? duelDetail;
@@ -228,22 +237,28 @@ public sealed partial class GameLoop
     /// menu until the original Help screen exists. Every choice is revision-bound; a refusal closes the window without state changes.</summary>
     private void UpdateDuelInput(InputFrame frame)
     {
-        if (duel is null) return;
+        if (duel is null || duel.View.Outcome is not null) return;
         if (frame.IsPressed(InputAction.Start)) { duel.Paused = true; screen = ScreenId.Paused; return; }
         var input = DuelInput(duel);
-        if (input.Handle(duel.View, frame, navigationTime.ElapsedGameTime) is { } submit && !duel.Choose(submit.Revision, submit.ChoiceId))
-            input.Rejected(duel.Notice);
-        if (duel.View.Outcome is not null) screen = ScreenId.Result;
+        var before = duel.View;
+        if (duelFieldPresentation.BeforeDeal(before, PresentationTime) && DuelField() is not null) return;
+        if (input.Handle(before, frame, navigationTime.ElapsedGameTime) is { } submit)
+        {
+            if (duel.Choose(submit.Revision, submit.ChoiceId)) duelFieldPresentation.Accept(before, duel.View, submit.ChoiceId, PresentationTime);
+            else input.Rejected(duel.Notice);
+        }
     }
     private void UpdateDuelPresentation()
     {
         if (duel is null) return;
-        if (IsActive && navigationTime.TotalGameTime.TotalSeconds >= opponentAt)
+        _ = DuelInput(duel);
+        if (duelFieldPresentation.BeforeDeal(duel.View, PresentationTime) && DuelField() is not null) return;
+        if (duel.View.Outcome is null && IsActive && navigationTime.TotalGameTime.TotalSeconds >= opponentAt)
         {
             if (!duel.OpponentStopped && duel.StepOpponent()) choiceIndex = 0;
             opponentAt = navigationTime.TotalGameTime.TotalSeconds + .35;
         }
-        if (duel.View.Outcome is not null) screen = ScreenId.Result;
+        if (duel.View.Outcome is not null && duelFieldPresentation.ResultReady(PresentationTime)) screen = ScreenId.Result;
     }
     private void UpdatePause(GuiButtons buttons)
     {
@@ -302,8 +317,14 @@ public sealed partial class GameLoop
     }
     private void DrawDuel()
     {
-        if (duel is not null) DuelScene.Draw(renderer, DuelField(), new(duel.View, choiceIndex, inspectIndex, duel.Notice, PresentationTime.TotalSeconds,
-            Style: duelStyle, Facts: FieldCardFacts(), Input: DuelInput(duel)));
+        if (duel is null) return;
+        var input = DuelInput(duel);
+        var notice = duelFieldPresentation.Notice(duel.View.Revision, duel.Notice, navigationTime.TotalGameTime);
+        DuelScene.Draw(renderer, DuelField(), new(duel.View, choiceIndex, inspectIndex, notice, PresentationTime.TotalSeconds,
+            Style: duelStyle, Facts: FieldCardFacts(), Input: input)
+        {
+            Presentation = duelFieldPresentation.Frame(duel.View, PresentationTime)
+        });
     }
     /// <summary>Level and Tuner facts of public cards, from the imported catalog.</summary>
     private Func<uint, DuelCardFacts?>? FieldCardFacts() => setup?.Game?.Catalog.Catalog is { } catalog ? id => DuelCardFacts.From(catalog[id]) : null;
@@ -321,6 +342,9 @@ public sealed partial class GameLoop
     /// <summary>Field text through the title flow's original card-text font.</summary>
     private sealed class FlowFieldText(TitleFlowVisuals visuals) : IDuelFieldTextSink
     {
+        public void DrawUi(string text, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha) =>
+            visuals.DrawText(text, x, y, scaleX, scaleY, color, shadowAlpha);
+        public float MeasureUi(string text, float scaleX) => visuals.MeasureText(text, scaleX);
         public void Draw(string text, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha) =>
             visuals.DrawCardFontText(text, x, y, scaleX, scaleY, color, shadowAlpha);
         public float Measure(string text, float scaleX) => visuals.MeasureCardFontText(text, scaleX);

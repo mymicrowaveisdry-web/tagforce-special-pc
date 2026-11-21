@@ -10,15 +10,22 @@ public enum DuelPart { Board, Cards, Hud, PhaseBar, Inspector, Prompt, Focus, Ef
 public abstract record DuelDraw(DuelPart Part);
 public sealed record DuelFill(DuelPart Part, Rectangle Rect, Color Color, SceneLayer Layer) : DuelDraw(Part);
 public sealed record DuelBorder(DuelPart Part, Rectangle Rect, Color Color, SceneLayer Layer) : DuelDraw(Part);
-public sealed record DuelText(DuelPart Part, string Text, int X, int Y, Color Color, int Scale = 1) : DuelDraw(Part);
+public sealed record DuelText(DuelPart Part, string Text, int X, int Y, Color Color, int Scale = 1) : DuelDraw(Part)
+{
+    public SceneLayer Layer { get; init; } = SceneLayer.Text;
+}
 public sealed record DuelWrapped(DuelPart Part, string Text, int X, int Y, int Columns, int Lines, Color Color) : DuelDraw(Part)
 {
     public bool Ellipsis { get; init; }
+    public SceneLayer Layer { get; init; } = SceneLayer.Text;
 }
 /// <summary>Original-font text in the field layer: glyph cells start at <paramref name="X"/> (left) or end at it (right-aligned), with the
 /// measured two-copy shadow. <paramref name="Color"/> is 0xBBGGRR.</summary>
 public sealed record DuelFieldText(DuelPart Part, string Text, float X, float Y, float ScaleX, float ScaleY, int Color, int ShadowAlpha,
-    bool AlignRight = false, float? LayoutScaleX = null) : DuelDraw(Part);
+    bool AlignRight = false, float? LayoutScaleX = null) : DuelDraw(Part)
+{
+    public bool Centered { get; init; }
+}
 /// <summary>The full-screen Show Details page (the Card Album's detail).</summary>
 public sealed record DuelCardDetail(DuelPart Part, App.Screens.Album.CardAlbumDetail Detail) : DuelDraw(Part);
 /// <summary>The left card panel for <paramref name="CardId"/> (a public card) or a back when null, with its strip tint.</summary>
@@ -37,6 +44,8 @@ public sealed class DuelDrawList
     public void Border(DuelPart part, Rectangle rect, Color color, SceneLayer layer = SceneLayer.Cursor) => draws.Add(new DuelBorder(part, rect, color, layer));
     public void Text(DuelPart part, string text, int x, int y, Color? color = null, int scale = 1) =>
         draws.Add(new DuelText(part, text, x, y, color ?? Color.White, scale));
+    internal void Text(DuelPart part, string text, int x, int y, Color color, SceneLayer layer, int scale = 1) =>
+        draws.Add(new DuelText(part, text, x, y, color, scale) { Layer = layer });
     public void Wrapped(DuelPart part, string text, int x, int y, int columns, int lines, Color? color = null) =>
         draws.Add(new DuelWrapped(part, text, x, y, columns, lines, color ?? Color.White));
 
@@ -56,7 +65,7 @@ public sealed class DuelDrawList
     }
 
     /// <summary>Commands rendered into the field layer, in order: measured draws and original-font text.</summary>
-    public IEnumerable<DuelDraw> FieldDraws => draws.Where(d => d is DuelFieldDraw or DuelFieldText or DuelFieldMenu or DuelFieldSprites or DuelRichText or DuelChainPrompt or DuelCardPanel or DuelCardDetail);
+    public IEnumerable<DuelDraw> FieldDraws => draws.Where(d => d is DuelFieldDraw or DuelFieldText or DuelFieldMenu or DuelFieldSprites or DuelRichText or DuelChainPrompt or DuelCardPanel or DuelCardDetail or DuelOutcomeReason);
 
     public void Add(DuelDraw draw) => draws.Add(draw);
 
@@ -70,8 +79,8 @@ public sealed class DuelDrawList
             {
                 case DuelFill f: renderer.Fill(f.Rect, f.Color, f.Layer); break;
                 case DuelBorder b: renderer.Border(b.Rect, b.Color, b.Layer); break;
-                case DuelText t: renderer.Text(t.Text, t.X, t.Y, t.Color, t.Scale); break;
-                case DuelWrapped w: renderer.Wrapped(w.Text, w.X, w.Y, w.Columns, w.Lines, w.Color, w.Ellipsis); break;
+                case DuelText t: renderer.Text(t.Text, t.X, t.Y, t.Color, t.Scale, t.Layer); break;
+                case DuelWrapped w: renderer.Wrapped(w.Text, w.X, w.Y, w.Columns, w.Lines, w.Color, w.Ellipsis, w.Layer); break;
                 case DuelCardThumbnail preview when field is not null:
                     var face = field.CardFace(preview.CardId);
                     renderer.Sprite(new(face, face.Bounds), preview.Rect, SceneLayer.PanelHighlight);

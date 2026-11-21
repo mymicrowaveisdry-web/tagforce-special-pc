@@ -9,7 +9,10 @@ public sealed record DuelFieldStyle(string Backdrop = "default", string PlayerNa
 
 /// <summary>One frame's presentation input: the authorized view plus the screen's own focus state. It holds no engine reference.</summary>
 public sealed record DuelSceneInput(DuelView View, int Choice, int InspectedCard, string Notice, double Seconds, DuelFieldStyle? Style = null,
-    Func<uint, DuelCardFacts?>? Facts = null, DuelFieldInput? Input = null);
+    Func<uint, DuelCardFacts?>? Facts = null, DuelFieldInput? Input = null)
+{
+    internal DuelFieldFrame Presentation { get; init; }
+}
 
 /// <summary>Composes the duel field from its parts in a fixed draw order.</summary>
 public static class DuelScene
@@ -33,26 +36,30 @@ public static class DuelScene
     private static DuelDrawList ComposeOriginal(DuelSceneInput input, DuelFieldProfile field)
     {
         var list = new DuelDrawList();
-        var view = input.View;
+        var frame = input.Presentation;
+        var view = frame.BeforeDeal ? DuelFieldPresentation.BeforeOpeningDeal(input.View) : input.View;
+        bool finished = view.Outcome is not null;
+        var session = finished ? null : input.Input;
         // Show Details is an opaque full-screen page; measured: its closing frame is blank.
-        if (input.Input?.Modal is DetailsModal { Detail: { } page })
+        if (session?.Modal is DetailsModal { Detail: { } page })
         {
             if (!page.Closing) list.Add(new DuelCardDetail(DuelPart.Inspector, page));
             return list;
         }
-        var focus = Focused(input);
-        var inspected = input.Input?.Modal is DetailsModal details ? details.Card
+        var focus = frame.BeforeDeal || finished ? null : Focused(input);
+        var inspected = session?.Modal is DetailsModal details ? details.Card
+            : frame.SummonedCard is { } summoned && session?.Modal is null ? summoned
             : focus is { Card: { Hidden: false } card } ? card : input.Input is null ? CardInspector.Target(view, input.Choice, input.InspectedCard) : null;
         DuelBoardRenderer.DrawOriginal(list, field, (input.Style ?? new()).Backdrop);
-        PhaseBar.DrawOriginal(list, field, view.Phase, input.Input?.Modal is PhaseModal);
+        PhaseBar.DrawOriginal(list, field, view.Phase, session?.Modal is PhaseModal);
         list.FieldPiece(DuelPart.Board, field, "depth.clear");
         DuelBoardRenderer.DrawPilesOriginal(list, field, view);
         int? lifted = focus is { Own: true, Kind: FieldObjectKind.Hand, Card.InstanceId: { } id } ? id : null;
-        var placed = CardSpriteRenderer.DrawFieldOriginal(list, view, lifted);
-        var attack = input.Input?.Modal as TargetModal;
+        var placed = CardSpriteRenderer.DrawFieldOriginal(list, view, lifted, frame);
+        var attack = session?.Modal as TargetModal;
         // GE order (attack-target capture): target cursor meshes, pointer, Battle Phase readouts, Levels, sword, trail and arrow head.
         if (attack is not null && focus is { } aimed) AttackTargetOverlay.DrawCursors(list, field, new(view, placed), aimed);
-        if (focus is { } target) InputFocusOverlay.DrawOriginal(list, field, new(view, placed), target, input.Input?.Modal is not (PhaseModal or ResponseModal),
+        if (focus is { } target) InputFocusOverlay.DrawOriginal(list, field, new(view, placed), target, session?.Modal is not (PhaseModal or ResponseModal),
             attack is not null);
         BattleReadouts.Draw(list, field, view);
         CardSpriteRenderer.DrawLevels(list, field, placed, input.Facts);
@@ -62,9 +69,9 @@ public static class DuelScene
         DuelHud.DrawOriginal(list, field, view, input.Style);
         if (!AttackInspector.TryDraw(list, view, attack, focus, input.Facts))
             CardInspector.DrawOriginal(list, inspected, input.Facts);
-        if (input.Input is { } session) PromptPresenter.DrawModal(list, view, session, input.Notice);
-        else PromptPresenter.Draw(list, view, input.Choice, input.Notice);
-        DuelEffectLayer.Draw(list, view);
+        if (session is not null) PromptPresenter.DrawModal(list, view, session, input.Notice);
+        else if (!finished) PromptPresenter.Draw(list, view, input.Choice, input.Notice);
+        DuelEffectLayer.DrawOriginal(list, view, field);
         return list;
     }
 
@@ -83,7 +90,11 @@ public static class DuelScene
         DrawSlots(list, DuelSceneLayout.SideSlots(view), inspected, input.Seconds);
         DuelBoardRenderer.DrawZoneLabels(list);
         CardInspector.Draw(list, inspected);
-        PromptPresenter.Draw(list, view, input.Choice, input.Notice);
+        if (view.Outcome is null)
+        {
+            if (input.Input is { } session) PromptPresenter.DrawModal(list, view, session, input.Notice, originalField: false);
+            else PromptPresenter.Draw(list, view, input.Choice, input.Notice);
+        }
         DuelEffectLayer.Draw(list, view);
         return list;
     }
@@ -95,6 +106,7 @@ public static class DuelScene
         var rows = DuelFieldRows.Build(input.View);
         if (input.Input is { } session)
         {
+            if (session.Modal is ListModal decision && DuelBoardDecision.Target(input.View, decision) is { } selected) return selected;
             if (session.Modal is TargetModal { } t && DuelFieldCommands.AttackTarget(t.Choices[t.Index]) is { } zone)
                 return rows[DuelFieldRows.OpponentMonster].First(o => o.Kind == FieldObjectKind.Monster && o.Index == zone);
             return session.Focus.Ready ? session.Focus.Current : null;

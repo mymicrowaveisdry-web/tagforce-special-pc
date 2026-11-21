@@ -3,7 +3,7 @@ using TagForceSpecial.Core;
 
 namespace TagForceSpecial.PC.App.Screens.DuelField;
 
-public enum DuelPileKind { Deck, Extra, Graveyard }
+public enum DuelPileKind { Deck, Extra, Graveyard, Banished }
 
 /// <summary>Measured Duel Field placements (NPJH00142 v1.01, English 2.1, Normal Duel), in the board's world units. The player is +z.
 /// Values come from the step 3 GE captures; each member says whether it was observed or derived.</summary>
@@ -15,6 +15,7 @@ public static class DuelLayoutProfile
     public const float MonsterZ = 117.730469f, SpellTrapZ = 222.730469f;
     /// <summary>Observed pile centres: Deck and Extra Deck rows, Graveyard (pile captures); Field Spell and Pendulum from the pad meshes.</summary>
     public const float PileX = 315f, DeckZ = 275.851562f, GraveyardZ = 65.855469f, PendulumX = 300f, PendulumZ = 170.84f;
+    public const float BanishedX = 403.1f;
     /// <summary>Observed hands: player cards 65 apart at y 200, z 440 (4, 5 and 6 cards); the focused card rises to y 215, z 430.
     /// Opponent backs 70 apart at y 50, z −300 (3 and 4 cards).</summary>
     public const float HandPitch = 65f, HandY = 200f, HandZ = 440f, FocusedHandY = 215f, FocusedHandZ = 430f;
@@ -51,7 +52,8 @@ public static class DuelLayoutProfile
     /// the opponent's are mirrored through the board centre.</summary>
     public static Matrix PileWorld(bool player, DuelPileKind pile)
     {
-        float x = pile == DuelPileKind.Extra ? -PileX : PileX, z = pile == DuelPileKind.Graveyard ? GraveyardZ : DeckZ;
+        float x = pile switch { DuelPileKind.Extra => -PileX, DuelPileKind.Banished => BanishedX, _ => PileX };
+        float z = pile is DuelPileKind.Graveyard or DuelPileKind.Banished ? GraveyardZ : DeckZ;
         return player ? Matrix.CreateTranslation(x, 0, z) : Opponent * Matrix.CreateTranslation(-x, 0, -z);
     }
 
@@ -66,10 +68,14 @@ public static class DuelLayoutProfile
 
     /// <summary>Observed for 4, 5 and 6 cards: x = ⌊(i − (n − 1) / 2) × 65⌋.</summary>
     public static Matrix HandWorld(int index, int count, bool focused) => HandTilt * Matrix.CreateTranslation(
-        MathF.Floor((index - (count - 1) / 2f) * HandPitch), focused ? FocusedHandY : HandY, focused ? FocusedHandZ : HandZ);
+        HandX(index, count, HandPitch), focused ? FocusedHandY : HandY, focused ? FocusedHandZ : HandZ);
 
     public static Matrix OpponentHandWorld(int index, int count) => HandTilt * Matrix.CreateTranslation(
-        MathF.Floor((index - (count - 1) / 2f) * OpponentHandPitch), OpponentHandY, OpponentHandZ);
+        HandX(index, count, OpponentHandPitch), OpponentHandY, OpponentHandZ);
+
+    // PC layout keeps both hands within the six-card span once their counts grow beyond it.
+    private static float HandX(int index, int count, float pitch) =>
+        MathF.Floor((index - (count - 1) / 2f) * pitch * (5f / Math.Max(count - 1, 5)));
 
     private static Matrix Rotation(bool player, BattlePosition? position) =>
         position is BattlePosition.FaceUpDefense or BattlePosition.FaceDownDefense ? (player ? PlayerDefense : OpponentDefense)

@@ -34,11 +34,12 @@ internal static class TurnActionCandidates
                 {
                     var tributes = zones.Select(z => new MonsterBinding(player, z, own.MonsterZones[z]!.Card, own.MonsterZones[z]!.PlacementId)).ToArray();
                     int mask = zones.Aggregate(0, (m, z) => m | 1 << z);
+                    string materials = string.Join(", ", zones.Select(z => z + 1));
                     yield return B(new TributeSummon(player, state.Revision, card.InstanceId, zones[0], tributes, procedureId: procedure), ActionKind.Summon,
-                        $"Tribute Summon {name}", card.InstanceId, zones[0], 2000 + mask);
+                        $"Tribute Summon {name} - use zone {materials}", card.InstanceId, zones[0], 2000 + mask);
                     if (allowsSet)
                         yield return B(new TributeSummon(player, state.Revision, card.InstanceId, zones[0], tributes, faceDown: true, procedureId: procedure), ActionKind.SetMonster,
-                            $"Tribute Set {name}", card.InstanceId, zones[0], 2000 + mask);
+                            $"Tribute Set {name} - use zone {materials}", card.InstanceId, zones[0], 2000 + mask);
                 }
             if (!effects.IsToonCard(card.GameCardId)) continue;
             foreach (var tributes in ZoneSubsets(own))

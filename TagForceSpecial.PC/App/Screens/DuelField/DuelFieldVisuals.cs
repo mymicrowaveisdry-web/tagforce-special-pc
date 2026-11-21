@@ -10,6 +10,9 @@ public interface IDuelFieldTextSink
 {
     void Draw(string text, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha);
     float Measure(string text, float scaleX);
+    void DrawUi(string text, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha) =>
+        Draw(text, x, y, scaleX, scaleY, color, shadowAlpha);
+    float MeasureUi(string text, float scaleX) => Measure(text, scaleX);
 }
 
 /// <summary>Renders the measured Duel Field draws into one 480×272 layer with a depth buffer, from the validated original textures.</summary>
@@ -70,6 +73,14 @@ public sealed class DuelFieldVisuals : IDisposable
     {
         switch (draw)
         {
+            case DuelOutcomeReason reason when Text is { } ui:
+                var lines = Message(reason.Offset).Split('\n');
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    string line = lines[i].TrimEnd('\r');
+                    ui.DrawUi(line, 314 - ui.MeasureUi(line, 0.6f) / 2, 173.42f + i * 11.72f, 0.6f, 0.54f, 0xffffff, 128);
+                }
+                break;
             case DuelFieldDraw d: renderer.Draw(Profile.Piece(d.Piece)[d.Index], Profile, Texture, d.Placement); break;
             case DuelFieldSprites s:
                 var template = Profile.Piece(s.Piece)[s.Index];
@@ -78,6 +89,7 @@ public sealed class DuelFieldVisuals : IDisposable
                 break;
             case DuelFieldText t when Text is { } sink:
                 float x = t.AlignRight ? t.X - sink.Measure(t.Text, t.LayoutScaleX ?? t.ScaleX) : t.X;
+                if (t.Centered) x -= sink.Measure(t.Text, t.LayoutScaleX ?? t.ScaleX) / 2;
                 sink.Draw(t.Text, x, t.Y, t.ScaleX, t.ScaleY, t.Color, t.ShadowAlpha);
                 break;
             case DuelFieldMenu m when Text is { } measure:

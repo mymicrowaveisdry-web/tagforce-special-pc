@@ -69,17 +69,18 @@ public static class DuelFieldReference
     /// <summary>The attack-target capture (ge-aki-attack): Battle Phase, Gusto Gulldo (500/500) attacking Lonefire Blossom (500/1400) through
     /// ○ → Attack, with the trail at update 37 (second lap, counter 45 = the capture's alpha phase 6).</summary>
     public static void CaptureAttack(Microsoft.Xna.Framework.Graphics.GraphicsDevice device, SpriteRenderer renderer, DuelFieldVisuals field,
-        string root, CardCatalog catalog)
+        string root, CardCatalog catalog) => CaptureAttack(device, renderer, field, root, catalog, 2, 2, "attack-target.png");
+
+    internal static void CaptureAttack(Microsoft.Xna.Framework.Graphics.GraphicsDevice device, SpriteRenderer renderer, DuelFieldVisuals field,
+        string root, CardCatalog catalog, int from, int to, string filename)
     {
         var board = AkiBoard();
-        var self = board.Self.Monsters.ToArray(); self[2] = self[2]! with { Attack = 500, Defense = 500 };
-        var opponent = board.Opponent.Monsters.ToArray(); opponent[2] = opponent[2]! with { Attack = 500, Defense = 1400 };
-        self[2] = Describe(self[2]!);
-        opponent[2] = Describe(opponent[2]!);
+        var self = new CardView?[5]; self[from] = Describe(board.Self.Monsters[2]!) with { Attack = 500, Defense = 500 };
+        var opponent = new CardView?[5]; opponent[to] = Describe(board.Opponent.Monsters[2]!) with { Attack = 500, Defense = 1400 };
         var view = board with
         {
             Phase = DuelPhase.Battle, Self = board.Self with { Monsters = self }, Opponent = board.Opponent with { Monsters = opponent },
-            Choices = [new(0, "Attack Lonefire Blossom", 5, ActionKind.Attack, TargetZone: 2), new(1, "End turn", null, ActionKind.EndTurn)]
+            Choices = [new(0, "Attack Lonefire Blossom", 5, ActionKind.Attack, TargetZone: to), new(1, "End turn", null, ActionKind.EndTurn)]
         };
         var input = new DuelFieldInput();
         var frame = TimeSpan.FromSeconds(1 / 59.94);
@@ -88,7 +89,7 @@ public static class DuelFieldReference
         input.Handle(view, new(InputAction.Confirm, InputAction.Confirm), frame);
         input.Handle(view, default, TimeSpan.FromSeconds(37.5 * AttackTrail.VblanksPerUpdate / 59.94) - frame);
         Save(device, renderer, field, DuelScene.Compose(new(view, 0, -1, "", 0, States[0].Style, id => DuelCardFacts.From(catalog[id]), input), field.Profile),
-            Path.Combine(root, "attack-target.png"));
+            Path.Combine(root, filename));
 
         CardView Describe(CardView card)
         {
@@ -111,7 +112,40 @@ public static class DuelFieldReference
         Save(device, renderer, field, DuelScene.Compose(new(view, 0, -1, "", 0, States[0].Style, facts, input), field.Profile), Path.Combine(root, "detail-caam.png"));
     }
 
-    private static void Save(Microsoft.Xna.Framework.Graphics.GraphicsDevice device, SpriteRenderer renderer, DuelFieldVisuals field, DuelDrawList list, string path)
+    internal static void CaptureDecisions(Microsoft.Xna.Framework.Graphics.GraphicsDevice device, SpriteRenderer renderer, DuelFieldVisuals field,
+        string root, Func<uint, DuelCardFacts?>? facts)
+    {
+        var view = AkiBoard() with
+        {
+            Choices = [.. Enumerable.Range(0, 5).Select(zone => new ChoiceView(zone, $"Target opposing Spell/Trap zone {zone + 1}",
+                Kind: ActionKind.ChooseTarget, TargetZone: zone)), new(5, "Target opposing Pendulum scale", Kind: ActionKind.ChooseTarget),
+                new(6, "Finish choosing", Kind: ActionKind.FinishChoice)]
+        };
+        var input = new DuelFieldInput();
+        var frame = TimeSpan.FromSeconds(1 / 60.0);
+        input.Handle(view, default, frame);
+        input.Handle(view, new(InputAction.Up, InputAction.Up), frame);
+        Capture("decision-list");
+        input.Handle(view, new(InputAction.Back, InputAction.Back), frame);
+        Capture("decision-required");
+        input.Rejected("That choice has expired");
+        Capture("action-rejected");
+        view = view with { Choices = [], Outcome = new(PlayerId.One, PlayerId.Two, DuelEndReason.LifePointsDepleted),
+            Opponent = view.Opponent with { LifePoints = 0 } };
+        Capture("outcome-win");
+        view = view with { Outcome = new(PlayerId.Two, PlayerId.One, DuelEndReason.LifePointsDepleted) };
+        Capture("outcome-loss");
+        var loss = DuelScene.Compose(new(view, 0, -1, "", 0, States[0].Style, facts, input), field.Profile);
+        var surrendered = new DuelDrawList();
+        foreach (var draw in loss.Draws)
+            surrendered.Add(draw is DuelOutcomeReason ? new DuelOutcomeReason(DuelPart.Effects, 402182) : draw);
+        Save(device, renderer, field, surrendered, Path.Combine(root, "outcome-surrender.png"));
+
+        void Capture(string name) => Save(device, renderer, field, DuelScene.Compose(new(view, 0, -1, "", 0, States[0].Style, facts, input), field.Profile),
+            Path.Combine(root, name + ".png"));
+    }
+
+    internal static void Save(Microsoft.Xna.Framework.Graphics.GraphicsDevice device, SpriteRenderer renderer, DuelFieldVisuals field, DuelDrawList list, string path)
     {
         field.Render(list.FieldDraws);
         using var target = new Microsoft.Xna.Framework.Graphics.RenderTarget2D(device, 480, 272);

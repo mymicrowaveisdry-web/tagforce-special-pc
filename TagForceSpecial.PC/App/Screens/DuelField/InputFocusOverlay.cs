@@ -42,6 +42,7 @@ public static class InputFocusOverlay
             FieldObjectKind.Deck => owner.DeckCount,
             FieldObjectKind.Extra => owner.ExtraDeckCount + owner.FaceUpExtraDeck.Count,
             FieldObjectKind.Graveyard => owner.Graveyard.Count,
+            FieldObjectKind.Banished => owner.BanishedCount,
             _ => 0
         };
         var centre = world.Translation + (pile > 0 ? new Vector3(0, DuelLayoutProfile.PileHeight(pile), 0) : Vector3.Zero);

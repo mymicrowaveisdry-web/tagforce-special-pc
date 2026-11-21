@@ -118,7 +118,7 @@ public static class DuelFieldCommands
         if (choices.Length == 1) return new SubmitCommand(choices[0].Id);
         // Several free zones for the same summon or set: the original places the card itself.
         if (verb is MenuVerb.Summon or MenuVerb.SetMonster or MenuVerb.SetSpellTrap && choices.Select(c => c.Kind).Distinct().Count() == 1 &&
-            choices.Select(c => StripZone(c.Label)).Distinct().Count() == 1 && choices.All(c => c.Zone is not null))
+            choices.Select(c => StripZone(c.Label)).Distinct().Count() == 1 && choices.All(c => c is { Zone: not null, TargetZone: null, Position: null }))
             return new SubmitCommand(choices.OrderBy(c => Array.IndexOf(PreferredZones, c.Zone!.Value) is var i && i < 0 ? 99 : i).First().Id);
         return new ListCommand(choices);
     }

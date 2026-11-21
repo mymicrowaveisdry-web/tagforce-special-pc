@@ -25,6 +25,7 @@ public static class DuelBoardRenderer
             Pile(list, field, player, DuelPileKind.Extra, owner.ExtraDeckCount + owner.FaceUpExtraDeck.Count, null);
             Pile(list, field, player, DuelPileKind.Deck, owner.DeckCount, null);
             Pile(list, field, player, DuelPileKind.Graveyard, owner.Graveyard.Count, owner.Graveyard.Count > 0 ? owner.Graveyard[^1] : null);
+            Pile(list, field, player, DuelPileKind.Banished, owner.BanishedCount, null);
         }
     }
 

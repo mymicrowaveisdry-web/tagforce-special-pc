@@ -10,9 +10,14 @@ public enum ActionKind
 public enum ActionAvailability { Ready, Waiting, Finished, Unsupported }
 
 // Handles that address commands kept inside DuelActionSource.
+public sealed record AuthorizedFieldTarget(PlayerId Player, FieldLocation Location, int Zone);
 public sealed record LegalAction(int Token, string Key, ActionKind Kind, string Label,
     int? CardInstanceId = null, int? Zone = null, int? TargetZone = null,
-    BattlePosition? Position = null, DuelPhase? Phase = null);
+    BattlePosition? Position = null, DuelPhase? Phase = null)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public AuthorizedFieldTarget? FieldTarget { get; init; }
+}
 public sealed record AuthorizedDecision(long Id, string Kind, IReadOnlyList<CardView> Cards);
 public sealed record DuelObservation(long Revision, PlayerId Player, PlayerId Actor, PlayerId ActivePlayer,
     int Turn, DuelPhase Phase, PlayerView Self, PlayerView Opponent, AuthorizedDecision? Decision,

@@ -1,6 +1,9 @@
 using System.Text.Json;
 using TagForceSpecial.Cards;
 using TagForceSpecial.Core;
+using TagForceSpecial.PC.App.Input;
+using TagForceSpecial.PC.App.Screens.DuelField;
+using TagForceSpecial.PC.DuelUI;
 using static TagForceSpecial.Tests.EventEffectScenario;
 
 namespace TagForceSpecial.Tests;
@@ -10,6 +13,9 @@ public sealed class TributeSummonTests
 {
     private const uint Low = uint.MaxValue - 1, High = uint.MaxValue, OtherCard = 100_000;
 
+    private static CardCatalog Catalog(uint level) => new(new(null, "synthetic-stage9-tributes"), new[] { Low, High, OtherCard }.Select(id =>
+        new CardDefinition(id, $"Probe {id}", "", new(1000, 1000, id == High ? level : 4))));
+
     private static DuelEngine Setup(uint level = 5, int donors = 1, bool faceDown = false,
         bool eligibleDonor = true, bool eligibleTarget = true,
         IEnumerable<TriggerEffectProfile>? triggers = null,
@@ -18,8 +24,7 @@ public sealed class TributeSummonTests
         IEnumerable<DecisionSequence>? sequences = null)
     {
         uint[] ids = [Low, High, OtherCard];
-        var catalog = new CardCatalog(new(null, "synthetic-stage9-tributes"), ids.Select(id =>
-            new CardDefinition(id, $"Probe {id}", "", new(1000, 1000, id == High ? level : 4))));
+        var catalog = Catalog(level);
         var rules = ids.ToDictionary(id => id, id => new DuelCardRules(CardCategory.Monster,
             AllowsNormalSummon: true, AllowsBasicBattle: true,
             AllowsTributeSummon: id == High && eligibleTarget,
@@ -108,6 +113,34 @@ public sealed class TributeSummonTests
         Ok(engine, Command(engine, zone: 4));
         Assert.Null(engine.State.GetPlayer(PlayerId.One).MonsterZones[0]);
         Assert.Equal(High, engine.State.GetPlayer(PlayerId.One).MonsterZones[4]!.Card.GameCardId);
+    }
+
+    [Fact]
+    public void PcTributeSelectionShowsDistinctLegalMaterialsAndSubmitsOnlyTheChosenOption()
+    {
+        var engine = Setup(donors: 2);
+        var controller = new DuelController(engine, Catalog(5));
+        var input = new DuelFieldInput();
+        var tick = TimeSpan.FromSeconds(1 / 60.0);
+        DuelSubmit? Press(InputAction action) => input.Handle(controller.View, new(action, action), tick);
+        Press(InputAction.None);
+        input.Focus.FocusOn(input.Focus.Row(DuelFieldRows.OwnBottom).First(slot => slot.Card?.CardId == High));
+        Assert.Null(Press(InputAction.Confirm));
+        Assert.Null(Press(InputAction.Confirm));
+        var decision = Assert.IsType<ListModal>(input.Modal);
+        Assert.Collection(decision.Choices,
+            option => Assert.EndsWith("use zone 1", option.Label), option => Assert.EndsWith("use zone 2", option.Label));
+
+        Assert.Null(Press(InputAction.Down));
+        var submit = Assert.IsType<DuelSubmit>(Press(InputAction.Confirm));
+        Assert.True(controller.Choose(submit.Revision, submit.ChoiceId));
+        Assert.Equal(Low, controller.View.Self.Monsters[0]?.CardId);
+        Assert.Equal(High, controller.View.Self.Monsters[1]?.CardId);
+        Assert.Single(controller.View.Self.Graveyard, card => card.CardId == Low);
+
+        long revision = controller.View.Revision;
+        Assert.False(controller.Choose(submit.Revision, submit.ChoiceId));
+        Assert.Equal(revision, controller.View.Revision);
     }
 
     [Fact]

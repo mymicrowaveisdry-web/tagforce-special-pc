@@ -35,7 +35,10 @@ public static class CardSpriteRenderer
 
     /// <summary>Original order (GE captures): the player's field, the player's hand, the opponent's field, the opponent's hand.
     /// <paramref name="focused"/> is the hand card raised by the cursor. Returns where each card was drawn.</summary>
-    public static IReadOnlyList<DuelCardPlacement> DrawFieldOriginal(DuelDrawList list, PC.DuelUI.DuelView view, int? focused)
+    public static IReadOnlyList<DuelCardPlacement> DrawFieldOriginal(DuelDrawList list, PC.DuelUI.DuelView view, int? focused) =>
+        DrawFieldOriginal(list, view, focused, default);
+
+    internal static IReadOnlyList<DuelCardPlacement> DrawFieldOriginal(DuelDrawList list, PC.DuelUI.DuelView view, int? focused, DuelFieldFrame presentation)
     {
         var placed = new List<DuelCardPlacement>();
         void Place(CardView card, Matrix world, bool hand)
@@ -46,7 +49,9 @@ public static class CardSpriteRenderer
         foreach (var (player, owner) in new[] { (true, view.Self), (false, view.Opponent) })
         {
             for (int i = 0; i < owner.Monsters.Count; i++)
-                if (owner.Monsters[i] is { } card) Place(card, DuelLayoutProfile.SlotWorld(player, false, i, card.Position), false);
+                if (owner.Monsters[i] is { } card)
+                    Place(card, player && presentation.SummonedCard?.InstanceId == card.InstanceId && presentation.SummonWorld is { } world
+                        ? world : DuelLayoutProfile.SlotWorld(player, false, i, card.Position), false);
             for (int i = 0; i < owner.SpellTraps.Count; i++)
                 if (owner.SpellTraps[i] is { } card) Place(card, DuelLayoutProfile.SlotWorld(player, true, i, null), false);
             for (int i = 0; i < owner.Pendulum.Count; i++)

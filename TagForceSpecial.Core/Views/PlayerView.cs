@@ -10,7 +10,11 @@ public sealed record PlayerView(PlayerId Id, int LifePoints, int DeckCount, int 
     IReadOnlyList<CardView> Hand, IReadOnlyList<CardView?> Monsters,
     IReadOnlyList<CardView?> SpellTraps, IReadOnlyList<CardView?> Pendulum,
     IReadOnlyList<CardView> Graveyard, IReadOnlyList<CardView> FaceUpExtraDeck,
-    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] CardView? FieldSpell = null);
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] CardView? FieldSpell = null)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public int BanishedCount { get; init; }
+}
 
 /// <summary>The shared visibility boundary for human and opponent presentation.</summary>
 public static class PlayerProjection
@@ -28,7 +32,10 @@ public static class PlayerProjection
             Read(p.PendulumZones.Select(f => f is null ? null : Card(f.Card, own || f.IsFaceUp, null, catalog, !f.IsFaceUp))),
             Read(p.Graveyard.Select(c => Card(c, true, null, catalog))),
             Read(p.FaceUpExtraDeck.Select(c => Card(c, true, null, catalog))),
-            p.FieldSpell is { } field ? Card(field.Card, own || field.IsFaceUp, null, catalog, !field.IsFaceUp) : null);
+            p.FieldSpell is { } field ? Card(field.Card, own || field.IsFaceUp, null, catalog, !field.IsFaceUp) : null)
+        {
+            BanishedCount = p.Banished.Count
+        };
     }
 
     internal static CardView Card(CardInstance card, bool visible, BattlePosition? position, CardCatalog catalog, bool faceDown = false)

@@ -35,10 +35,15 @@ public sealed class CardInfoPanel(GraphicsDevice device, TitleFlowVisuals visual
         // Measured: the info text is clipped to the text box (GE scissor on its draws).
         var s = profile.InfoScissor;
         var previous = device.RasterizerState;
+        var previousScissor = device.ScissorRectangle;
         device.ScissorRectangle = new Rectangle(s[0], s[1], s[2] - s[0] + 1, s[3] - s[1] + 1);
         device.RasterizerState = Scissored;
-        DrawInfo(card);
-        device.RasterizerState = previous ?? RasterizerState.CullNone;
+        try { DrawInfo(card); }
+        finally
+        {
+            device.ScissorRectangle = previousScissor;
+            device.RasterizerState = previous ?? RasterizerState.CullNone;
+        }
     }
 
     /// <summary>"[Type/Suffix]" for monsters, "[Spell/Kind]" or "[Trap/Kind]" (no kind for Normal) from cardinfo_jpn.ehp words; null when a

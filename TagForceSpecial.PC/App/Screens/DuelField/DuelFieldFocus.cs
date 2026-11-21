@@ -19,7 +19,6 @@ public readonly record struct FieldObject(int Row, FieldObjectKind Kind, bool Ow
 public static class DuelFieldRows
 {
     public const int OwnBottom = 0, OwnSpellTrap = 1, OwnMonster = 2, OpponentMonster = 3, OpponentSpellTrap = 4, OpponentTop = 5, Count = 6;
-    private const float BanishedX = 403.1f;
 
     public static IReadOnlyList<FieldObject>[] Build(DuelView view)
     {
@@ -32,8 +31,8 @@ public static class DuelFieldRows
         rows[OwnMonster] = [new(OwnMonster, FieldObjectKind.FieldSpell, true, 0, -DuelLayoutProfile.PileX, self.FieldSpell),
             .. Slots(OwnMonster, FieldObjectKind.Monster, self.Monsters, true),
             new(OwnMonster, FieldObjectKind.Graveyard, true, 0, DuelLayoutProfile.PileX, Top(self.Graveyard)),
-            new(OwnMonster, FieldObjectKind.Banished, true, 0, BanishedX, null)];
-        rows[OpponentMonster] = [new(OpponentMonster, FieldObjectKind.Banished, false, 0, -BanishedX, null),
+            new(OwnMonster, FieldObjectKind.Banished, true, 0, DuelLayoutProfile.BanishedX, null)];
+        rows[OpponentMonster] = [new(OpponentMonster, FieldObjectKind.Banished, false, 0, -DuelLayoutProfile.BanishedX, null),
             new(OpponentMonster, FieldObjectKind.Graveyard, false, 0, -DuelLayoutProfile.PileX, Top(opponent.Graveyard)),
             .. Slots(OpponentMonster, FieldObjectKind.Monster, opponent.Monsters, false),
             new(OpponentMonster, FieldObjectKind.FieldSpell, false, 0, DuelLayoutProfile.PileX, opponent.FieldSpell)];

@@ -30,19 +30,28 @@ public static class PromptPresenter
     }
 
     /// <summary>Interim drawing of the input session's open window (PC font, measured placement) and its feedback line.</summary>
-    public static void DrawModal(DuelDrawList list, DuelView view, DuelFieldInput input, string notice)
+    public static void DrawModal(DuelDrawList list, DuelView view, DuelFieldInput input, string notice) =>
+        DrawModal(list, view, input, notice, originalField: true);
+
+    internal static void DrawModal(DuelDrawList list, DuelView view, DuelFieldInput input, string notice, bool originalField)
     {
+        var profile = originalField ? DuelFieldProfileCache.Profile : null;
         switch (input.Modal)
         {
-            case CardMenuModal m: OriginalMenu(list, view, m.Target, m.Items, m.Index); break;
-            case GlobalMenuModal g: OriginalMenu(list, view, input.Focus.Current, DuelFieldCommands.GlobalVerbs.Select((v, i) => new MenuItem(DuelFieldCommands.GlobalMenu[i], new UnsupportedCommand(""), v)).ToArray(), g.Index); break;
-            case PhaseModal p: if (DuelFieldProfileCache.Profile is { } field) OriginalPhases(list, field, p, view); else Phases(list, p); break;
-            case ResponseModal r: if (DuelFieldProfileCache.Profile is not null && view.ChainTop is { } top) list.Add(new DuelChainPrompt(DuelPart.Prompt, top.Name, ResponseCards(view), r.Index)); else Response(list, view, r); break;
-            case ListModal l: Choices(list, "CHOOSE", l.Choices.Select(c => c.Label).ToArray(), l.Index); break;
+            case CardMenuModal m: OriginalMenu(list, profile, view, m.Target, m.Items, m.Index); break;
+            case GlobalMenuModal g: OriginalMenu(list, profile, view, input.Focus.Current, DuelFieldCommands.GlobalVerbs.Select((v, i) => new MenuItem(DuelFieldCommands.GlobalMenu[i], new UnsupportedCommand(""), v)).ToArray(), g.Index); break;
+            case PhaseModal p: if (profile is { } field) OriginalPhases(list, field, p, view); else Phases(list, p); break;
+            case ResponseModal r: if (profile is not null && view.ChainTop is { } top) list.Add(new DuelChainPrompt(DuelPart.Prompt, top.Name, ResponseCards(view), r.Index)); else Response(list, view, r); break;
+            case ListModal l:
+                if (profile is not null && DuelBoardDecision.OnField(l)) break;
+                if (profile is not null) DuelDecisionPanel.DrawOriginal(list, l);
+                else DuelDecisionPanel.Draw(list, l);
+                break;
+            case TargetModal t when profile is null: DuelDecisionPanel.Draw(list, new(t.Choices, t.Index, Cancelable: true)); break;
             case TargetModal: break; // drawn on the field (AttackTargetOverlay)
         }
-        string line = input.Feedback.Kind == DuelFeedbackKind.None ? notice : input.Feedback.Text;
-        if (line.Length > 0) list.Text(DuelPart.Prompt, line.Length > 77 ? line[..77] : line, 8, 263, input.Feedback.Kind == DuelFeedbackKind.None ? DuelPalette.Muted : DuelPalette.Gold);
+        if (profile is not null) DuelNoticeLine.DrawOriginal(list, input.Feedback);
+        else DuelNoticeLine.Draw(list, view, input.Feedback, notice);
     }
 
     public static Rectangle MenuWindow(Vector2 pointer, bool handCard, int rows)
@@ -54,9 +63,9 @@ public static class PromptPresenter
     }
 
     /// <summary>The original command window (<see cref="DuelMenuWindow"/>), anchored to the focused object's projected centre.</summary>
-    private static void OriginalMenu(DuelDrawList list, DuelView view, FieldObject target, IReadOnlyList<MenuItem> items, int index)
+    private static void OriginalMenu(DuelDrawList list, DuelFieldProfile? field, DuelView view, FieldObject target, IReadOnlyList<MenuItem> items, int index)
     {
-        if (DuelFieldProfileCache.Profile is not { } field) { Menu(list, view, target, items.Select(i => i.Label).ToArray(), index); return; }
+        if (field is null) { Menu(list, view, target, items.Select(i => i.Label).ToArray(), index); return; }
         var (centre, _) = InputFocusOverlay.Place(new(view, []), target);
         var screen = DuelLayoutProfile.Project(field, centre);
         list.Add(new DuelFieldMenu(DuelPart.Prompt, items, index, (int)screen.X, (int)screen.Y));
@@ -150,22 +159,6 @@ public static class PromptPresenter
             var button = new Rectangle(232 + i * 96, 118, 68, 23);
             list.Fill(DuelPart.Prompt, button, i == r.Index ? Highlight : new Color(40, 44, 52), SceneLayer.PanelHighlight);
             list.Text(DuelPart.Prompt, i == 0 ? "YES" : "NO", button.X + 24, button.Y + 8, Color.White);
-        }
-    }
-
-    private static void Choices(DuelDrawList list, string title, IReadOnlyList<string> labels, int index)
-    {
-        int rows = Math.Min(labels.Count, 8), start = Math.Clamp(index - rows + 1, 0, Math.Max(0, labels.Count - rows));
-        var window = new Rectangle(150, 40, 300, 22 + rows * RowHeight);
-        Box(list, window);
-        list.Text(DuelPart.Prompt, title + "  (PC LIST)", window.X + 8, window.Y + 6, Color.Black);
-        for (int i = 0; i < rows; i++)
-        {
-            int y = window.Y + 18 + i * RowHeight;
-            bool selected = start + i == index;
-            if (selected) list.Fill(DuelPart.Prompt, new(window.X + 4, y, window.Width - 8, RowHeight), Highlight, SceneLayer.PanelHighlight);
-            string label = labels[start + i];
-            list.Text(DuelPart.Prompt, label.Length > 45 ? label[..45] : label, window.X + 8, y + 4, selected ? Color.White : Color.Black);
         }
     }
 

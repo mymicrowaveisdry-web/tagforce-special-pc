@@ -72,9 +72,9 @@ public static class DuelHud
         list.FieldPiece(DuelPart.Hud, field, "portrait.opponent.frame");
         if (style.OpponentFace is { } face)
             list.FieldPiece(DuelPart.Hud, field, "portrait.opponent.face", new(Texture: Assets.Presentation.DuelFaceIcons.Key(face)));
-        // Status icons under the portraits (EBOOT dialog atlas): the captured controller and hourglass cells; every capture was taken with
-        // the player acting, so their opponent-turn cells are not measured yet.
-        list.FieldPiece(DuelPart.Hud, field, "portrait.opponent.status");
-        list.FieldPiece(DuelPart.Hud, field, "portrait.player.status");
+        // The PC uses the controller icon for the active side and the hourglass for the waiting side.
+        const float statusOffset = 312;
+        list.FieldPiece(DuelPart.Hud, field, "portrait.opponent.status", new(Offset: new(playerTurn ? 0 : -statusOffset, 0)));
+        list.FieldPiece(DuelPart.Hud, field, "portrait.player.status", new(Offset: new(playerTurn ? 0 : statusOffset, 0)));
     }
 }

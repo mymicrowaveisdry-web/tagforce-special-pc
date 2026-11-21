@@ -2,6 +2,7 @@ using TagForceSpecial.Core;
 using TagForceSpecial.Core.Views;
 using TagForceSpecial.PC.App.Screens.DuelField;
 using TagForceSpecial.PC.DuelUI;
+using TagForceSpecial.PC.Rendering;
 
 namespace TagForceSpecial.Tests;
 
@@ -71,9 +72,14 @@ public sealed class DuelSceneTests
     [Fact]
     public void OutcomeBannerIsTheLastLayer()
     {
-        var view = View([]) with { Prompt = "YOU WIN", Outcome = new DuelOutcome(PlayerId.One, PlayerId.Two, DuelEndReason.LifePointsDepleted) };
-        var last = Assert.IsType<DuelText>(DuelScene.Compose(new(view, 0, -1, "", 0)).Draws[^1]);
-        Assert.Equal((DuelPart.Effects, "YOU WIN"), (last.Part, last.Text));
+        var view = View([]) with { Outcome = new DuelOutcome(PlayerId.One, PlayerId.Two, DuelEndReason.LifePointsDepleted) };
+        var draws = DuelScene.Compose(new(view, 0, -1, "", 0)).Draws;
+        var banner = draws.TakeLast(4).ToArray();
+        Assert.All(banner, draw => Assert.Equal(DuelPart.Effects, draw.Part));
+        Assert.Equal(SceneLayer.Modal, Assert.IsType<DuelFill>(banner[0]).Layer);
+        var text = banner.OfType<DuelText>().ToArray();
+        Assert.Equal(["You win", "Opponent reached 0 LP"], text.Select(draw => draw.Text));
+        Assert.All(text, draw => Assert.Equal(SceneLayer.ModalText, draw.Layer));
     }
 
     [Fact]

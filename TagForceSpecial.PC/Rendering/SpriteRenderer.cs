@@ -4,7 +4,7 @@ using Microsoft.Xna.Framework.Graphics;
 namespace TagForceSpecial.PC.Rendering;
 
 /// <summary>Sprite depth bands; <see cref="Panel"/> and <see cref="PanelHighlight"/> sit under text so window labels stay readable.</summary>
-public enum SceneLayer { Background = 0, Field = 10, Cards = 30, Panel = 40, PanelHighlight = 50, Text = 60, Cursor = 80, Modal = 90 }
+public enum SceneLayer { Background = 0, Field = 10, Cards = 30, Panel = 40, PanelHighlight = 50, Text = 60, Cursor = 80, Modal = 90, ModalHighlight = 92, ModalText = 95 }
 public readonly record struct AtlasRegion(Texture2D Texture, Rectangle Source);
 
 public sealed class SpriteRenderer : IDisposable
@@ -36,11 +36,14 @@ public sealed class SpriteRenderer : IDisposable
         Fill(new(rect.Right - 1, rect.Y, 1, rect.Height), color, layer);
     }
     public void Text(string text, int x, int y, Color? color = null, int scale = 1) =>
-        font.Draw(batch, pixel, text, x, y, color ?? Color.White, scale, .6f);
+        Text(text, x, y, color, scale, SceneLayer.Text);
+
+    internal void Text(string text, int x, int y, Color? color, int scale, SceneLayer layer) =>
+        font.Draw(batch, pixel, text, x, y, color ?? Color.White, scale, (int)layer / 100f);
     public void Wrapped(string text, int x, int y, int columns, int lines, Color? color = null) =>
         Wrapped(text, x, y, columns, lines, color, false);
 
-    internal void Wrapped(string text, int x, int y, int columns, int lines, Color? color, bool ellipsis)
+    internal void Wrapped(string text, int x, int y, int columns, int lines, Color? color, bool ellipsis, SceneLayer layer = SceneLayer.Text)
     {
         using var rows = WrapLines(text, columns).GetEnumerator();
         for (int row = 0; row < lines && rows.MoveNext(); row++)
@@ -51,7 +54,7 @@ public sealed class SpriteRenderer : IDisposable
                 string marker = new('.', Math.Min(3, columns));
                 line = line[..Math.Min(line.Length, columns - marker.Length)].TrimEnd() + marker;
             }
-            Text(line, x, y + row * 9, color);
+            Text(line, x, y + row * 9, color, 1, layer);
         }
     }
 

@@ -76,6 +76,8 @@ public sealed class AttackTargetTests
         var view = Battle(new ChoiceView(0, "Attack", 5, ActionKind.Attack, TargetZone: 2), new(1, "End turn", null, ActionKind.EndTurn));
         var input = Aiming(view);
         Assert.IsType<TargetModal>(input.Modal);
+        var fallback = DuelScene.Compose(new(view, 0, -1, "", 0, Input: input));
+        Assert.Contains(fallback.Draws.OfType<DuelText>(), draw => draw.Text == "Choose target");
         Assert.Equal(new DuelSubmit(1, 0), input.Handle(view, new(InputAction.Confirm, InputAction.Confirm), Frame));
     }
 

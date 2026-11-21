@@ -190,6 +190,100 @@ public sealed class DuelFieldInputTests
     }
 
     [Fact]
+    public void BackFromResponseListReturnsToThePromptAndTheNextBackPasses()
+    {
+        var view = View(choices: [new(4, "Respond zone 1", null, ActionKind.ChainResponse, Zone: 0),
+            new(7, "Respond zone 2", null, ActionKind.ChainResponse, Zone: 1), new(9, "Pass", null, ActionKind.ChainPass)]);
+        var input = Started(view);
+        Assert.Null(input.Handle(view, Press(InputAction.Confirm), Frame));
+        Assert.IsType<ListModal>(input.Modal);
+
+        Assert.Null(input.Handle(view, Press(InputAction.Back | InputAction.Confirm), Frame));
+        Assert.IsType<ResponseModal>(input.Modal);
+        Assert.Equal(new DuelSubmit(1, 9), input.Handle(view, Press(InputAction.Back), Frame));
+    }
+
+    [Theory]
+    [InlineData(ActionKind.ChooseTarget, "Choose target")]
+    [InlineData(ActionKind.ChooseZone, "Choose zone")]
+    [InlineData(ActionKind.ChoosePosition, "Choose position")]
+    public void RequiredDecisionPagesKeepTheirTokensAcrossNavigation(ActionKind kind, string title)
+    {
+        var view = View(choices: [.. Enumerable.Range(0, 7).Select(i => new ChoiceView(100 + i, $"Option {i + 1}", Kind: kind))]);
+        var input = Started(view);
+        Assert.Null(input.Handle(view, Press(InputAction.Back | InputAction.Confirm), Frame));
+        Assert.Equal(DuelFeedbackKind.Required, input.Feedback.Kind);
+
+        input.Handle(view, Press(InputAction.Up), Frame); // Wrap to the final page.
+        var list = DuelScene.Compose(new(view, 0, -1, "", 0, Input: input));
+        Assert.Contains(list.Draws.OfType<DuelText>(), draw => draw.Text == title);
+        Assert.Contains(list.Draws.OfType<DuelText>(), draw => draw.Text == "7/7");
+        Assert.Equal(new[] { "Option 6", "Option 7" }, list.Draws.OfType<DuelWrapped>().Where(draw => draw.Part == DuelPart.Prompt).Select(draw => draw.Text));
+        var original = DuelScene.Compose(new(view, 0, -1, "", 0, Input: input), DuelFieldProfile.LoadEmbedded());
+        var menu = Assert.Single(original.Draws.OfType<DuelFieldMenu>());
+        Assert.Equal(new[] { "Option 6", "Option 7" }, menu.Rows.Select(row => row.Label));
+        Assert.Equal(new DuelSubmit(1, 106), input.Handle(view, Press(InputAction.Confirm), Frame));
+    }
+
+    [Fact]
+    public void RejectedRequiredChoiceReopensTheCurrentOptionsWithoutConsumingThePress()
+    {
+        var view = View(choices: [new(2, "Choose zone 1", Kind: ActionKind.ChooseZone)]);
+        var input = Started(view);
+        Assert.Equal(new DuelSubmit(1, 2), input.Handle(view, Press(InputAction.Confirm), Frame));
+        input.Rejected("That choice has expired");
+
+        var refreshed = view with { Revision = 2, Choices = [new(6, "Choose zone 3", Kind: ActionKind.ChooseZone)] };
+        Assert.Null(input.Handle(refreshed, Press(InputAction.Confirm), Frame));
+        Assert.IsType<ListModal>(input.Modal);
+        Assert.Equal(DuelFeedbackKind.Rejected, input.Feedback.Kind);
+        Assert.Equal(new DuelSubmit(2, 6), input.Handle(refreshed, Press(InputAction.Confirm), Frame));
+    }
+
+    [Fact]
+    public void EmptySlotReportsAbsentActionWithoutOpeningAMenu()
+    {
+        var view = View();
+        var input = Started(view);
+        input.Focus.FocusOn(input.Focus.Row(DuelFieldRows.OwnMonster).First(slot => slot is { Kind: FieldObjectKind.Monster, Card: null }));
+        Assert.Null(input.Handle(view, Press(InputAction.Confirm), Frame));
+        Assert.Null(input.Modal);
+        Assert.Equal(DuelFeedbackKind.Absent, input.Feedback.Kind);
+    }
+
+    [Fact]
+    public void AuthorizedFieldTargetsUseTheBoardWithoutRequestingHiddenFaces()
+    {
+        var view = View(choices: [new(4, "Target opponent zone 3", Kind: ActionKind.ChooseTarget)
+            { FieldTarget = new(PlayerId.Two, FieldLocation.SpellTrapZone, 2) },
+            new(8, "Target own zone 2", Kind: ActionKind.ChooseTarget)
+            { FieldTarget = new(PlayerId.One, FieldLocation.MonsterZone, 1) }]);
+        view = view with { Opponent = view.Opponent with { SpellTraps = [null, null, Hidden(), null, null] } };
+        var input = Started(view);
+        var scene = new DuelSceneInput(view, 0, -1, "", 0, Input: input);
+        var field = DuelFieldProfile.LoadEmbedded();
+        var selected = DuelScene.Focused(scene)!.Value;
+        Assert.False(selected.Own);
+        Assert.Equal((FieldObjectKind.SpellTrap, 2), (selected.Kind, selected.Index));
+        var draws = DuelScene.Compose(scene, field).Draws;
+        Assert.DoesNotContain(draws, draw => draw is DuelFieldMenu);
+        Assert.Contains(draws.OfType<DuelCardPanel>(), draw => draw.CardId is null);
+        Assert.Null(input.Handle(view, Press(InputAction.Right), Frame));
+        Assert.Equal(new DuelSubmit(1, 8), input.Handle(view, Press(InputAction.Confirm), Frame));
+    }
+
+    [Fact]
+    public void OutcomeSupersedesAnOpenPrompt()
+    {
+        var view = View(choices: [new(2, "Choose zone 1", Kind: ActionKind.ChooseZone)]);
+        var input = Started(view);
+        var outcome = view with { Choices = [], Outcome = new(PlayerId.One, PlayerId.Two, DuelEndReason.LifePointsDepleted) };
+        var list = DuelScene.Compose(new(outcome, 0, -1, "An old notice", 0, Input: input), DuelFieldProfile.LoadEmbedded());
+        Assert.Contains(list.Draws.OfType<DuelFieldDraw>(), draw => draw.Part == DuelPart.Effects && draw.Piece == "outcome.win");
+        Assert.DoesNotContain(list.Draws, draw => draw.Part is DuelPart.Prompt or DuelPart.Focus);
+    }
+
+    [Fact]
     public void UnsupportedCommandsSaySoInsteadOfActing()
     {
         var view = View();

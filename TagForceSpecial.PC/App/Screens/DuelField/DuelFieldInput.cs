@@ -13,14 +13,16 @@ public sealed record PhaseModal(IReadOnlyList<(DuelPhase Phase, int? ChoiceId)> 
 /// <summary>Chain-style prompt: YES (index 0) or NO (index 1), side by side.</summary>
 public sealed record ResponseModal(int Index) : DuelModal;
 /// <summary>PC list for decisions whose original screens were not measured; <paramref name="Cancelable"/> when × may back out.</summary>
-public sealed record ListModal(IReadOnlyList<ChoiceView> Choices, int Index, bool Cancelable) : DuelModal;
+public sealed record ListModal(IReadOnlyList<ChoiceView> Choices, int Index, bool Cancelable) : DuelModal
+{
+    internal DuelModal? Parent { get; init; }
+}
 /// <summary>Attack target selection; <paramref name="Elapsed"/> drives the trail animation (restarted when the target changes, inferred).</summary>
 public sealed record TargetModal(IReadOnlyList<ChoiceView> Choices, int Index, TimeSpan Elapsed = default) : DuelModal;
 /// <summary>Show Details: the Card Album's detail page for the card (<paramref name="Detail"/>, null when the host has no detail renderer).</summary>
 public sealed record DetailsModal(CardView Card, App.Screens.Album.CardAlbumDetail? Detail = null) : DuelModal;
 
-/// <summary>No feedback, an engine rejection (with its notice), or a command the PC does not support yet.</summary>
-public enum DuelFeedbackKind { None, Rejected, Unsupported }
+public enum DuelFeedbackKind { None, Rejected, Unsupported, Absent, Required }
 public readonly record struct DuelFeedback(DuelFeedbackKind Kind, string Text);
 /// <summary>A legal choice to submit, bound to the view revision it was chosen from.</summary>
 public readonly record struct DuelSubmit(long Revision, int ChoiceId);
@@ -37,6 +39,7 @@ public sealed class DuelFieldInput
     private InputAction heldDirection;
     private long revision = -1;
     private DuelPhase? phase;
+    private bool refreshAfterRejection;
 
     public DuelFieldFocus Focus { get; } = new();
     public DuelModal? Modal { get; private set; }
@@ -49,7 +52,7 @@ public sealed class DuelFieldInput
     /// <summary>Processes one frame. Returns a choice to submit through <c>DuelController.Choose</c>, or null.</summary>
     public DuelSubmit? Handle(DuelView view, InputFrame frame, TimeSpan delta)
     {
-        if (view.Revision != revision) return Refresh(view);
+        if (view.Revision != revision || refreshAfterRejection) return Refresh(view);
         if (view.Outcome is not null) return null;
         var (dx, dy, repeated) = Directions(frame, delta);
         bool confirm = frame.IsPressed(InputAction.Confirm), back = frame.IsPressed(InputAction.Back), menu = frame.IsPressed(InputAction.Menu);
@@ -61,7 +64,7 @@ public sealed class DuelFieldInput
             GlobalMenuModal g => GlobalMenu(view, g, dy, repeated, confirm, back),
             PhaseModal p => PhaseSelector(view, p, dx, confirm, back),
             ResponseModal r => Response(view, r, dx, confirm, back),
-            ListModal l => List(view, l, dy, repeated, confirm, back),
+            ListModal l => List(view, l, DuelBoardDecision.OnField(l) && dx != 0 ? -dx : dy, repeated, confirm, back),
             TargetModal t => Target(view, t with { Elapsed = t.Elapsed + delta }, dx, confirm, back),
             DetailsModal d => Details(d, frame),
             _ => null
@@ -69,11 +72,20 @@ public sealed class DuelFieldInput
     }
 
     /// <summary>The controller refused a submission (stale revision or rule): close menus without changing state and say why.</summary>
-    public void Rejected(string notice) { Modal = null; Feedback = new(DuelFeedbackKind.Rejected, notice); }
+    public void Rejected(string notice)
+    {
+        Modal = null;
+        refreshAfterRejection = true;
+        Feedback = new(DuelFeedbackKind.Rejected, notice);
+    }
 
     /// <summary>A new view: rebuild the focus, drop menus built from old choices and open whatever the new choices call for.</summary>
     private DuelSubmit? Refresh(DuelView view)
     {
+        bool recovering = refreshAfterRejection;
+        refreshAfterRejection = false;
+        heldDirection = InputAction.None;
+        repeat.Restart();
         revision = view.Revision;
         Focus.Sync(view);
         Modal = null;
@@ -83,7 +95,7 @@ public sealed class DuelFieldInput
         if (view.Outcome is not null) return null;
         switch (DuelFieldCommands.Mode(view))
         {
-            case DuelInputMode.AutoDraw: return new DuelSubmit(view.Revision, view.Choices[0].Id);
+            case DuelInputMode.AutoDraw when !recovering: return new DuelSubmit(view.Revision, view.Choices[0].Id);
             case DuelInputMode.Response: Modal = new ResponseModal(0); break;
             case DuelInputMode.DecisionList: Modal = new ListModal(view.Choices, 0, false); break;
             case DuelInputMode.Waiting when view.Availability == ActionAvailability.Unsupported:
@@ -107,7 +119,8 @@ public sealed class DuelFieldInput
         if (confirm)
         {
             var items = DuelFieldCommands.ObjectMenu(view, Focus.Current);
-            if (items.Count > 0) Modal = new CardMenuModal(Focus.Current, items, 0); // no commands: nothing happens (measured)
+            if (items.Count > 0) Modal = new CardMenuModal(Focus.Current, items, 0);
+            else Feedback = new(DuelFeedbackKind.Absent, "No action for this selection.");
             return null;
         }
         if (dx != 0 || dy != 0) Focus.Move(dx, dy);
@@ -130,7 +143,7 @@ public sealed class DuelFieldInput
         {
             case SubmitCommand s: Modal = null; return new DuelSubmit(view.Revision, s.ChoiceId);
             case TargetCommand t: return StartTargets(view, t.Choices);
-            case ListCommand l: Modal = new ListModal(l.Choices, 0, true); return null;
+            case ListCommand l: Modal = new ListModal(l.Choices, 0, true) { Parent = m }; return null;
             case DetailsCommand d: OpenDetails(d.Card); return null;
             case UnsupportedCommand u: Modal = null; Feedback = new(DuelFeedbackKind.Unsupported, u.Notice); return null;
         }
@@ -146,6 +159,7 @@ public sealed class DuelFieldInput
         switch (g.Index)
         {
             case 0 when Focus.Current.Card is { Hidden: false } card: OpenDetails(card); break;
+            case 0: Feedback = new(DuelFeedbackKind.Absent, "No visible card to inspect."); break;
             case 1: OpenPhaseSelector(view); break;
             case 2: Feedback = new(DuelFeedbackKind.Unsupported, "Duel options are not available in the PC duel yet."); break;
             case 3: Feedback = new(DuelFeedbackKind.Unsupported, "Duel help is not available in the PC duel yet."); break;
@@ -165,18 +179,32 @@ public sealed class DuelFieldInput
     private DuelSubmit? Response(DuelView view, ResponseModal r, int dx, bool confirm, bool back)
     {
         var (responses, pass) = DuelFieldCommands.Responses(view);
-        if (dx != 0) { Modal = r with { Index = Step(r.Index, dx, 2, wrap: true) }; return null; }
         // × declines like NO (measured: × closes the Chain prompt).
-        if (back || confirm && r.Index == 1) { Modal = null; return pass is null ? null : new DuelSubmit(view.Revision, pass.Id); }
+        if (back) return DeclineResponse(view, pass);
+        if (dx != 0) { Modal = r with { Index = Step(r.Index, dx, 2, wrap: true) }; return null; }
         if (!confirm) return null;
+        if (r.Index == 1) return DeclineResponse(view, pass);
+        if (responses.Count == 0) { Feedback = new(DuelFeedbackKind.Absent, "No response is available."); return null; }
         if (responses.Count == 1) { Modal = null; return new DuelSubmit(view.Revision, responses[0].Id); }
-        Modal = new ListModal(responses, 0, true);
+        Modal = new ListModal(responses, 0, true) { Parent = r };
         return null;
+    }
+
+    private DuelSubmit? DeclineResponse(DuelView view, ChoiceView? pass)
+    {
+        if (pass is null) { Feedback = new(DuelFeedbackKind.Required, "A response is required."); return null; }
+        Modal = null;
+        return new DuelSubmit(view.Revision, pass.Id);
     }
 
     private DuelSubmit? List(DuelView view, ListModal l, int dy, bool repeated, bool confirm, bool back)
     {
-        if (back && l.Cancelable) return Close(true);
+        if (back)
+        {
+            if (l.Cancelable) Modal = l.Parent;
+            else Feedback = new(DuelFeedbackKind.Required, "Choose an option to continue.");
+            return null;
+        }
         if (dy != 0) { Modal = l with { Index = Step(l.Index, -dy, l.Choices.Count, wrap: !repeated) }; return null; }
         if (!confirm) return null;
         Modal = null;

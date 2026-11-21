@@ -49,8 +49,7 @@ public static class AttackTrail
 public static class AttackTargetOverlay
 {
     /// <summary>Measured (one column): the trail starts 30 above the attacker's slot and ends on the target slot; the sword stands at the
-    /// attacker + (0.32, 30, −19.22). Other columns are inferred: the original turns the attack object toward the target (atan2), which
-    /// was not captured, so the sword offset is not rotated here.</summary>
+    /// attacker + (0.32, 30, −19.22). The PC rotates the sword toward the target in other columns.</summary>
     public static readonly Vector3 TrailStart = new(0, 30, 0), SwordOffset = new(0.32f, 30f, -19.22f);
 
     public static void DrawCursors(DuelDrawList list, DuelFieldProfile field, FocusContext context, FieldObject target)
@@ -65,8 +64,14 @@ public static class AttackTargetOverlay
 
     public static void DrawTrail(DuelDrawList list, DuelFieldProfile field, Vector3 attacker, Vector3 target, int updates)
     {
+        var towardTarget = target - attacker;
+        var heading = Matrix.CreateRotationY(MathF.Atan2(-towardTarget.X, -towardTarget.Z));
         for (int i = 0; i < field.Piece("attack.sword").Length; i++)
-            list.Field(DuelPart.Effects, "attack.sword", i, new(World: Moved(field, "attack.sword", i, attacker + SwordOffset)));
+        {
+            var sword = Moved(field, "attack.sword", i, Vector3.Zero) * heading;
+            sword.Translation = attacker + Vector3.TransformNormal(SwordOffset, heading);
+            list.Field(DuelPart.Effects, "attack.sword", i, new(World: sword));
+        }
         var alpha = AttackTrail.Alpha(updates);
         var from = attacker + TrailStart;
         for (int i = 0; i < AttackTrail.Particles; i++)
