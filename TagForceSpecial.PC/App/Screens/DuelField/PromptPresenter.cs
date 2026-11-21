@@ -1,3 +1,4 @@
+using TagForceSpecial.Core.Views;
 using Microsoft.Xna.Framework;
 using TagForceSpecial.PC.DuelUI;
 using TagForceSpecial.PC.Rendering;
@@ -33,10 +34,10 @@ public static class PromptPresenter
     {
         switch (input.Modal)
         {
-            case CardMenuModal m: Menu(list, view, m.Target, m.Items.Select(i => i.Label).ToArray(), m.Index); break;
-            case GlobalMenuModal g: Menu(list, view, input.Focus.Current, DuelFieldCommands.GlobalMenu, g.Index); break;
-            case PhaseModal p: Phases(list, p); break;
-            case ResponseModal r: Response(list, view, r); break;
+            case CardMenuModal m: OriginalMenu(list, view, m.Target, m.Items, m.Index); break;
+            case GlobalMenuModal g: OriginalMenu(list, view, input.Focus.Current, DuelFieldCommands.GlobalVerbs.Select((v, i) => new MenuItem(DuelFieldCommands.GlobalMenu[i], new UnsupportedCommand(""), v)).ToArray(), g.Index); break;
+            case PhaseModal p: if (DuelFieldProfileCache.Profile is { } field) OriginalPhases(list, field, p, view); else Phases(list, p); break;
+            case ResponseModal r: if (DuelFieldProfileCache.Profile is not null && view.ChainTop is { } top) list.Add(new DuelChainPrompt(DuelPart.Prompt, top.Name, ResponseCards(view), r.Index)); else Response(list, view, r); break;
             case ListModal l: Choices(list, "CHOOSE", l.Choices.Select(c => c.Label).ToArray(), l.Index); break;
             case TargetModal t: Choices(list, "ATTACK TARGET", t.Choices.Select(c => c.Label).ToArray(), t.Index); break;
         }
@@ -52,6 +53,15 @@ public static class PromptPresenter
         return new(x, Math.Max(0, bottom - height), WindowWidth, height);
     }
 
+    /// <summary>The original command window (<see cref="DuelMenuWindow"/>), anchored to the focused object's projected centre.</summary>
+    private static void OriginalMenu(DuelDrawList list, DuelView view, FieldObject target, IReadOnlyList<MenuItem> items, int index)
+    {
+        if (DuelFieldProfileCache.Profile is not { } field) { Menu(list, view, target, items.Select(i => i.Label).ToArray(), index); return; }
+        var (centre, _) = InputFocusOverlay.Place(new(view, []), target);
+        var screen = DuelLayoutProfile.Project(field, centre);
+        list.Add(new DuelFieldMenu(DuelPart.Prompt, items, index, (int)screen.X, (int)screen.Y));
+    }
+
     private static void Menu(DuelDrawList list, DuelView view, FieldObject target, IReadOnlyList<string> labels, int index)
     {
         var field = DuelFieldProfileCache.Profile;
@@ -64,6 +74,51 @@ public static class PromptPresenter
             int y = window.Y + 7 + i * RowHeight;
             if (i == index) list.Fill(DuelPart.Prompt, new(window.X + 6, y, window.Width - 12, RowHeight), Highlight, SceneLayer.PanelHighlight);
             list.Text(DuelPart.Prompt, labels[i].ToUpperInvariant(), window.X + 10, y + 4, i == index ? Color.White : Color.Black);
+        }
+    }
+
+    /// <summary>The faces of the viewer's eligible response cards: a set-zone response shows that zone's card, a card response its card.</summary>
+    public static IReadOnlyList<uint> ResponseCards(DuelView view)
+    {
+        var cards = DuelFieldRows.Build(view).SelectMany(r => r).Where(o => o.Own).Select(o => o.Card).OfType<CardView>().ToArray();
+        var ids = new List<uint>();
+        foreach (var choice in DuelFieldCommands.Responses(view).Responses)
+        {
+            var card = choice.FocusInstanceId is { } instance ? cards.FirstOrDefault(c => c.InstanceId == instance)
+                : choice.Zone is { } zone && zone < view.Self.SpellTraps.Count ? view.Self.SpellTraps[zone] : null;
+            if (card?.CardId is { } id && !ids.Contains(id)) ids.Add(id);
+        }
+        return ids;
+    }
+
+    /// <summary>Phase names in duel/basic_jj.ehp, Draw Phase to End Phase.</summary>
+    public static readonly int[] PhaseNameOffsets = [401118, 401140, 401168, 401190, 401216, 401242];
+    /// <summary>"Select @2phase@0 to enter." in duelsys/cardinfo_jpn.ehp.</summary>
+    public const int SelectPhaseOffset = 1179180;
+    private static readonly Dictionary<int, (int, int)> HeaderPalette = new() { [0] = (0xffffff, 128), [2] = (0x7f9900, 64) };
+    private static readonly Dictionary<int, (int, int)> TitlePalette = new() { [0] = (0x000000, 64) };
+
+    /// <summary>Original selector (Main Phase 1 capture): depth clear, window with header tab, phase name, header line, then per phase its
+    /// icon (bright cell when current or reachable, else dim) and the arrow before it (bright out of the current phase), with the cyan
+    /// highlight drawn just before the selected icon. Icons are 40 pixels apart.</summary>
+    private static void OriginalPhases(DuelDrawList list, DuelFieldProfile field, PhaseModal p, DuelView view)
+    {
+        list.FieldPiece(DuelPart.Prompt, field, "select.clear");
+        list.FieldPiece(DuelPart.Prompt, field, "select.window");
+        int selected = (int)p.Options[p.Index].Phase, current = (int)view.Phase;
+        list.Add(new DuelRichText(DuelPart.Prompt, Assets.Presentation.DuelFieldResources.BasicKey, PhaseNameOffsets[selected], null,
+            189.8f, 103.42f, 0.6f, 0.54f, TitlePalette));
+        list.Add(new DuelRichText(DuelPart.Prompt, Assets.Presentation.CardAlbumResources.CardInfoKey, SelectPhaseOffset, null,
+            181.8f, 79.42f, 0.6f, 0.54f, HeaderPalette));
+        var size = field.Textures[field.Piece("select.icon")[0].Texture!].Size;
+        float dimV = 32f / size[1];
+        for (int k = 0; k < 6; k++)
+        {
+            bool bright = k == current || p.Options.Any(o => (int)o.Phase == k);
+            if (k == selected) list.FieldPiece(DuelPart.Prompt, field, "select.highlight", new(Offset: new((k - 2) * 40, 0)));
+            list.Field(DuelPart.Prompt, "select.icon", 0, new(Offset: new(k * 40, 0), UvOffset: new(k * 20f / size[0], bright ? -dimV : 0)));
+            if (k >= 1)
+                list.Field(DuelPart.Prompt, "select.arrow", 0, new(Offset: new((k - 1) * 40, 0), UvOffset: new(0, k - 1 == current ? -dimV : 0)));
         }
     }
 

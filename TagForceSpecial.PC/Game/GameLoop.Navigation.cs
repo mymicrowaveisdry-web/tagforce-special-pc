@@ -286,10 +286,35 @@ public sealed partial class GameLoop
     private void DrawDuel()
     {
         if (duel is not null) DuelScene.Draw(renderer, DuelField(), new(duel.View, choiceIndex, inspectIndex, duel.Notice, PresentationTime.TotalSeconds,
-            Facts: FieldCardFacts(), Input: DuelInput(duel)));
+            Style: duelStyle, Facts: FieldCardFacts(), Input: DuelInput(duel)));
     }
     /// <summary>Level and Tuner facts of public cards, from the imported catalog.</summary>
     private Func<uint, DuelCardFacts?>? FieldCardFacts() => setup?.Game?.Catalog.Catalog is { } catalog ? id => DuelCardFacts.From(catalog[id]) : null;
+    private DuelFieldStyle? duelStyle;
+    /// <summary>Names and faces of a Free Duel. Backdrops are known for three captured characters only (Aki TF6, Yuya TF4, Joey default);
+    /// every other opponent uses the default backdrop until the original's selection is measured.</summary>
+    private DuelFieldStyle? FreeDuelStyle(App.Screens.FreeDuel.FreeDuelSession session)
+    {
+        if (freeDuelRenderer is not { } versus) return null;
+        var (name, bust) = versus.Versus.Opponent(session);
+        string? face = Assets.Presentation.DuelFaceIcons.ByRecord.GetValueOrDefault(bust - 3);
+        string backdrop = face switch { "fw3_aki01" => "tf6", "fw5_YUYA_00" => "tf4", _ => "default" };
+        return new(backdrop, session.PlayerName, name, Assets.Presentation.DuelFaceIcons.ByRecord[Assets.Presentation.DuelFaceIcons.PlayerRecord], face);
+    }
+    /// <summary>Field text through the title flow's original card-text font.</summary>
+    private sealed class FlowFieldText(TitleFlowVisuals visuals) : IDuelFieldTextSink
+    {
+        public void Draw(string text, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha) =>
+            visuals.DrawCardFontText(text, x, y, scaleX, scaleY, color, shadowAlpha);
+        public float Measure(string text, float scaleX) => visuals.MeasureCardFontText(text, scaleX);
+    }
+    /// <summary>EBOOT textures the title flow decodes and pins (the duel status icons share its dialog atlas).</summary>
+    private Microsoft.Xna.Framework.Graphics.Texture2D? EbootTexture(string key)
+    {
+        if (flowVisuals is null) return null;
+        try { return flowVisuals.Texture(key); }
+        catch (KeyNotFoundException) { return null; }
+    }
     private DuelFieldVisuals? duelField;
     private OriginalScreenAssetResolver? duelFieldAssets;
     /// <summary>The measured field for the current validated generation, or null when its original textures are not imported.</summary>
@@ -298,7 +323,7 @@ public sealed partial class GameLoop
         if (ReferenceEquals(duelFieldAssets, screenAssets)) return duelField;
         duelField?.Dispose(); duelField = null; duelFieldAssets = screenAssets;
         if (setup?.Game?.Presentation is null) return null;
-        try { duelField = new(GraphicsDevice, screenAssets); }
+        try { duelField = new(GraphicsDevice, screenAssets) { Text = flowVisuals is { } flow ? new FlowFieldText(flow) : null, External = EbootTexture }; }
         catch (Exception e) when (e is InvalidDataException or KeyNotFoundException or InvalidOperationException)
         { Console.Error.WriteLine("DUEL_FIELD_PENDING " + e.Message); }
         return duelField;

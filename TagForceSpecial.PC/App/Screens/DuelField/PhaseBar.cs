@@ -16,10 +16,15 @@ public static class PhaseBar
 
     /// <summary>Original strip: frame, six phase cells (drawn End Phase first), then the highlight, the current label and two glows on the
     /// current cell. The glows pulse in the original; this repeats the captured instant.</summary>
-    public static void DrawOriginal(DuelDrawList list, DuelFieldProfile field, DuelPhase phase)
+    /// <summary>Measured: while the phase selector is open the cell labels drop to alpha 0.494; the current cell stays bright.</summary>
+    public const float DimmedLabelAlpha = 0.494f;
+
+    public static void DrawOriginal(DuelDrawList list, DuelFieldProfile field, DuelPhase phase, bool dimmed = false)
     {
         list.FieldPiece(DuelPart.PhaseBar, field, "phase.frame");
-        list.FieldPiece(DuelPart.PhaseBar, field, "phase.cells");
+        var cells = field.Piece("phase.cells");
+        for (int i = 0; i < cells.Length; i++)
+            list.Field(DuelPart.PhaseBar, "phase.cells", i, dimmed && i % 2 == 1 ? new(Alpha: DimmedLabelAlpha) : default);
         var offset = new Vector2(((int)phase - CapturedPhase) * CellPitch, 0);
         string label = field.Piece("phase.cells")[LabelIndex(phase)].Texture!;
         list.Field(DuelPart.PhaseBar, "phase.active", 0, new(Offset: offset));

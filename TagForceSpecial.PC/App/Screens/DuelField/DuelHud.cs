@@ -51,15 +51,30 @@ public static class DuelHud
 
     /// <summary>Original: the score bar, the Help tab and both portrait frames. The additive glow marks the turn player's portrait; every
     /// capture shows it on the player's side, so the opponent's position is the measured frame offset.</summary>
-    public static void DrawOriginal(DuelDrawList list, DuelFieldProfile field, DuelView view)
+    /// <summary>Measured HUD names (card-text font ltn0, white, shadow alpha 128): the player's starts at x 205.8 at 0.6 × 0.54. The
+    /// opponent's is laid out right-aligned at x 417.55 with its width at 0.6, then drawn at 0.55 × 0.54 (Aki, Joey and Yuya captures
+    /// agree within 0.1 pixel).</summary>
+    public const float NameY = -1.58f, PlayerNameX = 205.8f, OpponentNameRight = 417.55f;
+
+    public static void DrawOriginal(DuelDrawList list, DuelFieldProfile field, DuelView view, DuelFieldStyle? style = null)
     {
+        style ??= new();
         list.FieldPiece(DuelPart.Hud, field, "hud.frame");
+        list.FieldText(DuelPart.Hud, style.PlayerName, PlayerNameX, NameY, 0.6f, 0.54f, 0xffffff, 128);
+        list.FieldText(DuelPart.Hud, style.OpponentName, OpponentNameRight, NameY, 0.55f, 0.54f, 0xffffff, 128, alignRight: true, layoutScaleX: 0.6f);
         DrawNumbers(list, field, view);
         list.FieldPiece(DuelPart.Hud, field, "hud.ornament");
         list.FieldPiece(DuelPart.Hud, field, "hud.help");
         list.FieldPiece(DuelPart.Hud, field, "portrait.player.frame");
+        list.FieldPiece(DuelPart.Hud, field, "portrait.player.face", new(Texture: Assets.Presentation.DuelFaceIcons.Key(style.PlayerFace)));
         bool playerTurn = view.ActivePlayer == view.Viewer;
         list.FieldPiece(DuelPart.Hud, field, "portrait.player.glow", new(Offset: new(playerTurn ? 0 : OpponentPortraitOffset, 0)));
         list.FieldPiece(DuelPart.Hud, field, "portrait.opponent.frame");
+        if (style.OpponentFace is { } face)
+            list.FieldPiece(DuelPart.Hud, field, "portrait.opponent.face", new(Texture: Assets.Presentation.DuelFaceIcons.Key(face)));
+        // Status icons under the portraits (EBOOT dialog atlas): the captured controller and hourglass cells; every capture was taken with
+        // the player acting, so their opponent-turn cells are not measured yet.
+        list.FieldPiece(DuelPart.Hud, field, "portrait.opponent.status");
+        list.FieldPiece(DuelPart.Hud, field, "portrait.player.status");
     }
 }

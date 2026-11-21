@@ -11,20 +11,20 @@ namespace TagForceSpecial.PC.App.Screens.DuelField;
 public static class DuelFieldReference
 {
     /// <summary>Capture name, backdrop piece, phase and turn of each reference state; the player is the turn player in every capture.</summary>
-    public static IReadOnlyList<(string Name, string Backdrop, DuelPhase Phase, int Turn)> States { get; } =
+    public static IReadOnlyList<(string Name, DuelFieldStyle Style, DuelPhase Phase, int Turn)> States { get; } =
     [
-        ("aki-board", "tf6", DuelPhase.Main1, 2),
-        ("joey-board", "default", DuelPhase.Battle, 3),
-        ("yuya-chain", "tf4", DuelPhase.Main1, 1)
+        ("aki-board", new("tf6", "RJ ANDA", "Aki Izayoi", "fw0_PLAYER_0", "fw3_aki01"), DuelPhase.Main1, 2),
+        ("joey-board", new("default", "PPSSPP", "Joey Wheeler", "fw0_PLAYER_0", "fw1_JONOUCHI_00"), DuelPhase.Battle, 3),
+        ("yuya-chain", new("tf4", "RJ ANDA", "Yuya Sakaki", "fw0_PLAYER_0", "fw5_YUYA_00"), DuelPhase.Main1, 1)
     ];
 
     public static void Capture(DuelFieldVisuals field, string root, Func<uint, DuelCardFacts?>? facts)
     {
         Directory.CreateDirectory(root);
-        foreach (var (name, backdrop, phase, turn) in States)
+        foreach (var (name, style, phase, turn) in States)
         {
             var view = name == "aki-board" ? AkiBoard() : EmptyView(phase, turn);
-            var list = DuelScene.Compose(new(view, 0, -1, "", 0, new(backdrop), facts), field.Profile);
+            var list = DuelScene.Compose(new(view, 0, -1, "", 0, style, facts), field.Profile);
             field.Render(list.FieldDraws);
             using var output = new FileStream(Path.Combine(root, name + ".field.png"), FileMode.CreateNew, FileAccess.Write);
             field.Layer.SaveAsPng(output, 480, 272);
@@ -61,12 +61,22 @@ public static class DuelFieldReference
         input.Handle(view, default, frame);
         (string Name, InputAction Press)[] steps = [("0-start", InputAction.None), ("1-left", InputAction.Left), ("2-left", InputAction.Left),
             ("3-menu", InputAction.Confirm), ("4-close", InputAction.Back), ("5-up", InputAction.Up), ("6-up", InputAction.Up),
-            ("7-phase", InputAction.Back), ("8-phase-right", InputAction.Right), ("9-close", InputAction.Back), ("10-global", InputAction.Menu)];
+            ("7-phase", InputAction.Back), ("8-phase-right", InputAction.Right), ("9-close", InputAction.Back), ("10-global", InputAction.Menu),
+            ("11-chain", InputAction.None)];
+        // The Chain prompt of the input capture: Scapegoat activated, a set Mystical Space Typhoon (4909) as the only response.
+        var chain = view with
+        {
+            Revision = 99,
+            Self = view.Self with { SpellTraps = [null, null, new CardView(6, 4909, "", "", null, null, null, false, FaceDown: true), null, null] },
+            ChainTop = new CardView(50, 4818, "Scapegoat", "", null, null, null, false),
+            Choices = [new(0, "Respond zone 3", null, ActionKind.ChainResponse, Zone: 2), new(1, "Pass response", null, ActionKind.ChainPass)]
+        };
         using var target = new Microsoft.Xna.Framework.Graphics.RenderTarget2D(device, 480, 272);
         foreach (var (name, press) in steps)
         {
-            if (press != InputAction.None) input.Handle(view, new(press, press), frame);
-            var list = DuelScene.Compose(new(view, 0, -1, "", 0, new("tf6"), facts, input), field.Profile);
+            if (name == "11-chain") { input.Handle(chain, default, frame); view = chain; }
+            else if (press != InputAction.None) input.Handle(view, new(press, press), frame);
+            var list = DuelScene.Compose(new(view, 0, -1, "", 0, States[0].Style, facts, input), field.Profile);
             field.Render(list.FieldDraws);
             device.SetRenderTarget(target);
             device.Clear(Microsoft.Xna.Framework.Color.Black);

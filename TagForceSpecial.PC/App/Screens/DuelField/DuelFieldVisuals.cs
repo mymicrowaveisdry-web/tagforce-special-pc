@@ -5,6 +5,13 @@ using TagForceSpecial.PC.App.Visual;
 
 namespace TagForceSpecial.PC.App.Screens.DuelField;
 
+/// <summary>Original-font text drawing into the currently bound target, and its advance width.</summary>
+public interface IDuelFieldTextSink
+{
+    void Draw(string text, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha);
+    float Measure(string text, float scaleX);
+}
+
 /// <summary>Renders the measured Duel Field draws into one 480×272 layer with a depth buffer, from the validated original textures.</summary>
 public sealed class DuelFieldVisuals : IDisposable
 {
@@ -25,8 +32,14 @@ public sealed class DuelFieldVisuals : IDisposable
         Layer = new(device, 480, 272, false, SurfaceFormat.Color, DepthFormat.Depth24Stencil8);
     }
 
+    /// <summary>Draws original-font text into the bound target (the title flow's PGF renderer); without it field text is skipped.</summary>
+    public IDuelFieldTextSink? Text { get; set; }
+
+    /// <summary>Textures the title flow decodes from the stored EBOOT and checks by pixel hash ("title.eboot.*" keys).</summary>
+    public Func<string, Texture2D?>? External { get; set; }
+
     /// <summary>Renders <paramref name="draws"/> in order into <see cref="Layer"/>, restoring the previous render targets.</summary>
-    public void Render(IEnumerable<DuelFieldDraw> draws)
+    public void Render(IEnumerable<DuelDraw> draws)
     {
         var targets = device.GetRenderTargets();
         var viewport = device.Viewport;
@@ -34,7 +47,7 @@ public sealed class DuelFieldVisuals : IDisposable
         {
             device.SetRenderTarget(Layer);
             device.Clear(ClearOptions.Target | ClearOptions.DepthBuffer | ClearOptions.Stencil, Color.Black, 1, 0);
-            foreach (var draw in draws) renderer.Draw(Profile.Piece(draw.Piece)[draw.Index], Profile, Texture, draw.Placement);
+            foreach (var draw in draws) RenderOne(draw);
         }
         finally
         {
@@ -44,14 +57,59 @@ public sealed class DuelFieldVisuals : IDisposable
         }
     }
 
+    private void RenderOne(DuelDraw draw)
+    {
+        switch (draw)
+        {
+            case DuelFieldDraw d: renderer.Draw(Profile.Piece(d.Piece)[d.Index], Profile, Texture, d.Placement); break;
+            case DuelFieldSprites s:
+                var template = Profile.Piece(s.Piece)[s.Index];
+                float[] rgba = template.Rgba?[^1] ?? [1, 1, 1, 1];
+                renderer.Draw(template with { Vertices = s.Vertices, Uv = s.Uv, Rgba = s.Vertices.Select(_ => rgba).ToArray() }, Profile, Texture);
+                break;
+            case DuelFieldText t when Text is { } sink:
+                float x = t.AlignRight ? t.X - sink.Measure(t.Text, t.LayoutScaleX ?? t.ScaleX) : t.X;
+                sink.Draw(t.Text, x, t.Y, t.ScaleX, t.ScaleY, t.Color, t.ShadowAlpha);
+                break;
+            case DuelFieldMenu m when Text is { } measure:
+                foreach (var part in DuelMenuWindow.Expand(m, Profile, measure.Measure, Message)) RenderOne(part);
+                break;
+            case DuelChainPrompt c when Text is { } chain:
+                foreach (var part in DuelChainPromptWindow.Expand(c, Profile, chain.Measure, Message)) RenderOne(part);
+                break;
+            case DuelRichText r when Text is { } runs:
+                foreach (var part in DuelRichTextLayout.Expand(r, Message(r.Source, r.Offset), runs.Measure)) RenderOne(part);
+                break;
+        }
+    }
+
+    private readonly Dictionary<string, byte[]> sources = new(StringComparer.Ordinal);
+    /// <summary>A zero-terminated UTF-16 string of duel/basic_jj.ehp at <paramref name="offset"/>.</summary>
+    public string Message(int offset) => Message(DuelFieldResources.BasicKey, offset);
+
+    /// <summary>A zero-terminated UTF-16 string of a stored archive (by asset key) at <paramref name="offset"/>.</summary>
+    public string Message(string source, int offset)
+    {
+        if (!sources.TryGetValue(source, out var bytes)) sources[source] = bytes = assets.ResolveBytes(source);
+        int end = offset;
+        while (end + 1 < bytes.Length && (bytes[end] != 0 || bytes[end + 1] != 0)) end += 2;
+        return System.Text.Encoding.Unicode.GetString(bytes, offset, end - offset);
+    }
+
+    private static readonly HashSet<string> PinnedFaces = DuelFieldReferenceResources.Cases.Select(c => c.AssetKey)
+        .Where(k => k.StartsWith("duel.face.", StringComparison.Ordinal)).ToHashSet(StringComparer.Ordinal);
     private CardFaceSource? faces;
     private readonly Dictionary<uint, Texture2D> cardFaces = [];
 
     private Texture2D Texture(string key, bool withAlpha)
     {
+        if (key.StartsWith("title.eboot.", StringComparison.Ordinal))
+            return External?.Invoke(key) ?? throw new InvalidDataException("EBOOT texture unavailable: " + key);
         if (key.StartsWith(CardSpriteRenderer.FaceKeyPrefix, StringComparison.Ordinal))
             return CardFace(uint.Parse(key.AsSpan(CardSpriteRenderer.FaceKeyPrefix.Length), System.Globalization.CultureInfo.InvariantCulture));
-        var source = assets.Resolve(key).Texture;
+        // Face icons seen in a capture are pinned; the others are decoded with the same decoder and stay labelled unverified.
+        var source = (key.StartsWith("duel.face.", StringComparison.Ordinal) && !Profile.Textures.ContainsKey(key) && !PinnedFaces.Contains(key)
+            ? assets.ResolveUnverified(key) : assets.Resolve(key)).Texture;
         if (withAlpha) return source;
         if (opaque.TryGetValue(key, out var copy)) return copy;
         var pixels = new Color[source.Width * source.Height];

@@ -51,7 +51,8 @@ public static class InputFocusOverlay
         return (centre, rotation);
     }
 
-    public static void DrawOriginal(DuelDrawList list, DuelFieldProfile field, FocusContext context, FieldObject focus)
+    /// <summary>Measured: the pointer is hidden while the phase selector or the Chain prompt is open; the cursor mesh stays.</summary>
+    public static void DrawOriginal(DuelDrawList list, DuelFieldProfile field, FocusContext context, FieldObject focus, bool pointer = true)
     {
         var (centre, rotation) = Place(context, focus);
         if (focus.Own && focus.Kind == FieldObjectKind.Hand)
@@ -63,9 +64,10 @@ public static class InputFocusOverlay
         else if (focus.Own)
             // Measured: the field cursor stands one unit above the board at the object's centre, also on piles.
             list.Field(DuelPart.Focus, "focus.field", 0, new(World: Matrix.CreateScale(60f) * rotation * Matrix.CreateTranslation(centre.X, 1, centre.Z)));
-        var pointer = Pointer(field, focus, centre);
+        if (!pointer) return;
+        var at = Pointer(field, focus, centre);
         var template = field.Piece("focus.pointer")[0].Vertices![0];
-        list.Field(DuelPart.Focus, "focus.pointer", 0, new(Offset: new(pointer.X - template[0], pointer.Y - template[1])));
+        list.Field(DuelPart.Focus, "focus.pointer", 0, new(Offset: new(at.X - template[0], at.Y - template[1])));
     }
 
     public static void Draw(DuelDrawList list, CardView? card, Rectangle rect, CardView? inspected, double seconds)

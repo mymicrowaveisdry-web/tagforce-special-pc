@@ -12,6 +12,10 @@ public sealed record DuelFill(DuelPart Part, Rectangle Rect, Color Color, SceneL
 public sealed record DuelBorder(DuelPart Part, Rectangle Rect, Color Color, SceneLayer Layer) : DuelDraw(Part);
 public sealed record DuelText(DuelPart Part, string Text, int X, int Y, Color Color, int Scale = 1) : DuelDraw(Part);
 public sealed record DuelWrapped(DuelPart Part, string Text, int X, int Y, int Columns, int Lines, Color Color) : DuelDraw(Part);
+/// <summary>Original-font text in the field layer: glyph cells start at <paramref name="X"/> (left) or end at it (right-aligned), with the
+/// measured two-copy shadow. <paramref name="Color"/> is 0xBBGGRR.</summary>
+public sealed record DuelFieldText(DuelPart Part, string Text, float X, float Y, float ScaleX, float ScaleY, int Color, int ShadowAlpha,
+    bool AlignRight = false, float? LayoutScaleX = null) : DuelDraw(Part);
 /// <summary>One measured original draw (<paramref name="Index"/> of a profile piece), repeated with a placement.</summary>
 public sealed record DuelFieldDraw(DuelPart Part, string Piece, int Index, PspPlacement Placement = default) : DuelDraw(Part);
 
@@ -36,7 +40,17 @@ public sealed class DuelDrawList
         for (int i = 0; i < profile.Piece(piece).Length; i++) Field(part, piece, i, placement);
     }
 
-    public IEnumerable<DuelFieldDraw> FieldDraws => draws.OfType<DuelFieldDraw>();
+    /// <summary>A right-aligned line is laid out with its width at <paramref name="layoutScaleX"/> (default: the drawing scale).</summary>
+    public void FieldText(DuelPart part, string text, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha, bool alignRight = false,
+        float? layoutScaleX = null)
+    {
+        if (text.Length > 0) draws.Add(new DuelFieldText(part, text, x, y, scaleX, scaleY, color, shadowAlpha, alignRight, layoutScaleX));
+    }
+
+    /// <summary>Commands rendered into the field layer, in order: measured draws and original-font text.</summary>
+    public IEnumerable<DuelDraw> FieldDraws => draws.Where(d => d is DuelFieldDraw or DuelFieldText or DuelFieldMenu or DuelFieldSprites or DuelRichText or DuelChainPrompt);
+
+    public void Add(DuelDraw draw) => draws.Add(draw);
 
     /// <summary>Replays the sprite commands; measured field draws are rendered separately by <see cref="DuelFieldVisuals"/>.</summary>
     public void Replay(SpriteRenderer renderer)

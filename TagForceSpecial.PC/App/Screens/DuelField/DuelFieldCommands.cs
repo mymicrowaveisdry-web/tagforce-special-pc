@@ -12,7 +12,36 @@ public sealed record TargetCommand(IReadOnlyList<ChoiceView> Choices) : MenuComm
 public sealed record ListCommand(IReadOnlyList<ChoiceView> Choices) : MenuCommand;
 public sealed record DetailsCommand(CardView Card) : MenuCommand;
 public sealed record UnsupportedCommand(string Notice) : MenuCommand;
-public sealed record MenuItem(string Label, MenuCommand Command);
+/// <summary>One menu row: its label (the original string when <see cref="Verb"/> has one), what it does, and its verb.</summary>
+public sealed record MenuItem(string Label, MenuCommand Command, MenuVerb Verb = MenuVerb.Other);
+
+/// <summary>Command verbs with an original string in duel/basic_jj.ehp. Icons are the card_icon02 cells seen in captures.</summary>
+public enum MenuVerb
+{
+    Summon, SpecialSummon, PendulumSummon, FlipSummon, SetMonster, SetSpellTrap, Activate, PendulumScale, Attack, ToAttack, ToDefense,
+    ShowCardList, Surrender, ShowDetails, ChangePhase, Option, Help, Other
+}
+
+public static class MenuVerbs
+{
+    /// <summary>String offsets in duel/basic_jj.ehp (UTF-16, zero-terminated).</summary>
+    public static int? TextOffset(MenuVerb verb) => verb switch
+    {
+        MenuVerb.Summon => 401574, MenuVerb.SpecialSummon => 401620, MenuVerb.PendulumSummon => 401588, MenuVerb.FlipSummon => 401288,
+        MenuVerb.SetMonster or MenuVerb.SetSpellTrap => 401354, MenuVerb.Activate => 400808, MenuVerb.PendulumScale => 400826,
+        MenuVerb.Attack => 400864, MenuVerb.ToAttack => 400878, MenuVerb.ToDefense => 400924, MenuVerb.ShowCardList => 401472,
+        MenuVerb.Surrender => 401642, MenuVerb.ShowDetails => 401502, MenuVerb.ChangePhase => 401262, MenuVerb.Option => 401104,
+        MenuVerb.Help => 401088, _ => null
+    };
+
+    /// <summary>card_icon02 cell (13 × 13) of each verb seen in a capture; verbs not captured yet have none.</summary>
+    public static (int U, int V)? Icon(MenuVerb verb) => verb switch
+    {
+        MenuVerb.Summon => (65, 66), MenuVerb.SetMonster => (104, 92), MenuVerb.SetSpellTrap => (52, 66), MenuVerb.Attack => (91, 66),
+        MenuVerb.ShowCardList => (65, 79), MenuVerb.Surrender => (0, 79), MenuVerb.ShowDetails => (0, 66), MenuVerb.ChangePhase => (91, 92),
+        MenuVerb.Option => (78, 92), MenuVerb.Help => (52, 79), _ => null
+    };
+}
 
 /// <summary>How the current legal choices are presented: the open field (cursor and menus), a Chain-style Yes/No response prompt, an
 /// automatic Draw, or a PC decision list for decisions whose original screens were not measured.</summary>
@@ -46,35 +75,48 @@ public static class DuelFieldCommands
     {
         var items = new List<MenuItem>();
         if (target.Own && target.Kind == FieldObjectKind.Deck)
-            return [new("Surrender", new UnsupportedCommand("Surrender is not available in the PC duel yet."))];
+            return [new("Surrender", new UnsupportedCommand("Surrender is not available in the PC duel yet."), MenuVerb.Surrender)];
         if (target.Kind == FieldObjectKind.Extra && target.Own || target.Kind == FieldObjectKind.Graveyard && target.Card is not null)
-            return [new("Show Card List", new UnsupportedCommand("The card list screen is not available in the PC duel yet."))];
+            return [new("Show Card List", new UnsupportedCommand("The card list screen is not available in the PC duel yet."), MenuVerb.ShowCardList)];
         if (target.Card is not { Hidden: false } card) return items;
         var own = view.Choices.Where(c => c.FocusInstanceId is { } id && id == card.InstanceId && c.Kind is not null && !ResponseKinds.Contains(c.Kind.Value));
-        foreach (var group in own.GroupBy(c => Verb(c.Kind!.Value)).OrderBy(g => VerbOrder(g.Key)))
-            items.Add(new(group.Key, Command(group.Key, group.ToArray())));
-        items.Add(new(ShowDetails, new DetailsCommand(card)));
+        foreach (var group in own.GroupBy(c => Verb(c, card)).OrderBy(g => g.Key))
+            items.Add(new(Label(group.Key, group.First()), Command(group.Key, group.ToArray()), group.Key));
+        items.Add(new(ShowDetails, new DetailsCommand(card), MenuVerb.ShowDetails));
         return items;
     }
 
-    private static string Verb(ActionKind kind) => kind switch
+    /// <summary>The original verb for a legal action; the engine's own label decides between summon kinds.</summary>
+    public static MenuVerb Verb(ChoiceView choice, CardView card) => choice.Kind switch
     {
-        ActionKind.Summon => "Summon",
-        ActionKind.SetMonster or ActionKind.SetSpellTrap => "Set",
-        ActionKind.Attack => "Attack",
-        ActionKind.Position => "Change Position",
-        ActionKind.Unequip => "Unequip",
-        _ => "Activate"
+        ActionKind.Summon when choice.Label.StartsWith("Pendulum Summon", StringComparison.Ordinal) => MenuVerb.PendulumSummon,
+        ActionKind.Summon when choice.Label.StartsWith("Special Summon", StringComparison.Ordinal) => MenuVerb.SpecialSummon,
+        ActionKind.Summon => MenuVerb.Summon,
+        ActionKind.SetMonster => MenuVerb.SetMonster,
+        ActionKind.SetSpellTrap => MenuVerb.SetSpellTrap,
+        ActionKind.Attack => MenuVerb.Attack,
+        ActionKind.Position when card.Position == BattlePosition.FaceDownDefense && choice.Position == BattlePosition.FaceUpAttack => MenuVerb.FlipSummon,
+        ActionKind.Position when choice.Position == BattlePosition.FaceUpAttack => MenuVerb.ToAttack,
+        ActionKind.Position => MenuVerb.ToDefense,
+        ActionKind.ActivateSpell when choice.Label.StartsWith("Scale ", StringComparison.Ordinal) => MenuVerb.PendulumScale,
+        ActionKind.ActivateSpell or ActionKind.ActivateSetSpell or ActionKind.MonsterEffect or ActionKind.CardEffect => MenuVerb.Activate,
+        _ => MenuVerb.Other
     };
 
-    private static int VerbOrder(string verb) => verb switch { "Summon" => 0, "Set" => 1, "Activate" => 2, "Attack" => 3, "Change Position" => 4, _ => 5 };
+    private static string Label(MenuVerb verb, ChoiceView choice) => verb switch
+    {
+        MenuVerb.Summon => "Summon", MenuVerb.SpecialSummon => "Sp. Summon", MenuVerb.PendulumSummon => "Pendulum Summon",
+        MenuVerb.FlipSummon => "Flip Summon", MenuVerb.SetMonster or MenuVerb.SetSpellTrap => "Set", MenuVerb.Activate => "Activate",
+        MenuVerb.PendulumScale => "Set Pendulum Scale", MenuVerb.Attack => "Attack", MenuVerb.ToAttack => "Change to ATK Position",
+        MenuVerb.ToDefense => "Change to DEF Position", _ => choice.Label
+    };
 
-    private static MenuCommand Command(string verb, ChoiceView[] choices)
+    private static MenuCommand Command(MenuVerb verb, ChoiceView[] choices)
     {
         if (choices.Length == 1) return new SubmitCommand(choices[0].Id);
-        if (verb == "Attack") return new TargetCommand(choices);
+        if (verb == MenuVerb.Attack) return new TargetCommand(choices);
         // Several free zones for the same summon or set: the original places the card itself.
-        if (verb is "Summon" or "Set" && choices.Select(c => c.Kind).Distinct().Count() == 1 &&
+        if (verb is MenuVerb.Summon or MenuVerb.SetMonster or MenuVerb.SetSpellTrap && choices.Select(c => c.Kind).Distinct().Count() == 1 &&
             choices.Select(c => StripZone(c.Label)).Distinct().Count() == 1 && choices.All(c => c.Zone is not null))
             return new SubmitCommand(choices.OrderBy(c => Array.IndexOf(PreferredZones, c.Zone!.Value) is var i && i < 0 ? 99 : i).First().Id);
         return new ListCommand(choices);
@@ -84,6 +126,7 @@ public static class DuelFieldCommands
 
     /// <summary>Global menu (△): Show Details, Change Phase, Option, Help (measured order).</summary>
     public static IReadOnlyList<string> GlobalMenu { get; } = [ShowDetails, "Change Phase", "Option", "Help"];
+    public static IReadOnlyList<MenuVerb> GlobalVerbs { get; } = [MenuVerb.ShowDetails, MenuVerb.ChangePhase, MenuVerb.Option, MenuVerb.Help];
 
     /// <summary>Phase selector options: the current phase and each reachable phase, in phase order (End Phase via End Turn when no explicit
     /// End Phase choice exists). Each maps to the choice that enters it; the current phase has none.</summary>

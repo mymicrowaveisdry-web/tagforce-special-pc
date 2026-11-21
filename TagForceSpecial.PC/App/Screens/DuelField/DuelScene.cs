@@ -3,8 +3,9 @@ using TagForceSpecial.PC.Rendering;
 
 namespace TagForceSpecial.PC.App.Screens.DuelField;
 
-/// <summary>Per-duel presentation choices: the backdrop piece ("default", "tf4", "tf6").</summary>
-public sealed record DuelFieldStyle(string Backdrop = "default");
+/// <summary>Per-duel presentation: the backdrop piece ("default", "tf4", "tf6"), the HUD names and the face icon stems of both duelists.</summary>
+public sealed record DuelFieldStyle(string Backdrop = "default", string PlayerName = "", string OpponentName = "",
+    string PlayerFace = "fw0_PLAYER_0", string? OpponentFace = null);
 
 /// <summary>One frame's presentation input: the authorized view plus the screen's own focus state. It holds no engine reference.</summary>
 public sealed record DuelSceneInput(DuelView View, int Choice, int InspectedCard, string Notice, double Seconds, DuelFieldStyle? Style = null,
@@ -37,14 +38,14 @@ public static class DuelScene
         var inspected = input.Input?.Modal is DetailsModal details ? details.Card
             : focus is { Card: { Hidden: false } card } ? card : input.Input is null ? CardInspector.Target(view, input.Choice, input.InspectedCard) : null;
         DuelBoardRenderer.DrawOriginal(list, field, (input.Style ?? new()).Backdrop);
-        PhaseBar.DrawOriginal(list, field, view.Phase);
+        PhaseBar.DrawOriginal(list, field, view.Phase, input.Input?.Modal is PhaseModal);
         list.FieldPiece(DuelPart.Board, field, "depth.clear");
         DuelBoardRenderer.DrawPilesOriginal(list, field, view);
         int? lifted = focus is { Own: true, Kind: FieldObjectKind.Hand, Card.InstanceId: { } id } ? id : null;
         var placed = CardSpriteRenderer.DrawFieldOriginal(list, view, lifted);
-        if (focus is { } target) InputFocusOverlay.DrawOriginal(list, field, new(view, placed), target);
+        if (focus is { } target) InputFocusOverlay.DrawOriginal(list, field, new(view, placed), target, input.Input?.Modal is not (PhaseModal or ResponseModal));
         CardSpriteRenderer.DrawLevels(list, field, placed, input.Facts);
-        DuelHud.DrawOriginal(list, field, view);
+        DuelHud.DrawOriginal(list, field, view, input.Style);
         // Interim sprite parts until their measured replacements exist.
         CardInspector.DrawInterim(list, inspected);
         if (input.Input is { } session) PromptPresenter.DrawModal(list, view, session, input.Notice);

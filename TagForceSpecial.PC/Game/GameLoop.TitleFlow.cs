@@ -419,6 +419,7 @@ public sealed partial class GameLoop
                 session.Versus?.ShowNotice(error.Message);
                 return false;
             }
+            owner.duelStyle = owner.FreeDuelStyle(session);
             owner.freeDuelResult = new();
             owner.choiceIndex = 0;
             owner.inspectIndex = -1;
