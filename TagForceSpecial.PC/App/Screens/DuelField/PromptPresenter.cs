@@ -39,7 +39,7 @@ public static class PromptPresenter
             case PhaseModal p: if (DuelFieldProfileCache.Profile is { } field) OriginalPhases(list, field, p, view); else Phases(list, p); break;
             case ResponseModal r: if (DuelFieldProfileCache.Profile is not null && view.ChainTop is { } top) list.Add(new DuelChainPrompt(DuelPart.Prompt, top.Name, ResponseCards(view), r.Index)); else Response(list, view, r); break;
             case ListModal l: Choices(list, "CHOOSE", l.Choices.Select(c => c.Label).ToArray(), l.Index); break;
-            case TargetModal t: Choices(list, "ATTACK TARGET", t.Choices.Select(c => c.Label).ToArray(), t.Index); break;
+            case TargetModal: break; // drawn on the field (AttackTargetOverlay)
         }
         string line = input.Feedback.Kind == DuelFeedbackKind.None ? notice : input.Feedback.Text;
         if (line.Length > 0) list.Text(DuelPart.Prompt, line.Length > 77 ? line[..77] : line, 8, 263, input.Feedback.Kind == DuelFeedbackKind.None ? DuelPalette.Muted : DuelPalette.Gold);

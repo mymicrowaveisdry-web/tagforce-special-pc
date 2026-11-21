@@ -52,7 +52,10 @@ public static class InputFocusOverlay
     }
 
     /// <summary>Measured: the pointer is hidden while the phase selector or the Chain prompt is open; the cursor mesh stays.</summary>
-    public static void DrawOriginal(DuelDrawList list, DuelFieldProfile field, FocusContext context, FieldObject focus, bool pointer = true)
+    /// <param name="attackTarget">Measured: on an attack target the pointer shows hand_icon01 cells (64, 64) and (96, 64) alternately (period not
+    /// measured; the first is drawn) instead of (0, 0).</param>
+    public static void DrawOriginal(DuelDrawList list, DuelFieldProfile field, FocusContext context, FieldObject focus, bool pointer = true,
+        bool attackTarget = false)
     {
         var (centre, rotation) = Place(context, focus);
         if (focus.Own && focus.Kind == FieldObjectKind.Hand)
@@ -66,8 +69,11 @@ public static class InputFocusOverlay
             list.Field(DuelPart.Focus, "focus.field", 0, new(World: Matrix.CreateScale(60f) * rotation * Matrix.CreateTranslation(centre.X, 1, centre.Z)));
         if (!pointer) return;
         var at = Pointer(field, focus, centre);
-        var template = field.Piece("focus.pointer")[0].Vertices![0];
-        list.Field(DuelPart.Focus, "focus.pointer", 0, new(Offset: new(at.X - template[0], at.Y - template[1])));
+        var draw = field.Piece("focus.pointer")[0];
+        var template = draw.Vertices![0];
+        // The template covers the 32-texel cell at (0, 0); the attack cell sits two cells right and down.
+        var cell = attackTarget ? new Vector2(draw.Uv![1][0] * 2, draw.Uv[1][1] * 2) : Vector2.Zero;
+        list.Field(DuelPart.Focus, "focus.pointer", 0, new(Offset: new(at.X - template[0], at.Y - template[1]), UvOffset: cell));
     }
 
     public static void Draw(DuelDrawList list, CardView? card, Rectangle rect, CardView? inspected, double seconds)

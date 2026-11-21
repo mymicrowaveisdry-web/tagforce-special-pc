@@ -113,8 +113,9 @@ public static class DuelFieldCommands
 
     private static MenuCommand Command(MenuVerb verb, ChoiceView[] choices)
     {
+        // Measured: one monster target still opens the target state; a lone direct attack submits (its screen was not captured).
+        if (verb == MenuVerb.Attack && choices.Any(c => AttackTarget(c) is not null)) return new TargetCommand(choices);
         if (choices.Length == 1) return new SubmitCommand(choices[0].Id);
-        if (verb == MenuVerb.Attack) return new TargetCommand(choices);
         // Several free zones for the same summon or set: the original places the card itself.
         if (verb is MenuVerb.Summon or MenuVerb.SetMonster or MenuVerb.SetSpellTrap && choices.Select(c => c.Kind).Distinct().Count() == 1 &&
             choices.Select(c => StripZone(c.Label)).Distinct().Count() == 1 && choices.All(c => c.Zone is not null))

@@ -103,6 +103,8 @@ public sealed partial class GameLoop
             DuelFieldReference.CaptureInputWalk(GraphicsDevice, renderer, fieldVisuals, fieldRoot, FieldCardFacts());
             DuelFieldReference.CapturePanels(GraphicsDevice, renderer, fieldVisuals, fieldRoot, FieldCardFacts());
             DuelFieldReference.CaptureDetail(GraphicsDevice, renderer, fieldVisuals, fieldRoot, FieldCardFacts(), DuelCardDetail);
+            DuelFieldReference.CaptureAttack(GraphicsDevice, renderer, fieldVisuals, fieldRoot,
+                setup?.Game?.Catalog.Catalog ?? throw new InvalidOperationException("Attack reference capture requires the imported card catalog."));
             Console.WriteLine("DUEL_FIELD_REFERENCE " + DuelFieldReference.States.Count); Exit(); return;
         }
         var initial = activeScreen == ScreenId.Title && originalTitle is null ? ScreenId.PcTools : activeScreen;

@@ -4,9 +4,10 @@ using Microsoft.Xna.Framework.Graphics;
 namespace TagForceSpecial.PC.App.Screens.DuelField;
 
 /// <summary>Where and with what a measured draw is repeated: a replacement world matrix, a screen offset in pixels, a replacement
-/// texture and a UV offset. The default repeats the draw exactly as captured.</summary>
+/// texture and a UV offset; <paramref name="VertexAlpha"/> replaces the alpha of each vertex in GE order (the attack arrow head). The default
+/// repeats the draw exactly as captured.</summary>
 public readonly record struct PspPlacement(Matrix? World = null, Vector2 Offset = default, string? Texture = null, Vector2 UvOffset = default,
-    float? Alpha = null, Vector4? Color = null);
+    float? Alpha = null, Vector4? Color = null, float[]? VertexAlpha = null);
 
 /// <summary>Repeats measured GE draws on the GPU. Transformed draws go through the captured world, view and projection matrices and
 /// viewport, so perspective, texturing and depth match the original; through-mode draws use their screen coordinates.</summary>
@@ -95,6 +96,7 @@ public sealed class PspDrawRenderer : IDisposable
         {
             float[] p = vertices[i];
             float[] c = placement.Color is { } tint ? [tint.X, tint.Y, tint.Z, tint.W] : draw.Rgba?[i] ?? [1, 1, 1, 1];
+            if (placement.VertexAlpha is { } alphas) c = [c[0], c[1], c[2], alphas[i]];
             float alpha = Math.Clamp(c[3] * (placement.Alpha ?? 1f) * (doubleAlpha ? 2 : 1), 0, 1);
             var uv = draw.Uv is { } uvs ? new Vector2(uvs[i][0], uvs[i][1]) + placement.UvOffset : Vector2.Zero;
             var position = draw.Through ? new Vector3(p[0], p[1], Depth01(p[2])) : new Vector3(p[0], p[1], p[2]);

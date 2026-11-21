@@ -23,7 +23,7 @@ public static class DuelScene
             field.Render(list.FieldDraws);
             renderer.Layer(field.Layer);
         }
-        list.Replay(renderer);
+        list.Replay(renderer, field);
     }
 
     /// <summary>Without <paramref name="field"/> (no validated original assets) the PC test visualization is composed instead.</summary>
@@ -49,11 +49,19 @@ public static class DuelScene
         DuelBoardRenderer.DrawPilesOriginal(list, field, view);
         int? lifted = focus is { Own: true, Kind: FieldObjectKind.Hand, Card.InstanceId: { } id } ? id : null;
         var placed = CardSpriteRenderer.DrawFieldOriginal(list, view, lifted);
-        if (focus is { } target) InputFocusOverlay.DrawOriginal(list, field, new(view, placed), target, input.Input?.Modal is not (PhaseModal or ResponseModal));
+        var attack = input.Input?.Modal as TargetModal;
+        // GE order (attack-target capture): target cursor meshes, pointer, Battle Phase readouts, Levels, sword, trail and arrow head.
+        if (attack is not null && focus is { } aimed) AttackTargetOverlay.DrawCursors(list, field, new(view, placed), aimed);
+        if (focus is { } target) InputFocusOverlay.DrawOriginal(list, field, new(view, placed), target, input.Input?.Modal is not (PhaseModal or ResponseModal),
+            attack is not null);
+        BattleReadouts.Draw(list, field, view);
         CardSpriteRenderer.DrawLevels(list, field, placed, input.Facts);
+        if (attack is not null && focus is { } end && AttackTargetOverlay.AttackerCentre(view, attack.Choices) is { } start)
+            AttackTargetOverlay.DrawTrail(list, field, start, InputFocusOverlay.Place(new(view, placed), end).Centre with { Y = 0 },
+                AttackTrail.Updates(attack.Elapsed));
         DuelHud.DrawOriginal(list, field, view, input.Style);
-        // Interim sprite parts until their measured replacements exist.
-        CardInspector.DrawOriginal(list, inspected, input.Facts);
+        if (!AttackInspector.TryDraw(list, view, attack, focus, input.Facts))
+            CardInspector.DrawOriginal(list, inspected, input.Facts);
         if (input.Input is { } session) PromptPresenter.DrawModal(list, view, session, input.Notice);
         else PromptPresenter.Draw(list, view, input.Choice, input.Notice);
         DuelEffectLayer.Draw(list, view);

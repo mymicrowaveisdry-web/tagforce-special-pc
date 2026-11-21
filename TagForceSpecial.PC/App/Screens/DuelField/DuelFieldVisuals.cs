@@ -138,7 +138,7 @@ public sealed class DuelFieldVisuals : IDisposable
     }
 
     /// <summary>A public card's 64 × 64 cardm face (PSP DXT1, opaque), decoded once per card from the stored archive.</summary>
-    private Texture2D CardFace(uint cardId)
+    internal Texture2D CardFace(uint cardId)
     {
         if (cardFaces.TryGetValue(cardId, out var texture)) return texture;
         faces ??= new CardFaceSource(assets.ResolveBytes(CardAlbumResources.FacesKey));

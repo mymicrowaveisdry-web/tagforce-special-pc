@@ -11,7 +11,10 @@ public abstract record DuelDraw(DuelPart Part);
 public sealed record DuelFill(DuelPart Part, Rectangle Rect, Color Color, SceneLayer Layer) : DuelDraw(Part);
 public sealed record DuelBorder(DuelPart Part, Rectangle Rect, Color Color, SceneLayer Layer) : DuelDraw(Part);
 public sealed record DuelText(DuelPart Part, string Text, int X, int Y, Color Color, int Scale = 1) : DuelDraw(Part);
-public sealed record DuelWrapped(DuelPart Part, string Text, int X, int Y, int Columns, int Lines, Color Color) : DuelDraw(Part);
+public sealed record DuelWrapped(DuelPart Part, string Text, int X, int Y, int Columns, int Lines, Color Color) : DuelDraw(Part)
+{
+    public bool Ellipsis { get; init; }
+}
 /// <summary>Original-font text in the field layer: glyph cells start at <paramref name="X"/> (left) or end at it (right-aligned), with the
 /// measured two-copy shadow. <paramref name="Color"/> is 0xBBGGRR.</summary>
 public sealed record DuelFieldText(DuelPart Part, string Text, float X, float Y, float ScaleX, float ScaleY, int Color, int ShadowAlpha,
@@ -20,6 +23,7 @@ public sealed record DuelFieldText(DuelPart Part, string Text, float X, float Y,
 public sealed record DuelCardDetail(DuelPart Part, App.Screens.Album.CardAlbumDetail Detail) : DuelDraw(Part);
 /// <summary>The left card panel for <paramref name="CardId"/> (a public card) or a back when null, with its strip tint.</summary>
 public sealed record DuelCardPanel(DuelPart Part, uint? CardId, Microsoft.Xna.Framework.Color Tint) : DuelDraw(Part);
+public sealed record DuelCardThumbnail(DuelPart Part, uint CardId, Rectangle Rect) : DuelDraw(Part);
 /// <summary>One measured original draw (<paramref name="Index"/> of a profile piece), repeated with a placement.</summary>
 public sealed record DuelFieldDraw(DuelPart Part, string Piece, int Index, PspPlacement Placement = default) : DuelDraw(Part);
 
@@ -57,7 +61,9 @@ public sealed class DuelDrawList
     public void Add(DuelDraw draw) => draws.Add(draw);
 
     /// <summary>Replays the sprite commands; measured field draws are rendered separately by <see cref="DuelFieldVisuals"/>.</summary>
-    public void Replay(SpriteRenderer renderer)
+    public void Replay(SpriteRenderer renderer) => Replay(renderer, null);
+
+    internal void Replay(SpriteRenderer renderer, DuelFieldVisuals? field)
     {
         foreach (var draw in draws)
             switch (draw)
@@ -65,7 +71,11 @@ public sealed class DuelDrawList
                 case DuelFill f: renderer.Fill(f.Rect, f.Color, f.Layer); break;
                 case DuelBorder b: renderer.Border(b.Rect, b.Color, b.Layer); break;
                 case DuelText t: renderer.Text(t.Text, t.X, t.Y, t.Color, t.Scale); break;
-                case DuelWrapped w: renderer.Wrapped(w.Text, w.X, w.Y, w.Columns, w.Lines, w.Color); break;
+                case DuelWrapped w: renderer.Wrapped(w.Text, w.X, w.Y, w.Columns, w.Lines, w.Color, w.Ellipsis); break;
+                case DuelCardThumbnail preview when field is not null:
+                    var face = field.CardFace(preview.CardId);
+                    renderer.Sprite(new(face, face.Bounds), preview.Rect, SceneLayer.PanelHighlight);
+                    break;
             }
     }
 }

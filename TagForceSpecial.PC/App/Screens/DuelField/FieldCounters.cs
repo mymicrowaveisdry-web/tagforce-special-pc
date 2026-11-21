@@ -10,11 +10,12 @@ public static class FieldCounters
     public const int DigitWidth = 7, DigitHeight = 9, AtlasWidth = 128;
     public static readonly Vector4 White = new(1, 1, 1, 1), Tuner = new(1, 1, 0, 1);
 
-    public static void Draw(DuelDrawList list, DuelPart part, DuelFieldProfile field, int value, Vector3 anchor, Vector4 color)
+    /// <param name="lineOffset">Pixels below the anchored line (the Battle Phase DEF readout).</param>
+    public static void Draw(DuelDrawList list, DuelPart part, DuelFieldProfile field, int value, Vector3 anchor, Vector4 color, int lineOffset = 0)
     {
         string text = value.ToString(CultureInfo.InvariantCulture);
         var screen = DuelLayoutProfile.Project(field, anchor);
-        int x0 = (int)screen.X - DigitWidth * text.Length / 2, y0 = (int)screen.Y - DigitHeight / 2;
+        int x0 = (int)screen.X - DigitWidth * text.Length / 2, y0 = (int)screen.Y - DigitHeight / 2 + lineOffset;
         var template = field.Piece("digit.small")[0];
         float templateX = template.Vertices![0][0], templateY = template.Vertices[0][1];
         // The template shows the digit 1.

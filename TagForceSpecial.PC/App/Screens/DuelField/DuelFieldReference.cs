@@ -1,3 +1,4 @@
+using TagForceSpecial.Cards;
 using TagForceSpecial.Core;
 using TagForceSpecial.Core.Views;
 using TagForceSpecial.PC.App.Input;
@@ -65,6 +66,37 @@ public static class DuelFieldReference
         }
     }
 
+    /// <summary>The attack-target capture (ge-aki-attack): Battle Phase, Gusto Gulldo (500/500) attacking Lonefire Blossom (500/1400) through
+    /// ○ → Attack, with the trail at update 37 (second lap, counter 45 = the capture's alpha phase 6).</summary>
+    public static void CaptureAttack(Microsoft.Xna.Framework.Graphics.GraphicsDevice device, SpriteRenderer renderer, DuelFieldVisuals field,
+        string root, CardCatalog catalog)
+    {
+        var board = AkiBoard();
+        var self = board.Self.Monsters.ToArray(); self[2] = self[2]! with { Attack = 500, Defense = 500 };
+        var opponent = board.Opponent.Monsters.ToArray(); opponent[2] = opponent[2]! with { Attack = 500, Defense = 1400 };
+        self[2] = Describe(self[2]!);
+        opponent[2] = Describe(opponent[2]!);
+        var view = board with
+        {
+            Phase = DuelPhase.Battle, Self = board.Self with { Monsters = self }, Opponent = board.Opponent with { Monsters = opponent },
+            Choices = [new(0, "Attack Lonefire Blossom", 5, ActionKind.Attack, TargetZone: 2), new(1, "End turn", null, ActionKind.EndTurn)]
+        };
+        var input = new DuelFieldInput();
+        var frame = TimeSpan.FromSeconds(1 / 59.94);
+        input.Handle(view, default, frame);
+        input.Handle(view, new(InputAction.Confirm, InputAction.Confirm), frame);
+        input.Handle(view, new(InputAction.Confirm, InputAction.Confirm), frame);
+        input.Handle(view, default, TimeSpan.FromSeconds(37.5 * AttackTrail.VblanksPerUpdate / 59.94) - frame);
+        Save(device, renderer, field, DuelScene.Compose(new(view, 0, -1, "", 0, States[0].Style, id => DuelCardFacts.From(catalog[id]), input), field.Profile),
+            Path.Combine(root, "attack-target.png"));
+
+        CardView Describe(CardView card)
+        {
+            var definition = catalog[card.CardId!.Value];
+            return card with { Name = definition.Name, Description = definition.Description };
+        }
+    }
+
     /// <summary>Show Details of Caam (aki-board, focused in hand) through ○ → Show Details, compared with ge-aki-detail.png (counters
     /// differ: the capture shows the owner's save).</summary>
     public static void CaptureDetail(Microsoft.Xna.Framework.Graphics.GraphicsDevice device, SpriteRenderer renderer, DuelFieldVisuals field,
@@ -85,7 +117,7 @@ public static class DuelFieldReference
         using var target = new Microsoft.Xna.Framework.Graphics.RenderTarget2D(device, 480, 272);
         device.SetRenderTarget(target);
         device.Clear(Microsoft.Xna.Framework.Color.Black);
-        renderer.Begin(); renderer.Layer(field.Layer); list.Replay(renderer); renderer.End();
+        renderer.Begin(); renderer.Layer(field.Layer); list.Replay(renderer, field); renderer.End();
         device.SetRenderTarget(null);
         using var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write);
         target.SaveAsPng(output, 480, 272);
@@ -124,7 +156,7 @@ public static class DuelFieldReference
             field.Render(list.FieldDraws);
             device.SetRenderTarget(target);
             device.Clear(Microsoft.Xna.Framework.Color.Black);
-            renderer.Begin(); renderer.Layer(field.Layer); list.Replay(renderer); renderer.End();
+            renderer.Begin(); renderer.Layer(field.Layer); list.Replay(renderer, field); renderer.End();
             device.SetRenderTarget(null);
             using var output = new FileStream(Path.Combine(root, "walk-" + name + ".png"), FileMode.CreateNew, FileAccess.Write);
             target.SaveAsPng(output, 480, 272);

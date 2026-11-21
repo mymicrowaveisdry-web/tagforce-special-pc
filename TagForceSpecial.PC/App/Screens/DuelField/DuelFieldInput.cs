@@ -14,7 +14,8 @@ public sealed record PhaseModal(IReadOnlyList<(DuelPhase Phase, int? ChoiceId)> 
 public sealed record ResponseModal(int Index) : DuelModal;
 /// <summary>PC list for decisions whose original screens were not measured; <paramref name="Cancelable"/> when × may back out.</summary>
 public sealed record ListModal(IReadOnlyList<ChoiceView> Choices, int Index, bool Cancelable) : DuelModal;
-public sealed record TargetModal(IReadOnlyList<ChoiceView> Choices, int Index) : DuelModal;
+/// <summary>Attack target selection; <paramref name="Elapsed"/> drives the trail animation (restarted when the target changes, inferred).</summary>
+public sealed record TargetModal(IReadOnlyList<ChoiceView> Choices, int Index, TimeSpan Elapsed = default) : DuelModal;
 /// <summary>Show Details: the Card Album's detail page for the card (<paramref name="Detail"/>, null when the host has no detail renderer).</summary>
 public sealed record DetailsModal(CardView Card, App.Screens.Album.CardAlbumDetail? Detail = null) : DuelModal;
 
@@ -61,7 +62,7 @@ public sealed class DuelFieldInput
             PhaseModal p => PhaseSelector(view, p, dx, confirm, back),
             ResponseModal r => Response(view, r, dx, confirm, back),
             ListModal l => List(view, l, dy, repeated, confirm, back),
-            TargetModal t => Target(view, t, dx, confirm, back),
+            TargetModal t => Target(view, t with { Elapsed = t.Elapsed + delta }, dx, confirm, back),
             DetailsModal d => Details(d, frame),
             _ => null
         };
@@ -182,12 +183,12 @@ public sealed class DuelFieldInput
         return new DuelSubmit(view.Revision, l.Choices[l.Index].Id);
     }
 
-    /// <summary>Attack targets (inferred: the original's target cursor was not captured): Left/Right among the opponent's attackable
-    /// monsters; a direct attack alone submits at once.</summary>
+    /// <summary>Attack targets: measured, a single monster target still opens the target state (cursor, sword, trail) and ○ confirms it.
+    /// Inferred: Left/Right move among several targets; a direct attack alone submits at once (its screen was not captured).</summary>
     private DuelSubmit? StartTargets(DuelView view, IReadOnlyList<ChoiceView> choices)
     {
         Modal = null;
-        if (choices.Count == 1) return new DuelSubmit(view.Revision, choices[0].Id);
+        if (choices.Count == 1 && DuelFieldCommands.AttackTarget(choices[0]) is null) return new DuelSubmit(view.Revision, choices[0].Id);
         var ordered = choices.OrderBy(c => DuelFieldCommands.AttackTarget(c) ?? -1).ToArray();
         Modal = new TargetModal(ordered, 0);
         return null;
@@ -196,7 +197,8 @@ public sealed class DuelFieldInput
     private DuelSubmit? Target(DuelView view, TargetModal t, int dx, bool confirm, bool back)
     {
         if (back) return Close(true);
-        if (dx != 0) { Modal = t with { Index = Step(t.Index, dx, t.Choices.Count, wrap: true) }; return null; }
+        Modal = t;
+        if (dx != 0) { Modal = t with { Index = Step(t.Index, dx, t.Choices.Count, wrap: true), Elapsed = TimeSpan.Zero }; return null; }
         if (!confirm) return null;
         Modal = null;
         return new DuelSubmit(view.Revision, t.Choices[t.Index].Id);
