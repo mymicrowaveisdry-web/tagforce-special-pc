@@ -108,6 +108,7 @@ public sealed partial class GameLoop
             DuelFieldReference.CaptureAttack(GraphicsDevice, renderer, fieldVisuals, fieldRoot, game.Catalog.Catalog, 1, 3, "attack-off-centre.png");
             DuelFieldPresentationReference.Capture(GraphicsDevice, renderer, fieldVisuals, fieldRoot, game);
             DuelFieldReference.CaptureDecisions(GraphicsDevice, renderer, fieldVisuals, fieldRoot, FieldCardFacts());
+            DuelFieldReference.CaptureCardList(GraphicsDevice, renderer, fieldVisuals, fieldRoot, game.Catalog.Catalog, FieldCardFacts());
             Console.WriteLine("DUEL_FIELD_REFERENCE " + DuelFieldReference.States.Count); Exit(); return;
         }
         var initial = activeScreen == ScreenId.Title && originalTitle is null ? ScreenId.PcTools : activeScreen;
@@ -375,6 +376,7 @@ public sealed partial class GameLoop
                 var panel = new App.Screens.Album.CardInfoPanel(GraphicsDevice, visuals, album);
                 duelField.Panel = (id, tint, back) => panel.Draw(id is { } card ? catalog[card] : null, id is null,
                     App.Screens.Title.MainMenuEntry.FramesIn(PresentationTime), tint, back);
+                duelField.AttackPanel = a => AttackPanels.Draw(panel, catalog, a, App.Screens.Title.MainMenuEntry.FramesIn(PresentationTime));
                 // Show Details is the Card Album's detail page (same screen in the original).
                 var detailProfile = App.Screens.Album.CardAlbumDetailProfile.LoadEmbedded();
                 visuals.UseAlbumAssets(screenAssets, detailProfile.AssetKeys(), Assets.Presentation.CardAlbumResources.ArchiveKey, Assets.Presentation.CardAlbumResources.CardInfoKey);

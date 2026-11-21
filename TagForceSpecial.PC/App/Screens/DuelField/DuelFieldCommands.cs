@@ -76,8 +76,14 @@ public static class DuelFieldCommands
         var items = new List<MenuItem>();
         if (target.Own && target.Kind == FieldObjectKind.Deck)
             return [new("Surrender", new UnsupportedCommand("Surrender is not available in the PC duel yet."), MenuVerb.Surrender)];
-        if (target.Kind == FieldObjectKind.Extra && target.Own || target.Kind == FieldObjectKind.Graveyard && target.Card is not null)
-            return [new("Show Card List", new UnsupportedCommand("The card list screen is not available in the PC duel yet."), MenuVerb.ShowCardList)];
+        // Measured: Show Card List on the own Extra Deck opens the card list. Graveyards and Banished piles use the same list (inferred).
+        var owner = target.Own ? view.Self : view.Opponent;
+        if (target.Kind == FieldObjectKind.Extra && target.Own && view.Self.ExtraDeckCount + view.Self.FaceUpExtraDeck.Count > 0)
+            return [new("Show Card List", new CardListCommand(true, CardListPile.ExtraDeck), MenuVerb.ShowCardList)];
+        if (target.Kind == FieldObjectKind.Graveyard && owner.Graveyard.Count > 0)
+            return [new("Show Card List", new CardListCommand(target.Own, CardListPile.Graveyard), MenuVerb.ShowCardList)];
+        if (target.Kind == FieldObjectKind.Banished && owner.BanishedCount > 0)
+            return [new("Show Card List", new CardListCommand(target.Own, CardListPile.Banished), MenuVerb.ShowCardList)];
         if (target.Card is not { Hidden: false } card) return items;
         var own = view.Choices.Where(c => c.FocusInstanceId is { } id && id == card.InstanceId && c.Kind is not null && !ResponseKinds.Contains(c.Kind.Value));
         foreach (var group in own.GroupBy(c => Verb(c, card)).OrderBy(g => g.Key))

@@ -104,22 +104,20 @@ public sealed class AttackTargetTests
         var input = Aiming(view);
         IReadOnlyList<DuelDraw> Draws() => DuelScene.Compose(new(view, 0, -1, "", 0, Input: input), field).Draws;
 
+        // The original two-card panel (aki-attack 210–289): target above, attacker below; no standard panel meanwhile.
         var visibleDraws = Draws();
-        Assert.Equal(new uint[] { 101, 100 }, visibleDraws.OfType<DuelCardThumbnail>().Select(draw => draw.CardId));
-        Assert.Contains(visibleDraws.OfType<DuelWrapped>(), draw => draw.Text == "Public effect" && draw.Ellipsis);
-        Assert.Contains(visibleDraws.OfType<DuelText>(), draw => draw.Text == "DEF 1400");
+        var both = Assert.Single(visibleDraws.OfType<DuelAttackPanel>());
+        Assert.Equal((101u, 100u), (both.TargetId!.Value, both.AttackerId!.Value));
         Assert.Empty(visibleDraws.OfType<DuelCardPanel>());
 
+        // A face-down target contributes no identity (back tint, no text).
         input.Handle(view, new(InputAction.Right, InputAction.Right), Frame);
-        var concealedDraws = Draws();
-        Assert.Equal(100u, Assert.Single(concealedDraws.OfType<DuelCardThumbnail>()).CardId);
-        Assert.Contains(concealedDraws.OfType<DuelText>(), draw => draw.Text == "Face-down");
-        Assert.DoesNotContain(concealedDraws.OfType<DuelWrapped>(), draw => draw.Text.StartsWith("Concealed", StringComparison.Ordinal));
-        Assert.DoesNotContain(concealedDraws.OfType<DuelText>(), draw => draw.Text == "DEF 9999");
+        var concealed2 = Assert.Single(Draws().OfType<DuelAttackPanel>());
+        Assert.Equal(((uint?)null, CardInspector.BackTint, 100u), (concealed2.TargetId, concealed2.TargetTint, concealed2.AttackerId!.Value));
 
         input.Handle(view, new(InputAction.Back, InputAction.Back), Frame);
         var closedDraws = Draws();
-        Assert.Empty(closedDraws.OfType<DuelCardThumbnail>());
+        Assert.Empty(closedDraws.OfType<DuelAttackPanel>());
         Assert.Single(closedDraws.OfType<DuelCardPanel>());
     }
 

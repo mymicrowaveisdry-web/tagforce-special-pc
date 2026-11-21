@@ -105,8 +105,22 @@ public sealed class DuelFieldInputTests
     }
 
     [Fact]
-    public void CrossOnTheFieldOpensThePhaseSelectorThatWrapsAndEnters()
+    public void FeedbackUsesTheOriginalMessageWindow()
     {
+        var view = View();
+        var input = Started(view);
+        var field = DuelFieldProfile.LoadEmbedded();
+        IReadOnlyList<DuelDraw> Draws() => DuelScene.Compose(new(view, 0, -1, "", 0, Input: input), field).Draws;
+        Assert.DoesNotContain(Draws().OfType<DuelRichText>(), t => t.Source.Length == 0);
+        input.Rejected("That choice has expired");
+        var draws = Draws();
+        var text = Assert.Single(draws.OfType<DuelRichText>(), t => t.Source.Length == 0);
+        Assert.Equal(("That choice has expired", 217.8f, 50.42f, 11.72f), (text.Argument, text.X, text.Y, text.LinePitch));
+        Assert.Contains(draws.OfType<DuelFieldSprites>(), s => s.Piece == "menu.window");
+    }
+
+    [Fact]
+    public void CrossOnTheFieldOpensThePhaseSelectorThatWrapsAndEnters()    {
         var view = View();
         var input = Started(view);
         input.Handle(view, Press(InputAction.Back), Frame);

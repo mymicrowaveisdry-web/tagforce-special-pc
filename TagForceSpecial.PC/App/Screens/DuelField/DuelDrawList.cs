@@ -65,7 +65,7 @@ public sealed class DuelDrawList
     }
 
     /// <summary>Commands rendered into the field layer, in order: measured draws and original-font text.</summary>
-    public IEnumerable<DuelDraw> FieldDraws => draws.Where(d => d is DuelFieldDraw or DuelFieldText or DuelFieldMenu or DuelFieldSprites or DuelRichText or DuelChainPrompt or DuelCardPanel or DuelCardDetail or DuelOutcomeReason);
+    public IEnumerable<DuelDraw> FieldDraws => draws.Where(d => d is DuelFieldDraw or DuelFieldText or DuelFieldMenu or DuelFieldSprites or DuelRichText or DuelChainPrompt or DuelCardPanel or DuelCardDetail or DuelAttackPanel or DuelOutcomeReason);
 
     public void Add(DuelDraw draw) => draws.Add(draw);
 

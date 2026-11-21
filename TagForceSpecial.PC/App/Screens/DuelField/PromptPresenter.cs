@@ -50,7 +50,7 @@ public static class PromptPresenter
             case TargetModal t when profile is null: DuelDecisionPanel.Draw(list, new(t.Choices, t.Index, Cancelable: true)); break;
             case TargetModal: break; // drawn on the field (AttackTargetOverlay)
         }
-        if (profile is not null) DuelNoticeLine.DrawOriginal(list, input.Feedback);
+        if (profile is not null) DuelNoticeLine.DrawOriginal(list, profile, input.Feedback);
         else DuelNoticeLine.Draw(list, view, input.Feedback, notice);
     }
 

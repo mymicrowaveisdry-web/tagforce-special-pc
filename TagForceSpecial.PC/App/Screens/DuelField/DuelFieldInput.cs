@@ -67,6 +67,7 @@ public sealed class DuelFieldInput
             ListModal l => List(view, l, DuelBoardDecision.OnField(l) && dx != 0 ? -dx : dy, repeated, confirm, back),
             TargetModal t => Target(view, t with { Elapsed = t.Elapsed + delta }, dx, confirm, back),
             DetailsModal d => Details(d, frame),
+            CardListModal c => CardListInput(view, c, dx, dy, repeated, confirm, back, frame),
             _ => null
         };
     }
@@ -145,6 +146,7 @@ public sealed class DuelFieldInput
             case TargetCommand t: return StartTargets(view, t.Choices);
             case ListCommand l: Modal = new ListModal(l.Choices, 0, true) { Parent = m }; return null;
             case DetailsCommand d: OpenDetails(d.Card); return null;
+            case CardListCommand c: Modal = new CardListModal(c.Own, c.Pile); return null;
             case UnsupportedCommand u: Modal = null; Feedback = new(DuelFeedbackKind.Unsupported, u.Notice); return null;
         }
         return null;
@@ -243,6 +245,20 @@ public sealed class DuelFieldInput
         // As the album: the Back update already counts, so exactly one blank frame is drawn.
         detail.Handle(frame);
         if (detail.Closing && ++detailCloseUpdates >= 2) Modal = null;
+        return null;
+    }
+
+    /// <summary>The card list (measured): directions per <see cref="CardList.Move"/>; ○ on Close and × close it with the field cursor where it
+    /// was; ○ on a card does nothing. △ (sort menu) and □ (field check) open original screens the PC does not have yet.</summary>
+    private DuelSubmit? CardListInput(DuelView view, CardListModal list, int dx, int dy, bool repeated, bool confirm, bool back, InputFrame frame)
+    {
+        if (back || confirm && list.OnClose) return Close(true);
+        if (frame.IsPressed(InputAction.Menu) || frame.IsPressed(InputAction.Switch))
+        {
+            Feedback = new(DuelFeedbackKind.Unsupported, "Sorting and the field check are not available in the PC card list yet.");
+            return null;
+        }
+        Modal = CardList.Move(list, dx, dy, CardList.Cards(view, list.Own, list.Pile).Count, repeated);
         return null;
     }
 

@@ -45,6 +45,9 @@ public sealed class DuelFieldVisuals : IDisposable
     /// <summary>Draws the shared left card panel (card id or null for a back, strip tint, back drawer) into the bound target.</summary>
     public Action<uint?, Color, Action>? Panel { get; set; }
 
+    /// <summary>Draws the attack target's two compact panels (host: the shared card panel) into the bound target.</summary>
+    public Action<DuelAttackPanel>? AttackPanel { get; set; }
+
     /// <summary>Draws the Show Details page (the Card Album's detail renderer) into the bound target.</summary>
     public Action<App.Screens.Album.CardAlbumDetail>? Detail { get; set; }
 
@@ -78,7 +81,9 @@ public sealed class DuelFieldVisuals : IDisposable
                 for (int i = 0; i < lines.Length; i++)
                 {
                     string line = lines[i].TrimEnd('\r');
-                    ui.DrawUi(line, 314 - ui.MeasureUi(line, 0.6f) / 2, 173.42f + i * 11.72f, 0.6f, 0.54f, 0xffffff, 128);
+                    // Measured (surrender reason): card font; centre fitted to x 309 from that one string (first glyph at 259.8 for
+                    // "You surrendered."); other reasons were not captured.
+                    ui.Draw(line, 309 - ui.Measure(line, 0.6f) / 2, 173.42f + i * 11.72f, 0.6f, 0.54f, 0xffffff, 128);
                 }
                 break;
             case DuelFieldDraw d: renderer.Draw(Profile.Piece(d.Piece)[d.Index], Profile, Texture, d.Placement); break;
@@ -101,12 +106,16 @@ public sealed class DuelFieldVisuals : IDisposable
             case DuelCardDetail page when Detail is { } detail:
                 detail(page.Detail);
                 break;
+            case DuelAttackPanel a when AttackPanel is { } attackPanel:
+                attackPanel(a);
+                break;
             case DuelCardPanel p when Panel is { } panel:
                 // A back is the hidden-inspector capture's rotated cil_0000 sprite, composited 1:1 at (5, 4).
                 panel(p.CardId, p.Tint, () => RenderOne(new DuelFieldDraw(p.Part, "panel.back", 0, new(Offset: new(5, 4)))));
                 break;
             case DuelRichText r when Text is { } runs:
-                foreach (var part in DuelRichTextLayout.Expand(r, Message(r.Source, r.Offset), runs.Measure)) RenderOne(part);
+                // An empty source carries its text in the argument (PC notices in the original message window).
+                foreach (var part in DuelRichTextLayout.Expand(r, r.Source.Length == 0 ? "%s" : Message(r.Source, r.Offset), runs.Measure)) RenderOne(part);
                 break;
         }
     }

@@ -14,7 +14,16 @@ public sealed record PlayerView(PlayerId Id, int LifePoints, int DeckCount, int 
 {
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public int BanishedCount { get; init; }
+
+    /// <summary>The banished cards (all public: the engine banishes face-up); null when there are none.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<CardView>? Banished { get; init; }
+
+    /// <summary>The face-down Extra Deck in its order, for its owner only (the card list); null for the opponent or when empty.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<CardView>? ExtraDeck { get; init; }
 }
+
 
 /// <summary>The shared visibility boundary for human and opponent presentation.</summary>
 public static class PlayerProjection
@@ -34,7 +43,9 @@ public static class PlayerProjection
             Read(p.FaceUpExtraDeck.Select(c => Card(c, true, null, catalog))),
             p.FieldSpell is { } field ? Card(field.Card, own || field.IsFaceUp, null, catalog, !field.IsFaceUp) : null)
         {
-            BanishedCount = p.Banished.Count
+            BanishedCount = p.Banished.Count,
+            Banished = p.Banished.Count == 0 ? null : Read(p.Banished.Select(c => Card(c, true, null, catalog))),
+            ExtraDeck = !own || p.ExtraDeck.Count == 0 ? null : Read(p.ExtraDeck.Select(c => Card(c, true, null, catalog)))
         };
     }
 

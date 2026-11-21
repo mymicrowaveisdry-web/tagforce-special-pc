@@ -98,6 +98,32 @@ public static class DuelFieldReference
         }
     }
 
+    /// <summary>The card-list capture (order32-gallery g-open / h04): the own Extra Deck list opened through ○ on the Extra Deck and ○ on Show
+    /// Card List, 15 cards led by the five the native list shows first; then Close focused.</summary>
+    public static void CaptureCardList(Microsoft.Xna.Framework.Graphics.GraphicsDevice device, SpriteRenderer renderer, DuelFieldVisuals field,
+        string root, CardCatalog catalog, Func<uint, DuelCardFacts?>? facts)
+    {
+        string[] first = ["Ultimate Axon Kicker", "Stardust Dragon", "Daigusto Eguls", "Black Rose Dragon", "Daigusto Sphreez"];
+        var known = first.Select(n => catalog.Cards.First(c => c.Name == n)).ToList();
+        var extra = Enumerable.Range(0, 15).Select(i => known[i % known.Count])
+            .Select((c, i) => new CardView(100 + i, c.GameCardId, c.Name, c.Description, c.Statistics.Attack, c.Statistics.Defense, null, false)).ToArray();
+        var board = AkiBoard();
+        var view = board with
+        {
+            Self = board.Self with { ExtraDeckCount = extra.Length, ExtraDeck = extra },
+            Choices = [new(0, "Phase: Battle", null, ActionKind.Phase, Phase: DuelPhase.Battle), new(1, "End turn", null, ActionKind.EndTurn)]
+        };
+        var input = new DuelFieldInput();
+        var frame = TimeSpan.FromSeconds(1 / 59.94);
+        input.Handle(view, default, frame);
+        input.Focus.FocusOn(DuelFieldRows.Build(view).SelectMany(r => r).First(o => o.Own && o.Kind == FieldObjectKind.Extra));
+        input.Handle(view, new(InputAction.Confirm, InputAction.Confirm), frame);
+        input.Handle(view, new(InputAction.Confirm, InputAction.Confirm), frame);
+        Save(device, renderer, field, DuelScene.Compose(new(view, 0, -1, "", 0, States[0].Style, facts, input), field.Profile), Path.Combine(root, "cardlist-open.png"));
+        input.Handle(view, new(InputAction.Down, InputAction.Down), frame);
+        Save(device, renderer, field, DuelScene.Compose(new(view, 0, -1, "", 0, States[0].Style, facts, input), field.Profile), Path.Combine(root, "cardlist-close.png"));
+    }
+
     /// <summary>Show Details of Caam (aki-board, focused in hand) through ○ → Show Details, compared with ge-aki-detail.png (counters
     /// differ: the capture shows the owner's save).</summary>
     public static void CaptureDetail(Microsoft.Xna.Framework.Graphics.GraphicsDevice device, SpriteRenderer renderer, DuelFieldVisuals field,

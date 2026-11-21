@@ -7,11 +7,19 @@ namespace TagForceSpecial.PC.App.Screens.DuelField;
 
 internal static class DuelNoticeLine
 {
-    public static void DrawOriginal(DuelDrawList list, DuelFeedback feedback)
+    private static readonly IReadOnlyDictionary<int, (int, int)> Dark = new Dictionary<int, (int, int)> { [0] = (0x212121, 64) };
+
+    /// <summary>PC feedback (rejected, unsupported, required) in the original message window (measured on the card list's "Checking field…"
+    /// message, order32-notice n-checking: depth clear, window04 frame [208, 41, 420, 91] centred on x 314, card-font text 0.6 × 0.54 in
+    /// 0x212121 with a 64 shadow from (217.8, 50.42) on an 11.72 line pitch). Inferred from that one sample: the fixed window size and
+    /// the wrap width 196 (two lines fit). Empty selections have no overlay.</summary>
+    public static void DrawOriginal(DuelDrawList list, DuelFieldProfile field, DuelFeedback feedback)
     {
-        // Empty selections have no native overlay. Engine-specific failures retain a readable message.
         if (feedback.Kind is DuelFeedbackKind.None or DuelFeedbackKind.Absent) return;
-        list.Add(new DuelFieldText(DuelPart.Prompt, feedback.Text, 154.8f, 245.42f, 0.6f, 0.54f, 0xffffff, 128));
+        const DuelPart part = DuelPart.Prompt;
+        list.FieldPiece(part, field, "menu.clear");
+        list.Add(DuelMenuWindow.Frame(part, field, "menu.window", 208, 41, 420, 91, null));
+        list.Add(new DuelRichText(part, "", 0, feedback.Text, 217.8f, 50.42f, 0.6f, 0.54f, Dark, 196, 11.72f));
     }
 
     public static void Draw(DuelDrawList list, DuelView view, DuelFeedback feedback, string notice)

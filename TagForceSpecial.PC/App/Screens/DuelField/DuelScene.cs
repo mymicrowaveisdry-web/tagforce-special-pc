@@ -48,6 +48,7 @@ public static class DuelScene
         }
         var focus = frame.BeforeDeal || finished ? null : Focused(input);
         var inspected = session?.Modal is DetailsModal details ? details.Card
+            : session?.Modal is CardListModal shown ? CardList.Highlighted(view, shown)
             : frame.SummonedCard is { } summoned && session?.Modal is null ? summoned
             : focus is { Card: { Hidden: false } card } ? card : input.Input is null ? CardInspector.Target(view, input.Choice, input.InspectedCard) : null;
         DuelBoardRenderer.DrawOriginal(list, field, (input.Style ?? new()).Backdrop);
@@ -59,7 +60,7 @@ public static class DuelScene
         var attack = session?.Modal as TargetModal;
         // GE order (attack-target capture): target cursor meshes, pointer, Battle Phase readouts, Levels, sword, trail and arrow head.
         if (attack is not null && focus is { } aimed) AttackTargetOverlay.DrawCursors(list, field, new(view, placed), aimed);
-        if (focus is { } target) InputFocusOverlay.DrawOriginal(list, field, new(view, placed), target, session?.Modal is not (PhaseModal or ResponseModal),
+        if (focus is { } target) InputFocusOverlay.DrawOriginal(list, field, new(view, placed), target, session?.Modal is not (PhaseModal or ResponseModal or CardListModal),
             attack is not null);
         BattleReadouts.Draw(list, field, view);
         CardSpriteRenderer.DrawLevels(list, field, placed, input.Facts);
@@ -69,6 +70,8 @@ public static class DuelScene
         DuelHud.DrawOriginal(list, field, view, input.Style);
         if (!AttackInspector.TryDraw(list, view, attack, focus, input.Facts))
             CardInspector.DrawOriginal(list, inspected, input.Facts);
+        // Measured (card-list capture): the window comes after the left panel, over the field, with the pointer hidden.
+        if (session?.Modal is CardListModal cards) CardList.Draw(list, field, view, cards, input.Facts);
         if (session is not null) PromptPresenter.DrawModal(list, view, session, input.Notice);
         else if (!finished) PromptPresenter.Draw(list, view, input.Choice, input.Notice);
         DuelEffectLayer.DrawOriginal(list, view, field);
