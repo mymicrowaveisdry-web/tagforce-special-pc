@@ -1,6 +1,8 @@
 using TagForceSpecial.Core;
 using TagForceSpecial.Core.Views;
+using TagForceSpecial.PC.App.Input;
 using TagForceSpecial.PC.DuelUI;
+using TagForceSpecial.PC.Rendering;
 
 namespace TagForceSpecial.PC.App.Screens.DuelField;
 
@@ -43,6 +45,36 @@ public static class DuelFieldReference
             [null, null, Face(7, 7568, BattlePosition.FaceUpAttack), null, null],
             [null, null, Hidden(), null, null], new CardView?[2], [], []);
         return new(0, PlayerId.One, PlayerId.One, 2, DuelPhase.Main1, self, opponent, "", [new ChoiceView(0, "", 4)], null);
+    }
+
+    /// <summary>Scripted presses on the aki-board state, each rendered as the full composite (field layer and interim windows).</summary>
+    public static void CaptureInputWalk(Microsoft.Xna.Framework.Graphics.GraphicsDevice device, SpriteRenderer renderer, DuelFieldVisuals field,
+        string root, Func<uint, DuelCardFacts?>? facts)
+    {
+        var view = AkiBoard() with
+        {
+            Choices = [new(0, "Phase: Battle", null, ActionKind.Phase, Phase: DuelPhase.Battle), new(1, "End turn", null, ActionKind.EndTurn),
+                new(2, "Set Spell Shattering Arrow [1]", 3, ActionKind.SetSpellTrap, Zone: 0)]
+        };
+        var input = new DuelFieldInput();
+        var frame = TimeSpan.FromSeconds(1 / 59.94);
+        input.Handle(view, default, frame);
+        (string Name, InputAction Press)[] steps = [("0-start", InputAction.None), ("1-left", InputAction.Left), ("2-left", InputAction.Left),
+            ("3-menu", InputAction.Confirm), ("4-close", InputAction.Back), ("5-up", InputAction.Up), ("6-up", InputAction.Up),
+            ("7-phase", InputAction.Back), ("8-phase-right", InputAction.Right), ("9-close", InputAction.Back), ("10-global", InputAction.Menu)];
+        using var target = new Microsoft.Xna.Framework.Graphics.RenderTarget2D(device, 480, 272);
+        foreach (var (name, press) in steps)
+        {
+            if (press != InputAction.None) input.Handle(view, new(press, press), frame);
+            var list = DuelScene.Compose(new(view, 0, -1, "", 0, new("tf6"), facts, input), field.Profile);
+            field.Render(list.FieldDraws);
+            device.SetRenderTarget(target);
+            device.Clear(Microsoft.Xna.Framework.Color.Black);
+            renderer.Begin(); renderer.Layer(field.Layer); list.Replay(renderer); renderer.End();
+            device.SetRenderTarget(null);
+            using var output = new FileStream(Path.Combine(root, "walk-" + name + ".png"), FileMode.CreateNew, FileAccess.Write);
+            target.SaveAsPng(output, 480, 272);
+        }
     }
 
     public static DuelView EmptyView(DuelPhase phase, int turn) => new(0, PlayerId.One, PlayerId.One, turn, phase,

@@ -39,4 +39,15 @@ public static class CardInspector
         list.Text(DuelPart.Inspector, $"DEF {detail.Defense?.ToString() ?? "?"}", 350, 83, DuelPalette.Muted);
         list.Wrapped(DuelPart.Inspector, detail.Description, 350, 96, 20, 5, DuelPalette.Muted);
     }
+
+    /// <summary>Interim text in the original inspector column (x 0–144), until the measured card panel replaces it.</summary>
+    public static void DrawInterim(DuelDrawList list, CardView? detail)
+    {
+        list.Fill(DuelPart.Inspector, new(0, 0, 144, 272), new(22, 29, 44), Rendering.SceneLayer.Field);
+        if (detail is null) return;
+        list.Wrapped(DuelPart.Inspector, detail.Name.ToUpperInvariant(), 6, 8, 22, 3, DuelPalette.Gold);
+        if (detail.Attack is not null || detail.Defense is not null)
+            list.Text(DuelPart.Inspector, $"ATK {detail.Attack?.ToString() ?? "?"} DEF {detail.Defense?.ToString() ?? "?"}", 6, 40, DuelPalette.Muted);
+        list.Wrapped(DuelPart.Inspector, detail.Description, 6, 56, 22, 22, Microsoft.Xna.Framework.Color.White);
+    }
 }

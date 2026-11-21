@@ -116,6 +116,7 @@ public sealed class DuelController
             : v.Decision is { } d ? $"Choose {d.Kind}"
             : v.Availability == ActionAvailability.Waiting ? "Opponent choosing" : "Choose an action";
         return new(v.Revision, viewer, v.ActivePlayer, v.Turn, v.Phase, v.Self, v.Opponent, prompt,
-            PlayerProjection.Read(v.Actions.Select(a => new ChoiceView(a.Token, a.Label, a.CardInstanceId))), v.Outcome);
+            PlayerProjection.Read(v.Actions.Select(a => new ChoiceView(a.Token, a.Label, a.CardInstanceId, a.Kind, a.TargetZone, a.Phase, a.Zone))), v.Outcome,
+            v.Availability);
     }
 }

@@ -8,7 +8,7 @@ public sealed record DuelFieldStyle(string Backdrop = "default");
 
 /// <summary>One frame's presentation input: the authorized view plus the screen's own focus state. It holds no engine reference.</summary>
 public sealed record DuelSceneInput(DuelView View, int Choice, int InspectedCard, string Notice, double Seconds, DuelFieldStyle? Style = null,
-    Func<uint, DuelCardFacts?>? Facts = null);
+    Func<uint, DuelCardFacts?>? Facts = null, DuelFieldInput? Input = null);
 
 /// <summary>Composes the duel field from its parts in a fixed draw order.</summary>
 public static class DuelScene
@@ -33,20 +33,22 @@ public static class DuelScene
     {
         var list = new DuelDrawList();
         var view = input.View;
-        var inspected = CardInspector.Target(view, input.Choice, input.InspectedCard);
+        var focus = Focused(input);
+        var inspected = input.Input?.Modal is DetailsModal details ? details.Card
+            : focus is { Card: { Hidden: false } card } ? card : input.Input is null ? CardInspector.Target(view, input.Choice, input.InspectedCard) : null;
         DuelBoardRenderer.DrawOriginal(list, field, (input.Style ?? new()).Backdrop);
         PhaseBar.DrawOriginal(list, field, view.Phase);
         list.FieldPiece(DuelPart.Board, field, "depth.clear");
         DuelBoardRenderer.DrawPilesOriginal(list, field, view);
-        int? selected = SelectedCard(view, input.Choice);
-        var placed = CardSpriteRenderer.DrawFieldOriginal(list, view, selected);
-        InputFocusOverlay.DrawOriginal(list, field, placed, selected);
+        int? lifted = focus is { Own: true, Kind: FieldObjectKind.Hand, Card.InstanceId: { } id } ? id : null;
+        var placed = CardSpriteRenderer.DrawFieldOriginal(list, view, lifted);
+        if (focus is { } target) InputFocusOverlay.DrawOriginal(list, field, new(view, placed), target);
         CardSpriteRenderer.DrawLevels(list, field, placed, input.Facts);
         DuelHud.DrawOriginal(list, field, view);
         // Interim sprite parts until their measured replacements exist.
-        DuelHud.DrawLifePoints(list, view);
-        CardInspector.Draw(list, inspected);
-        PromptPresenter.Draw(list, view, input.Choice, input.Notice);
+        CardInspector.DrawInterim(list, inspected);
+        if (input.Input is { } session) PromptPresenter.DrawModal(list, view, session, input.Notice);
+        else PromptPresenter.Draw(list, view, input.Choice, input.Notice);
         DuelEffectLayer.Draw(list, view);
         return list;
     }
@@ -69,6 +71,24 @@ public static class DuelScene
         PromptPresenter.Draw(list, view, input.Choice, input.Notice);
         DuelEffectLayer.Draw(list, view);
         return list;
+    }
+
+    /// <summary>The focused object: the input session's (an attack target while one is being chosen), else the object holding the
+    /// selected choice's card.</summary>
+    public static FieldObject? Focused(DuelSceneInput input)
+    {
+        var rows = DuelFieldRows.Build(input.View);
+        if (input.Input is { } session)
+        {
+            if (session.Modal is TargetModal { } t && DuelFieldCommands.AttackTarget(t.Choices[t.Index]) is { } zone)
+                return rows[DuelFieldRows.OpponentMonster].First(o => o.Kind == FieldObjectKind.Monster && o.Index == zone);
+            return session.Focus.Ready ? session.Focus.Current : null;
+        }
+        if (SelectedCard(input.View, input.Choice) is not { } id) return null;
+        foreach (var row in rows)
+            foreach (var o in row)
+                if (o.Card?.InstanceId == id) return o;
+        return null;
     }
 
     /// <summary>The card the selected legal choice refers to, if any.</summary>

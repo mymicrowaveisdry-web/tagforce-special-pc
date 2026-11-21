@@ -5,6 +5,7 @@ using TagForceSpecial.PC.App.Screens;
 using TagForceSpecial.PC.App.Screens.DuelField;
 using TagForceSpecial.PC.App.Screens.Title;
 using TagForceSpecial.PC.App.Visual;
+using TagForceSpecial.PC.DuelUI;
 using TagForceSpecial.PC.DuelUI.Input;
 using TagForceSpecial.Import.Storage;
 using TagForceSpecial.PC.Screens;
@@ -88,7 +89,7 @@ public sealed partial class GameLoop
         Register(ScreenId.Controls, _ => { }, DrawControls, raw: UpdateControls);
         Register(ScreenId.DeckSelection, UpdateFreeDuel, DrawFreeDuel,
             pointer: Rows(at => TextRow(at, 40, 84, 23, InitialOpponentDecks.Names.Count, 0)));
-        Register(ScreenId.Duel, UpdateDuelInput, DrawDuel, update: UpdateDuelPresentation);
+        Register(ScreenId.Duel, _ => { }, DrawDuel, update: UpdateDuelPresentation, raw: UpdateDuelInput);
         Register(ScreenId.Result, UpdateDuelResult, DrawDuelResult, pointer: DuelResultPointer);
         Register(ScreenId.Paused, UpdatePause, DrawPause, pointer: Rows(at => TextRow(at, 40, 84, 23, 2, 0)));
         if (options.PresentationSmoke && originalTitle is null)
@@ -97,7 +98,9 @@ public sealed partial class GameLoop
             (originalTitle ?? throw new InvalidOperationException("Title layer capture requires a validated title generation.")).ExportReviewLayers(layerRoot);
         if (options.DuelFieldReferenceRoot is { } fieldRoot)
         {
-            DuelFieldReference.Capture(DuelField() ?? throw new InvalidOperationException("Duel field reference capture requires the imported field textures."), fieldRoot, FieldCardFacts());
+            var fieldVisuals = DuelField() ?? throw new InvalidOperationException("Duel field reference capture requires the imported field textures.");
+            DuelFieldReference.Capture(fieldVisuals, fieldRoot, FieldCardFacts());
+            DuelFieldReference.CaptureInputWalk(GraphicsDevice, renderer, fieldVisuals, fieldRoot, FieldCardFacts());
             Console.WriteLine("DUEL_FIELD_REFERENCE " + DuelFieldReference.States.Count); Exit(); return;
         }
         var initial = activeScreen == ScreenId.Title && originalTitle is null ? ScreenId.PcTools : activeScreen;
@@ -196,19 +199,23 @@ public sealed partial class GameLoop
         MoveMenu(buttons, InitialOpponentDecks.Names.Count);
         if (buttons.Confirm) StartDuel(menuIndex);
     }
-    private void UpdateDuelInput(GuiButtons buttons)
+    private DuelFieldInput? duelInput;
+    private DuelController? duelInputOwner;
+    /// <summary>The input session of the current duel; a new duel starts a new one.</summary>
+    private DuelFieldInput DuelInput(DuelController controller)
+    {
+        if (!ReferenceEquals(duelInputOwner, controller)) { duelInput = new(); duelInputOwner = controller; }
+        return duelInput!;
+    }
+    /// <summary>Original controls (measured): ○ menus, × closes or opens the phase selector, △ global menu. START opens the PC pause
+    /// menu until the original Help screen exists. Every choice is revision-bound; a refusal closes the window without state changes.</summary>
+    private void UpdateDuelInput(InputFrame frame)
     {
         if (duel is null) return;
-        if (buttons.Back) { duel.Paused = true; screen = ScreenId.Paused; return; }
-        int count = duel.View.Choices.Count;
-        if (count > 0)
-        {
-            int delta = buttons.Down ? 1 : buttons.Up ? -1 : buttons.Right ? 4 : buttons.Left ? -4 : 0;
-            choiceIndex = (choiceIndex + delta % count + count) % count;
-            if (delta != 0) inspectIndex = -1;
-            if (buttons.Confirm) { duel.Choose(duel.View.Revision, choiceIndex); choiceIndex = 0; inspectIndex = -1; }
-        }
-        if (buttons.Inspect) inspectIndex++;
+        if (frame.IsPressed(InputAction.Start)) { duel.Paused = true; screen = ScreenId.Paused; return; }
+        var input = DuelInput(duel);
+        if (input.Handle(duel.View, frame, navigationTime.ElapsedGameTime) is { } submit && !duel.Choose(submit.Revision, submit.ChoiceId))
+            input.Rejected(duel.Notice);
         if (duel.View.Outcome is not null) screen = ScreenId.Result;
     }
     private void UpdateDuelPresentation()
@@ -279,7 +286,7 @@ public sealed partial class GameLoop
     private void DrawDuel()
     {
         if (duel is not null) DuelScene.Draw(renderer, DuelField(), new(duel.View, choiceIndex, inspectIndex, duel.Notice, PresentationTime.TotalSeconds,
-            Facts: FieldCardFacts()));
+            Facts: FieldCardFacts(), Input: DuelInput(duel)));
     }
     /// <summary>Level and Tuner facts of public cards, from the imported catalog.</summary>
     private Func<uint, DuelCardFacts?>? FieldCardFacts() => setup?.Game?.Catalog.Catalog is { } catalog ? id => DuelCardFacts.From(catalog[id]) : null;

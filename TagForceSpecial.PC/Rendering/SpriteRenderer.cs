@@ -3,7 +3,8 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace TagForceSpecial.PC.Rendering;
 
-public enum SceneLayer { Background = 0, Field = 10, Cards = 30, Text = 60, Cursor = 80, Modal = 90 }
+/// <summary>Sprite depth bands; <see cref="Panel"/> and <see cref="PanelHighlight"/> sit under text so window labels stay readable.</summary>
+public enum SceneLayer { Background = 0, Field = 10, Cards = 30, Panel = 40, PanelHighlight = 50, Text = 60, Cursor = 80, Modal = 90 }
 public readonly record struct AtlasRegion(Texture2D Texture, Rectangle Source);
 
 public sealed class SpriteRenderer : IDisposable
