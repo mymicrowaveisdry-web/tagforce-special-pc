@@ -15,7 +15,8 @@ public sealed record ResponseModal(int Index) : DuelModal;
 /// <summary>PC list for decisions whose original screens were not measured; <paramref name="Cancelable"/> when × may back out.</summary>
 public sealed record ListModal(IReadOnlyList<ChoiceView> Choices, int Index, bool Cancelable) : DuelModal;
 public sealed record TargetModal(IReadOnlyList<ChoiceView> Choices, int Index) : DuelModal;
-public sealed record DetailsModal(CardView Card) : DuelModal;
+/// <summary>Show Details: the Card Album's detail page for the card (<paramref name="Detail"/>, null when the host has no detail renderer).</summary>
+public sealed record DetailsModal(CardView Card, App.Screens.Album.CardAlbumDetail? Detail = null) : DuelModal;
 
 /// <summary>No feedback, an engine rejection (with its notice), or a command the PC does not support yet.</summary>
 public enum DuelFeedbackKind { None, Rejected, Unsupported }
@@ -40,6 +41,10 @@ public sealed class DuelFieldInput
     public DuelModal? Modal { get; private set; }
     public DuelFeedback Feedback { get; private set; }
 
+    /// <summary>Builds the detail page for a visible card (the host's counts and content heights); null shows no page.</summary>
+    public Func<CardView, App.Screens.Album.CardAlbumDetail?>? DetailFactory { get; set; }
+    private int detailCloseUpdates;
+
     /// <summary>Processes one frame. Returns a choice to submit through <c>DuelController.Choose</c>, or null.</summary>
     public DuelSubmit? Handle(DuelView view, InputFrame frame, TimeSpan delta)
     {
@@ -57,7 +62,7 @@ public sealed class DuelFieldInput
             ResponseModal r => Response(view, r, dx, confirm, back),
             ListModal l => List(view, l, dy, repeated, confirm, back),
             TargetModal t => Target(view, t, dx, confirm, back),
-            DetailsModal => Close(confirm || back),
+            DetailsModal d => Details(d, frame),
             _ => null
         };
     }
@@ -125,7 +130,7 @@ public sealed class DuelFieldInput
             case SubmitCommand s: Modal = null; return new DuelSubmit(view.Revision, s.ChoiceId);
             case TargetCommand t: return StartTargets(view, t.Choices);
             case ListCommand l: Modal = new ListModal(l.Choices, 0, true); return null;
-            case DetailsCommand d: Modal = new DetailsModal(d.Card); return null;
+            case DetailsCommand d: OpenDetails(d.Card); return null;
             case UnsupportedCommand u: Modal = null; Feedback = new(DuelFeedbackKind.Unsupported, u.Notice); return null;
         }
         return null;
@@ -139,7 +144,7 @@ public sealed class DuelFieldInput
         Modal = null;
         switch (g.Index)
         {
-            case 0 when Focus.Current.Card is { Hidden: false } card: Modal = new DetailsModal(card); break;
+            case 0 when Focus.Current.Card is { Hidden: false } card: OpenDetails(card); break;
             case 1: OpenPhaseSelector(view); break;
             case 2: Feedback = new(DuelFeedbackKind.Unsupported, "Duel options are not available in the PC duel yet."); break;
             case 3: Feedback = new(DuelFeedbackKind.Unsupported, "Duel help is not available in the PC duel yet."); break;
@@ -195,6 +200,20 @@ public sealed class DuelFieldInput
         if (!confirm) return null;
         Modal = null;
         return new DuelSubmit(view.Revision, t.Choices[t.Index].Id);
+    }
+
+    private void OpenDetails(CardView card) { Modal = new DetailsModal(card, DetailFactory?.Invoke(card)); detailCloseUpdates = 0; }
+
+    /// <summary>The album detail page takes all input (Left/Right tabs, held Up/Down scroll); measured: Back shows one blank frame, then the
+    /// field returns with the cursor where it was. Without a page, ○ or × closes.</summary>
+    private DuelSubmit? Details(DetailsModal modal, InputFrame frame)
+    {
+        if (modal.Detail is not { } detail)
+            return Close(frame.IsPressed(InputAction.Confirm) || frame.IsPressed(InputAction.Back));
+        // As the album: the Back update already counts, so exactly one blank frame is drawn.
+        detail.Handle(frame);
+        if (detail.Closing && ++detailCloseUpdates >= 2) Modal = null;
+        return null;
     }
 
     private DuelSubmit? Close(bool pressed)

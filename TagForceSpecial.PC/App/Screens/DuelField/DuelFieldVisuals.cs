@@ -29,7 +29,8 @@ public sealed class DuelFieldVisuals : IDisposable
         // Every texture the profile names must resolve before the field is shown; a partial original field is never drawn.
         foreach (string key in Profile.Textures.Keys) _ = assets.Resolve(key);
         renderer = new(device);
-        Layer = new(device, 480, 272, false, SurfaceFormat.Color, DepthFormat.Depth24Stencil8);
+        // Preserved: the shared card panel composes its card in another target mid-frame and comes back to this one.
+        Layer = new(device, 480, 272, false, SurfaceFormat.Color, DepthFormat.Depth24Stencil8, 0, RenderTargetUsage.PreserveContents);
     }
 
     /// <summary>Draws original-font text into the bound target (the title flow's PGF renderer); without it field text is skipped.</summary>
@@ -37,6 +38,12 @@ public sealed class DuelFieldVisuals : IDisposable
 
     /// <summary>Textures the title flow decodes from the stored EBOOT and checks by pixel hash ("title.eboot.*" keys).</summary>
     public Func<string, Texture2D?>? External { get; set; }
+
+    /// <summary>Draws the shared left card panel (card id or null for a back, strip tint, back drawer) into the bound target.</summary>
+    public Action<uint?, Color, Action>? Panel { get; set; }
+
+    /// <summary>Draws the Show Details page (the Card Album's detail renderer) into the bound target.</summary>
+    public Action<App.Screens.Album.CardAlbumDetail>? Detail { get; set; }
 
     /// <summary>Renders <paramref name="draws"/> in order into <see cref="Layer"/>, restoring the previous render targets.</summary>
     public void Render(IEnumerable<DuelDraw> draws)
@@ -47,6 +54,8 @@ public sealed class DuelFieldVisuals : IDisposable
         {
             device.SetRenderTarget(Layer);
             device.Clear(ClearOptions.Target | ClearOptions.DepthBuffer | ClearOptions.Stencil, Color.Black, 1, 0);
+            // Measured 2D draws include rotated sprites with reversed winding: never inherit the culling SpriteBatch leaves behind.
+            device.RasterizerState = RasterizerState.CullNone; device.DepthStencilState = DepthStencilState.None;
             foreach (var draw in draws) RenderOne(draw);
         }
         finally
@@ -76,6 +85,13 @@ public sealed class DuelFieldVisuals : IDisposable
                 break;
             case DuelChainPrompt c when Text is { } chain:
                 foreach (var part in DuelChainPromptWindow.Expand(c, Profile, chain.Measure, Message)) RenderOne(part);
+                break;
+            case DuelCardDetail page when Detail is { } detail:
+                detail(page.Detail);
+                break;
+            case DuelCardPanel p when Panel is { } panel:
+                // A back is the hidden-inspector capture's rotated cil_0000 sprite, composited 1:1 at (5, 4).
+                panel(p.CardId, p.Tint, () => RenderOne(new DuelFieldDraw(p.Part, "panel.back", 0, new(Offset: new(5, 4)))));
                 break;
             case DuelRichText r when Text is { } runs:
                 foreach (var part in DuelRichTextLayout.Expand(r, Message(r.Source, r.Offset), runs.Measure)) RenderOne(part);

@@ -7,12 +7,12 @@ using TagForceSpecial.PC.Rendering;
 namespace TagForceSpecial.PC.App.Screens.DuelField;
 
 /// <summary>Public facts the field prints on a face-up card: whether it is a monster, its Level and whether it is a Tuner.</summary>
-public sealed record DuelCardFacts(bool Monster, int Level, bool Tuner)
+public sealed record DuelCardFacts(bool Monster, int Level, bool Tuner, bool Trap = false)
 {
     /// <summary>From the decoded codes: raw kinds 13/14 are Spells/Traps; Tuner getter kinds are the ones Core treats as Tuners. Xyz
     /// monsters (raw kinds 22/23) report no Level: no capture shows what the field prints for their Rank.</summary>
     public static DuelCardFacts From(CardDefinition card) => new(card.Codes is { RawKind: not (13 or 14) } codes,
-        card.Codes?.RawKind is 22 or 23 ? 0 : (int)card.Statistics.Level, card.Codes?.GetterKind is 15 or 16 or 19 or 30 or 32);
+        card.Codes?.RawKind is 22 or 23 ? 0 : (int)card.Statistics.Level, card.Codes?.GetterKind is 15 or 16 or 19 or 30 or 32, card.Codes?.RawKind == 14);
 }
 
 /// <summary>Where a card was drawn: its world matrix and whether it is in the player's hand.</summary>

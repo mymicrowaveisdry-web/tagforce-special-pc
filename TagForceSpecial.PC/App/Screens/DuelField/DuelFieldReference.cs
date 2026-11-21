@@ -47,6 +47,50 @@ public static class DuelFieldReference
         return new(0, PlayerId.One, PlayerId.One, 2, DuelPhase.Main1, self, opponent, "", [new ChoiceView(0, "", 4)], null);
     }
 
+    /// <summary>The left panel for the inspected cards of the native captures: Krebons (joey-board) and Contact with Gusto (aki-board), focused
+    /// in hand, and a hidden opponent hand card (back).</summary>
+    public static void CapturePanels(Microsoft.Xna.Framework.Graphics.GraphicsDevice device, SpriteRenderer renderer, DuelFieldVisuals field,
+        string root, Func<uint, DuelCardFacts?>? facts)
+    {
+        foreach (var (name, id) in new[] { ("panel-krebons", 7716u), ("panel-contact", 9183u), ("panel-hidden", 0u) })
+        {
+            var view = AkiBoard();
+            var hand = view.Self.Hand.ToArray();
+            if (id != 0) hand[3] = new CardView(4, id, "", "", null, null, null, false);
+            view = view with { Self = view.Self with { Hand = hand }, Choices = [new(0, "Phase: Battle", null, ActionKind.Phase, Phase: DuelPhase.Battle), new(1, "End turn", null, ActionKind.EndTurn)] };
+            var input = new DuelFieldInput();
+            input.Handle(view, default, TimeSpan.FromSeconds(1 / 59.94));
+            if (id == 0) input.Handle(view, new(InputAction.Down, InputAction.Down), TimeSpan.FromSeconds(1 / 59.94));
+            Save(device, renderer, field, DuelScene.Compose(new(view, 0, -1, "", 0, States[0].Style, facts, input), field.Profile), Path.Combine(root, name + ".png"));
+        }
+    }
+
+    /// <summary>Show Details of Caam (aki-board, focused in hand) through ○ → Show Details, compared with ge-aki-detail.png (counters
+    /// differ: the capture shows the owner's save).</summary>
+    public static void CaptureDetail(Microsoft.Xna.Framework.Graphics.GraphicsDevice device, SpriteRenderer renderer, DuelFieldVisuals field,
+        string root, Func<uint, DuelCardFacts?>? facts, Func<CardView, App.Screens.Album.CardAlbumDetail?> detail)
+    {
+        var view = AkiBoard() with { Choices = [new(0, "Phase: Battle", null, ActionKind.Phase, Phase: DuelPhase.Battle), new(1, "End turn", null, ActionKind.EndTurn)] };
+        var input = new DuelFieldInput { DetailFactory = detail };
+        var frame = TimeSpan.FromSeconds(1 / 59.94);
+        input.Handle(view, default, frame);
+        input.Handle(view, new(InputAction.Confirm, InputAction.Confirm), frame);
+        input.Handle(view, new(InputAction.Confirm, InputAction.Confirm), frame);
+        Save(device, renderer, field, DuelScene.Compose(new(view, 0, -1, "", 0, States[0].Style, facts, input), field.Profile), Path.Combine(root, "detail-caam.png"));
+    }
+
+    private static void Save(Microsoft.Xna.Framework.Graphics.GraphicsDevice device, SpriteRenderer renderer, DuelFieldVisuals field, DuelDrawList list, string path)
+    {
+        field.Render(list.FieldDraws);
+        using var target = new Microsoft.Xna.Framework.Graphics.RenderTarget2D(device, 480, 272);
+        device.SetRenderTarget(target);
+        device.Clear(Microsoft.Xna.Framework.Color.Black);
+        renderer.Begin(); renderer.Layer(field.Layer); list.Replay(renderer); renderer.End();
+        device.SetRenderTarget(null);
+        using var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write);
+        target.SaveAsPng(output, 480, 272);
+    }
+
     /// <summary>Scripted presses on the aki-board state, each rendered as the full composite (field layer and interim windows).</summary>
     public static void CaptureInputWalk(Microsoft.Xna.Framework.Graphics.GraphicsDevice device, SpriteRenderer renderer, DuelFieldVisuals field,
         string root, Func<uint, DuelCardFacts?>? facts)

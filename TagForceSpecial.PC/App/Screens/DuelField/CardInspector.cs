@@ -40,14 +40,21 @@ public static class CardInspector
         list.Wrapped(DuelPart.Inspector, detail.Description, 350, 96, 20, 5, DuelPalette.Muted);
     }
 
-    /// <summary>Interim text in the original inspector column (x 0–144), until the measured card panel replaces it.</summary>
-    public static void DrawInterim(DuelDrawList list, CardView? detail)
+    /// <summary>Measured strip tints of the left panel by card kind (one captured sample each; the strip brightness also pulses): monster,
+    /// Spell, Trap, and a back.</summary>
+    public static readonly Microsoft.Xna.Framework.Color MonsterTint = new(1f, 0.859f, 0.624f), SpellTint = new(0.71f, 1f, 0.992f),
+        TrapTint = new(1f, 0.749f, 0.969f), BackTint = new(0.918f, 0.918f, 0.918f);
+
+    /// <summary>The original left panel: a public card's face, stats and text, or a back (hidden, face-down to the viewer, piles and empty
+    /// objects; measured for a hidden hand card and the Deck).</summary>
+    public static void DrawOriginal(DuelDrawList list, CardView? detail, Func<uint, DuelCardFacts?>? facts)
     {
-        list.Fill(DuelPart.Inspector, new(0, 0, 144, 272), new(22, 29, 44), Rendering.SceneLayer.Field);
-        if (detail is null) return;
-        list.Wrapped(DuelPart.Inspector, detail.Name.ToUpperInvariant(), 6, 8, 22, 3, DuelPalette.Gold);
-        if (detail.Attack is not null || detail.Defense is not null)
-            list.Text(DuelPart.Inspector, $"ATK {detail.Attack?.ToString() ?? "?"} DEF {detail.Defense?.ToString() ?? "?"}", 6, 40, DuelPalette.Muted);
-        list.Wrapped(DuelPart.Inspector, detail.Description, 6, 56, 22, 22, Microsoft.Xna.Framework.Color.White);
+        if (detail is { Hidden: false, CardId: { } id })
+        {
+            var kind = facts?.Invoke(id);
+            var tint = kind is null ? MonsterTint : kind.Monster ? MonsterTint : kind.Trap ? TrapTint : SpellTint;
+            list.Add(new DuelCardPanel(DuelPart.Inspector, id, tint));
+        }
+        else list.Add(new DuelCardPanel(DuelPart.Inspector, null, BackTint));
     }
 }

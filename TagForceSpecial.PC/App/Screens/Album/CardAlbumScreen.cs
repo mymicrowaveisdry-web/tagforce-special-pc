@@ -41,7 +41,7 @@ public sealed class CardAlbumScreen : IDisposable
             var renderer = new CardAlbumRenderer(device, visuals, binder, profile, faces, catalog);
             var detailProfile = CardAlbumDetailProfile.LoadEmbedded();
             visuals.UseAlbumAssets(assets, detailProfile.AssetKeys(), CardAlbumResources.ArchiveKey, CardAlbumResources.CardInfoKey);
-            renderer.Detail = new CardAlbumDetailRenderer(device, visuals, renderer, catalog, detailProfile,
+            renderer.Detail = new CardAlbumDetailRenderer(device, visuals, renderer.Panel, catalog, detailProfile,
                 new CardDetailSource(visuals.SourceBytes("eboot"), visuals.SourceBytes("cardinfo")));
             return new(catalog, renderer);
         }

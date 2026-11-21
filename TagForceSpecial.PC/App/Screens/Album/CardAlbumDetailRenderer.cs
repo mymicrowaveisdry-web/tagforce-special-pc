@@ -16,12 +16,12 @@ public sealed class CardAlbumDetailRenderer
     private static readonly RasterizerState Scissored = new() { CullMode = CullMode.None, ScissorTestEnable = true };
     private readonly GraphicsDevice device;
     private readonly TitleFlowVisuals visuals;
-    private readonly CardAlbumRenderer album;
+    private readonly CardInfoPanel album;
     private readonly CardCatalog catalog;
     public CardAlbumDetailProfile Profile { get; }
     public CardDetailSource Source { get; }
 
-    public CardAlbumDetailRenderer(GraphicsDevice device, TitleFlowVisuals visuals, CardAlbumRenderer album, CardCatalog catalog, CardAlbumDetailProfile profile,
+    public CardAlbumDetailRenderer(GraphicsDevice device, TitleFlowVisuals visuals, CardInfoPanel album, CardCatalog catalog, CardAlbumDetailProfile profile,
         CardDetailSource source)
     {
         this.device = device; this.visuals = visuals; this.album = album; this.catalog = catalog; Profile = profile; Source = source;

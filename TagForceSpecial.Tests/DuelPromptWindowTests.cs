@@ -51,6 +51,28 @@ public sealed class DuelPromptWindowTests
         Assert.Equal((0f, 11.72f), (lines[1].Commands[0].X, lines[1].Commands[0].Y));
     }
 
+    [Theory]
+    [InlineData(true, false, "monster")]
+    [InlineData(false, false, "spell")]
+    [InlineData(false, true, "trap")]
+    public void CardPanelTintsTheStripByKind(bool monster, bool trap, string expected)
+    {
+        var list = new DuelDrawList();
+        CardInspector.DrawOriginal(list, new CardView(1, 10, "", "", null, null, null, false), _ => new DuelCardFacts(monster, 4, false, trap));
+        var panel = Assert.IsType<DuelCardPanel>(Assert.Single(list.Draws));
+        var tint = expected switch { "monster" => CardInspector.MonsterTint, "spell" => CardInspector.SpellTint, _ => CardInspector.TrapTint };
+        Assert.Equal((10u, tint), (panel.CardId!.Value, panel.Tint));
+    }
+
+    [Fact]
+    public void HiddenOrEmptyFocusShowsTheBackWithoutAnIdentity()
+    {
+        var list = new DuelDrawList();
+        CardInspector.DrawOriginal(list, new CardView(null, 77, "Secret", "", null, null, null, true), null);
+        CardInspector.DrawOriginal(list, null, null);
+        Assert.All(list.Draws.Cast<DuelCardPanel>(), p => Assert.Equal((null, CardInspector.BackTint), (p.CardId, p.Tint)));
+    }
+
     [Fact]
     public void SetIconsDifferForMonstersAndSpellTraps()
     {

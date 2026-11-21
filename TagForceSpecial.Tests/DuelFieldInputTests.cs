@@ -83,6 +83,28 @@ public sealed class DuelFieldInputTests
     }
 
     [Fact]
+    public void ShowDetailsHostsTheAlbumPageAndBackDrawsOneBlankFrame()
+    {
+        var view = View();
+        var input = Started(view);
+        input.DetailFactory = card => new(card.CardId!.Value, new(0, 0, 3), _ => 100);
+        var before = input.Focus.Current;
+        input.Handle(view, Press(InputAction.Confirm), Frame);
+        input.Handle(view, Press(InputAction.Confirm), Frame); // the only verb: Show Details
+        var page = Assert.IsType<DetailsModal>(input.Modal).Detail;
+        Assert.NotNull(page);
+        input.Handle(view, Press(InputAction.Right), Frame);
+        Assert.Equal(TagForceSpecial.PC.App.Screens.Album.CardAlbumDetailTab.Genre, page!.Tab);
+        Assert.Null(input.Handle(view, Press(InputAction.Back), Frame));
+        Assert.True(page.Closing);
+        var blank = DuelScene.Compose(new(view, 0, -1, "", 0, null, null, input), DuelFieldProfile.LoadEmbedded());
+        Assert.Empty(blank.Draws);
+        input.Handle(view, default, Frame);
+        Assert.Null(input.Modal);
+        Assert.Equal(before, input.Focus.Current);
+    }
+
+    [Fact]
     public void CrossOnTheFieldOpensThePhaseSelectorThatWrapsAndEnters()
     {
         var view = View();

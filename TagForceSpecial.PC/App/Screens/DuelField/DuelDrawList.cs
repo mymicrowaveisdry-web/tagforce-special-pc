@@ -16,6 +16,10 @@ public sealed record DuelWrapped(DuelPart Part, string Text, int X, int Y, int C
 /// measured two-copy shadow. <paramref name="Color"/> is 0xBBGGRR.</summary>
 public sealed record DuelFieldText(DuelPart Part, string Text, float X, float Y, float ScaleX, float ScaleY, int Color, int ShadowAlpha,
     bool AlignRight = false, float? LayoutScaleX = null) : DuelDraw(Part);
+/// <summary>The full-screen Show Details page (the Card Album's detail).</summary>
+public sealed record DuelCardDetail(DuelPart Part, App.Screens.Album.CardAlbumDetail Detail) : DuelDraw(Part);
+/// <summary>The left card panel for <paramref name="CardId"/> (a public card) or a back when null, with its strip tint.</summary>
+public sealed record DuelCardPanel(DuelPart Part, uint? CardId, Microsoft.Xna.Framework.Color Tint) : DuelDraw(Part);
 /// <summary>One measured original draw (<paramref name="Index"/> of a profile piece), repeated with a placement.</summary>
 public sealed record DuelFieldDraw(DuelPart Part, string Piece, int Index, PspPlacement Placement = default) : DuelDraw(Part);
 
@@ -48,7 +52,7 @@ public sealed class DuelDrawList
     }
 
     /// <summary>Commands rendered into the field layer, in order: measured draws and original-font text.</summary>
-    public IEnumerable<DuelDraw> FieldDraws => draws.Where(d => d is DuelFieldDraw or DuelFieldText or DuelFieldMenu or DuelFieldSprites or DuelRichText or DuelChainPrompt);
+    public IEnumerable<DuelDraw> FieldDraws => draws.Where(d => d is DuelFieldDraw or DuelFieldText or DuelFieldMenu or DuelFieldSprites or DuelRichText or DuelChainPrompt or DuelCardPanel or DuelCardDetail);
 
     public void Add(DuelDraw draw) => draws.Add(draw);
 

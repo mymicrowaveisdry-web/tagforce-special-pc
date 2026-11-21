@@ -101,6 +101,8 @@ public sealed partial class GameLoop
             var fieldVisuals = DuelField() ?? throw new InvalidOperationException("Duel field reference capture requires the imported field textures.");
             DuelFieldReference.Capture(fieldVisuals, fieldRoot, FieldCardFacts());
             DuelFieldReference.CaptureInputWalk(GraphicsDevice, renderer, fieldVisuals, fieldRoot, FieldCardFacts());
+            DuelFieldReference.CapturePanels(GraphicsDevice, renderer, fieldVisuals, fieldRoot, FieldCardFacts());
+            DuelFieldReference.CaptureDetail(GraphicsDevice, renderer, fieldVisuals, fieldRoot, FieldCardFacts(), DuelCardDetail);
             Console.WriteLine("DUEL_FIELD_REFERENCE " + DuelFieldReference.States.Count); Exit(); return;
         }
         var initial = activeScreen == ScreenId.Title && originalTitle is null ? ScreenId.PcTools : activeScreen;
@@ -204,8 +206,21 @@ public sealed partial class GameLoop
     /// <summary>The input session of the current duel; a new duel starts a new one.</summary>
     private DuelFieldInput DuelInput(DuelController controller)
     {
-        if (!ReferenceEquals(duelInputOwner, controller)) { duelInput = new(); duelInputOwner = controller; }
+        if (!ReferenceEquals(duelInputOwner, controller)) { duelInput = new() { DetailFactory = DuelCardDetail }; duelInputOwner = controller; }
         return duelInput!;
+    }
+    private App.Screens.Album.CardAlbumDetailRenderer? duelDetail;
+    /// <summary>The detail page of a visible card, with the album's counters: copies in the current deck (Main with Extra, Side) and the
+    /// Trunk (owned copies of supported cards minus those).</summary>
+    private App.Screens.Album.CardAlbumDetail? DuelCardDetail(Core.Views.CardView card)
+    {
+        if (duelDetail is not { } renderer || card.CardId is not { } id) return null;
+        var draft = editor?.Draft;
+        int main = draft is null ? 0 : draft.Count(id, Core.Decks.DeckSection.Main) + draft.Count(id, Core.Decks.DeckSection.Extra);
+        int side = draft?.Count(id, Core.Decks.DeckSection.Side) ?? 0;
+        int owned = Effects.ConfirmedCardPool.Contains(id) ? App.Screens.Title.DeckEditSession.OwnedCopies : 0;
+        var scroll = renderer.Profile.Scroll;
+        return new(id, new(main, side, Math.Max(0, owned - main - side)), tab => renderer.ContentHeight(id, tab), scroll.Visible, scroll.PixelsPerFrame);
     }
     /// <summary>Original controls (measured): ○ menus, × closes or opens the phase selector, △ global menu. START opens the PC pause
     /// menu until the original Help screen exists. Every choice is revision-bound; a refusal closes the window without state changes.</summary>
@@ -323,7 +338,25 @@ public sealed partial class GameLoop
         if (ReferenceEquals(duelFieldAssets, screenAssets)) return duelField;
         duelField?.Dispose(); duelField = null; duelFieldAssets = screenAssets;
         if (setup?.Game?.Presentation is null) return null;
-        try { duelField = new(GraphicsDevice, screenAssets) { Text = flowVisuals is { } flow ? new FlowFieldText(flow) : null, External = EbootTexture }; }
+        try
+        {
+            duelField = new(GraphicsDevice, screenAssets) { Text = flowVisuals is { } flow ? new FlowFieldText(flow) : null, External = EbootTexture };
+            if (flowVisuals is { } visuals && setup.Game.Catalog.Catalog is { } catalog)
+            {
+                // The left card panel is the Card Album's (same measured geometry); its textures come from the same pinned imports.
+                var album = App.Screens.Album.CardAlbumProfile.LoadEmbedded();
+                visuals.UseAlbumAssets(screenAssets, album.AssetKeys(), Assets.Presentation.CardAlbumResources.ArchiveKey, Assets.Presentation.CardAlbumResources.CardInfoKey);
+                var panel = new App.Screens.Album.CardInfoPanel(GraphicsDevice, visuals, album);
+                duelField.Panel = (id, tint, back) => panel.Draw(id is { } card ? catalog[card] : null, id is null,
+                    App.Screens.Title.MainMenuEntry.FramesIn(PresentationTime), tint, back);
+                // Show Details is the Card Album's detail page (same screen in the original).
+                var detailProfile = App.Screens.Album.CardAlbumDetailProfile.LoadEmbedded();
+                visuals.UseAlbumAssets(screenAssets, detailProfile.AssetKeys(), Assets.Presentation.CardAlbumResources.ArchiveKey, Assets.Presentation.CardAlbumResources.CardInfoKey);
+                duelDetail = new App.Screens.Album.CardAlbumDetailRenderer(GraphicsDevice, visuals, panel, catalog, detailProfile,
+                    new Assets.Presentation.CardDetailSource(visuals.SourceBytes("eboot"), visuals.SourceBytes("cardinfo")));
+                duelField.Detail = duelDetail.Draw;
+            }
+        }
         catch (Exception e) when (e is InvalidDataException or KeyNotFoundException or InvalidOperationException)
         { Console.Error.WriteLine("DUEL_FIELD_PENDING " + e.Message); }
         return duelField;

@@ -34,6 +34,12 @@ public static class DuelScene
     {
         var list = new DuelDrawList();
         var view = input.View;
+        // Show Details is an opaque full-screen page; measured: its closing frame is blank.
+        if (input.Input?.Modal is DetailsModal { Detail: { } page })
+        {
+            if (!page.Closing) list.Add(new DuelCardDetail(DuelPart.Inspector, page));
+            return list;
+        }
         var focus = Focused(input);
         var inspected = input.Input?.Modal is DetailsModal details ? details.Card
             : focus is { Card: { Hidden: false } card } ? card : input.Input is null ? CardInspector.Target(view, input.Choice, input.InspectedCard) : null;
@@ -47,7 +53,7 @@ public static class DuelScene
         CardSpriteRenderer.DrawLevels(list, field, placed, input.Facts);
         DuelHud.DrawOriginal(list, field, view, input.Style);
         // Interim sprite parts until their measured replacements exist.
-        CardInspector.DrawInterim(list, inspected);
+        CardInspector.DrawOriginal(list, inspected, input.Facts);
         if (input.Input is { } session) PromptPresenter.DrawModal(list, view, session, input.Notice);
         else PromptPresenter.Draw(list, view, input.Choice, input.Notice);
         DuelEffectLayer.Draw(list, view);

@@ -131,10 +131,19 @@ public sealed class PspDrawRenderer : IDisposable
         for (int i = 0; i + 1 < v.Length; i += 2)
         {
             var a = v[i]; var b = v[i + 1];
-            var tl = new VertexPositionColorTexture(a.Position, b.Color, a.TextureCoordinate);
-            var tr = new VertexPositionColorTexture(new(b.Position.X, a.Position.Y, b.Position.Z), b.Color, new(b.TextureCoordinate.X, a.TextureCoordinate.Y));
-            var bl = new VertexPositionColorTexture(new(a.Position.X, b.Position.Y, b.Position.Z), b.Color, new(a.TextureCoordinate.X, b.TextureCoordinate.Y));
-            var br = new VertexPositionColorTexture(b.Position, b.Color, b.TextureCoordinate);
+            // GE rotated sprite: when the corners are mirrored on exactly one axis, u follows y and v follows x.
+            bool rotated = a.Position.X > b.Position.X != a.Position.Y > b.Position.Y;
+            Vector2 Uv(float x, float y)
+            {
+                float tx = (x - a.Position.X) / (b.Position.X - a.Position.X), ty = (y - a.Position.Y) / (b.Position.Y - a.Position.Y);
+                return rotated ? new(MathHelper.Lerp(a.TextureCoordinate.X, b.TextureCoordinate.X, ty), MathHelper.Lerp(a.TextureCoordinate.Y, b.TextureCoordinate.Y, tx))
+                    : new(MathHelper.Lerp(a.TextureCoordinate.X, b.TextureCoordinate.X, tx), MathHelper.Lerp(a.TextureCoordinate.Y, b.TextureCoordinate.Y, ty));
+            }
+            VertexPositionColorTexture At(float x, float y, float z) => new(new(x, y, z), b.Color, Uv(x, y));
+            var tl = At(a.Position.X, a.Position.Y, a.Position.Z);
+            var tr = At(b.Position.X, a.Position.Y, b.Position.Z);
+            var bl = At(a.Position.X, b.Position.Y, b.Position.Z);
+            var br = At(b.Position.X, b.Position.Y, b.Position.Z);
             output.AddRange([tl, tr, bl, bl, tr, br]);
         }
         return [.. output];
