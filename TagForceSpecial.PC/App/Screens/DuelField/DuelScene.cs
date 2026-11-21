@@ -11,7 +11,7 @@ public sealed record DuelFieldStyle(string Backdrop = "default", string PlayerNa
 public sealed record DuelSceneInput(DuelView View, int Choice, int InspectedCard, string Notice, double Seconds, DuelFieldStyle? Style = null,
     Func<uint, DuelCardFacts?>? Facts = null, DuelFieldInput? Input = null)
 {
-    internal DuelFieldFrame Presentation { get; init; }
+    public DuelFieldFrame Presentation { get; init; }
 }
 
 /// <summary>Composes the duel field from its parts in a fixed draw order.</summary>
@@ -47,10 +47,15 @@ public static class DuelScene
             return list;
         }
         var focus = frame.BeforeDeal || finished ? null : Focused(input);
+        // Normal Summon (measured): the cursor stays on the raised card until the flight, shows nothing in flight, then the hand focus returns.
+        if (frame is { HandBefore: { } handBefore, SummonedCard: { } moving })
+            focus = frame.Flying ? null : new FieldObject(DuelFieldRows.OwnBottom, FieldObjectKind.Hand, true,
+                handBefore.ToList().FindIndex(c => c.InstanceId == moving.InstanceId), 0, moving);
         var inspected = session?.Modal is DetailsModal details ? details.Card
             : session?.Modal is CardListModal shown ? CardList.Highlighted(view, shown)
             : session?.Modal is PositionModal positioned ? positioned.Choices[0].Subject
             : frame.SummonedCard is { } summoned && session?.Modal is null ? summoned
+            : session is { Modal: null, HeldInspection: { } held } ? held
             : focus is { Card: { Hidden: false } card } ? card : input.Input is null ? CardInspector.Target(view, input.Choice, input.InspectedCard) : null;
         DuelBoardRenderer.DrawOriginal(list, field, (input.Style ?? new()).Backdrop);
         PhaseBar.DrawOriginal(list, field, view.Phase, session?.Modal is PhaseModal);
@@ -58,11 +63,12 @@ public static class DuelScene
         DuelBoardRenderer.DrawPilesOriginal(list, field, view);
         int? lifted = focus is { Own: true, Kind: FieldObjectKind.Hand, Card.InstanceId: { } id } ? id : null;
         var placed = CardSpriteRenderer.DrawFieldOriginal(list, view, lifted, frame);
+        if (frame.GlowFrame is { } glow) SummonGlow.Draw(list, field, glow, frame.GlowZone);
         var attack = session?.Modal as TargetModal;
         // GE order (attack-target capture): target cursor meshes, pointer, Battle Phase readouts, Levels, sword, trail and arrow head.
         if (attack is not null && focus is { } aimed) AttackTargetOverlay.DrawCursors(list, field, new(view, placed), aimed);
-        if (focus is { } target) InputFocusOverlay.DrawOriginal(list, field, new(view, placed), target, session?.Modal is not (PhaseModal or ResponseModal or CardListModal or PositionModal or TributeConfirmModal),
-            attack is not null);
+        if (focus is { } target) InputFocusOverlay.DrawOriginal(list, field, new(view, placed), target, session?.Modal is not (PhaseModal or ResponseModal or CardListModal or PositionModal or TributeConfirmModal) && !frame.PointerHidden,
+            attack is not null, HandVerbs(view, session, frame, target));
         BattleReadouts.Draw(list, field, view);
         CardSpriteRenderer.DrawLevels(list, field, placed, input.Facts);
         if (attack is not null && focus is { } end && AttackTargetOverlay.AttackerCentre(view, attack.Choices) is { } start)
@@ -74,10 +80,21 @@ public static class DuelScene
         // Measured (card-list capture): the window comes after the left panel, over the field, with the pointer hidden.
         if (session?.Modal is CardListModal cards) CardList.Draw(list, field, view, cards, input.Facts);
         if (session?.Modal is PositionModal position) PositionScreen.Draw(list, field, position);
+        if (session is { Modal: null } && frame.ClosingMenu is { } closing) PromptPresenter.DrawClosingMenu(list, view with { Self = view.Self with { Hand = frame.HandBefore ?? view.Self.Hand } }, closing);
         if (session is not null) PromptPresenter.DrawModal(list, view, session, input.Notice);
         else if (!finished) PromptPresenter.Draw(list, view, input.Choice, input.Notice);
         DuelEffectLayer.DrawOriginal(list, view, field);
         return list;
+    }
+
+    /// <summary>The command icons above a focused own hand card: its menu's verbs on the open field or under its menu; during a Normal Summon
+    /// the chosen card's menu until the pointer hides (measured).</summary>
+    private static IReadOnlyList<MenuVerb>? HandVerbs(DuelView view, DuelFieldInput? session, DuelFieldFrame frame, FieldObject focus)
+    {
+        if (session is null || !focus.Own || focus.Kind != FieldObjectKind.Hand) return null;
+        if (frame.HandBefore is not null) return session.SubmittedFrom?.Items.Select(i => i.Verb).ToArray();
+        if (session.Modal is not (null or CardMenuModal)) return null;
+        return DuelFieldCommands.ObjectMenu(view, focus).Select(i => i.Verb).Where(v => v != MenuVerb.ShowDetails).ToArray();
     }
 
     private static DuelDrawList ComposeTestVisualization(DuelSceneInput input)

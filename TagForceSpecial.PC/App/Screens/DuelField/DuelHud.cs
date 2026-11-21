@@ -8,6 +8,8 @@ public static class DuelHud
 {
     /// <summary>Measured: the opponent's portrait frame sits 286 pixels right of the player's (150 → 436).</summary>
     public const float OpponentPortraitOffset = 286f;
+    public const int HelpOffset = 401088;
+    private static readonly IReadOnlyDictionary<int, (int, int)> HelpStyle = new Dictionary<int, (int, int)> { [0] = (0xffffff, 128) };
 
     public static void DrawBar(DuelDrawList list)
     {
@@ -65,6 +67,8 @@ public static class DuelHud
         DrawNumbers(list, field, view);
         list.FieldPiece(DuelPart.Hud, field, "hud.ornament");
         list.FieldPiece(DuelPart.Hud, field, "hud.help");
+        // Measured (aki-board draws 108–109): "Help" (basic_jj 401088) after the START ? tab, white with shadow 128, 0.5 × 0.4947.
+        list.Add(new DuelRichText(DuelPart.Hud, Assets.Presentation.DuelFieldResources.BasicKey, HelpOffset, null, 447.5f, 257.64f, 0.5f, 0.4947f, HelpStyle));
         list.FieldPiece(DuelPart.Hud, field, "portrait.player.frame");
         list.FieldPiece(DuelPart.Hud, field, "portrait.player.face", new(Texture: Assets.Presentation.DuelFaceIcons.Key(style.PlayerFace)));
         bool playerTurn = view.ActivePlayer == view.Viewer;

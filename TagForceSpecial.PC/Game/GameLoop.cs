@@ -61,6 +61,7 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
             OpenAssetDiagnostics();
         }
         if (options.Smoke && !SetupAutomation && !StartDuel(options.DeckVariant)) throw new InvalidOperationException(setupMessage);
+        if (options.DuelWalkRoot is not null) StartDuelWalk();
     }
 
     private bool StartDuel(int variant)
@@ -117,8 +118,9 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
             if (smokeUpdatedFrame == frames) return;
             smokeUpdatedFrame = frames;
         }
+        if (options.DuelWalkRoot is not null && !DuelWalkUpdate(ref gameTime)) return;
         PollSetupTask();
-        var frame = options.PresentationSmoke ? PresentationSmokeInput()
+        var frame = options.PresentationSmoke ? PresentationSmokeInput() : options.DuelWalkRoot is not null ? DuelWalkInput()
             : options.RealtimeWalkRoot is not null ? RealtimeWalkInput(gameTime) : PollPlayer();
         navigationTime = gameTime;
         // Input is ignored while a fade runs; the change at black may also move to another screen.
@@ -177,6 +179,7 @@ public sealed partial class GameLoop : Microsoft.Xna.Framework.Game
         DrawTransitionOverlay();
         if (options.PresentationSmoke) CheckPresentationSmokeFrame();
         if (options.RealtimeWalkRoot is not null) CheckRealtimeWalkFrame(gameTime);
+        if (options.DuelWalkRoot is not null) CheckDuelWalkFrame();
         GraphicsDevice.SetRenderTarget(null);
         GraphicsDevice.Clear(Color.Black);
         var target = PictureRect();

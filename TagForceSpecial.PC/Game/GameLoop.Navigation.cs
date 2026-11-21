@@ -217,7 +217,7 @@ public sealed partial class GameLoop
         if (!ReferenceEquals(duelInputOwner, controller))
         {
             duelInput = new() { DetailFactory = DuelCardDetail };
-            duelFieldPresentation = new(PresentationTime, !options.PixelExact);
+            duelFieldPresentation = new(PresentationTime, options.DuelWalkRoot is null ? !options.PixelExact : !options.DuelWalkStatic);
             duelInputOwner = controller;
         }
         return duelInput!;
@@ -243,10 +243,10 @@ public sealed partial class GameLoop
         if (frame.IsPressed(InputAction.Start)) { duel.Paused = true; screen = ScreenId.Paused; return; }
         var input = DuelInput(duel);
         var before = duel.View;
-        if (duelFieldPresentation.BeforeDeal(before, PresentationTime) && DuelField() is not null) return;
+        if ((duelFieldPresentation.BeforeDeal(before, PresentationTime) || duelFieldPresentation.Busy(before, PresentationTime)) && DuelField() is not null) return;
         if (input.Handle(before, frame, navigationTime.ElapsedGameTime) is { } submit)
         {
-            if (duel.Choose(submit.Revision, submit.ChoiceId)) duelFieldPresentation.Accept(before, duel.View, submit.ChoiceId, PresentationTime);
+            if (duel.Choose(submit.Revision, submit.ChoiceId)) duelFieldPresentation.Accept(before, duel.View, submit.ChoiceId, PresentationTime, input.SubmittedFrom);
             else input.Rejected(duel.Notice);
         }
     }

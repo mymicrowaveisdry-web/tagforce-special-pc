@@ -32,7 +32,7 @@ internal static class DuelFieldPresentationReference
             var before = duel.View;
             if (input.Handle(before, new(pressed, pressed), frame) is not { } submit) return;
             if (!duel.Choose(submit.Revision, submit.ChoiceId)) throw new InvalidOperationException(duel.Notice);
-            presentation.Accept(before, duel.View, submit.ChoiceId, elapsed);
+            presentation.Accept(before, duel.View, submit.ChoiceId, elapsed, input.SubmittedFrom);
         }
 
         void Save(string name, DuelSceneInput scene) => DuelFieldReference.Save(device, renderer, field,
@@ -45,15 +45,10 @@ internal static class DuelFieldPresentationReference
 
         SaveSequence("summon-00-opening");
         elapsed = DuelFieldPresentation.OpeningHold;
-        Advance(); // First draw (skipped by the controller on turn 1).
+        // The first draw (skipped on turn 1) and the Standby Phase pass by themselves; Main Phase 1 starts on the centre Spell & Trap Zone.
+        for (int i = 0; i < 4 && duel.View.Phase != DuelPhase.Main1; i++) Advance();
         Advance();
-        if (duel.View.Phase == DuelPhase.Standby)
-        {
-            Advance(InputAction.Back);
-            Advance(InputAction.Right);
-            Advance(InputAction.Confirm);
-            Advance();
-        }
+        Advance(InputAction.Down);
         if (duel.View.Phase != DuelPhase.Main1 || input.Focus.Current.Card?.CardId != BattleOx)
             throw new InvalidOperationException("The summon reference must start in Main Phase 1 with Battle Ox focused.");
         SaveSequence("summon-01-hand");
@@ -67,12 +62,14 @@ internal static class DuelFieldPresentationReference
         if (duel.View.Revision != beforeSummon + 1 || duel.View.Self.Hand.Count != 4 || duel.View.Self.Monsters[2]?.CardId != BattleOx ||
             presentation.Frame(duel.View, elapsed).SummonWorld is null)
             throw new InvalidOperationException("Expected one accepted, animated centre-slot Normal Summon.");
-        Advance();
-        elapsed += DuelFieldPresentation.SummonTravel / 2;
+        var accepted = elapsed;
+        // Half a vblank into each step, away from its boundary.
+        TimeSpan At(int vblanks) => accepted + TimeSpan.FromSeconds((vblanks + 0.5) / DuelFieldPresentation.VblankHz);
+        elapsed = At(DuelFieldPresentation.MidPose);
         SaveSequence("summon-03-motion");
-        elapsed += DuelFieldPresentation.SummonTravel / 2;
+        elapsed = At(DuelFieldPresentation.Landed);
         SaveSequence("summon-04-landed");
-        elapsed += DuelFieldPresentation.SummonHold;
+        elapsed = At(DuelFieldPresentation.PointerBack);
         SaveSequence("summon-05-settled");
 
         Save("field-layout-cases", new(LayoutCases(catalog), 0, -1, "", 0, style, id => DuelCardFacts.From(catalog[id]), new DuelFieldInput()));
@@ -83,7 +80,7 @@ internal static class DuelFieldPresentationReference
         var deck = InitialOpponentDecks.Create(0);
         var main = deck.Main.ToList();
         if (!main.Remove(BattleOx)) throw new InvalidOperationException("The reference deck needs Battle Ox.");
-        main.Insert(4, BattleOx);
+        main.Insert(2, BattleOx);
         return new(deck.DeckId, deck.Revision, deck.OwnerId, deck.CatalogId, deck.CatalogRevision, deck.SourceBuild,
             deck.PolicyId, deck.PolicyRevision, main, deck.Extra, deck.Side);
     }

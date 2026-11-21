@@ -44,6 +44,10 @@ public sealed class DuelFieldInput
     public DuelFieldFocus Focus { get; } = new();
     public DuelModal? Modal { get; private set; }
     public DuelFeedback Feedback { get; private set; }
+    /// <summary>The object menu the last submission was chosen from (the presentation keeps drawing it briefly); null otherwise.</summary>
+    public CardMenuModal? SubmittedFrom { get; private set; }
+    /// <summary>The card the left panel keeps showing on the field until the next press (the summoned card); null otherwise.</summary>
+    public CardView? HeldInspection { get; private set; }
 
     /// <summary>Builds the detail page for a visible card (the host's counts and content heights); null shows no page.</summary>
     public Func<CardView, App.Screens.Album.CardAlbumDetail?>? DetailFactory { get; set; }
@@ -56,7 +60,7 @@ public sealed class DuelFieldInput
         if (view.Outcome is not null) return null;
         var (dx, dy, repeated) = Directions(frame, delta);
         bool confirm = frame.IsPressed(InputAction.Confirm), back = frame.IsPressed(InputAction.Back), menu = frame.IsPressed(InputAction.Menu);
-        if (confirm || back || menu || dx != 0 || dy != 0) Feedback = default;
+        if (confirm || back || menu || dx != 0 || dy != 0) { Feedback = default; HeldInspection = null; }
         return Modal switch
         {
             null => Field(view, dx, dy, confirm, back, menu),
@@ -95,11 +99,15 @@ public sealed class DuelFieldInput
         Modal = null;
         if (phase != view.Phase && view.Phase == DuelPhase.Battle && view.ActivePlayer == view.Viewer)
             FocusFirstAttacker(view); // measured: entering Battle Phase moves the cursor onto the player's monster
+        // Measured (matched walk): the player's Main Phase 1 starts with the cursor on the centre Spell & Trap Zone.
+        if (phase is DuelPhase.Draw or DuelPhase.Standby && view.Phase == DuelPhase.Main1 && view.ActivePlayer == view.Viewer)
+            Focus.FocusOn(Focus.Row(DuelFieldRows.OwnSpellTrap).First(o => o.Kind == FieldObjectKind.SpellTrap && o.Index == 2));
         phase = view.Phase;
         if (view.Outcome is not null) return null;
         switch (DuelFieldCommands.Mode(view))
         {
             case DuelInputMode.AutoDraw when !recovering: return new DuelSubmit(view.Revision, view.Choices[0].Id);
+            case DuelInputMode.AutoStandby when !recovering: return new DuelSubmit(view.Revision, DuelFieldCommands.StandbyExit(view)!.Id);
             case DuelInputMode.Response: Modal = new ResponseModal(0); break;
             // Measured original screens for a position choice and a card choice; other decisions keep the list.
             case DuelInputMode.DecisionList when PositionScreen.Applies(view.Choices): Modal = PositionScreen.Open(view.Choices); break;
@@ -148,7 +156,11 @@ public sealed class DuelFieldInput
         if (!confirm) return null;
         switch (m.Items[m.Index].Command)
         {
-            case SubmitCommand s: Modal = null; return new DuelSubmit(view.Revision, s.ChoiceId);
+            case SubmitCommand s:
+                Modal = null; SubmittedFrom = m;
+                // Measured (matched walk): after a Normal Summon the left panel keeps the summoned card until the cursor moves.
+                HeldInspection = m.Items[m.Index].Verb == MenuVerb.Summon ? m.Target.Card : null;
+                return new DuelSubmit(view.Revision, s.ChoiceId);
             case TargetCommand t: return StartTargets(view, t.Choices);
             case ListCommand l: Modal = new ListModal(l.Choices, 0, true) { Parent = m }; return null;
             case DetailsCommand d: OpenDetails(d.Card); return null;

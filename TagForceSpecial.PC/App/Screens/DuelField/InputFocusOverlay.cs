@@ -55,8 +55,10 @@ public static class InputFocusOverlay
     /// <summary>Measured: the pointer is hidden while the phase selector or the Chain prompt is open; the cursor mesh stays.</summary>
     /// <param name="attackTarget">Measured: on an attack target the pointer shows hand_icon01 cells (64, 64) and (96, 64) alternately (period not
     /// measured; the first is drawn) instead of (0, 0).</param>
+    /// <param name="verbs">Measured (matched walk): above a focused own hand card the icons of its commands (Summon, Set) follow the pointer,
+    /// 14 pixels apart from 8 left and 12 above its top-left.</param>
     public static void DrawOriginal(DuelDrawList list, DuelFieldProfile field, FocusContext context, FieldObject focus, bool pointer = true,
-        bool attackTarget = false)
+        bool attackTarget = false, IReadOnlyList<MenuVerb>? verbs = null)
     {
         var (centre, rotation) = Place(context, focus);
         if (focus.Own && focus.Kind == FieldObjectKind.Hand)
@@ -75,6 +77,10 @@ public static class InputFocusOverlay
         // The template covers the 32-texel cell at (0, 0); the attack cell sits two cells right and down.
         var cell = attackTarget ? new Vector2(draw.Uv![1][0] * 2, draw.Uv[1][1] * 2) : Vector2.Zero;
         list.Field(DuelPart.Focus, "focus.pointer", 0, new(Offset: new(at.X - template[0], at.Y - template[1]), UvOffset: cell));
+        if (!focus.Own || focus.Kind != FieldObjectKind.Hand || verbs is null) return;
+        float x = at.X - 8;
+        foreach (var verb in verbs)
+            if (DuelMenuWindow.Icon(DuelPart.Focus, field, verb, x, at.Y - 12) is { } icon) { list.Add(icon); x += 14; }
     }
 
     public static void Draw(DuelDrawList list, CardView? card, Rectangle rect, CardView? inspected, double seconds)

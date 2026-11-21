@@ -85,6 +85,15 @@ public static class DuelMenuWindow
                 draws[i].Vertices!.Select(p => new[] { Pin(p[0], tx0, tx1, x0, x1), Pin(p[1], ty0, ty1, y0, y1), p[2] }).ToArray(), draws[i].Uv!);
     }
 
+    /// <summary>A verb's card_icon02 cell as a 13 × 13 sprite at (<paramref name="x"/>, <paramref name="y"/>); null for verbs without a captured cell.</summary>
+    public static DuelFieldSprites? Icon(DuelPart part, DuelFieldProfile field, MenuVerb verb, float x, float y)
+    {
+        if (MenuVerbs.Icon(verb) is not { } cell) return null;
+        var atlas = field.Textures[field.Piece("menu.icon")[0].Texture!].Size;
+        return Sprite(part, "menu.icon", x, y, x + 13, y + 13, cell.U / (float)atlas[0], cell.V / (float)atlas[1], (cell.U + 13) / (float)atlas[0],
+            (cell.V + 13) / (float)atlas[1]);
+    }
+
     private static DuelFieldSprites Sprite(DuelPart part, string piece, float ax, float ay, float bx, float by, float u0, float v0, float u1, float v1) =>
         new(part, piece, 0, [[ax, ay, 0], [bx, by, 0]], [[u0, v0], [u1, v1]]);
 }

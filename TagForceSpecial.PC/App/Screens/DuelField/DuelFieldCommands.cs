@@ -45,7 +45,7 @@ public static class MenuVerbs
 
 /// <summary>How the current legal choices are presented: the open field (cursor and menus), a Chain-style Yes/No response prompt, an
 /// automatic Draw, or a PC decision list for decisions whose original screens were not measured.</summary>
-public enum DuelInputMode { Field, Response, AutoDraw, DecisionList, Waiting }
+public enum DuelInputMode { Field, Response, AutoDraw, AutoStandby, DecisionList, Waiting }
 
 /// <summary>Builds menus from the authorized legal choices. Wording observed in the original: Summon, Set, Attack, Show Details, Show Card
 /// List, Surrender, Change Phase, Option, Help; "Activate" and "Change Position" are PC wording until their menus are captured.</summary>
@@ -62,6 +62,9 @@ public static class DuelFieldCommands
     {
         var kinds = view.Choices.Select(c => c.Kind).ToArray();
         if (kinds.Length == 0) return DuelInputMode.Waiting;
+        // Measured (matched walk): with nothing to activate, the Standby Phase passes to Main Phase 1 by itself.
+        if (view.Phase == DuelPhase.Standby && kinds.All(k => k is ActionKind.Phase or ActionKind.EndTurn) && StandbyExit(view) is not null)
+            return DuelInputMode.AutoStandby;
         if (kinds.Any(k => k is ActionKind.Phase or ActionKind.EndTurn)) return DuelInputMode.Field;
         if (kinds.All(k => k == ActionKind.Draw)) return DuelInputMode.AutoDraw;
         if (kinds.Any(k => k is ActionKind.ChainPass or ActionKind.BattlePass) &&
@@ -139,6 +142,10 @@ public static class DuelFieldCommands
 
     /// <summary>Phase selector options: the current phase and each reachable phase, in phase order (End Phase via End Turn when no explicit
     /// End Phase choice exists). Each maps to the choice that enters it; the current phase has none.</summary>
+    /// <summary>The choice that enters Main Phase 1 from the Standby Phase.</summary>
+    public static ChoiceView? StandbyExit(DuelView view) =>
+        view.Choices.FirstOrDefault(c => c.Kind == ActionKind.Phase && c.Phase == DuelPhase.Main1);
+
     public static IReadOnlyList<(DuelPhase Phase, int? ChoiceId)> PhaseOptions(DuelView view)
     {
         var options = new Dictionary<DuelPhase, int?> { [view.Phase] = null };

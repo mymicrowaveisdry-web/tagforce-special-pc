@@ -58,6 +58,10 @@ public static class PromptPresenter
         else DuelNoticeLine.Draw(list, view, input.Feedback, notice);
     }
 
+    /// <summary>The menu ○ just closed by choosing Summon, still drawn as it was (measured: it stays 26 vblanks).</summary>
+    internal static void DrawClosingMenu(DuelDrawList list, DuelView view, CardMenuModal menu) =>
+        OriginalMenu(list, DuelFieldProfileCache.Profile, view, menu.Target, menu.Items, menu.Index);
+
     public static Rectangle MenuWindow(Vector2 pointer, bool handCard, int rows)
     {
         int height = 19 + RowHeight * rows;

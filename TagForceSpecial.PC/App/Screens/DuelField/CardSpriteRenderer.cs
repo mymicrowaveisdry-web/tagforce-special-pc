@@ -43,22 +43,41 @@ public static class CardSpriteRenderer
     internal static IReadOnlyList<DuelCardPlacement> DrawFieldOriginal(DuelDrawList list, PC.DuelUI.DuelView view, int? focused, DuelFieldFrame presentation)
     {
         var placed = new List<DuelCardPlacement>();
-        void Place(CardView card, Matrix world, bool hand)
+        void Place(CardView card, Matrix world, bool hand, bool level = true)
         {
             DrawOriginal(list, card, world);
-            placed.Add(new(card, world, hand));
+            if (level) placed.Add(new(card, world, hand));
         }
+        // Measured (matched walk): until the flight the summoned card is still a raised hand card; in flight no hand Level is drawn.
+        bool flying = presentation.Flying;
         foreach (var (player, owner) in new[] { (true, view.Self), (false, view.Opponent) })
         {
             for (int i = 0; i < owner.Monsters.Count; i++)
                 if (owner.Monsters[i] is { } card)
-                    Place(card, player && presentation.SummonedCard?.InstanceId == card.InstanceId && presentation.SummonWorld is { } world
-                        ? world : DuelLayoutProfile.SlotWorld(player, false, i, card.Position), false);
+                {
+                    if (player && presentation.SummonedCard?.InstanceId == card.InstanceId && presentation.SummonWorld is { } world)
+                        Place(card, world, hand: presentation.HandBefore is not null, level: !flying);
+                    else Place(card, DuelLayoutProfile.SlotWorld(player, false, i, card.Position), false);
+                }
             for (int i = 0; i < owner.SpellTraps.Count; i++)
                 if (owner.SpellTraps[i] is { } card) Place(card, DuelLayoutProfile.SlotWorld(player, true, i, null), false);
             for (int i = 0; i < owner.Pendulum.Count; i++)
                 if (owner.Pendulum[i] is { } card) Place(card, DuelLayoutProfile.PendulumWorld(player, i), false);
             if (owner.FieldSpell is { } fieldSpell) Place(fieldSpell, DuelLayoutProfile.FieldSpellWorld(player), false);
+            if (player && presentation.HandBefore is { } before)
+            {
+                // The hand as it was, closing the summoned card's gap in the original's steps (no card raised meanwhile).
+                for (int i = 0; i < owner.Hand.Count; i++)
+                {
+                    var card = owner.Hand[i];
+                    int from = before.ToList().FindIndex(c => c.InstanceId == card.InstanceId);
+                    var start = DuelLayoutProfile.HandWorld(from < 0 ? i : from, before.Count, false);
+                    var end = DuelLayoutProfile.HandWorld(i, owner.Hand.Count, false);
+                    var world = start with { Translation = Vector3.Lerp(start.Translation, end.Translation, presentation.HandProgress) };
+                    Place(card, world, true, level: !flying);
+                }
+                continue;
+            }
             for (int i = 0; i < owner.Hand.Count; i++)
             {
                 var card = owner.Hand[i];
