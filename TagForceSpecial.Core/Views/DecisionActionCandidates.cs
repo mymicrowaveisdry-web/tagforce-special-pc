@@ -27,11 +27,19 @@ internal static class DecisionActionCandidates
         }
         if (state.PendingDecision is { } decision)
         {
+            // The chooser sees the cards of its own decision (the original's card list shows them, Deck options included).
             foreach (var card in decision.CardOptions.OrderBy(c => c.GameCardId).ThenBy(c => c.InstanceId))
-                yield return B(new ChooseDecisionCard(player, decision.DecisionId, card.InstanceId), ActionKind.ChooseCard,
+            {
+                var option = B(new ChooseDecisionCard(player, decision.DecisionId, card.InstanceId), ActionKind.ChooseCard,
                     $"Choose {catalog[card.GameCardId].Name}", card.InstanceId);
+                yield return option with { Action = option.Action with { Subject = PlayerProjection.Card(card, true, null, catalog), SubjectSource = decision.CardSource } };
+            }
+            var subject = Subject(state, player, decision) is { } picked ? PlayerProjection.Card(picked, true, null, catalog) : null;
             foreach (var position in decision.PositionOptions)
-                yield return B(new ChooseDecisionPosition(player, decision.DecisionId, position), ActionKind.ChoosePosition, $"{position}", position: position);
+            {
+                var candidate = B(new ChooseDecisionPosition(player, decision.DecisionId, position), ActionKind.ChoosePosition, $"{position}", position: position);
+                yield return candidate with { Action = candidate.Action with { Subject = subject } };
+            }
             foreach (int zone in decision.MonsterZoneOptions)
                 yield return B(new ChooseDecisionZone(player, decision.DecisionId, zone), ActionKind.ChooseZone, $"Monster zone {zone + 1}", zone: zone);
             foreach (var target in decision.TargetOptions)
@@ -165,4 +173,12 @@ internal static class DecisionActionCandidates
             yield return B(new DeclareValue(player, decisionId, (int)id), ActionKind.ChooseCard, $"Declare {catalog[id].Name}", target: (int)id);
     }
 
+    /// <summary>The card the sequence's latest card answer picked (the card being positioned), wherever its owner holds it now.</summary>
+    private static CardInstance? Subject(DuelState state, PlayerId player, PendingDecision decision)
+    {
+        if (decision.Answers.LastOrDefault(a => a.CardInstanceId is not null)?.CardInstanceId is not { } id) return null;
+        var p = state.GetPlayer(player);
+        return p.Deck.Concat(p.Hand).Concat(p.Graveyard).Concat(p.Banished).Concat(p.ExtraDeck).Concat(p.FaceUpExtraDeck)
+            .FirstOrDefault(c => c.InstanceId == id);
+    }
 }

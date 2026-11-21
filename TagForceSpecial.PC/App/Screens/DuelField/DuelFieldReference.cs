@@ -124,6 +124,52 @@ public static class DuelFieldReference
         Save(device, renderer, field, DuelScene.Compose(new(view, 0, -1, "", 0, States[0].Style, facts, input), field.Profile), Path.Combine(root, "cardlist-close.png"));
     }
 
+    /// <summary>The decision screens of Gusto Gulldo's Deck summon (order32-tribute-3 v-01/v-02/v-04): the card list in selection mode led by
+    /// Gusto Squirro (opened, then marked with OK focused) and the battle position screen for it.</summary>
+    public static void CaptureDecisionScreens(Microsoft.Xna.Framework.Graphics.GraphicsDevice device, SpriteRenderer renderer, DuelFieldVisuals field,
+        string root, CardCatalog catalog, Func<uint, DuelCardFacts?>? facts)
+    {
+        var squirro = catalog.Cards.First(c => c.Name == "Gusto Squirro");
+        var others = catalog.Cards.Where(c => c.Name.StartsWith("Gusto ", StringComparison.Ordinal) && c.GameCardId != squirro.GameCardId).Take(4);
+        CardView Public(CardDefinition c, int instance) => new(instance, c.GameCardId, c.Name, c.Description, c.Statistics.Attack, c.Statistics.Defense, null, false);
+        var options = new[] { squirro }.Concat(others).Select((c, i) => new ChoiceView(i, "Choose " + c.Name, 200 + i, ActionKind.ChooseCard) { Subject = Public(c, 200 + i), SubjectSource = DecisionCardSource.Deck }).ToArray();
+        var board = AkiBoard();
+        var view = board with { Revision = 10, Choices = options };
+        var input = new DuelFieldInput();
+        var frame = TimeSpan.FromSeconds(1 / 59.94);
+        input.Handle(view, default, frame);
+        Save(device, renderer, field, DuelScene.Compose(new(view, 0, -1, "", 0, States[0].Style, facts, input), field.Profile), Path.Combine(root, "select-open.png"));
+        input.Handle(view, new(InputAction.Confirm, InputAction.Confirm), frame);
+        Save(device, renderer, field, DuelScene.Compose(new(view, 0, -1, "", 0, States[0].Style, facts, input), field.Profile), Path.Combine(root, "select-marked.png"));
+        var subject = Public(squirro, 200);
+        var position = board with
+        {
+            Revision = 11,
+            Choices = [new(0, "FaceUpAttack", null, ActionKind.ChoosePosition, Position: BattlePosition.FaceUpAttack) { Subject = subject },
+                new(1, "FaceUpDefense", null, ActionKind.ChoosePosition, Position: BattlePosition.FaceUpDefense) { Subject = subject }]
+        };
+        input.Handle(position, default, frame);
+        Save(device, renderer, field, DuelScene.Compose(new(position, 0, -1, "", 0, States[0].Style, facts, input), field.Profile), Path.Combine(root, "position-atk.png"));
+
+        // Tribute Summon of Winda (hand) over Gusto Squirro in zone 3, compared with order32-win-5 s2 (prompt) and s3 (selection).
+        var monsters = board.Self.Monsters.ToArray();
+        monsters[2] = new CardView(5, squirro.GameCardId, "", "", null, null, BattlePosition.FaceUpAttack, false);
+        var tribute = board with
+        {
+            Revision = 12, Self = board.Self with { Monsters = monsters },
+            Choices = [new(0, "Tribute Summon Winda - use zone 3", 1, ActionKind.Summon, TargetZone: 2004, Zone: 2),
+                new(1, "Phase: Battle", null, ActionKind.Phase, Phase: DuelPhase.Battle), new(2, "End turn", null, ActionKind.EndTurn)]
+        };
+        input = new DuelFieldInput();
+        input.Handle(tribute, default, frame);
+        input.Focus.FocusOn(input.Focus.Row(DuelFieldRows.OwnBottom).First(slot => slot.Card?.InstanceId == 1));
+        input.Handle(tribute, new(InputAction.Confirm, InputAction.Confirm), frame);
+        input.Handle(tribute, new(InputAction.Confirm, InputAction.Confirm), frame);
+        Save(device, renderer, field, DuelScene.Compose(new(tribute, 0, -1, "", 0, States[0].Style, facts, input), field.Profile), Path.Combine(root, "tribute-prompt.png"));
+        input.Handle(tribute, new(InputAction.Confirm, InputAction.Confirm), frame);
+        Save(device, renderer, field, DuelScene.Compose(new(tribute, 0, -1, "", 0, States[0].Style, facts, input), field.Profile), Path.Combine(root, "tribute-select.png"));
+    }
+
     /// <summary>Show Details of Caam (aki-board, focused in hand) through ○ → Show Details, compared with ge-aki-detail.png (counters
     /// differ: the capture shows the owner's save).</summary>
     public static void CaptureDetail(Microsoft.Xna.Framework.Graphics.GraphicsDevice device, SpriteRenderer renderer, DuelFieldVisuals field,

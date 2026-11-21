@@ -109,6 +109,7 @@ public sealed partial class GameLoop
             DuelFieldPresentationReference.Capture(GraphicsDevice, renderer, fieldVisuals, fieldRoot, game);
             DuelFieldReference.CaptureDecisions(GraphicsDevice, renderer, fieldVisuals, fieldRoot, FieldCardFacts());
             DuelFieldReference.CaptureCardList(GraphicsDevice, renderer, fieldVisuals, fieldRoot, game.Catalog.Catalog, FieldCardFacts());
+            DuelFieldReference.CaptureDecisionScreens(GraphicsDevice, renderer, fieldVisuals, fieldRoot, game.Catalog.Catalog, FieldCardFacts());
             Console.WriteLine("DUEL_FIELD_REFERENCE " + DuelFieldReference.States.Count); Exit(); return;
         }
         var initial = activeScreen == ScreenId.Title && originalTitle is null ? ScreenId.PcTools : activeScreen;

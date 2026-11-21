@@ -127,11 +127,14 @@ public sealed class TributeSummonTests
         input.Focus.FocusOn(input.Focus.Row(DuelFieldRows.OwnBottom).First(slot => slot.Card?.CardId == High));
         Assert.Null(Press(InputAction.Confirm));
         Assert.Null(Press(InputAction.Confirm));
-        var decision = Assert.IsType<ListModal>(input.Modal);
-        Assert.Collection(decision.Choices,
+        var prompt = Assert.IsType<TributeConfirmModal>(input.Modal);
+        Assert.Collection(prompt.Choices,
             option => Assert.EndsWith("use zone 1", option.Label), option => Assert.EndsWith("use zone 2", option.Label));
+        Assert.Null(Press(InputAction.Confirm)); // YES
+        Assert.Equal(0, Assert.IsType<TributeModal>(input.Modal).Zone);
 
-        Assert.Null(Press(InputAction.Down));
+        Assert.Null(Press(InputAction.Right));
+        Assert.Equal((FieldObjectKind.Monster, 1), (input.Focus.Current.Kind, input.Focus.Current.Index));
         var submit = Assert.IsType<DuelSubmit>(Press(InputAction.Confirm));
         Assert.True(controller.Choose(submit.Revision, submit.ChoiceId));
         Assert.Equal(Low, controller.View.Self.Monsters[0]?.CardId);

@@ -68,6 +68,9 @@ public sealed class DuelFieldInput
             TargetModal t => Target(view, t with { Elapsed = t.Elapsed + delta }, dx, confirm, back),
             DetailsModal d => Details(d, frame),
             CardListModal c => CardListInput(view, c, dx, dy, repeated, confirm, back, frame),
+            PositionModal p => PositionInput(view, p, dx, confirm),
+            TributeConfirmModal c => TributeConfirm(c, dx, confirm, back),
+            TributeModal t => TributeInput(view, t, dx, confirm, back),
             _ => null
         };
     }
@@ -98,6 +101,9 @@ public sealed class DuelFieldInput
         {
             case DuelInputMode.AutoDraw when !recovering: return new DuelSubmit(view.Revision, view.Choices[0].Id);
             case DuelInputMode.Response: Modal = new ResponseModal(0); break;
+            // Measured original screens for a position choice and a card choice; other decisions keep the list.
+            case DuelInputMode.DecisionList when PositionScreen.Applies(view.Choices): Modal = PositionScreen.Open(view.Choices); break;
+            case DuelInputMode.DecisionList when CardList.Selects(view.Choices): Modal = CardList.Select(view.Choices); break;
             case DuelInputMode.DecisionList: Modal = new ListModal(view.Choices, 0, false); break;
             case DuelInputMode.Waiting when view.Availability == ActionAvailability.Unsupported:
                 Feedback = new(DuelFeedbackKind.Unsupported, "This decision is not supported by the PC duel.");
@@ -147,6 +153,7 @@ public sealed class DuelFieldInput
             case ListCommand l: Modal = new ListModal(l.Choices, 0, true) { Parent = m }; return null;
             case DetailsCommand d: OpenDetails(d.Card); return null;
             case CardListCommand c: Modal = new CardListModal(c.Own, c.Pile); return null;
+            case TributeCommand t: Modal = new TributeConfirmModal(t.Choices, 0); return null;
             case UnsupportedCommand u: Modal = null; Feedback = new(DuelFeedbackKind.Unsupported, u.Notice); return null;
         }
         return null;
@@ -252,6 +259,20 @@ public sealed class DuelFieldInput
     /// was; ○ on a card does nothing. △ (sort menu) and □ (field check) open original screens the PC does not have yet.</summary>
     private DuelSubmit? CardListInput(DuelView view, CardListModal list, int dx, int dy, bool repeated, bool confirm, bool back, InputFrame frame)
     {
+        if (list.Options is { } options)
+        {
+            // Selection mode (measured): ○ on a card marks it and moves to OK; ○ on OK submits the marked card. Inferred: × does nothing
+            // (the captured choice was mandatory) and OK without a mark does nothing.
+            if (confirm && list.OnClose)
+            {
+                if (list.Marked is not { } marked) return null;
+                Modal = null;
+                return new DuelSubmit(view.Revision, options[marked].Id);
+            }
+            if (confirm) { Modal = list with { Marked = list.Selected, OnClose = true }; return null; }
+            Modal = CardList.Move(list, dx, dy, options.Count, repeated);
+            return null;
+        }
         if (back || confirm && list.OnClose) return Close(true);
         if (frame.IsPressed(InputAction.Menu) || frame.IsPressed(InputAction.Switch))
         {
@@ -260,6 +281,41 @@ public sealed class DuelFieldInput
         }
         Modal = CardList.Move(list, dx, dy, CardList.Cards(view, list.Own, list.Pile).Count, repeated);
         return null;
+    }
+
+    /// <summary>Battle position screen: Left/Right switch (inferred), ○ submits (measured).</summary>
+    private DuelSubmit? PositionInput(DuelView view, PositionModal modal, int dx, bool confirm)
+    {
+        if (confirm) { Modal = null; return new DuelSubmit(view.Revision, modal.Choices[modal.Index].Id); }
+        if (dx != 0) Modal = modal with { Index = Step(modal.Index, dx, modal.Choices.Count, wrap: false) };
+        return null;
+    }
+
+    /// <summary>Tribute prompt (see <see cref="TributeSelection"/>): YES opens the selection with the field cursor on the first eligible
+    /// monster; NO and × close.</summary>
+    private DuelSubmit? TributeConfirm(TributeConfirmModal modal, int dx, bool confirm, bool back)
+    {
+        if (back || confirm && modal.Index == 1) return Close(true);
+        if (dx != 0) { Modal = modal with { Index = Step(modal.Index, dx, 2, wrap: true) }; return null; }
+        if (confirm) FocusTribute(TributeSelection.Open(modal.Choices));
+        return null;
+    }
+
+    private DuelSubmit? TributeInput(DuelView view, TributeModal modal, int dx, bool confirm, bool back)
+    {
+        if (back) return Close(true);
+        if (dx != 0) { FocusTribute(TributeSelection.Move(modal, dx)); return null; }
+        if (!confirm) return null;
+        var (next, submit) = TributeSelection.Toggle(modal);
+        if (submit is null) { FocusTribute(next); return null; }
+        Modal = null;
+        return new DuelSubmit(view.Revision, submit.Id);
+    }
+
+    private void FocusTribute(TributeModal modal)
+    {
+        Modal = modal;
+        if (TributeSelection.Slot(Focus, modal.Zone) is { } slot) Focus.FocusOn(slot);
     }
 
     private DuelSubmit? Close(bool pressed)

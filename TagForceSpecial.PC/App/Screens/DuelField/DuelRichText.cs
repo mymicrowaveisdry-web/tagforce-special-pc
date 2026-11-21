@@ -42,9 +42,9 @@ public static class DuelRichTextLayout
         }
     }
 
-    /// <summary>The message after "%s" substitution.</summary>
-    public static string Resolve(DuelRichText text, string message) =>
-        text.Argument is { } argument ? message.Replace("%s", argument, StringComparison.Ordinal) : message;
+    /// <summary>The message after "%s" (or a count's "%d") substitution.</summary>
+    public static string Resolve(DuelRichText text, string message) => text.Argument is { } argument
+        ? message.Replace("%s", argument, StringComparison.Ordinal).Replace("%d", argument, StringComparison.Ordinal) : message;
 
     /// <summary>Text commands in reading order. Without wrapping, one command per run; with wrapping, a word moves to the next line when its
     /// visible part would pass <see cref="DuelRichText.WrapWidth"/> (its trailing space stays on the line it ends).</summary>

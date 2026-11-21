@@ -77,14 +77,13 @@ public sealed class DuelFieldVisuals : IDisposable
         switch (draw)
         {
             case DuelOutcomeReason reason when Text is { } ui:
-                var lines = Message(reason.Offset).Split('\n');
+                var lines = Message(reason.Offset).Split('\n').Select(l => l.TrimEnd('\r')).ToArray();
+                // Measured: card font; the block is centred (x 309 fitted from "You surrendered.", first glyph 259.8) and its lines share
+                // the widest line's left edge; two lines (native win, "Your opponent's Life Points have been\nreduced to 0.") start
+                // at y 167.42 and 179.14, one line at 173.42.
+                float left = 309 - lines.Max(l => ui.Measure(l, 0.6f)) / 2, top = 173.42f - MathF.Round((lines.Length - 1) * 11.72f / 2);
                 for (int i = 0; i < lines.Length; i++)
-                {
-                    string line = lines[i].TrimEnd('\r');
-                    // Measured (surrender reason): card font; centre fitted to x 309 from that one string (first glyph at 259.8 for
-                    // "You surrendered."); other reasons were not captured.
-                    ui.Draw(line, 309 - ui.Measure(line, 0.6f) / 2, 173.42f + i * 11.72f, 0.6f, 0.54f, 0xffffff, 128);
-                }
+                    ui.Draw(lines[i], left, top + i * 11.72f, 0.6f, 0.54f, 0xffffff, 128);
                 break;
             case DuelFieldDraw d: renderer.Draw(Profile.Piece(d.Piece)[d.Index], Profile, Texture, d.Placement); break;
             case DuelFieldSprites s:

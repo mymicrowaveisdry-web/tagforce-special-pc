@@ -127,7 +127,7 @@ public sealed class DuelController
             : v.Availability == ActionAvailability.Waiting ? "Opponent choosing" : "Choose an action";
         return new(v.Revision, viewer, v.ActivePlayer, v.Turn, v.Phase, v.Self, v.Opponent, prompt,
             PlayerProjection.Read(v.Actions.Select(a => new ChoiceView(a.Token, a.Label, a.CardInstanceId, a.Kind, a.TargetZone, a.Phase, a.Zone, a.Position)
-                { FieldTarget = a.FieldTarget })), v.Outcome,
+                { FieldTarget = a.FieldTarget, Subject = a.Subject, SubjectSource = a.SubjectSource })), v.Outcome,
             v.Availability, engine.State.PendingChain?.Links is { Count: > 0 } links
                 ? Public(links[^1].Activation.Spell) : null);
     }

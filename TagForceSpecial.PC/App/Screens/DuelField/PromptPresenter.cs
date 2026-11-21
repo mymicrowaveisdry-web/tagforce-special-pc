@@ -49,6 +49,10 @@ public static class PromptPresenter
                 break;
             case TargetModal t when profile is null: DuelDecisionPanel.Draw(list, new(t.Choices, t.Index, Cancelable: true)); break;
             case TargetModal: break; // drawn on the field (AttackTargetOverlay)
+            case TributeConfirmModal c when profile is not null: list.Add(TributeSelection.Prompt(c)); break;
+            case TributeConfirmModal c: DuelDecisionPanel.Draw(list, new(c.Choices, 0, Cancelable: true)); break;
+            case TributeModal t when profile is null: DuelDecisionPanel.Draw(list, new(t.Choices, 0, Cancelable: true)); break;
+            case TributeModal: break; // the field cursor on the monster (measured: no window)
         }
         if (profile is not null) DuelNoticeLine.DrawOriginal(list, profile, input.Feedback);
         else DuelNoticeLine.Draw(list, view, input.Feedback, notice);

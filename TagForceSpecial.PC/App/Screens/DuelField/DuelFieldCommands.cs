@@ -121,6 +121,8 @@ public static class DuelFieldCommands
     {
         // Measured: one monster target still opens the target state; a lone direct attack submits (its screen was not captured).
         if (verb == MenuVerb.Attack && choices.Any(c => AttackTarget(c) is not null)) return new TargetCommand(choices);
+        // Measured: a Tribute Summon opens the Tribute prompt and selection even when only one set of Tributes is possible.
+        if (verb == MenuVerb.Summon && TributeSelection.Applies(choices)) return new TributeCommand(choices);
         if (choices.Length == 1) return new SubmitCommand(choices[0].Id);
         // Several free zones for the same summon or set: the original places the card itself.
         if (verb is MenuVerb.Summon or MenuVerb.SetMonster or MenuVerb.SetSpellTrap && choices.Select(c => c.Kind).Distinct().Count() == 1 &&

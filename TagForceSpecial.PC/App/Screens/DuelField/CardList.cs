@@ -15,6 +15,9 @@ public sealed record CardListCommand(bool Own, CardListPile Pile) : MenuCommand;
 public sealed record CardListModal(bool Own, CardListPile Pile, int Column = 0, int Scroll = 0, bool OnClose = false) : DuelModal
 {
     public int Selected => Scroll + Column;
+    /// <summary>Selection mode: the decision's choose-card options (their cards in <see cref="ChoiceView.Subject"/>) and the marked one.</summary>
+    public IReadOnlyList<ChoiceView>? Options { get; init; }
+    public int? Marked { get; init; }
 }
 
 /// <summary>The original card list (Order 3.2 captures `order32-gallery`, own Extra Deck): five columns, the cursor moving across them and
@@ -26,6 +29,19 @@ public static class CardList
     public const float ColumnPitch = 49;
 
     /// <summary>The pile's public cards; the opponent's face-down Extra Deck is never listed.</summary>
+    /// <summary>The listed cards: a selection's options, else the pile's public cards.</summary>
+    public static IReadOnlyList<CardView> Cards(DuelView view, CardListModal list) =>
+        list.Options is { } options ? [.. options.Select(o => o.Subject!)] : Cards(view, list.Own, list.Pile);
+
+    /// <summary>A single-card choice whose options all carry their card: the original shows it as the card list in selection mode
+    /// (measured: Gusto Gulldo's Deck summon).</summary>
+    public static bool Selects(IReadOnlyList<ChoiceView> choices) =>
+        choices.Count > 0 && choices.All(c => c.Kind == ActionKind.ChooseCard && c.Subject is { Hidden: false });
+
+    public static CardListModal Select(IReadOnlyList<ChoiceView> choices) => new(true, CardListPile.ExtraDeck) { Options = choices };
+
+    public const int CardListTitleOffset = 400788, OkOffset = 400570;
+
     public static IReadOnlyList<CardView> Cards(DuelView view, bool own, CardListPile pile)
     {
         var owner = own ? view.Self : view.Opponent;
@@ -72,34 +88,41 @@ public static class CardList
     /// <summary>The highlighted card, for the left panel.</summary>
     public static CardView? Highlighted(DuelView view, CardListModal list)
     {
-        var cards = Cards(view, list.Own, list.Pile);
+        var cards = Cards(view, list);
         return list.Selected < cards.Count ? cards[list.Selected] : null;
     }
 
     private static readonly IReadOnlyDictionary<int, (int, int)> White = new Dictionary<int, (int, int)> { [0] = (0xffffff, 128) };
     private static readonly IReadOnlyDictionary<int, (int, int)> Black = new Dictionary<int, (int, int)> { [0] = (0x000000, 64) };
-    /// <summary>Measured thumb: 71 px for 5 of 15 cards, x = 210 + round(143·scroll/(count − 5)); the length rule for other counts is
-    /// inferred (span 214 × visible/count).</summary>
+    /// <summary>Measured thumb: length round(214 × 5/count) (71 for 15 cards, 119 for 9), x = 210 + round((214 − length)·scroll/(count − 5))
+    /// (positions measured for 15 cards).</summary>
     public const float ThumbStart = 210, ThumbSpan = 214;
 
     public static void Draw(DuelDrawList list, DuelFieldProfile field, DuelView view, CardListModal modal, Func<uint, DuelCardFacts?>? facts)
     {
-        var cards = Cards(view, modal.Own, modal.Pile);
+        var cards = Cards(view, modal);
+        bool selecting = modal.Options is not null;
         const DuelPart part = DuelPart.Prompt;
         foreach (var piece in new[] { "gallery.clear", "gallery.window" }) list.FieldPiece(part, field, piece);
-        list.Add(new DuelRichText(part, CardAlbumResources.CardInfoKey, TitleOffset(modal.Own, modal.Pile), null, 188.8f, 19.42f, 0.6f, 0.54f, White));
+        list.Add(selecting ? new DuelRichText(part, DuelFieldResources.BasicKey, CardListTitleOffset, null, 188.8f, 19.42f, 0.6f, 0.54f, White)
+            : new DuelRichText(part, CardAlbumResources.CardInfoKey, TitleOffset(modal.Own, modal.Pile), null, 188.8f, 19.42f, 0.6f, 0.54f, White));
         list.Add(new DuelRichText(part, DuelFieldResources.BasicKey, SortOrderOffset, null, 192.8f, 39.42f, 0.6f, 0.54f, Black));
         list.FieldPiece(part, field, "gallery.sort");
         DrawScroll(list, field, modal, cards.Count);
         list.FieldPiece(part, field, "gallery.close");
         if (modal.OnClose) list.FieldPiece(part, field, "gallery.close.focus");
-        list.Add(new DuelRichText(part, DuelFieldResources.BasicKey, CloseOffset, null, 293.8f, 212.42f, 0.6f, 0.54f, White));
+        // Measured: selection mode labels the button OK (basic_jj 400570) at (300.8, 212.42).
+        list.Add(selecting ? new DuelRichText(part, DuelFieldResources.BasicKey, OkOffset, null, 300.8f, 212.42f, 0.6f, 0.54f, White)
+            : new DuelRichText(part, DuelFieldResources.BasicKey, CloseOffset, null, 293.8f, 212.42f, 0.6f, 0.54f, White));
         // Measured: the selected column keeps a dim highlight while Close has the cursor (captured over column 5).
         if (cards.Count > 0)
             list.FieldPiece(part, field, modal.OnClose ? "gallery.highlight.idle" : "gallery.highlight",
                 new(Offset: new((modal.Column - (modal.OnClose ? Columns - 1 : 0)) * ColumnPitch, 0)));
         for (int column = 0; column < Math.Min(Columns, cards.Count - modal.Scroll); column++)
-            DrawColumn(list, field, cards[modal.Scroll + column], column * ColumnPitch, facts);
+        {
+            DrawColumn(list, field, cards[modal.Scroll + column], column * ColumnPitch, facts, HeaderShift(modal));
+            if (modal.Marked == modal.Scroll + column) list.FieldPiece(part, field, "gallery.mark", new(Offset: new(column * ColumnPitch, 0)));
+        }
         if (cards.Count > Columns) list.FieldPiece(part, field, "gallery.marker");
     }
 
@@ -108,7 +131,7 @@ public static class CardList
         const DuelPart part = DuelPart.Prompt;
         list.FieldPiece(part, field, "gallery.arrow.left");
         list.FieldPiece(part, field, "gallery.track");
-        float length = count <= Columns ? ThumbSpan : MathF.Floor(ThumbSpan * Columns / count);
+        float length = count <= Columns ? ThumbSpan : MathF.Round(ThumbSpan * Columns / count); // measured 71 (5/15), 119 (5/9)
         float x = count <= Columns ? ThumbStart : ThumbStart + MathF.Round((ThumbSpan - length) * modal.Scroll / (count - Columns));
         // The thumb template is 71 px (5 of 15): left cap, right cap and middle; the caps move, the middle stretches (inferred for other lengths).
         var caps = field.Piece("gallery.thumb");
@@ -125,12 +148,22 @@ public static class CardList
     private static float[][] Stretch(float[][] vertices, float dx, float grow) =>
         [[vertices[0][0] + dx, vertices[0][1], vertices[0][2]], [vertices[1][0] + dx + grow, vertices[1][1], vertices[1][2]]];
 
-    private static void DrawColumn(DuelDrawList list, DuelFieldProfile field, CardView card, float dx, Func<uint, DuelCardFacts?>? facts)
+    /// <summary>Header icon cell: the Extra Deck swirl (measured on the Extra Deck list) or, 16 texels right, the Deck icon (measured on a Deck
+    /// selection); other sources use the Deck icon (inferred).</summary>
+    private static float HeaderShift(CardListModal modal)
+    {
+        bool extra = modal.Options is { } options ? options[0].SubjectSource is Core.DecisionCardSource.ExtraDeck or Core.DecisionCardSource.FaceUpExtraDeck
+            : modal.Pile == CardListPile.ExtraDeck;
+        return extra ? 0 : 16f / 128f;
+    }
+
+    private static void DrawColumn(DuelDrawList list, DuelFieldProfile field, CardView card, float dx, Func<uint, DuelCardFacts?>? facts, float headerShift)
     {
         const DuelPart part = DuelPart.Prompt;
         var offset = new PspPlacement(Offset: new(dx, 0));
         list.FieldPiece(part, field, "gallery.column", offset);
-        list.FieldPiece(part, field, "gallery.header", offset);
+        list.Field(part, "gallery.header", 0, offset);
+        list.Field(part, "gallery.header", 1, offset with { UvOffset = new(headerShift, 0) });
         if (!CardSpriteRenderer.ShowsFace(card, out uint id)) return;
         list.Field(part, "gallery.face", 0, offset with { Texture = CardSpriteRenderer.FaceKey(id) });
         // Measured: the first six characters of the name, trailing spaces dropped ("Black Rose Dragon" → "Black").
@@ -147,7 +180,8 @@ public static class CardList
         // Level star cell (56, 120) or Rank star (112, 120) of card_icon01; "x" + value at 0.45.
         var uv = fact!.Rank > 0 ? new Vector2(56f / 128f, 0) : Vector2.Zero;
         list.Field(part, "gallery.level", 0, offset with { UvOffset = uv });
-        list.Add(new DuelFieldText(part, "x" + value.ToString(CultureInfo.InvariantCulture), 204.85f + dx, 172.85f, 0.45f, 0.45f, 0x000000, 64));
+        // Measured: yellow for Tuners (Deck selection), black otherwise.
+        list.Add(new DuelFieldText(part, "x" + value.ToString(CultureInfo.InvariantCulture), 204.85f + dx, 172.85f, 0.45f, 0.45f, fact.Tuner ? 0x00ffff : 0x000000, 64));
     }
 
     /// <summary>Measured: statistic digits right-aligned on a 7-pixel pitch (last digit at x 225.5), 0.5 × 0.54, black with a 64 shadow.</summary>
