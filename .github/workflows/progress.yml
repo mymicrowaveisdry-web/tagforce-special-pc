@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -22,12 +22,12 @@ jobs:
         with:
           python-version: '3.14'
       - name: Install verification dependencies
-        run: python3 -m pip install 'Pillow==12.1.0'
+        run: python -m pip install 'Pillow==12.1.0'
       - name: Test verification command with synthetic inputs
-        run: python3 -m unittest discover -s Verification -p 'test_*.py' -v
-      # Dependency locks and PSP reference fixtures remain local.
+        run: python -m unittest discover -s Verification -p 'test_*.py' -v
+      # PSP reference fixtures remain local.
       - name: Restore the C# solution
-        run: dotnet restore ygo-tag-force-special-decomp.slnx -p:RestorePackagesWithLockFile=false
+        run: dotnet restore ygo-tag-force-special-decomp.slnx
       - name: Build the engine, tools and PC host
         run: dotnet build ygo-tag-force-special-decomp.slnx --no-restore -p:IncludeReferenceFixtures=false
       - name: Test C# behavior without local reference fixtures
