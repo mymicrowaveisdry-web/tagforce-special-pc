@@ -89,6 +89,10 @@ public sealed class FreeDuelVersusRenderer(GraphicsDevice device, TitleFlowVisua
         Line(label, style with { ScaleX = scale }, dy);
     }
 
+    /// <summary>The chosen opponent's name (original text) and bust index (EBOOT character record + 3).</summary>
+    public (string Name, int Bust) Opponent(FreeDuelSession session) =>
+        (Text(roster.Characters[session.Opponent].Name), roster.Characters[session.Opponent].Bust);
+
     /// <summary>Title of the PC notice: the focused part's own text.</summary>
     public string NoticeTitle(FreeDuelSession session) => session.Versus!.Focus switch
     {

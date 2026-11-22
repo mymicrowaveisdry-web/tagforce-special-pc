@@ -17,7 +17,7 @@ public static class GamePresentationPlan
     public static IReadOnlyList<PresentationReferenceCase> Required { get; } = Array.AsReadOnly(
         TitleReferenceResources.Cases.Concat(TitleFlowReferenceResources.Cases).Concat(OptionsReferenceResources.Cases)
             .Concat(DeckEditReferenceResources.Cases).Concat(CardAlbumReferenceResources.Cases).Concat(FreeDuelReferenceResources.Cases)
-            .Concat(PresentationReferenceCases.Cases.Where(c => c.AssetKey == "title.source.press-start0002")).ToArray());
+            .Concat(DuelFieldReferenceResources.Cases).Concat(PresentationReferenceCases.Cases.Where(c => c.AssetKey == "title.source.press-start0002")).ToArray());
     public static IReadOnlyList<(string Key, string Path)> StoredSources { get; } =
     [
         (TitleFlowReferenceResources.EbootKey, TitleFlowReferenceResources.EbootPath),
@@ -29,9 +29,14 @@ public static class GamePresentationPlan
         (CardAlbumResources.CardInfoKey, CardAlbumResources.CardInfoPath),
         (FreeDuelReferenceResources.CharaListKey, FreeDuelReferenceResources.CharaListPath),
         (FreeDuelReferenceResources.StartKey, FreeDuelReferenceResources.StartPath),
-        (FreeDuelReferenceResources.ResultKey, FreeDuelReferenceResources.ResultPath)
+        (FreeDuelReferenceResources.ResultKey, FreeDuelReferenceResources.ResultPath),
+        (DuelFieldResources.BasicKey, DuelFieldResources.BasicPath)
     ];
     public static IReadOnlyList<uint> ThumbnailCards => ConfirmedCardPool.CardIds;
+    /// <summary>Duel face icons decoded with the pinned decoder but not seen in a capture (the captured ones are pinned in Required).</summary>
+    public const string FaceIconEvidenceId = "phase9.duel-field.faceicon-decoded-unverified-v1";
+    public static IReadOnlyList<string> FaceIconSupplements { get; } = Array.AsReadOnly(DuelFaceIcons.ByRecord.Values.Distinct(StringComparer.Ordinal)
+        .Where(stem => Required.All(c => c.AssetKey != DuelFaceIcons.Key(stem))).Order(StringComparer.Ordinal).ToArray());
 
     public static IEnumerable<PresentationResourceRequest> Requests() =>
         Required.Select(c => new PresentationResourceRequest(c.AssetKey, c.SourcePath, c.Member, PresentationConversion.GimRgba,
@@ -40,7 +45,9 @@ public static class GamePresentationPlan
             .Concat(DeckEditResources.Supplements.Select(s => new PresentationResourceRequest(s.AssetKey, DeckEditReferenceResources.Archive, s.Member,
                 PresentationConversion.GimRgba, s.PaletteLevel, EhpReadMode.InspectStoredRanges, Frame: s.Frame)))
             .Concat(ThumbnailCards.Select(id => new PresentationResourceRequest(CardArtworkProvider.ThumbnailKey(id), CardThumbnailDecoder.SourcePath,
-                null, PresentationConversion.CardThumbnailRgba, CardId: id)));
+                null, PresentationConversion.CardThumbnailRgba, CardId: id)))
+            .Concat(FaceIconSupplements.Select(stem => new PresentationResourceRequest(DuelFaceIcons.Key(stem), DuelFaceIcons.SourcePath(stem), null,
+                PresentationConversion.GimRgba, 0, EhpReadMode.InspectStoredRanges)));
 
     /// <summary>Semantic entries for a created package; every entry stays "mapped-unverified" with its evidence identifier.</summary>
     public static IEnumerable<AssetManifestEntry> Map(PresentationPackage package, string buildId)
@@ -63,6 +70,11 @@ public static class GamePresentationPlan
             {
                 string key = CardArtworkProvider.ThumbnailKey(id);
                 return Entry(key, package.Resources[key], [0, 0, CardThumbnailDecoder.Width, CardThumbnailDecoder.Height], ThumbnailEvidenceId, true);
+            }))
+            .Concat(FaceIconSupplements.Select(stem =>
+            {
+                var r = package.Resources[DuelFaceIcons.Key(stem)];
+                return Entry(DuelFaceIcons.Key(stem), r, [0, 0, r.Width!.Value, r.Height!.Value], FaceIconEvidenceId, true);
             }));
     }
 }

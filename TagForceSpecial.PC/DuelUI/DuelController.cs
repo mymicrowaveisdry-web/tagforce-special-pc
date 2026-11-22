@@ -9,6 +9,8 @@ namespace TagForceSpecial.PC.DuelUI;
 public sealed class DuelController
 {
     private readonly DuelActionSource source;
+    private readonly DuelEngine engine;
+    private readonly CardCatalog catalog;
     private readonly PlayerId viewer, opponent;
     private readonly OpponentDriver driver;
     private readonly List<ReplayEntry> replay = [];
@@ -30,6 +32,7 @@ public sealed class DuelController
         this.viewer = viewer;
         opponent = viewer == PlayerId.One ? PlayerId.Two : PlayerId.One;
         source = new(engine, catalog);
+        this.engine = engine; this.catalog = catalog;
         driver = new(opponent, seed, opponentStepBudget);
         replayFromStart = engine.State.Revision == 0;
         startingPlayer = engine.State.ActivePlayer;
@@ -108,6 +111,13 @@ public sealed class DuelController
         replay.Add(new(before.Revision, after, before.Player, action.Key, action.Kind, before.Decision?.Id));
     }
 
+    /// <summary>An activated card is public: its identity as any viewer sees it.</summary>
+    private CardView Public(CardInstance card)
+    {
+        var data = catalog[card.GameCardId];
+        return new(card.InstanceId, card.GameCardId, data.Name, data.Description, data.Statistics.Attack, data.Statistics.Defense, null, false);
+    }
+
     private DuelView Build()
     {
         var v = source.Observe(viewer);
@@ -116,6 +126,9 @@ public sealed class DuelController
             : v.Decision is { } d ? $"Choose {d.Kind}"
             : v.Availability == ActionAvailability.Waiting ? "Opponent choosing" : "Choose an action";
         return new(v.Revision, viewer, v.ActivePlayer, v.Turn, v.Phase, v.Self, v.Opponent, prompt,
-            PlayerProjection.Read(v.Actions.Select(a => new ChoiceView(a.Token, a.Label, a.CardInstanceId))), v.Outcome);
+            PlayerProjection.Read(v.Actions.Select(a => new ChoiceView(a.Token, a.Label, a.CardInstanceId, a.Kind, a.TargetZone, a.Phase, a.Zone, a.Position)
+                { FieldTarget = a.FieldTarget, Subject = a.Subject, SubjectSource = a.SubjectSource })), v.Outcome,
+            v.Availability, engine.State.PendingChain?.Links is { Count: > 0 } links
+                ? Public(links[^1].Activation.Spell) : null);
     }
 }

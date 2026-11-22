@@ -40,7 +40,8 @@ public static class PresentationReferenceCases
             CpjArtworkReferenceProfiles.ArchiveSha256, CpjArtworkReferenceProfiles.JpegSha256,
             CpjArtworkReferenceProfiles.RgbaSha256, 256, 256, true)
     }.Concat(TitleReferenceResources.Cases).Concat(TitleFlowReferenceResources.Cases).Concat(OptionsReferenceResources.Cases)
-        .Concat(DeckEditReferenceResources.Cases).Concat(CardAlbumReferenceResources.Cases).Concat(FreeDuelReferenceResources.Cases).ToArray());
+        .Concat(DeckEditReferenceResources.Cases).Concat(CardAlbumReferenceResources.Cases).Concat(FreeDuelReferenceResources.Cases)
+        .Concat(DuelFieldReferenceResources.Cases).ToArray());
 
     internal static string? Match(AssetManifestEntry entry, PresentationResource resource, string profileFingerprint)
     {

@@ -189,17 +189,32 @@ public sealed partial class TitleFlowVisuals
     }
 
     /// <summary>The monster ATK/DEF line on the strip under the preview card (the same place in Deck Edit and the Card Album).</summary>
-    public void DrawCardStats(CardDefinition card)
+    /// <param name="dy">Vertical offset of the stats line (the duel's attack-target panels move the strip).</param>
+    public void DrawCardStats(CardDefinition card, float dy = 0)
     {
         var f = DeckEditProfile.Fields;
         if (card.Codes?.RawKind is not (13 or 14) && card.Statistics is { } stats)
         {
             string slash = DeckText(f.PreviewSlash);
-            DrawField(f.PreviewAttackLabel, DeckText(f.PreviewAttackLabel.Source!) + slash);
-            DrawField(f.PreviewAttack, Stat(stats.Attack));
-            DrawField(f.PreviewDefenseLabel, DeckText(f.PreviewDefenseLabel.Source!) + slash);
-            DrawField(f.PreviewDefense, Stat(stats.Defense));
+            DrawField(f.PreviewAttackLabel, DeckText(f.PreviewAttackLabel.Source!) + slash, dy);
+            DrawField(f.PreviewAttack, Stat(stats.Attack), dy);
+            DrawField(f.PreviewDefenseLabel, DeckText(f.PreviewDefenseLabel.Source!) + slash, dy);
+            DrawField(f.PreviewDefense, Stat(stats.Defense), dy);
         }
+    }
+
+    /// <summary>The card's 80 × 80 artwork (the preview's three-piece art unpack) drawn straight to the bound target, scaled to
+    /// <paramref name="size"/> at (<paramref name="x"/>, <paramref name="y"/>): the duel's attack-target panels (measured 78 × 78).</summary>
+    public void DrawCardArt(CardDefinition card, float x, float y, float size)
+    {
+        if (Thumbnail(card.GameCardId) is null) return;
+        var art = DeckEditProfile.Preview.Art;
+        float x0 = art.Points.Min(p => p[0]), y0 = art.Points.Min(p => p[1]), scale = size / (art.Points.Max(p => p[0]) - x0);
+        DrawMeasured(art with
+        {
+            AssetKey = CardArtworkProvider.ThumbnailKey(card.GameCardId),
+            Points = art.Points.Select(p => new[] { x + (p[0] - x0) * scale, y + (p[1] - y0) * scale }).ToArray()
+        });
     }
 
     /// <summary>Composes the preview card and shows it unscaled at the recorded composite box (the same in Deck Edit and the Card Album).</summary>

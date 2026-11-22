@@ -27,9 +27,13 @@ public sealed class CardAlbumRenderer : IDisposable
     private static readonly BlendState Additive = new() { ColorSourceBlend = Blend.One, ColorDestinationBlend = Blend.One, AlphaSourceBlend = Blend.One, AlphaDestinationBlend = Blend.One };
     private static readonly BlendState AlphaAdditive = new() { ColorSourceBlend = Blend.SourceAlpha, ColorDestinationBlend = Blend.One, AlphaSourceBlend = Blend.SourceAlpha, AlphaDestinationBlend = Blend.One };
     private readonly RasterizerState cullOn;
-    private static readonly RasterizerState Scissored = new() { CullMode = CullMode.None, ScissorTestEnable = true };
     public RenderTarget2D Layer { get; }
     public CardAlbumProfile Profile => profile;
+    private readonly CardInfoPanel panel;
+    /// <summary>The shared left card panel (also drawn by the Duel Field).</summary>
+    public CardInfoPanel Panel => panel;
+    internal string? TypeLine(CardDefinition card) => panel.TypeLine(card);
+    internal (float[]? Attribute, float[]? Type) IconCells(CardDefinition card) => panel.IconCells(card);
     /// <summary>The card detail drawn instead of the album while open.</summary>
     public CardAlbumDetailRenderer? Detail { get; set; }
     private VertexPositionColorTexture[] blended = [];
@@ -45,6 +49,7 @@ public sealed class CardAlbumRenderer : IDisposable
         this.device = device; this.visuals = visuals; this.binder = binder; this.profile = profile; this.faces = faces; this.catalog = catalog;
         effect = new(device) { TextureEnabled = true, VertexColorEnabled = true, LightingEnabled = false, World = Matrix.Identity };
         cullOn = new() { CullMode = GeCullDirection0 };
+        panel = new(device, visuals, profile);
         Layer = new(device, 480, 272, false, SurfaceFormat.Color, DepthFormat.Depth24Stencil8, 0, RenderTargetUsage.PreserveContents);
     }
 
@@ -70,23 +75,8 @@ public sealed class CardAlbumRenderer : IDisposable
             _ => profile.HandOffset(session.RightPage, session.Pocket)
         };
         if (!session.HandHidden) visuals.DrawFlow(Shift(profile.Hand, offset[0], offset[1]));
-        var card = session.PreviewCard is uint id ? catalog[id] : null;
-        if (card is not null) visuals.DrawCardComposite(card);
-        else if (session.PreviewsCardBack) visuals.DrawFlow(profile.CardBack.Draw);
-        // Measured order: strip, text box and scroll bar, then the text glyphs over the box.
-        var glint = profile.Glint;
-        foreach (var draw in profile.Panel)
-            visuals.DrawFlow(draw.AssetKey == glint.AssetKey ? Shift(draw, glint.Left(session.GlintFrame) - glint.MeasuredLeft, 0) : draw);
-        if (card is not null)
-        {
-            visuals.DrawCardStats(card); DrawIcons(card); DrawLevel(card);
-            // Measured: the info text is clipped to the text box (GE scissor on its draws).
-            var s = profile.InfoScissor;
-            device.ScissorRectangle = new Rectangle(s[0], s[1], s[2] - s[0] + 1, s[3] - s[1] + 1);
-            device.RasterizerState = Scissored;
-            DrawInfo(card);
-            device.RasterizerState = RasterizerState.CullNone;
-        }
+        panel.Draw(session.PreviewCard is uint id ? catalog[id] : null, session.PreviewsCardBack, session.GlintFrame);
+        device.RasterizerState = RasterizerState.CullNone;
         if (session.JumpOpen) DrawPageJump(session, 1);
         else if (session.JumpFrame is 0) DrawPageJump(session, profile.PageJump.Close.FadeAlpha);
         else if (session.JumpFrame is int closing && closing <= profile.PageJump.Close.Panels.Length)
@@ -243,55 +233,6 @@ public sealed class CardAlbumRenderer : IDisposable
             visuals.DrawText(total[i].ToString(), c.TotalX[i], c.Y, c.ScaleX, c.ScaleY, c.Color, c.ShadowAlpha);
     }
 
-    /// <summary>"[Type/Suffix]" for monsters, "[Spell/Kind]" or "[Trap/Kind]" (no kind for Normal) from cardinfo_jpn.ehp words; null when a
-    /// code has no word.</summary>
-    internal string? TypeLine(CardDefinition card)
-    {
-        var w = profile.TypeLine;
-        if (card.Codes is not { } codes) return null;
-        string Word(int offset) => visuals.Message(w.Source, offset);
-        string body;
-        if (codes.RawKind is 13 or 14)
-        {
-            body = Word(codes.RawKind == 13 ? w.Spell : w.Trap);
-            if (codes.Icon is > 0 && codes.Icon < w.IconWords.Length) body += "/" + Word(w.IconWords[codes.Icon]);
-        }
-        else
-        {
-            if (codes.Type >= w.TypeWords.Length) return null;
-            body = Word(w.TypeWords[codes.Type]);
-            if (codes.RawKind != 0)
-            {
-                if (!w.KindSuffix.TryGetValue(codes.RawKind.ToString(CultureInfo.InvariantCulture), out int suffix)) return null;
-                body += Word(suffix);
-            }
-        }
-        return Word(w.Open) + body + Word(w.Close);
-    }
-
-    /// <summary>Attribute icon, then the monster type or Spell/Trap kind icon, from the Deck Edit icon tables (same icon01 cells).</summary>
-    private void DrawIcons(CardDefinition card)
-    {
-        var (attribute, type) = IconCells(card);
-        if (attribute is not null) visuals.DrawFlow(Quad(profile.AttributeIconRect, attribute));
-        if (type is not null) visuals.DrawFlow(Quad(profile.TypeIconRect, type));
-    }
-
-    /// <summary>icon01 cells of the attribute and of the monster type or Spell/Trap kind (the album preview and the detail use the same).</summary>
-    internal (float[]? Attribute, float[]? Type) IconCells(CardDefinition card)
-    {
-        if (card.Codes is not { } codes) return (null, null);
-        var tables = visuals.DeckEditProfile.Tables;
-        float[]? Cell(string table, string key) =>
-            tables.TryGetValue(table, out var t) && t.TryGetValue(key, out var e) ? e.EnumerateArray().Select(v => v.GetSingle()).ToArray() : null;
-        var attribute = Cell("attributeIcon", codes.Attribute.ToString(CultureInfo.InvariantCulture));
-        var type = codes.RawKind is 13 or 14
-            ? Cell("spellTrapIcon", $"{codes.RawKind}:{codes.Icon}")
-            : Cell("typeIcon", codes.Type.ToString(CultureInfo.InvariantCulture))
-              ?? (profile.TypeIconExtra.TryGetValue(codes.Type.ToString(CultureInfo.InvariantCulture), out var extra) ? extra : null);
-        return (attribute, type);
-    }
-
     /// <summary>Page Jump overlay over everything else, as drawn last in the original frame. <paramref name="fade"/> scales the label,
     /// highlight and letters (measured: half on the first closing frame; the panel stays opaque).</summary>
     private void DrawPageJump(CardAlbumSession session, float fade)
@@ -318,57 +259,10 @@ public sealed class CardAlbumRenderer : IDisposable
             }
     }
 
-    /// <summary>Monsters: the star and "x" with the level above the strip; Xyz monsters show the rank star (measured on Pit Boss; "x" is the
-    /// drawn glyph).</summary>
-    private void DrawLevel(CardDefinition card)
-    {
-        if (card.Codes?.RawKind is 13 or 14 or null || card.Statistics.Level == 0) return;
-        var star = card.Codes.RawKind is 22 or 23 ? profile.RankStar : profile.LevelStar;
-        visuals.DrawFlow(Quad(star.Rect, star.Uv));
-        var t = profile.LevelText;
-        string text = "x" + card.Statistics.Level.ToString(CultureInfo.InvariantCulture);
-        float[] x = text.Length == t.X.Length ? t.X : [.. t.X, .. Enumerable.Range(1, text.Length - t.X.Length).Select(i => t.X[^1] + i * (t.X[^1] - t.X[0]))];
-        for (int i = 0; i < text.Length; i++) visuals.DrawText(text[i].ToString(), x[i], t.Y, t.ScaleX, t.ScaleY, t.Color, t.ShadowAlpha);
-    }
-
     internal static FlowDraw Quad(float[] r, float[] uv) => new("deck.all.icon01", 3,
         [[r[0], r[1]], [r[2], r[1]], [r[0], r[3]], [r[0], r[3]], [r[2], r[1]], [r[2], r[3]]],
         [[uv[0], uv[1]], [uv[2], uv[1]], [uv[0], uv[3]], [uv[0], uv[3]], [uv[2], uv[1]], [uv[2], uv[3]]],
         [255, 255, 255, 255], null, null, false, false, false, false, false);
-
-    /// <summary>Name lines (yellow), the bracketed type line (green), then card text, in the card-text font (measured: its advances).</summary>
-    private void DrawInfo(CardDefinition card)
-    {
-        var t = profile.InfoText;
-        var lines = Wrap(card.Name, t.Width, t.ScaleX).Select(l => (l, t.NameColor)).Append((TypeLine(card) ?? "", t.TypeColor))
-            .Concat(Wrap(card.Description, t.Width, t.ScaleX).Select(l => (l, t.TextColor))).Take(t.Lines).ToList();
-        for (int i = 0; i < lines.Count; i++)
-            if (lines[i].Item1.Length > 0)
-                visuals.DrawCardFontText(lines[i].Item1, t.X, t.FirstY + i * t.LineHeight, t.ScaleX, t.ScaleY, lines[i].Item2, t.ShadowAlpha);
-    }
-
-    /// <summary>Greedy wrap with the card-text font's advances; measured on the album: a line may also break after a hyphen ("face-" / "up").</summary>
-    private List<string> Wrap(string text, float width, float scaleX)
-    {
-        var lines = new List<string>();
-        foreach (string paragraph in text.Split('\n'))
-        {
-            string line = "";
-            foreach (string word in paragraph.Split(' '))
-            {
-                var parts = System.Text.RegularExpressions.Regex.Split(word, "(?<=-)(?=.)");
-                for (int i = 0; i < parts.Length; i++)
-                {
-                    string glue = line.Length == 0 || i > 0 ? "" : " ";
-                    string next = line + glue + parts[i];
-                    if (line.Length > 0 && visuals.MeasureCardFontText(next, scaleX) > width) { lines.Add(line); line = parts[i]; }
-                    else line = next;
-                }
-            }
-            lines.Add(line);
-        }
-        return lines;
-    }
 
     internal static FlowDraw Shift(FlowDraw draw, float dx, float dy) =>
         draw with { Points = draw.Points.Select(p => new[] { p[0] + dx, p[1] + dy }).ToArray() };

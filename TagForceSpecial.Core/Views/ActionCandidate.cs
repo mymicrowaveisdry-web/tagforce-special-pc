@@ -3,6 +3,8 @@ namespace TagForceSpecial.Core.Views;
 /// <summary>A trusted command and its public description before authorization and token assignment.</summary>
 internal sealed record ActionCandidate(DuelCommand Command, LegalAction Action)
 {
+    internal ActionCandidate WithFieldTarget(PlayerId player, FieldLocation location, int zone) =>
+        this with { Action = Action with { FieldTarget = new(player, location, zone) } };
     internal static PlayerId Other(PlayerId player) => player == PlayerId.One ? PlayerId.Two : PlayerId.One;
 
     internal static ActionCandidate B(DuelCommand command, ActionKind kind, string label, int? card = null, int? zone = null,

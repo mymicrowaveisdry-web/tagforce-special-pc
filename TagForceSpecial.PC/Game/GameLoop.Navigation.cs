@@ -2,8 +2,10 @@ using Microsoft.Xna.Framework;
 using TagForceSpecial.Effects;
 using TagForceSpecial.PC.App.Input;
 using TagForceSpecial.PC.App.Screens;
+using TagForceSpecial.PC.App.Screens.DuelField;
 using TagForceSpecial.PC.App.Screens.Title;
 using TagForceSpecial.PC.App.Visual;
+using TagForceSpecial.PC.DuelUI;
 using TagForceSpecial.PC.DuelUI.Input;
 using TagForceSpecial.Import.Storage;
 using TagForceSpecial.PC.Screens;
@@ -87,13 +89,29 @@ public sealed partial class GameLoop
         Register(ScreenId.Controls, _ => { }, DrawControls, raw: UpdateControls);
         Register(ScreenId.DeckSelection, UpdateFreeDuel, DrawFreeDuel,
             pointer: Rows(at => TextRow(at, 40, 84, 23, InitialOpponentDecks.Names.Count, 0)));
-        Register(ScreenId.Duel, UpdateDuelInput, DrawDuel, update: UpdateDuelPresentation);
+        Register(ScreenId.Duel, _ => { }, DrawDuel, update: UpdateDuelPresentation, raw: UpdateDuelInput);
         Register(ScreenId.Result, UpdateDuelResult, DrawDuelResult, pointer: DuelResultPointer);
         Register(ScreenId.Paused, UpdatePause, DrawPause, pointer: Rows(at => TextRow(at, 40, 84, 23, 2, 0)));
         if (options.PresentationSmoke && originalTitle is null)
             throw new InvalidOperationException("Presentation smoke requires the validated Phase 3 title generation in --data-root.");
         if (options.TitleLayerCaptureRoot is { } layerRoot)
             (originalTitle ?? throw new InvalidOperationException("Title layer capture requires a validated title generation.")).ExportReviewLayers(layerRoot);
+        if (options.DuelFieldReferenceRoot is { } fieldRoot)
+        {
+            var fieldVisuals = DuelField() ?? throw new InvalidOperationException("Duel field reference capture requires the imported field textures.");
+            var game = setup?.Game ?? throw new InvalidOperationException("Duel field reference capture requires the imported card catalog.");
+            DuelFieldReference.Capture(fieldVisuals, fieldRoot, FieldCardFacts());
+            DuelFieldReference.CaptureInputWalk(GraphicsDevice, renderer, fieldVisuals, fieldRoot, FieldCardFacts());
+            DuelFieldReference.CapturePanels(GraphicsDevice, renderer, fieldVisuals, fieldRoot, FieldCardFacts());
+            DuelFieldReference.CaptureDetail(GraphicsDevice, renderer, fieldVisuals, fieldRoot, FieldCardFacts(), DuelCardDetail);
+            DuelFieldReference.CaptureAttack(GraphicsDevice, renderer, fieldVisuals, fieldRoot, game.Catalog.Catalog);
+            DuelFieldReference.CaptureAttack(GraphicsDevice, renderer, fieldVisuals, fieldRoot, game.Catalog.Catalog, 1, 3, "attack-off-centre.png");
+            DuelFieldPresentationReference.Capture(GraphicsDevice, renderer, fieldVisuals, fieldRoot, game);
+            DuelFieldReference.CaptureDecisions(GraphicsDevice, renderer, fieldVisuals, fieldRoot, FieldCardFacts());
+            DuelFieldReference.CaptureCardList(GraphicsDevice, renderer, fieldVisuals, fieldRoot, game.Catalog.Catalog, FieldCardFacts());
+            DuelFieldReference.CaptureDecisionScreens(GraphicsDevice, renderer, fieldVisuals, fieldRoot, game.Catalog.Catalog, FieldCardFacts());
+            Console.WriteLine("DUEL_FIELD_REFERENCE " + DuelFieldReference.States.Count); Exit(); return;
+        }
         var initial = activeScreen == ScreenId.Title && originalTitle is null ? ScreenId.PcTools : activeScreen;
         router.GoTo(ScreenName(initial));
     }
@@ -190,30 +208,59 @@ public sealed partial class GameLoop
         MoveMenu(buttons, InitialOpponentDecks.Names.Count);
         if (buttons.Confirm) StartDuel(menuIndex);
     }
-    private void UpdateDuelInput(GuiButtons buttons)
+    private DuelFieldInput? duelInput;
+    private DuelController? duelInputOwner;
+    private DuelFieldPresentation duelFieldPresentation = null!;
+    /// <summary>The input session of the current duel; a new duel starts a new one.</summary>
+    private DuelFieldInput DuelInput(DuelController controller)
     {
-        if (duel is null) return;
-        if (buttons.Back) { duel.Paused = true; screen = ScreenId.Paused; return; }
-        int count = duel.View.Choices.Count;
-        if (count > 0)
+        if (!ReferenceEquals(duelInputOwner, controller))
         {
-            int delta = buttons.Down ? 1 : buttons.Up ? -1 : buttons.Right ? 4 : buttons.Left ? -4 : 0;
-            choiceIndex = (choiceIndex + delta % count + count) % count;
-            if (delta != 0) inspectIndex = -1;
-            if (buttons.Confirm) { duel.Choose(duel.View.Revision, choiceIndex); choiceIndex = 0; inspectIndex = -1; }
+            duelInput = new() { DetailFactory = DuelCardDetail };
+            duelFieldPresentation = new(PresentationTime, options.DuelWalkRoot is null ? !options.PixelExact : !options.DuelWalkStatic);
+            duelInputOwner = controller;
         }
-        if (buttons.Inspect) inspectIndex++;
-        if (duel.View.Outcome is not null) screen = ScreenId.Result;
+        return duelInput!;
+    }
+    private App.Screens.Album.CardAlbumDetailRenderer? duelDetail;
+    /// <summary>The detail page of a visible card, with the album's counters: copies in the current deck (Main with Extra, Side) and the
+    /// Trunk (owned copies of supported cards minus those).</summary>
+    private App.Screens.Album.CardAlbumDetail? DuelCardDetail(Core.Views.CardView card)
+    {
+        if (duelDetail is not { } renderer || card.CardId is not { } id) return null;
+        var draft = editor?.Draft;
+        int main = draft is null ? 0 : draft.Count(id, Core.Decks.DeckSection.Main) + draft.Count(id, Core.Decks.DeckSection.Extra);
+        int side = draft?.Count(id, Core.Decks.DeckSection.Side) ?? 0;
+        int owned = Effects.ConfirmedCardPool.Contains(id) ? App.Screens.Title.DeckEditSession.OwnedCopies : 0;
+        var scroll = renderer.Profile.Scroll;
+        return new(id, new(main, side, Math.Max(0, owned - main - side)), tab => renderer.ContentHeight(id, tab), scroll.Visible, scroll.PixelsPerFrame);
+    }
+    /// <summary>Original controls (measured): ○ menus, × closes or opens the phase selector, △ global menu. START opens the PC pause
+    /// menu until the original Help screen exists. Every choice is revision-bound; a refusal closes the window without state changes.</summary>
+    private void UpdateDuelInput(InputFrame frame)
+    {
+        if (duel is null || duel.View.Outcome is not null) { if (duel is not null) duelFieldPresentation.OutcomeInput(frame.IsPressed(InputAction.Confirm)); return; }
+        if (frame.IsPressed(InputAction.Start)) { duel.Paused = true; screen = ScreenId.Paused; return; }
+        var input = DuelInput(duel);
+        var before = duel.View;
+        if ((duelFieldPresentation.BeforeDeal(before, PresentationTime) || duelFieldPresentation.Busy(before, PresentationTime)) && DuelField() is not null) return;
+        if (input.Handle(before, frame, navigationTime.ElapsedGameTime) is { } submit)
+        {
+            if (duel.Choose(submit.Revision, submit.ChoiceId)) duelFieldPresentation.Accept(before, duel.View, submit.ChoiceId, PresentationTime, input.SubmittedFrom);
+            else input.Rejected(duel.Notice);
+        }
     }
     private void UpdateDuelPresentation()
     {
         if (duel is null) return;
-        if (IsActive && navigationTime.TotalGameTime.TotalSeconds >= opponentAt)
+        _ = DuelInput(duel);
+        if (duelFieldPresentation.BeforeDeal(duel.View, PresentationTime) && DuelField() is not null) return;
+        if (duel.View.Outcome is null && IsActive && navigationTime.TotalGameTime.TotalSeconds >= opponentAt)
         {
             if (!duel.OpponentStopped && duel.StepOpponent()) choiceIndex = 0;
             opponentAt = navigationTime.TotalGameTime.TotalSeconds + .35;
         }
-        if (duel.View.Outcome is not null) screen = ScreenId.Result;
+        if (duel.View.Outcome is not null && duelFieldPresentation.ResultReady(PresentationTime)) screen = ScreenId.Result;
     }
     private void UpdatePause(GuiButtons buttons)
     {
@@ -272,7 +319,76 @@ public sealed partial class GameLoop
     }
     private void DrawDuel()
     {
-        if (duel is not null) DuelScreen.Draw(renderer, duel.View, choiceIndex, inspectIndex, duel.Notice, PresentationTime.TotalSeconds);
+        if (duel is null) return;
+        var input = DuelInput(duel);
+        var notice = duelFieldPresentation.Notice(duel.View.Revision, duel.Notice, navigationTime.TotalGameTime);
+        DuelScene.Draw(renderer, DuelField(), new(duel.View, choiceIndex, inspectIndex, notice, PresentationTime.TotalSeconds,
+            Style: duelStyle, Facts: FieldCardFacts(), Input: input)
+        {
+            Presentation = duelFieldPresentation.Frame(duel.View, PresentationTime)
+        });
+    }
+    /// <summary>Level and Tuner facts of public cards, from the imported catalog.</summary>
+    private Func<uint, DuelCardFacts?>? FieldCardFacts() => setup?.Game?.Catalog.Catalog is { } catalog ? id => DuelCardFacts.From(catalog[id]) : null;
+    private DuelFieldStyle? duelStyle;
+    /// <summary>Names and faces of a Free Duel. Backdrops are known for three captured characters only (Aki TF6, Yuya TF4, Joey default);
+    /// every other opponent uses the default backdrop until the original's selection is measured.</summary>
+    private DuelFieldStyle? FreeDuelStyle(App.Screens.FreeDuel.FreeDuelSession session)
+    {
+        if (freeDuelRenderer is not { } versus) return null;
+        var (name, bust) = versus.Versus.Opponent(session);
+        string? face = Assets.Presentation.DuelFaceIcons.ByRecord.GetValueOrDefault(bust - 3);
+        string backdrop = face switch { "fw3_aki01" => "tf6", "fw5_YUYA_00" => "tf4", _ => "default" };
+        return new(backdrop, session.PlayerName, name, Assets.Presentation.DuelFaceIcons.ByRecord[Assets.Presentation.DuelFaceIcons.PlayerRecord], face);
+    }
+    /// <summary>Field text through the title flow's original card-text font.</summary>
+    private sealed class FlowFieldText(TitleFlowVisuals visuals) : IDuelFieldTextSink
+    {
+        public void DrawUi(string text, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha) =>
+            visuals.DrawText(text, x, y, scaleX, scaleY, color, shadowAlpha);
+        public float MeasureUi(string text, float scaleX) => visuals.MeasureText(text, scaleX);
+        public void Draw(string text, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha) =>
+            visuals.DrawCardFontText(text, x, y, scaleX, scaleY, color, shadowAlpha);
+        public float Measure(string text, float scaleX) => visuals.MeasureCardFontText(text, scaleX);
+    }
+    /// <summary>EBOOT textures the title flow decodes and pins (the duel status icons share its dialog atlas).</summary>
+    private Microsoft.Xna.Framework.Graphics.Texture2D? EbootTexture(string key)
+    {
+        if (flowVisuals is null) return null;
+        try { return flowVisuals.Texture(key); }
+        catch (KeyNotFoundException) { return null; }
+    }
+    private DuelFieldVisuals? duelField;
+    private OriginalScreenAssetResolver? duelFieldAssets;
+    /// <summary>The measured field for the current validated generation, or null when its original textures are not imported.</summary>
+    private DuelFieldVisuals? DuelField()
+    {
+        if (ReferenceEquals(duelFieldAssets, screenAssets)) return duelField;
+        duelField?.Dispose(); duelField = null; duelFieldAssets = screenAssets;
+        if (setup?.Game?.Presentation is null) return null;
+        try
+        {
+            duelField = new(GraphicsDevice, screenAssets) { Text = flowVisuals is { } flow ? new FlowFieldText(flow) : null, External = EbootTexture };
+            if (flowVisuals is { } visuals && setup.Game.Catalog.Catalog is { } catalog)
+            {
+                // The left card panel is the Card Album's (same measured geometry); its textures come from the same pinned imports.
+                var album = App.Screens.Album.CardAlbumProfile.LoadEmbedded();
+                visuals.UseAlbumAssets(screenAssets, album.AssetKeys(), Assets.Presentation.CardAlbumResources.ArchiveKey, Assets.Presentation.CardAlbumResources.CardInfoKey);
+                var panel = new App.Screens.Album.CardInfoPanel(GraphicsDevice, visuals, album);
+                duelField.Panel = (id, tint, back) => panel.Draw(id is { } card ? catalog[card] : null, id is null,
+                    App.Screens.Title.MainMenuEntry.FramesIn(PresentationTime), tint, back);
+                duelField.AttackPanel = a => AttackPanels.Draw(panel, catalog, a, App.Screens.Title.MainMenuEntry.FramesIn(PresentationTime));
+                // Show Details is the Card Album's detail page (same screen in the original).
+                var detailProfile = App.Screens.Album.CardAlbumDetailProfile.LoadEmbedded();
+                visuals.UseAlbumAssets(screenAssets, detailProfile.AssetKeys(), Assets.Presentation.CardAlbumResources.ArchiveKey, Assets.Presentation.CardAlbumResources.CardInfoKey);
+                duelDetail = new App.Screens.Album.CardAlbumDetailRenderer(GraphicsDevice, visuals, panel, catalog, detailProfile,
+                    new Assets.Presentation.CardDetailSource(visuals.SourceBytes("eboot"), visuals.SourceBytes("cardinfo")));
+                duelField.Detail = duelDetail.Draw;
+            }
+        }
+        catch (Exception e) when (e is InvalidDataException or KeyNotFoundException or InvalidOperationException)
+        { Console.Error.WriteLine("DUEL_FIELD_PENDING " + e.Message); }
+        return duelField;
     }
     private void DrawPreferences()
     {

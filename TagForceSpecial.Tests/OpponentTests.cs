@@ -100,6 +100,24 @@ public sealed class OpponentTests
     }
 
     [Fact]
+    public void CardAndPositionChoicesCarryTheirCardForTheChooserOnly()
+    {
+        var deck = Enumerable.Repeat(4012u, 5).Concat(Enumerable.Repeat(4030u, 35));
+        var e = new DuelEngine(Catalog(), PlayablePreview.Rules, deck, deck,
+            decisionSequences: [new("select", [DecisionStep.Card(DecisionCardSource.Deck, [4030]),
+                DecisionStep.Position([BattlePosition.FaceUpAttack, BattlePosition.FaceUpDefense]), DecisionStep.EmptyMonsterZone()], false)]);
+        EnterMain(e); Ok(e, new BeginDecisionSequence(PlayerId.One, "select"));
+        var source = new DuelActionSource(e, Catalog());
+        var cards = source.Observe(PlayerId.One);
+        Assert.All(cards.Actions, a => Assert.Equal((4030u, false, DecisionCardSource.Deck), (a.Subject!.CardId!.Value, a.Subject.Hidden, a.SubjectSource!.Value)));
+        Assert.Empty(source.Observe(PlayerId.Two).Actions);
+        var picked = cards.Actions[0];
+        Assert.True(source.Execute(PlayerId.One, cards.Revision, picked.Token).Accepted);
+        var positions = source.Observe(PlayerId.One);
+        Assert.All(positions.Actions, a => Assert.Equal((ActionKind.ChoosePosition, picked.CardInstanceId, 4030u), (a.Kind, a.Subject!.InstanceId, a.Subject.CardId!.Value)));
+    }
+
+    [Fact]
     public void CostAndTargetBindingsAreCurrentWithoutExposingOpponentSetIdentity()
     {
         var deck = new uint[] { 4350, 4012, 4012, 4030, 4032 }.Concat(Enumerable.Repeat(4012u, 35));
