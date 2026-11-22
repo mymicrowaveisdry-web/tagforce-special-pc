@@ -266,9 +266,8 @@ public sealed class PresentationPackage
     }
     private static string DecoderHash()
     {
-        string path = typeof(GimTextureDecoder).Assembly.Location;
-        Require(!string.IsNullOrEmpty(path), "Decoder assembly identity unavailable in this deployment.");
-        using var stream = File.OpenRead(path); return Convert.ToHexStringLower(SHA256.HashData(stream));
+        Require(DecoderIdentity.TryGetSha256(out string? hash), "Decoder assembly identity unavailable in this deployment.");
+        return hash!;
     }
     private static void WriteNew(string path, byte[] bytes)
     { using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write); stream.Write(bytes); stream.Flush(flushToDisk: true); }

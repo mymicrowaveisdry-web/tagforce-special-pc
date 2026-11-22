@@ -8,5 +8,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../TagForceSpecial.Import/TagForceSpecial.Import.csproj" />
+    <ProjectReference Include="../TagForceSpecial.App/TagForceSpecial.App.csproj" />
   </ItemGroup>
 </Project>

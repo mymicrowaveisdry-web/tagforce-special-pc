@@ -1,7 +1,7 @@
 # Yu-Gi-Oh! ARC-V Tag Force Special PC
 
 C# reconstruction for native PC play, with extensible cards as a long-term goal.
-**Initial playable slice:** the MonoGame host supports a 14-card pool against a seeded opponent; game assets are not bundled.
+**Initial playable slice:** the MonoGame host (now being replaced by Godot) supports a 14-card pool against a seeded opponent; game assets are not bundled.
 
 ## Quick start
 
@@ -39,7 +39,8 @@ new timing comparisons remain deferred. Synthetic tests do not establish full PS
 | [Core](TagForceSpecial.Core/README.md) | Duel state, commands and experimental contracts |
 | [Effects](TagForceSpecial.Effects/README.md) | Reviewed card families and effect definitions |
 | [AI](TagForceSpecial.AI/README.md) | Seeded policy, bounded stepping and replays |
-| [PC](TagForceSpecial.PC/README.md) | MonoGame host with authorized player views |
+| [App](TagForceSpecial.App) | Host-neutral decks, setup, sessions and duel controller |
+| [PC](TagForceSpecial.PC/README.md) | Godot game host (MonoGame screens being ported) with authorized player views |
 | [Workbench](docs/importer/USER_GUIDE.md) | Windows WPF importer, asset inspection and evidence analysis |
 | [Tools](TagForceSpecial.Tools/README.md) | Demo, imports and local research commands |
 | `TagForceSpecial.Tests` | Synthetic and optional PSP reference tests |

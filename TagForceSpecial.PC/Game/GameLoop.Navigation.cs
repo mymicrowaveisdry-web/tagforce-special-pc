@@ -194,7 +194,12 @@ public sealed partial class GameLoop
     /// <summary>The PC utility hub, reached through F12. It is not an original screen.</summary>
     private void UpdatePcTools(GuiButtons buttons)
     {
-        if (buttons.Back) { WorkbenchLauncher.Start(setup?.Storage.Root); Exit(); return; }
+        if (buttons.Back)
+        {
+            WorkbenchLauncher.Start(Path.Combine(AppContext.BaseDirectory, "workbench", "TagForceSpecial.Workbench.exe"),
+                new(Path.Combine(AppContext.BaseDirectory, "TagForceSpecial.PC.exe"), []), setup?.Storage.Root);
+            Exit(); return;
+        }
         MoveMenu(buttons, 5);
         if (!buttons.Confirm) return;
         // Navigation/application actions only. Gum never receives a DuelController.

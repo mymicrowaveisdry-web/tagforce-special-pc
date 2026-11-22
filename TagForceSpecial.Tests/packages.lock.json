@@ -64,6 +64,19 @@
           "System.Data.DataSetExtensions": "4.5.0"
         }
       },
+      "GodotSharp": {
+        "type": "Transitive",
+        "resolved": "4.7.2",
+        "contentHash": "EPvfayB7b7MrBNdASvy86jRS5AbM9dprkVivcRD80g+ngn2M8KAIrBQH4NhyQL+pwxni0xVnuqhD9AFpZeNQpw=="
+      },
+      "GodotSharpEditor": {
+        "type": "Transitive",
+        "resolved": "4.7.2",
+        "contentHash": "Fuf2rNvajla9N8Z+ksxsSIt326wsjpB2F2uZCtxkdfWIsApabCHy5fsE2EKxOlQ4NaINGdgMIv62D0n583qe1A==",
+        "dependencies": {
+          "GodotSharp": "4.7.2"
+        }
+      },
       "Gum.MonoGame": {
         "type": "Transitive",
         "resolved": "2026.11.2.1",
@@ -234,6 +247,8 @@
       "tagforcespecial.pc": {
         "type": "Project",
         "dependencies": {
+          "GodotSharp": "[4.7.2, )",
+          "GodotSharpEditor": "[4.7.2, )",
           "Gum.MonoGame": "[2026.11.2.1, )",
           "MonoGame.Framework.DesktopGL": "[3.8.6, )",
           "TagForceSpecial.AI": "[1.0.0, )",

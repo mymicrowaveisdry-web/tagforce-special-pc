@@ -7,7 +7,7 @@ public sealed record HostOptions(string? CachePath = null, bool PixelExact = fal
     string? PresentationTracePath = null, string? TitleLayerCaptureRoot = null, string? PspFontPath = null, string? FlowCaptureRoot = null,
     IReadOnlyDictionary<int, int>? MainMenuFrameByRow = null, int? MainMenuEntryFrame = null, string? RealtimeWalkRoot = null, int? DeckMenuFrame = null, string? RecipeReferenceRoot = null,
     string? PspCardFontPath = null, bool LaunchGame = false, string? AlbumReferenceRoot = null, string? DuelFieldReferenceRoot = null,
-    string? DuelWalkRoot = null, bool DuelWalkStatic = false)
+    string? DuelWalkRoot = null, bool DuelWalkStatic = false, string? DecoderSha256 = null)
 {
     /// <summary>Pixel-exact game frame per focused Main Menu row, for same-instant comparisons with GE dumps.</summary>
     public IReadOnlyDictionary<int, int> MainMenuFrames => MainMenuFrameByRow ?? new Dictionary<int, int>();
@@ -24,7 +24,7 @@ public sealed record HostOptions(string? CachePath = null, bool PixelExact = fal
         string? assetPreview = null, presentationTrace = null, titleLayers = null, pspFont = null, pspCardFont = null, flowCapture = null;
         Dictionary<int, int>? menuFrames = null;
         int? menuEntryFrame = null, deckMenuFrame = null;
-        string? realtimeWalk = null, recipeReference = null, albumReference = null, duelFieldReference = null, duelWalk = null;
+        string? realtimeWalk = null, recipeReference = null, albumReference = null, duelFieldReference = null, duelWalk = null, decoderSha256 = null;
         bool seedSpecified = false;
         bool pixel = false, smoke = false, assetDiagnostics = false, presentationSmoke = false, launchGame = false, duelWalkStatic = false;
         for (int i = 0; i < args.Length; i++)
@@ -71,6 +71,7 @@ public sealed record HostOptions(string? CachePath = null, bool PixelExact = fal
                 case "--capture-result" when i + 1 < args.Length: resultCapture = Path.GetFullPath(args[++i]); break;
                 case "--deck" when i + 1 < args.Length && int.TryParse(args[i + 1], out deckVariant) && deckVariant is >= 0 and <= 2: i++; break;
                 case "--data-root" when i + 1 < args.Length: dataRoot = Path.GetFullPath(args[++i]); break;
+                case "--decoder-sha256" when i + 1 < args.Length: decoderSha256 = args[++i]; break;
                 case "--setup-smoke" when i + 1 < args.Length: setupSource = Path.GetFullPath(args[++i]); break;
                 case "--capture-editor" when i + 1 < args.Length: editorCapture = Path.GetFullPath(args[++i]); break;
                 default: throw new ArgumentException("Usage: PC [--cache <cache>] [--pixel-exact] [--capture <new.png>] [--smoke] [--deck <0|1|2>] [--seed <uint>] [--replay <new.json>] [--capture-result <new.png>] [--asset-diagnostics] [--asset-screen <screen>] [--data-root <private-root>] [--recipe-reference <private-root>]");
@@ -93,6 +94,6 @@ public sealed record HostOptions(string? CachePath = null, bool PixelExact = fal
         if (duelWalk is not null && (cache is null || smoke || presentationSmoke || assetDiagnostics || capture is not null || realtimeWalk is not null || duelFieldReference is not null))
             throw new ArgumentException("--duel-walk requires --cache and an isolated launch.");
         if (duelWalkStatic && duelWalk is null) throw new ArgumentException("--duel-walk-static requires --duel-walk.");
-        return new(cache, pixel, capture, smoke, seed, replay, resultCapture, deckVariant, dataRoot, setupSource, editorCapture, seedSpecified, assetDiagnostics, diagnosticScreen, assetPreview, presentationSmoke, presentationTrace, titleLayers, pspFont, flowCapture, menuFrames, menuEntryFrame, realtimeWalk, deckMenuFrame, recipeReference, pspCardFont, launchGame, albumReference, duelFieldReference, duelWalk, duelWalkStatic);
+        return new(cache, pixel, capture, smoke, seed, replay, resultCapture, deckVariant, dataRoot, setupSource, editorCapture, seedSpecified, assetDiagnostics, diagnosticScreen, assetPreview, presentationSmoke, presentationTrace, titleLayers, pspFont, flowCapture, menuFrames, menuEntryFrame, realtimeWalk, deckMenuFrame, recipeReference, pspCardFont, launchGame, albumReference, duelFieldReference, duelWalk, duelWalkStatic, decoderSha256);
     }
 }
