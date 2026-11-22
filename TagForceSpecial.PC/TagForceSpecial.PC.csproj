@@ -23,7 +23,6 @@
   </Target>
 
   <ItemGroup>
-    <None Update="UI\Gum\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <EmbeddedResource Include="App\Screens\Album\card-album-detail.json" />
   </ItemGroup>
 
