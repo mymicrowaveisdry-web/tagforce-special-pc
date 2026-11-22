@@ -111,8 +111,8 @@ public sealed class CardAlbumRenderer : IDisposable
             baseView = CardAlbumBinder.TurnBaseView(session.JumpDirection, session.JumpTargetView - session.JumpDirection);
         }
         else { frame = binder.Settled(session.View, session.Views); baseView = session.View; posed = false; }
-        effect.View = next is null ? frame.View : Matrix.Lerp(frame.View, next.View, t);
-        effect.Projection = next is null ? frame.Projection : Matrix.Lerp(frame.Projection, next.Projection, t);
+        effect.View = Xna(next is null ? frame.View : System.Numerics.Matrix4x4.Lerp(frame.View, next.View, t));
+        effect.Projection = Xna(next is null ? frame.Projection : System.Numerics.Matrix4x4.Lerp(frame.Projection, next.Projection, t));
         for (int i = 0; i < frame.Meshes.Length; i++)
             DrawMesh(binder.Meshes[frame.Meshes[i]], session, baseView, count, next is null ? null : binder.Meshes[next.Meshes[i]], t);
         if (!posed && session.Focus == CardAlbumFocus.Pocket && binder.Cursor(session.View, session.Views, session.RightPage, session.Pocket) is { } cursor)
@@ -145,18 +145,30 @@ public sealed class CardAlbumRenderer : IDisposable
         foreach (var pass in effect.CurrentTechnique.Passes)
         {
             pass.Apply();
-            device.DrawUserPrimitives(PrimitiveType.TriangleList, toward is null ? mesh.Vertices : BlendVertices(mesh.Vertices, toward.Vertices, t), 0, mesh.Vertices.Length / 3);
+            device.DrawUserPrimitives(PrimitiveType.TriangleList, toward is null ? Vertices(mesh) : BlendVertices(mesh.Vertices, toward.Vertices, t), 0, mesh.Vertices.Length / 3);
         }
     }
 
-    private VertexPositionColorTexture[] BlendVertices(VertexPositionColorTexture[] a, VertexPositionColorTexture[] b, float t)
+    private readonly Dictionary<CardAlbumMesh, VertexPositionColorTexture[]> converted = new(ReferenceEqualityComparer.Instance);
+
+    private VertexPositionColorTexture[] Vertices(CardAlbumMesh mesh)
+    {
+        if (!converted.TryGetValue(mesh, out var vertices)) converted[mesh] = vertices = Array.ConvertAll(mesh.Vertices, Xna);
+        return vertices;
+    }
+
+    private VertexPositionColorTexture[] BlendVertices(CardAlbumVertex[] a, CardAlbumVertex[] b, float t)
     {
         if (blended.Length < a.Length) blended = new VertexPositionColorTexture[a.Length];
-        for (int i = 0; i < a.Length; i++)
-            blended[i] = new(Vector3.Lerp(a[i].Position, b[i].Position, t), Color.Lerp(a[i].Color, b[i].Color, t),
-                Vector2.Lerp(a[i].TextureCoordinate, b[i].TextureCoordinate, t));
+        for (int i = 0; i < a.Length; i++) blended[i] = Xna(CardAlbumBinder.Lerp(a[i], b[i], t));
         return blended;
     }
+
+    private static VertexPositionColorTexture Xna(CardAlbumVertex v) =>
+        new(new Vector3(v.Position.X, v.Position.Y, v.Position.Z), new Color(v.R, v.G, v.B, v.A), new Vector2(v.Uv.X, v.Uv.Y));
+
+    private static Matrix Xna(System.Numerics.Matrix4x4 m) =>
+        new(m.M11, m.M12, m.M13, m.M14, m.M21, m.M22, m.M23, m.M24, m.M31, m.M32, m.M33, m.M34, m.M41, m.M42, m.M43, m.M44);
 
     private Texture2D? Face(uint cardId)
     {
@@ -207,19 +219,7 @@ public sealed class CardAlbumRenderer : IDisposable
     }
 
     /// <summary>Right to left from the last digit cell: digits at the cell pitch, the point and the digit before it at their measured advances.</summary>
-    public static IEnumerable<(char Char, float X)> PercentPositions(string value, CardAlbumPercent cells)
-    {
-        var placed = new List<(char, float)>();
-        float x = cells.LastDigitX;
-        for (int i = value.Length - 1; i >= 0; i--)
-        {
-            if (i < value.Length - 1)
-                x -= value[i] == '.' ? cells.PointAdvance : value[i + 1] == '.' ? cells.BeforePoint : cells.Pitch;
-            placed.Add((value[i], x));
-        }
-        placed.Reverse();
-        return placed;
-    }
+    public static IEnumerable<(char Char, float X)> PercentPositions(string value, CardAlbumPercent cells) => CardAlbumScene.PercentPositions(value, cells);
 
     /// <summary>Measured: the current sheet right-aligned in 9 px cells before the slash; the total in its recorded cells after it.</summary>
     private void DrawCounter(int sheet, int sheets)
@@ -264,8 +264,7 @@ public sealed class CardAlbumRenderer : IDisposable
         [[uv[0], uv[1]], [uv[2], uv[1]], [uv[0], uv[3]], [uv[0], uv[3]], [uv[2], uv[1]], [uv[2], uv[3]]],
         [255, 255, 255, 255], null, null, false, false, false, false, false);
 
-    internal static FlowDraw Shift(FlowDraw draw, float dx, float dy) =>
-        draw with { Points = draw.Points.Select(p => new[] { p[0] + dx, p[1] + dy }).ToArray() };
+    internal static FlowDraw Shift(FlowDraw draw, float dx, float dy) => CardAlbumScene.Shift(draw, dx, dy);
 
     public void Dispose()
     {

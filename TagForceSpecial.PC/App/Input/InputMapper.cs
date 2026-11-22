@@ -9,9 +9,7 @@ namespace TagForceSpecial.PC.App.Input;
 /// gamepad buttons are fixed; the mouse is sampled only when a picture rectangle is given.</summary>
 public sealed class InputMapper
 {
-    private InputAction previous;
-    private bool previousUtility;
-    private bool ready;
+    private readonly InputEdges edges = new();
     private MouseState? previousMouse;
     private int wheelRemainder;
     public KeyBindings Bindings { get; set; } = KeyBindings.Default;
@@ -34,13 +32,9 @@ public sealed class InputMapper
         Map(InputAction.Menu, Buttons.Y); Map(InputAction.Switch, Buttons.X);
         Map(InputAction.PreviousPage, Buttons.LeftShoulder); Map(InputAction.NextPage, Buttons.RightShoulder);
         Map(InputAction.Start, Buttons.Start); Map(InputAction.Select, Buttons.Back);
-        var pointer = mouse is { } m && ready && active ? Sample(m.State, m.Picture) : default;
+        var pointer = mouse is { } m && edges.Ready && active ? Sample(m.State, m.Picture) : default;
         if (mouse is { } current) previousMouse = current.State;
-        var frame = new InputFrame(ready && active ? held & ~previous : InputAction.None, active ? held : InputAction.None,
-            ready && active && keys.IsKeyDown(Keys.F12) && !previousUtility, pointer);
-        previousUtility = keys.IsKeyDown(Keys.F12);
-        previous = held; ready = active;
-        return frame;
+        return edges.Next(held, keys.IsKeyDown(Keys.F12), active, pointer);
     }
 
     private PointerInput Sample(MouseState state, CanvasRect picture)

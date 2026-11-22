@@ -27,15 +27,7 @@ public sealed partial class TitleFlowVisuals : IDisposable
     /// <summary>Fallback text used only when no game font was imported.</summary>
     public List<(string Text, int X, int Y, Color Color)> FallbackLines => textRenderer.FallbackLines;
 
-    public static FlowProfile LoadProfile()
-    {
-        using var stream = typeof(TitleFlowVisuals).Assembly.GetManifestResourceStream(
-            "TagForceSpecial.PC.App.Screens.Title.title-flow-frames.json") ?? throw new InvalidDataException("Missing measured title-flow profile.");
-        var value = JsonSerializer.Deserialize<FlowProfile>(stream) ?? throw new InvalidDataException("Invalid title-flow profile.");
-        if (value.SchemaVersion != 1 || value.BuildId != Assets.GameSource.GameBuildProfile.English21.BuildId)
-            throw new InvalidDataException("Title-flow profile/source mismatch.");
-        return value;
-    }
+    public static FlowProfile LoadProfile() => FlowProfile.LoadEmbedded();
 
     public const string CardTextFontSha256 = PgfTextRenderer.CardTextFontSha256;
     /// <summary>Card-face text renderer (system ltn0), or null when that font was not imported.</summary>

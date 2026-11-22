@@ -1,0 +1,81 @@
+[gd_scene load_steps=1 format=3]
+
+[node name="OriginalMenuBar" type="Control"]
+layout_mode = 3
+offset_right = 253.0
+offset_bottom = 24.0
+mouse_filter = 2
+metadata/gum_source = "Components/OriginalMenuBar.gucx"
+
+[node name="BaseLeft" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 6.0
+offset_bottom = 24.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(20, 0, 6, 24)
+
+[node name="BaseCenter" type="TextureRect" parent="."]
+offset_left = 6.0
+offset_top = 0.0
+offset_right = 250.0
+offset_bottom = 24.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(26, 0, 1, 24)
+
+[node name="BaseRight" type="TextureRect" parent="."]
+offset_left = 250.0
+offset_top = 0.0
+offset_right = 253.0
+offset_bottom = 24.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(37, 0, 3, 24)
+
+[node name="FocusLeft" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 6.0
+offset_bottom = 24.0
+visible = false
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 6, 24)
+
+[node name="FocusCenter" type="TextureRect" parent="."]
+offset_left = 6.0
+offset_top = 0.0
+offset_right = 250.0
+offset_bottom = 24.0
+visible = false
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(6, 0, 1, 24)
+
+[node name="FocusRight" type="TextureRect" parent="."]
+offset_left = 250.0
+offset_top = 0.0
+offset_right = 253.0
+offset_bottom = 24.0
+visible = false
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(17, 0, 3, 24)
+
+[node name="Label" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 253.0
+offset_bottom = 24.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 253, 24)

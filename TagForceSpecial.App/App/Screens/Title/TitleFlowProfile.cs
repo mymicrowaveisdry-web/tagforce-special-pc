@@ -16,7 +16,19 @@ public sealed record FlowFrame(string Id, string DumpSha256, FlowDraw[] Draws, F
 public sealed record FlowEbootTexture(string Key, int Offset, int Length, int ClutOffset, int ClutBytes, int Width, int Height, int Bpp, int Stride, string RgbaSha256);
 public sealed record FlowButtonStyle(FlowQuad[] Focus, FlowQuad Plain);
 public sealed record FlowProfile(int SchemaVersion, string BuildId, string Scope, FlowButtonStyle Button, FlowTextSource[] LevelNames,
-    FlowEbootTexture[] EbootTextures, FlowFrame[] Frames);
+    FlowEbootTexture[] EbootTextures, FlowFrame[] Frames)
+{
+    /// <summary>The measured title-flow profile for the supported build.</summary>
+    public static FlowProfile LoadEmbedded()
+    {
+        using var stream = typeof(FlowProfile).Assembly.GetManifestResourceStream(
+            "TagForceSpecial.PC.App.Screens.Title.title-flow-frames.json") ?? throw new InvalidDataException("Missing measured title-flow profile.");
+        var value = System.Text.Json.JsonSerializer.Deserialize<FlowProfile>(stream) ?? throw new InvalidDataException("Invalid title-flow profile.");
+        if (value.SchemaVersion != 1 || value.BuildId != Assets.GameSource.GameBuildProfile.English21.BuildId)
+            throw new InvalidDataException("Title-flow profile/source mismatch.");
+        return value;
+    }
+}
 
 /// <summary>Reads prompt text from pinned source bytes. Original strings stay in the private cache, never in Git.</summary>
 public static partial class TitleFlowText

@@ -57,6 +57,8 @@ public sealed record CardAlbumProfile(int SchemaVersion, string BuildId, string 
     CardAlbumTypeLine TypeLine, float[] AttributeIconRect, float[] TypeIconRect, Dictionary<string, float[]> TypeIconExtra,
     CardAlbumIcon LevelStar, CardAlbumIcon RankStar, CardAlbumGlyphs LevelText, int[] InfoScissor, CardAlbumCardBack CardBack, CardAlbumPageJump PageJump, CardAlbumGlint Glint)
 {
+    /// <summary>Buttons on the bottom bar, each with a measured hand position.</summary>
+    public const int BarButtons = 6;
     private const float LeftColumnPitch = 45;
 
     /// <summary>Hand offset over a pocket. Left-page pockets 4, 7 and 8 are measured; the others follow their 45 px column pitch (inferred).</summary>
@@ -79,7 +81,7 @@ public sealed record CardAlbumProfile(int SchemaVersion, string BuildId, string 
         var value = JsonSerializer.Deserialize<CardAlbumProfile>(stream) ?? throw new InvalidDataException("Invalid Card Album profile.");
         if (value.SchemaVersion != 1 || value.BuildId != Assets.GameSource.GameBuildProfile.English21.BuildId)
             throw new InvalidDataException("Card Album profile/source mismatch.");
-        if (value.HandRight.Length != 9 || value.HandBar.Length != CardAlbumSession.BarButtons || value.HandEdge.Length != 2)
+        if (value.HandRight.Length != 9 || value.HandBar.Length != BarButtons || value.HandEdge.Length != 2)
             throw new InvalidDataException("Card Album hand positions are incomplete.");
         return value;
     }

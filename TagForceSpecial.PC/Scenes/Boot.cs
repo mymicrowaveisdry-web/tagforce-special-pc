@@ -22,26 +22,41 @@ public partial class Boot : Control
 
     public override void _Ready()
     {
-        var (report, exitCode) = Route(OS.GetCmdlineUserArgs());
-        GetNode<Label>("Status").Text = report;
+        var (report, exitCode, options) = Route(OS.GetCmdlineUserArgs());
         GD.Print(report);
+        if (exitCode is null && options is not null)
+        {
+            var game = new Host.GameRoot(options);
+            try { game.Load(); }
+            catch (Exception error) when (error is InvalidOperationException or InvalidDataException or IOException or NotSupportedException)
+            {
+                game.Free();
+                (report, exitCode) = (report + "\n" + error.Message, 1);
+                GD.PrintErr(error.Message);
+            }
+            if (exitCode is null) { GetNode<Label>("Status").Visible = false; AddChild(game); return; }
+        }
+        GetNode<Label>("Status").Text = report;
         if (exitCode is { } code) GetTree().Quit(code);
     }
 
-    private static (string Report, int? ExitCode) Route(string[] args)
+    /// <summary>The launch report, an exit code when the process should end, and the options when a game should start.</summary>
+    private static (string Report, int? ExitCode, Game.HostOptions? Game) Route(string[] args)
     {
         Game.HostOptions options;
         try { options = Game.HostOptions.Parse(args); }
-        catch (ArgumentException error) { return (error.Message, 1); }
+        catch (ArgumentException error) { return (error.Message, 1, null); }
         string decoder = AcceptDecoderIdentity(options.DecoderSha256);
         if (options.OpenImporterOnLaunch)
         {
             try { WorkbenchLauncher.Start(HostLocation.Workbench(), HostLocation.Self(), options.DataRoot); }
-            catch (InvalidOperationException error) { return (error.Message, 1); }
-            return ("Opening the importer workbench.", 0);
+            catch (InvalidOperationException error) { return (error.Message, 1, null); }
+            return ("Opening the importer workbench.", 0, null);
         }
-        if (!options.LaunchGame) return ("This launch mode is not available in the Godot host yet.", NotPorted);
-        return (StatusReport(decoder, options.DataRoot), null);
+        // Pilots: the presentation smoke covers only the ported Main Menu and album frames; the field reference renders exported draw lists.
+        if (!options.LaunchGame && !options.PresentationSmoke && options.DuelFieldReferenceRoot is null)
+            return ("This launch mode is not available in the Godot host yet.", NotPorted, null);
+        return (StatusReport(decoder, options.DataRoot), null, options);
     }
 
     private static string StatusReport(string decoder, string? dataRoot)

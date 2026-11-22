@@ -24,29 +24,23 @@ public sealed class OriginalScreenAssetResolver : IDisposable
     /// <summary>Decoded resources that have no original-reference pin yet (card thumbnails, Deck Edit supplements). The returned scope says
     /// so; callers must keep such resources labelled and never present them as verified.</summary>
     public ResolvedScreenSprite ResolveUnverified(string key) => Resolve(key, SpriteSizing.Native, null, allowUnverified: true);
-    public const string UnverifiedScope = "decoded-unverified";
+    public const string UnverifiedScope = ScreenAssets.UnverifiedScope;
 
     private ResolvedScreenSprite Resolve(string key, SpriteSizing sizing, string? stretchEvidenceId, bool allowUnverified)
     {
         thread.Check(); ObjectDisposedException.ThrowIf(disposed, this);
         if (device is null || registry is null) throw new InvalidOperationException("No validated presentation generation is available.");
-        string scope = registry.VerifiedReferenceScope(key) ?? (allowUnverified ? UnverifiedScope : throw new InvalidDataException("Reference approval pending: " + key));
-        var asset = registry.Resolve(key);
-        int width = asset.Manifest.Output.Width ?? throw new InvalidDataException("Asset is not a decoded texture.");
-        int height = asset.Manifest.Output.Height ?? throw new InvalidDataException("Asset is not a decoded texture.");
-        if (width <= 0 || height <= 0 || asset.Content.Length != checked(width * height * 4)) throw new InvalidDataException("Invalid RGBA texture.");
-        var rect = asset.Manifest.Output.SourceRectangle;
-        if (rect is null) throw new InvalidDataException("An explicit atlas rectangle is required.");
+        var asset = new ScreenAssets(registry).Texture(key, allowUnverified);
+        var rect = asset.SourceRectangle;
         var region = new SpriteRegion(new Rectangle(rect[0], rect[1], rect[2], rect[3]), sizing, stretchEvidenceId);
-        region.Validate(width, height);
-        string identity = asset.Manifest.Output.ContentSha256;
-        if (!textures.TryGetValue(identity, out var texture))
+        region.Validate(asset.Width, asset.Height);
+        if (!textures.TryGetValue(asset.ContentSha256, out var texture))
         {
-            texture = new(device, width, height);
-            try { texture.SetData(asset.Content); textures.Add(identity, texture); }
+            texture = new(device, asset.Width, asset.Height);
+            try { texture.SetData(asset.Rgba); textures.Add(asset.ContentSha256, texture); }
             catch { texture.Dispose(); throw; }
         }
-        return new(texture, region, scope);
+        return new(texture, region, asset.Scope);
     }
     /// <summary>Exact stored source bytes from the validated generation (pinned by manifest hash, no pixel claim).</summary>
     public byte[] ResolveBytes(string key)

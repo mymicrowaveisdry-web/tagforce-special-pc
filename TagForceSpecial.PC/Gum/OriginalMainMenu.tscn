@@ -1,0 +1,122 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://Gum/OriginalMenuBar.tscn" id="1_OriginalMenuBar"]
+
+[node name="OriginalMainMenu" type="Control"]
+layout_mode = 3
+offset_right = 480.0
+offset_bottom = 272.0
+mouse_filter = 2
+metadata/gum_source = "Screens/OriginalMainMenu.gusx"
+
+[node name="Background" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 272.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 480, 272)
+
+[node name="Bar0" parent="." instance=ExtResource("1_OriginalMenuBar")]
+offset_left = 114.0
+offset_top = 58.0
+offset_right = 367.0
+offset_bottom = 82.0
+
+[node name="Bar1" parent="." instance=ExtResource("1_OriginalMenuBar")]
+offset_left = 114.0
+offset_top = 81.0
+offset_right = 367.0
+offset_bottom = 105.0
+
+[node name="Bar2" parent="." instance=ExtResource("1_OriginalMenuBar")]
+offset_left = 114.0
+offset_top = 104.0
+offset_right = 367.0
+offset_bottom = 128.0
+
+[node name="Bar3" parent="." instance=ExtResource("1_OriginalMenuBar")]
+offset_left = 114.0
+offset_top = 127.0
+offset_right = 367.0
+offset_bottom = 151.0
+
+[node name="Bar4" parent="." instance=ExtResource("1_OriginalMenuBar")]
+offset_left = 114.0
+offset_top = 150.0
+offset_right = 367.0
+offset_bottom = 174.0
+
+[node name="Bar5" parent="." instance=ExtResource("1_OriginalMenuBar")]
+offset_left = 114.0
+offset_top = 173.0
+offset_right = 367.0
+offset_bottom = 197.0
+
+[node name="Bar6" parent="." instance=ExtResource("1_OriginalMenuBar")]
+offset_left = 114.0
+offset_top = 196.0
+offset_right = 367.0
+offset_bottom = 220.0
+
+[node name="Bar7" parent="." instance=ExtResource("1_OriginalMenuBar")]
+offset_left = 114.0
+offset_top = 219.0
+offset_right = 367.0
+offset_bottom = 243.0
+
+[node name="Notice" type="Control" parent="."]
+offset_left = 70.0
+offset_top = 84.0
+offset_right = 410.0
+offset_bottom = 188.0
+visible = false
+mouse_filter = 2
+
+[node name="NoticeShade" type="TextureRect" parent="Notice"]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 340.0
+offset_bottom = 104.0
+mouse_filter = 2
+modulate = Color(0.0471, 0.0706, 0.1255, 0.9216)
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 1, 1)
+
+[node name="NoticeTitle" type="Label" parent="Notice"]
+offset_left = 12.0
+offset_top = 8.0
+offset_right = 328.0
+offset_bottom = 28.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.9333, 0.7686, 0.4078, 1.0)
+text = "Mode name"
+autowrap_mode = 3
+theme_override_font_sizes/font_size = 12
+metadata/gum_font = "Fonts/LiberationSans-Regular.ttf"
+
+[node name="NoticeBody" type="Label" parent="Notice"]
+offset_left = 12.0
+offset_top = 32.0
+offset_right = 328.0
+offset_bottom = 72.0
+mouse_filter = 2
+text = "Availability message."
+autowrap_mode = 3
+theme_override_font_sizes/font_size = 12
+metadata/gum_font = "Fonts/LiberationSans-Regular.ttf"
+
+[node name="NoticeHint" type="Label" parent="Notice"]
+offset_left = 12.0
+offset_top = 80.0
+offset_right = 328.0
+offset_bottom = 98.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.6667, 0.7059, 0.7843, 1.0)
+text = "PC notice. Enter / A or Esc / B: back"
+autowrap_mode = 3
+theme_override_font_sizes/font_size = 12
+metadata/gum_font = "Fonts/LiberationSans-Regular.ttf"

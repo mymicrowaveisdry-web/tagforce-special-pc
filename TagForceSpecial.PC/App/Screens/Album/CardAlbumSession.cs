@@ -6,8 +6,6 @@ namespace TagForceSpecial.PC.App.Screens.Album;
 public enum CardAlbumFocus { Pocket, Edge, Bar }
 public enum CardAlbumOutcome { None, Close, DetailRequested }
 
-/// <summary>One page turn in progress: direction, the view it started from and game frames elapsed.</summary>
-public sealed record CardAlbumTurn(int Direction, int FromView, int Frames);
 
 /// <summary>Card Album state and input as observed on the same build. Measured: D-pad moves within the 3x3 page and across to the other
 /// page; Right past the last column reaches the page edge, where Right or Confirm turns forward; Down past the last row reaches the bar;
@@ -15,7 +13,7 @@ public sealed record CardAlbumTurn(int Direction, int FromView, int Frames);
 /// the first or last view; Switch moves to the bar's first button; Back leaves. Confirm on an owned card asks for the detail screen.</summary>
 public sealed class CardAlbumSession
 {
-    public const int BarButtons = 6;
+    public const int BarButtons = CardAlbumProfile.BarButtons;
     /// <summary>Captured page-turn keyframes: 14 poses, two game frames each.</summary>
     public const int TurnFrames = 28;
     /// <summary>Inferred from the captured fast flip (about ten views per second): game frames per view while flipping.</summary>

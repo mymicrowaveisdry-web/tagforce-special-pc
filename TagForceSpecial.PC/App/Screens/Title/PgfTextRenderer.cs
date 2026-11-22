@@ -1,22 +1,19 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using TagForceSpecial.Assets.Presentation;
+using TagForceSpecial.PC.App.Visual.Flow;
 
 namespace TagForceSpecial.PC.App.Screens.Title;
 
-/// <summary>Owns the pinned PGF glyph atlas, metrics, shadows and authored fallback text on the game thread.</summary>
+/// <summary>Uploads the shared PGF glyph atlas and draws its line layout on the game thread; keeps the authored fallback text.</summary>
 internal sealed class PgfTextRenderer : IDisposable
 {
     internal const string RequiredFontSha256 = TagForceSpecial.Import.Resources.GameFonts.MenuSha256;
-    private const int CellSize = 30, CellPitch = 32, BaselineRow = 24, GlyphLeft = 7;
-    private const char Bullet = '\u25CF';
+    private const int CellSize = 30;
     private readonly Action<Texture2D, FlowQuad, Color> drawGlyph;
-    private readonly PgfFont? font;
+    private readonly PgfGlyphAtlas? glyphs;
     private readonly Texture2D? atlas;
-    private readonly Dictionary<char, (int X, int Y)> cells = [];
-    private readonly Color[] atlasPixels = new Color[512 * 512];
-    private bool atlasDirty;
-    internal bool OriginalFontAvailable => font is not null;
+    private int uploadedVersion = -1;
+    internal bool OriginalFontAvailable => glyphs is not null;
     internal List<(string Text, int X, int Y, Color Color)> FallbackLines { get; } = [];
 
     /// <summary>FTT-NewRodin Pro Latin (system ltn0): Deck Edit's card-face text, whose recorded glyph steps equal its advances x 0.2.</summary>
@@ -27,87 +24,24 @@ internal sealed class PgfTextRenderer : IDisposable
         this.drawGlyph = drawGlyph;
         if (fontFile is not null)
         {
-            var parsed = new PgfFont(fontFile);
-            if (parsed.Sha256 != requiredSha256) throw new InvalidDataException("PSP font file differs from the pinned system font.");
-            font = parsed;
-            atlas = new(device, 512, 512);
+            glyphs = new(fontFile, requiredSha256);
+            atlas = new(device, PgfGlyphAtlas.Size, PgfGlyphAtlas.Size);
         }
     }
 
     /// <summary>Width of a line using the PSP font's own advances; without the font, half a glyph cell per character.</summary>
-    internal float TextWidth(string value, float scaleX)
-    {
-        if (font is null) return value.Length * CellSize * scaleX / 2;
-        return value.Sum(c => font.Glyph(c)?.AdvanceH26_6 / 64f * scaleX ?? CellSize * scaleX / 2);
-    }
+    internal float TextWidth(string value, float scaleX) => glyphs?.TextWidth(value, scaleX) ?? value.Length * CellSize * scaleX / 2;
 
     internal void DrawLine(string value, float x, float y, float scaleX, float scaleY, int color, int shadowAlpha, float[]? measuredX = null, int alpha = 255)
     {
-        if (font is null || atlas is null)
+        if (glyphs is null || atlas is null)
         {
             FallbackLines.Add((value.ToUpperInvariant(), (int)x, (int)y + 3, new Color(color & 255, (color >> 8) & 255, (color >> 16) & 255)));
             return;
         }
-        foreach (char c in value) EnsureGlyph(c);
-        if (atlasDirty) { atlas.SetData(atlasPixels); atlasDirty = false; }
-        var main = new Color((color) & 255, (color >> 8) & 255, (color >> 16) & 255, alpha);
-        // Measured shadow: two copies at (+0,+1) and (+1,+1) beneath the opaque text.
-        if (shadowAlpha > 0)
-        {
-            var shadow = new Color(0, 0, 0, shadowAlpha);
-            Glyphs(value, x, y + 1, scaleX, scaleY, shadow, measuredX, 0);
-            Glyphs(value, x + 1, y + 1, scaleX, scaleY, shadow, measuredX, 1);
-        }
-        Glyphs(value, x, y, scaleX, scaleY, main, measuredX, 0);
-    }
-
-    private void Glyphs(string value, float x, float y, float scaleX, float scaleY, Color color, float[]? measuredX, float measuredOffset)
-    {
-        float pen = x;
-        float cellW = CellSize * scaleX, cellH = CellSize * scaleY;
-        for (int i = 0; i < value.Length; i++)
-        {
-            char c = value[i];
-            float at = measuredX is not null ? measuredX[i] + measuredOffset : pen;
-            var (cx, cy) = cells[c];
-            var quad = new FlowQuad(at, y, at + cellW, y + cellH, cx / 512f, cy / 512f, (cx + CellSize) / 512f, (cy + CellSize) / 512f, [255, 255, 255, 255], false);
-            drawGlyph(atlas!, quad, color);
-            pen += font!.Glyph(c)?.AdvanceH26_6 / 64f * scaleX ?? cellW / 2;
-        }
-    }
-
-    private void EnsureGlyph(char c)
-    {
-        if (cells.ContainsKey(c)) return;
-        int index = cells.Count;
-        int cx = 1 + index % 16 * CellPitch, cy = 1 + index / 16 * CellPitch;
-        if (cy + CellSize > 512) throw new InvalidOperationException("Glyph atlas budget exhausted.");
-        cells[c] = (cx, cy);
-        var glyph = font!.Glyph(c);
-        if (glyph is null && c == Bullet) { DrawBullet(cx, cy); atlasDirty = true; return; }
-        if (glyph is null || glyph.Width == 0) return;
-        for (int y = 0; y < glyph.Height; y++)
-            for (int x = 0; x < glyph.Width; x++)
-            {
-                int ax = cx + GlyphLeft + glyph.Left + x, ay = cy + BaselineRow - glyph.Top + y;
-                if (ax < cx || ay < cy || ax >= cx + CellSize || ay >= cy + CellSize) continue;
-                int coverage = glyph.Coverage4[y * glyph.Width + x] * 17;
-                atlasPixels[ay * 512 + ax] = new Color(255, 255, 255, coverage);
-            }
-        atlasDirty = true;
-    }
-
-    /// <summary>The Latin font has no bullet. This disc is authored and recorded as a known mismatch, not original typography.</summary>
-    private void DrawBullet(int cx, int cy)
-    {
-        const float centerX = GlyphLeft + 7.5f, centerY = BaselineRow - 7.5f, radius = 6.5f;
-        for (int y = 0; y < CellSize; y++)
-            for (int x = 0; x < CellSize; x++)
-            {
-                float distance = MathF.Sqrt((x + .5f - centerX) * (x + .5f - centerX) + (y + .5f - centerY) * (y + .5f - centerY));
-                int coverage = (int)(Math.Clamp(radius + .5f - distance, 0, 1) * 255);
-                atlasPixels[(cy + y) * 512 + cx + x] = new Color(255, 255, 255, coverage);
-            }
+        var quads = glyphs.Line(value, x, y, scaleX, scaleY, color, shadowAlpha, measuredX, alpha);
+        if (glyphs.Version != uploadedVersion) { atlas.SetData(glyphs.Pixels); uploadedVersion = glyphs.Version; }
+        foreach (var (quad, (r, g, b, a)) in quads) drawGlyph(atlas, quad, new Color(r, g, b, a));
     }
 
     public void Dispose() => atlas?.Dispose();

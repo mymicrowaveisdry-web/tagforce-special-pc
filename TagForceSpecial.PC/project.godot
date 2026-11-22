@@ -16,11 +16,8 @@ config/features=PackedStringArray("4.7", "C#")
 
 [display]
 
-window/size/viewport_width=480
-window/size/viewport_height=272
-window/size/window_width_override=960
-window/size/window_height_override=544
-window/stretch/mode="viewport"
+window/size/viewport_width=960
+window/size/viewport_height=544
 
 [dotnet]
 
@@ -29,4 +26,7 @@ project/solution_directory=".."
 
 [rendering]
 
+renderer/rendering_method="forward_plus"
+rendering_device/fallback_to_d3d12=true
+rendering_device/fallback_to_opengl3=false
 textures/canvas_textures/default_texture_filter=0

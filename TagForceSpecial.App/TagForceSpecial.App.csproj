@@ -11,8 +11,10 @@
 
   <ItemGroup>
     <EmbeddedResource Include="App\Screens\Title\main-menu-animation.json" />
+    <EmbeddedResource Include="App\Screens\Title\title-flow-frames.json" />
     <EmbeddedResource Include="App\Screens\Title\deck-edit-frame.json" />
     <EmbeddedResource Include="App\Screens\Title\deck-edit-menu-frame.json" />
+    <EmbeddedResource Include="App\Screens\Album\card-album-frame.json" />
     <EmbeddedResource Include="App\Screens\FreeDuel\free-duel-settings-frame.json" />
     <EmbeddedResource Include="App\Screens\FreeDuel\free-duel-picker-frame.json" />
     <EmbeddedResource Include="App\Screens\FreeDuel\free-duel-start-frame.json" />
