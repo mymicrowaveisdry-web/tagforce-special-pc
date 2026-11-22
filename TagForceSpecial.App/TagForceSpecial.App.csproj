@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Host-neutral application logic shared by the game host, Tools and Tests: no window, GPU or UI-runtime dependency. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Kept from the game host so namespaces and embedded resource names are unchanged by the move. -->
+    <RootNamespace>TagForceSpecial.PC</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="App\Screens\Title\main-menu-animation.json" />
+    <EmbeddedResource Include="App\Screens\Title\deck-edit-frame.json" />
+    <EmbeddedResource Include="App\Screens\Title\deck-edit-menu-frame.json" />
+    <EmbeddedResource Include="App\Screens\FreeDuel\free-duel-settings-frame.json" />
+    <EmbeddedResource Include="App\Screens\FreeDuel\free-duel-picker-frame.json" />
+    <EmbeddedResource Include="App\Screens\FreeDuel\free-duel-start-frame.json" />
+    <EmbeddedResource Include="App\Screens\DuelField\duel-field-frame.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TagForceSpecial.AI\TagForceSpecial.AI.csproj" />
+    <ProjectReference Include="..\TagForceSpecial.Assets\TagForceSpecial.Assets.csproj" />
+    <ProjectReference Include="..\TagForceSpecial.Cards\TagForceSpecial.Cards.csproj" />
+    <ProjectReference Include="..\TagForceSpecial.Core\TagForceSpecial.Core.csproj" />
+    <ProjectReference Include="..\TagForceSpecial.Effects\TagForceSpecial.Effects.csproj" />
+    <ProjectReference Include="..\TagForceSpecial.Import\TagForceSpecial.Import.csproj" />
+  </ItemGroup>
+</Project>

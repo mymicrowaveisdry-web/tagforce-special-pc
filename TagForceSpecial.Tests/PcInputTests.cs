@@ -20,23 +20,30 @@ public class PcInputTests
     public void DefaultsKeepTheRetainedPrimaryKeysAndAddPcAlternatives()
     {
         var b = KeyBindings.Default;
-        Assert.Equal(Keys.Enter, b[InputAction.Confirm, 0]);
-        Assert.Equal(Keys.Escape, b[InputAction.Back, 0]);
-        Assert.Equal(Keys.Tab, b[InputAction.Menu, 0]);
-        Assert.Equal(Keys.Space, b[InputAction.Switch, 0]);
-        Assert.Equal(InputAction.Up | InputAction.Confirm, b.Held(new KeyboardState(Keys.W, Keys.Z)));
+        Assert.Equal(PhysicalKey.Enter, b[InputAction.Confirm, 0]);
+        Assert.Equal(PhysicalKey.Escape, b[InputAction.Back, 0]);
+        Assert.Equal(PhysicalKey.Tab, b[InputAction.Menu, 0]);
+        Assert.Equal(PhysicalKey.Space, b[InputAction.Switch, 0]);
+        Assert.Equal(InputAction.Up | InputAction.Confirm, b.Held(key => key is PhysicalKey.W or PhysicalKey.Z));
     }
 
     [Fact]
     public void RebindingMovesAKeyAndSwapsTheReplacedOne()
     {
-        var b = KeyBindings.Default.With(InputAction.Confirm, 1, Keys.W); // W was Up's second key
-        Assert.Equal(Keys.W, b[InputAction.Confirm, 1]);
-        Assert.Equal(Keys.Z, b[InputAction.Up, 1]); // Up takes Confirm's old Z, so no action loses a key
-        Assert.Same(b, b.With(InputAction.Up, 0, Keys.Escape)); // Escape is reserved
-        Assert.Same(b, b.With(InputAction.Back, 0, Keys.X)); // Back keeps Escape in slot 0
+        var b = KeyBindings.Default.With(InputAction.Confirm, 1, PhysicalKey.W); // W was Up's second key
+        Assert.Equal(PhysicalKey.W, b[InputAction.Confirm, 1]);
+        Assert.Equal(PhysicalKey.Z, b[InputAction.Up, 1]); // Up takes Confirm's old Z, so no action loses a key
+        Assert.Same(b, b.With(InputAction.Up, 0, PhysicalKey.Escape)); // Escape is reserved
+        Assert.Same(b, b.With(InputAction.Back, 0, PhysicalKey.X)); // Back keeps Escape in slot 0
         var round = KeyBindings.FromDocument(b.ToDocument());
         Assert.Equal(b.ToDocument(), round.ToDocument());
+    }
+
+    [Fact]
+    public void PhysicalKeysKeepTheSavedNamesAndValuesOfTheMonoGameKeys()
+    {
+        Assert.Equal(Enum.GetNames<Keys>(), Enum.GetNames<PhysicalKey>());
+        Assert.Equal(Enum.GetValues<Keys>().Select(k => (int)k), Enum.GetValues<PhysicalKey>().Select(k => (int)k));
     }
 
     [Fact]
@@ -101,12 +108,14 @@ public class PcInputTests
         Assert.Equal(ControlsOutcome.None, c.Handle(new(InputAction.Confirm, InputAction.Confirm), new KeyboardState(Keys.Enter)));
         Assert.True(c.Capturing);
         Assert.Equal(ControlsOutcome.None, c.Handle(default, new KeyboardState(Keys.Enter))); // Enter still held: not a new key
+        Assert.Equal(ControlsOutcome.None, c.Handle(default, new KeyboardState(Keys.F12))); // reserved: never bound
+        Assert.True(c.Capturing);
         Assert.Equal(ControlsOutcome.Changed, c.Handle(default, new KeyboardState(Keys.I)));
-        Assert.Equal(Keys.I, c.Bindings[InputAction.Up, 0]);
+        Assert.Equal(PhysicalKey.I, c.Bindings[InputAction.Up, 0]);
         c.Handle(new(InputAction.Confirm, InputAction.Confirm), none);
         Assert.Equal(ControlsOutcome.None, c.Handle(default, new KeyboardState(Keys.Escape)));
         Assert.False(c.Capturing);
-        Assert.Equal(Keys.I, c.Bindings[InputAction.Up, 0]);
+        Assert.Equal(PhysicalKey.I, c.Bindings[InputAction.Up, 0]);
     }
 
     [Fact]

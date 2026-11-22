@@ -96,6 +96,17 @@
           "TagForceSpecial.Core": "[1.0.0, )"
         }
       },
+      "tagforcespecial.app": {
+        "type": "Project",
+        "dependencies": {
+          "TagForceSpecial.AI": "[1.0.0, )",
+          "TagForceSpecial.Assets": "[1.0.0, )",
+          "TagForceSpecial.Cards": "[1.0.0, )",
+          "TagForceSpecial.Core": "[1.0.0, )",
+          "TagForceSpecial.Effects": "[1.0.0, )",
+          "TagForceSpecial.Import": "[1.0.0, )"
+        }
+      },
       "tagforcespecial.assets": {
         "type": "Project",
         "dependencies": {

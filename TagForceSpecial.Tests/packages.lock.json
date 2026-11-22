@@ -191,6 +191,17 @@
           "TagForceSpecial.Core": "[1.0.0, )"
         }
       },
+      "tagforcespecial.app": {
+        "type": "Project",
+        "dependencies": {
+          "TagForceSpecial.AI": "[1.0.0, )",
+          "TagForceSpecial.Assets": "[1.0.0, )",
+          "TagForceSpecial.Cards": "[1.0.0, )",
+          "TagForceSpecial.Core": "[1.0.0, )",
+          "TagForceSpecial.Effects": "[1.0.0, )",
+          "TagForceSpecial.Import": "[1.0.0, )"
+        }
+      },
       "tagforcespecial.assets": {
         "type": "Project",
         "dependencies": {
@@ -226,6 +237,7 @@
           "Gum.MonoGame": "[2026.11.2.1, )",
           "MonoGame.Framework.DesktopGL": "[3.8.6, )",
           "TagForceSpecial.AI": "[1.0.0, )",
+          "TagForceSpecial.App": "[1.0.0, )",
           "TagForceSpecial.Assets": "[1.0.0, )",
           "TagForceSpecial.Cards": "[1.0.0, )",
           "TagForceSpecial.Core": "[1.0.0, )",
@@ -236,11 +248,11 @@
       "tagforcespecial.tools": {
         "type": "Project",
         "dependencies": {
+          "TagForceSpecial.App": "[1.0.0, )",
           "TagForceSpecial.Assets": "[1.0.0, )",
           "TagForceSpecial.Cards": "[1.0.0, )",
           "TagForceSpecial.Core": "[1.0.0, )",
-          "TagForceSpecial.Effects": "[1.0.0, )",
-          "TagForceSpecial.PC": "[1.0.0, )"
+          "TagForceSpecial.Effects": "[1.0.0, )"
         }
       }
     }

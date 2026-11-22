@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="TagForceSpecial.AI/TagForceSpecial.AI.csproj" />
+  <Project Path="TagForceSpecial.App/TagForceSpecial.App.csproj" />
   <Project Path="TagForceSpecial.Assets/TagForceSpecial.Assets.csproj" />
   <Project Path="TagForceSpecial.Cards/TagForceSpecial.Cards.csproj" />
   <Project Path="TagForceSpecial.Core/TagForceSpecial.Core.csproj" />

@@ -31,7 +31,8 @@ public sealed class ControlsEditor(KeyBindings bindings)
         if (Capturing)
         {
             if (p.RightPressed || keys.IsKeyDown(Keys.Escape) && !previous.IsKeyDown(Keys.Escape)) { Capturing = false; return ControlsOutcome.None; }
-            var pressed = keys.GetPressedKeys().Where(k => !previous.IsKeyDown(k) && Array.IndexOf(KeyBindings.Reserved, k) < 0).ToArray();
+            var pressed = keys.GetPressedKeys().Where(k => !previous.IsKeyDown(k)).Select(k => (PhysicalKey)k)
+                .Where(k => Array.IndexOf(KeyBindings.Reserved, k) < 0).ToArray();
             if (pressed.Length == 0) return ControlsOutcome.None;
             Capturing = false;
             var next = Bindings.With(KeyBindings.Actions[Row].Action, Slot, pressed[0]);
