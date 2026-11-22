@@ -1,5 +1,6 @@
 using Godot;
 using TagForceSpecial.PC.App.Input;
+using TagForceSpecial.PC.App.Screens.Title;
 
 namespace TagForceSpecial.PC.Host;
 
@@ -28,6 +29,13 @@ internal sealed class GodotInput
     }
 
     private static bool IsDown(PhysicalKey key) => GodotKeys.ToGodot(key) is { } godot && Input.IsKeyPressed(godot);
+
+    public static void TypeName(InputEventKey key, TitleFlow flow)
+    {
+        if (key.Keycode == Key.Backspace) flow.TypeCharacter('\b');
+        else if (key.Unicode is > 0 and <= char.MaxValue && !char.IsSurrogate((char)key.Unicode))
+            flow.TypeCharacter((char)key.Unicode);
+    }
 }
 
 /// <summary>Physical keys (Windows virtual-key codes) as Godot keycodes.</summary>

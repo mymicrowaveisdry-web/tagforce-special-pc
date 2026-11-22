@@ -1,0 +1,167 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://Gum/OriginalOptionRow.tscn" id="1_OriginalOptionRow"]
+
+[ext_resource type="PackedScene" path="res://Gum/OriginalChoiceDialog.tscn" id="2_OriginalChoiceDialog"]
+
+[node name="OriginalOptions" type="Control"]
+layout_mode = 3
+offset_right = 480.0
+offset_bottom = 272.0
+mouse_filter = 2
+metadata/gum_source = "Screens/OriginalOptions.gusx"
+
+[node name="Background" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 272.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 480, 272)
+
+[node name="Static" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 272.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 480, 272)
+
+[node name="Group0" type="TextureRect" parent="."]
+offset_left = 110.0
+offset_top = 62.0
+offset_right = 290.0
+offset_bottom = 78.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 180, 16)
+
+[node name="Group1" type="TextureRect" parent="."]
+offset_left = 110.0
+offset_top = 114.0
+offset_right = 290.0
+offset_bottom = 130.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 180, 16)
+
+[node name="Row0" parent="." instance=ExtResource("1_OriginalOptionRow")]
+offset_left = 0.0
+offset_top = 47.0
+offset_right = 480.0
+offset_bottom = 61.0
+
+[node name="Row1" parent="." instance=ExtResource("1_OriginalOptionRow")]
+offset_left = 0.0
+offset_top = 75.0
+offset_right = 480.0
+offset_bottom = 89.0
+
+[node name="Row2" parent="." instance=ExtResource("1_OriginalOptionRow")]
+offset_left = 0.0
+offset_top = 87.0
+offset_right = 480.0
+offset_bottom = 101.0
+
+[node name="Row3" parent="." instance=ExtResource("1_OriginalOptionRow")]
+offset_left = 0.0
+offset_top = 99.0
+offset_right = 480.0
+offset_bottom = 113.0
+
+[node name="Row4" parent="." instance=ExtResource("1_OriginalOptionRow")]
+offset_left = 0.0
+offset_top = 127.0
+offset_right = 480.0
+offset_bottom = 141.0
+
+[node name="Row5" parent="." instance=ExtResource("1_OriginalOptionRow")]
+offset_left = 0.0
+offset_top = 139.0
+offset_right = 480.0
+offset_bottom = 153.0
+
+[node name="Row6" parent="." instance=ExtResource("1_OriginalOptionRow")]
+offset_left = 0.0
+offset_top = 151.0
+offset_right = 480.0
+offset_bottom = 165.0
+
+[node name="Row7" parent="." instance=ExtResource("1_OriginalOptionRow")]
+offset_left = 0.0
+offset_top = 163.0
+offset_right = 480.0
+offset_bottom = 177.0
+
+[node name="Row8" parent="." instance=ExtResource("1_OriginalOptionRow")]
+offset_left = 0.0
+offset_top = 175.0
+offset_right = 480.0
+offset_bottom = 189.0
+
+[node name="Row9" parent="." instance=ExtResource("1_OriginalOptionRow")]
+offset_left = 0.0
+offset_top = 187.0
+offset_right = 480.0
+offset_bottom = 201.0
+
+[node name="Row10" parent="." instance=ExtResource("1_OriginalOptionRow")]
+offset_left = 0.0
+offset_top = 199.0
+offset_right = 480.0
+offset_bottom = 213.0
+
+[node name="Row11" parent="." instance=ExtResource("1_OriginalOptionRow")]
+offset_left = 0.0
+offset_top = 211.0
+offset_right = 480.0
+offset_bottom = 225.0
+
+[node name="Row12" parent="." instance=ExtResource("1_OriginalOptionRow")]
+offset_left = 0.0
+offset_top = 223.0
+offset_right = 480.0
+offset_bottom = 237.0
+
+[node name="Help" type="TextureRect" parent="."]
+offset_left = 20.0
+offset_top = 250.0
+offset_right = 476.0
+offset_bottom = 266.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 456, 16)
+
+[node name="CancelDialog" parent="." instance=ExtResource("2_OriginalChoiceDialog")]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 272.0
+visible = false
+
+[node name="SaveDialog" parent="." instance=ExtResource("2_OriginalChoiceDialog")]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 272.0
+visible = false
+
+[node name="PcNote" type="Label" parent="."]
+offset_left = 378.0
+offset_top = 0.0
+offset_right = 476.0
+offset_bottom = 14.0
+visible = false
+mouse_filter = 2
+theme_override_colors/font_color = Color(1.0, 0.8392, 0.4706, 1.0)
+text = "Not used yet"
+autowrap_mode = 3
+theme_override_font_sizes/font_size = 12
+metadata/gum_font = "Fonts/LiberationSans-Regular.ttf"

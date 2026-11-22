@@ -9,7 +9,8 @@ public static class FlowDrawCompiler
     public static FlowCommand? Compile(FlowDraw draw)
     {
         if (draw.ClearStencil) return new FlowClearStencil();
-        if (draw.Points.Length < 3 || draw.Primitive is not (3 or 4 or 5)) return null;
+        bool lines = draw.Primitive == 2;
+        if (lines ? draw.Points.Length < 2 : draw.Points.Length < 3 || draw.Primitive is not (3 or 4 or 5)) return null;
         var blend = draw.WriteMask ? FlowBlend.Mask : draw.Additive ? FlowBlend.Additive : FlowBlend.Alpha;
         var stencil = draw.WriteMask ? FlowStencil.Write : draw.Stencil ? FlowStencil.Test : FlowStencil.None;
         FlowTexture? texture = draw.AssetKey is not { } key ? null
@@ -25,7 +26,16 @@ public static class FlowDrawCompiler
             float u = draw.Uv.Length == 0 ? 0 : draw.Uv[i][0], v = draw.Uv.Length == 0 ? 0 : draw.Uv[i][1];
             input[i] = new(draw.Points[i][0], draw.Points[i][1], Byte(vr), Byte(vg), Byte(vb), Byte(va), u, v);
         }
+        if (lines) return new FlowBatch(texture, blend, stencil, draw.LinearSampling, Segments(input), Lines: true);
         return new FlowBatch(texture, blend, stencil, draw.LinearSampling, draw.Primitive == 3 ? input : Expand(input, draw.Primitive));
+    }
+
+    /// <summary>A line strip (2) as a line list: each vertex joined to the next.</summary>
+    public static FlowVertex[] Segments(FlowVertex[] strip)
+    {
+        var output = new FlowVertex[(strip.Length - 1) * 2];
+        for (int i = 0; i + 1 < strip.Length; i++) { output[i * 2] = strip[i]; output[i * 2 + 1] = strip[i + 1]; }
+        return output;
     }
 
     /// <summary>A textured quad offset by (<paramref name="dx"/>, <paramref name="dy"/>), tinted by <paramref name="tint"/> or the quad's own colour.</summary>

@@ -1,0 +1,17 @@
+[remap]
+
+importer="font_data_bmfont"
+type="FontFile"
+uid="uid://dc651tq73rfjr"
+path="res://.godot/imported/Font18LiberationSans-Regular_ttf_ba33345d.fnt-98a90bb48718747d24bffdf59ea5f88f.fontdata"
+
+[deps]
+
+source_file="res://Fonts/Font18LiberationSans-Regular_ttf_ba33345d.fnt"
+dest_files=["res://.godot/imported/Font18LiberationSans-Regular_ttf_ba33345d.fnt-98a90bb48718747d24bffdf59ea5f88f.fontdata"]
+
+[params]
+
+fallbacks=[]
+compress=true
+scaling_mode=2

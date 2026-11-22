@@ -43,7 +43,7 @@ internal sealed class GeLayer : IDisposable
     private readonly Dictionary<string, Rid?> textures = new(StringComparer.Ordinal);
     private readonly Dictionary<(bool, bool, bool), Rid> samplers = [];
     private readonly Dictionary<(Rid, Rid), Rid> uniformSets = [];
-    private readonly Dictionary<(GeBlend?, bool, GeCompare, bool, GeStencil, bool), Rid> pipelines = [];
+    private readonly Dictionary<(GeBlend?, bool, GeCompare, bool, GeStencil, bool, bool), Rid> pipelines = [];
     private readonly List<Rid> transient = [];
     private RenderingDevice rd = null!;
     private Rid color, depth, framebuffer, shader, white;
@@ -142,7 +142,7 @@ internal sealed class GeLayer : IDisposable
             if (texture is not { } textureRid) continue;
             if (list < 0) list = rd.DrawListBegin(framebuffer, RenderingDevice.DrawFlags.DefaultAll, [], 1, 0);
             var s = draw.State;
-            rd.DrawListBindRenderPipeline(list, Pipeline(s));
+            rd.DrawListBindRenderPipeline(list, Pipeline(s, draw.Lines));
             rd.DrawListBindUniformSet(list, UniformSet(textureRid, Sampler(s.Linear, s.ClampU, s.ClampV)), 0);
             var array = rd.VertexArrayCreate((uint)draw.Triangles.Length, vertexFormat, [buffer, buffer, buffer], [offsets[draw], offsets[draw], offsets[draw]]);
             transient.Add(array);
@@ -216,9 +216,9 @@ internal sealed class GeLayer : IDisposable
         return set;
     }
 
-    private Rid Pipeline(GeState s)
+    private Rid Pipeline(GeState s, bool lines)
     {
-        var key = (s.Blend, s.DepthTest, s.DepthCompare, s.DepthWrite, s.Stencil, s.WriteColor);
+        var key = (s.Blend, s.DepthTest, s.DepthCompare, s.DepthWrite, s.Stencil, s.WriteColor, lines);
         if (pipelines.TryGetValue(key, out var known)) return known;
         var attachment = new RDPipelineColorBlendStateAttachment
         {
@@ -252,7 +252,7 @@ internal sealed class GeLayer : IDisposable
             depthState.FrontOpWriteMask = depthState.BackOpWriteMask = 0xff;
         }
         var dynamic = s.Blend is { } used && Uses(used, GeFactor.Constant) ? RenderingDevice.PipelineDynamicStateFlags.BlendConstants : 0;
-        var pipeline = rd.RenderPipelineCreate(shader, framebufferFormat, vertexFormat, RenderingDevice.RenderPrimitive.Triangles,
+        var pipeline = rd.RenderPipelineCreate(shader, framebufferFormat, vertexFormat, lines ? RenderingDevice.RenderPrimitive.Lines : RenderingDevice.RenderPrimitive.Triangles,
             new RDPipelineRasterizationState { CullMode = RenderingDevice.PolygonCullMode.Disabled }, new RDPipelineMultisampleState(),
             depthState, blendState, dynamic);
         pipelines[key] = pipeline;

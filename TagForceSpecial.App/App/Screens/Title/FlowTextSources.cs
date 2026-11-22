@@ -11,4 +11,6 @@ public sealed class FlowTextSources
         sources.GetValueOrDefault(source) ?? throw new InvalidDataException("Unknown or missing text source " + source + "."), offset, start, chars);
 
     public string Read(FlowText run) => Read(run.Source, run.Offset, run.Start, run.Chars);
+
+    public string Read(FlowTextSource reference) => Read(reference.Source, reference.Offset, reference.Start, reference.Chars);
 }

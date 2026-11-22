@@ -48,7 +48,7 @@ public static class GeGeometry
             return new GeVertex(x, y, 0, 1, v.R, v.G, v.B, v.A, v.U, v.V);
         });
         return new GeDraw(batch.Texture, new GeState(blend, false, GeCompare.Always, false, batch.Linear, true, true,
-            Stencil: stencil, WriteColor: batch.Blend != FlowBlend.Mask), vertices);
+            Stencil: stencil, WriteColor: batch.Blend != FlowBlend.Mask), vertices, batch.Lines);
     }
 
     /// <summary>A flow layer as GE commands: cleared to transparent first, as the flow layers were.</summary>

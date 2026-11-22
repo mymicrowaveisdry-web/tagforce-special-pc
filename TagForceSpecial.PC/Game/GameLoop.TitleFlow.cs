@@ -293,27 +293,11 @@ public sealed partial class GameLoop
             renderer.End();
         }
         if (activeScreen != ScreenId.TitleFlow || titleFlow is null) return;
-        if (titleFlow.Step is not (TitleFlowStep.NameKeyboard or TitleFlowStep.SystemSavePrompt or TitleFlowStep.SystemSaveDone)) return;
+        if (TitleFlowOverlay.Lines(titleFlow, ProfilePresent) is not { } lines) return;
         renderer.Begin();
-        renderer.Fill(new(0, 0, 480, 272), new Color(16, 16, 16), Rendering.SceneLayer.Background);
-        if (titleFlow.Step == TitleFlowStep.NameKeyboard)
-        {
-            renderer.Text($"NAME ({TitleFlow.NameLimit} LETTERS OR LESS)", 120, 70, Color.White);
-            renderer.Text(titleFlow.Name + "_", 190, 110, new Color(238, 196, 104));
-            renderer.Text("TYPE ON KEYBOARD", 160, 160, Color.White);
-            renderer.Text("ENTER/F1: FINISH   ESC: DELETE", 90, 190, Color.White);
-        }
-        else if (titleFlow.Step == TitleFlowStep.SystemSavePrompt)
-        {
-            renderer.Text(ProfilePresent ? "DO YOU WANT TO OVERWRITE THE DATA?" : "DO YOU WANT TO SAVE THIS DATA?", 100, 100, Color.White);
-            renderer.Text((titleFlow.ButtonFocus == 0 ? "> " : "  ") + "YES", 170, 140, Color.White);
-            renderer.Text((titleFlow.ButtonFocus == 1 ? "> " : "  ") + "NO", 270, 140, Color.White);
-        }
-        else
-        {
-            renderer.Text("SAVE COMPLETED.", 170, 120, Color.White);
-            renderer.Text("ESC / B: BACK", 185, 170, Color.White);
-        }
+        var fill = TitleFlowOverlay.Fill;
+        renderer.Fill(new(0, 0, 480, 272), new Color(fill.R, fill.G, fill.B), Rendering.SceneLayer.Background);
+        foreach (var (text, x, y, (r, g, b)) in lines) renderer.Text(text, x, y, new Color(r, g, b));
         renderer.End();
     }
 

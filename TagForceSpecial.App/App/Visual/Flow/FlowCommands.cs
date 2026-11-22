@@ -26,5 +26,6 @@ public abstract record FlowCommand;
 /// <summary>Clears the layer's stencil to zero.</summary>
 public sealed record FlowClearStencil : FlowCommand;
 
-/// <summary>A triangle list with one texture (or none: vertex colour only), blend, stencil use and sampling (point unless linear).</summary>
-public sealed record FlowBatch(FlowTexture? Texture, FlowBlend Blend, FlowStencil Stencil, bool Linear, FlowVertex[] Triangles) : FlowCommand;
+/// <summary>A triangle list (or, with <see cref="Lines"/>, a line list) with one texture (or none: vertex colour only), blend, stencil use
+/// and sampling (point unless linear).</summary>
+public sealed record FlowBatch(FlowTexture? Texture, FlowBlend Blend, FlowStencil Stencil, bool Linear, FlowVertex[] Triangles, bool Lines = false) : FlowCommand;

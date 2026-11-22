@@ -20,6 +20,9 @@ public sealed record FreeDuelVersusProfile(int SchemaVersion, string BuildId, st
     FlowDraw[] PlayerDeckPanel, FlowDraw[] OpponentDeckPanel, FreeDuelVersusFocusFrames Focus, float DigitU0, float DigitStep, FreeDuelVersusTexts Text,
     FlowTextSource DeckHint, FreeDuelDefaultOpponent DefaultOpponent)
 {
+    /// <summary>PC-authored label of the deck the deterministic PC opponent plays (the INITIAL PREVIEW deck).</summary>
+    public static string PcDeckLabel => "PC: " + Effects.InitialOpponentDecks.Names[0];
+
     public IEnumerable<string> AssetKeys() => Header.Concat(StartIdle).Concat(StartActive).Concat(PlayerPortrait).Append(PlayerBust)
         .Append(PlayerLpBadge).Concat(PlayerLpDigits).Concat(OpponentPortrait).Append(OpponentBust).Append(OpponentLpBadge).Concat(OpponentLpDigits)
         .Concat(PlayerNamePanel).Concat(OpponentNamePanel).Concat(PlayerDeckPanel).Concat(OpponentDeckPanel)

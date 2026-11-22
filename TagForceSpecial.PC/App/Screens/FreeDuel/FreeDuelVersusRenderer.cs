@@ -14,7 +14,7 @@ public sealed class FreeDuelVersusRenderer(GraphicsDevice device, TitleFlowVisua
         - profile.Text.PlayerDeck.X - 7;
 
     /// <summary>PC-authored label of the deck the deterministic PC opponent plays (the INITIAL PREVIEW deck).</summary>
-    public static string PcDeckLabel => "PC: " + Effects.InitialOpponentDecks.Names[0];
+    public static string PcDeckLabel => FreeDuelVersusProfile.PcDeckLabel;
     public FreeDuelVersusProfile Profile => profile;
     public IReadOnlyList<string> Gaps { get; } = Array.AsReadOnly(new[]
     {

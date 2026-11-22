@@ -33,5 +33,6 @@ public abstract record GeCommand;
 /// <summary>Clears colour (to the given RGBA), depth (to <see cref="Depth"/>) and stencil, each when requested.</summary>
 public sealed record GeClear(bool ClearColor, bool ClearDepth, bool ClearStencil, byte R, byte G, byte B, byte A, float Depth) : GeCommand;
 
-/// <summary>A triangle list (back faces already removed) sampling <see cref="Texture"/> (or vertex colour only).</summary>
-public sealed record GeDraw(FlowTexture? Texture, GeState State, GeVertex[] Triangles) : GeCommand;
+/// <summary>A triangle list (back faces already removed), or with <see cref="Lines"/> a line list, sampling <see cref="Texture"/> (or vertex
+/// colour only).</summary>
+public sealed record GeDraw(FlowTexture? Texture, GeState State, GeVertex[] Triangles, bool Lines = false) : GeCommand;

@@ -1,0 +1,130 @@
+[gd_scene load_steps=1 format=3]
+
+[node name="OriginalTitleStartMenu" type="Control"]
+layout_mode = 3
+offset_right = 480.0
+offset_bottom = 272.0
+mouse_filter = 2
+metadata/gum_source = "Screens/OriginalTitleStartMenu.gusx"
+
+[node name="YuseiPanel" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 272.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 480, 272)
+
+[node name="YugiPanel" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 272.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 480, 272)
+
+[node name="JadenPanel" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 272.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 480, 272)
+
+[node name="YumaPanel" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 272.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 480, 272)
+
+[node name="PanelEdges" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 272.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 480, 272)
+
+[node name="Yuya" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 272.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 480, 272)
+
+[node name="LogoEffects" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 272.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 480, 272)
+
+[node name="Logo" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 272.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 480, 272)
+
+[node name="Copyright" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 272.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 480, 272)
+
+[node name="PromptShade" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 272.0
+visible = false
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 480, 272)
+
+[node name="PressStart" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 272.0
+visible = false
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 480, 272)
+
+[node name="FlowFrame" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 272.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 480, 272)

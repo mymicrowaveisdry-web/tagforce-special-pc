@@ -78,6 +78,35 @@ public sealed class FlowRenderingTests
     }
 
     [Fact]
+    public void TitleFlowFramesCoverEveryMeasuredFrameAndTheirTextures()
+    {
+        var profile = FlowProfile.LoadEmbedded();
+        var layers = new MainMenuLayers(profile, MainMenuAnimation.LoadEmbedded());
+        var frames = new TitleFlowFrames(profile, layers, new FlowTextSources(), null!, "font");
+        Assert.All(new[] { "storage", "no-data", "cancel-load.black", "entry.name", "entry.rules", "entry.confidence", "entry.level", "entry.create",
+            TitleFlowFrames.QuitFrame, "start-menu" }, id => Assert.True(frames.Has(id), id));
+        Assert.Contains(TitleFlowFrames.ButtonKey, frames.TextureKeys);
+        Assert.Contains(MainMenuLayers.PanelKey, frames.TextureKeys);
+        // The quit question is drawn over the whole Main Menu background, so it starts after that many draws.
+        Assert.True(profile.Frames.Single(f => f.Id == TitleFlowFrames.QuitFrame).Draws.Length > layers.BackgroundDrawCount);
+    }
+
+    [Fact]
+    public void SubmenuBarsUseTheirOwnBasePiecesAndTheMainMenuFocusPieces()
+    {
+        foreach (var kind in Enum.GetValues<SubmenuKind>())
+        {
+            var profile = SubmenuProfile.LoadEmbedded(kind);
+            var layers = new SubmenuLayers(profile);
+            var pieces = layers.BarPieces;
+            Assert.Equal(["BaseLeft", "BaseCenter", "BaseRight", "FocusLeft", "FocusCenter", "FocusRight"], pieces.Select(p => p.Piece));
+            Assert.Equal(profile.BasePieces[1], new[] { pieces[1].X, pieces[1].Y, pieces[1].Width, pieces[1].Height });
+            Assert.Equal(MainMenuLayers.BarPieces[3], pieces[3]);
+            Assert.Equal(MainMenuLayers.LabelHeight * 2 * profile.Rows.Length, layers.LabelLayerHeight);
+        }
+    }
+
+    [Fact]
     public void MainMenuBackgroundFollowsTheEntrySequence()
     {
         var layers = new MainMenuLayers(FlowProfile.LoadEmbedded(), MainMenuAnimation.LoadEmbedded());

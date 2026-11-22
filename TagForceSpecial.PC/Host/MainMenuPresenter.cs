@@ -56,7 +56,12 @@ internal sealed partial class MainMenuPresenter : Control
             var label = bar.GetNode<TextureRect>("Label");
             label.Material = CanvasMaterials.Premultiplied;
         }
+        GumText.ApplyFonts(screen);
+        ShowNotice(null);
     }
+
+    /// <summary>The PC notice for a Main Menu row the PC does not recreate, or none.</summary>
+    public void ShowNotice(MainMenuDestination? destination) => GumText.ShowNotice(screen, destination?.Label, destination?.Notice);
 
     /// <summary>Shows the menu at loop frame <paramref name="gameFrame"/> and entry frame <paramref name="entryFrame"/>. While a submenu is open
     /// the menu is drawn without focus and tinted by <paramref name="dim"/> (255 = undimmed), bars and labels alike.</summary>

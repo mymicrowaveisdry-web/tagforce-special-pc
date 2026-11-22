@@ -53,7 +53,7 @@ public partial class Boot : Control
             catch (InvalidOperationException error) { return (error.Message, 1, null); }
             return ("Opening the importer workbench.", 0, null);
         }
-        // Pilots: the presentation smoke covers only the ported Main Menu and album frames; the field reference renders exported draw lists.
+        // The field reference renders exported draw lists independently of the title route.
         if (!options.LaunchGame && !options.PresentationSmoke && options.DuelFieldReferenceRoot is null)
             return ("This launch mode is not available in the Godot host yet.", NotPorted, null);
         return (StatusReport(decoder, options.DataRoot), null, options);

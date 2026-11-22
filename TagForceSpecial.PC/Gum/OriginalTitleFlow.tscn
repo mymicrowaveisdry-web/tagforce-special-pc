@@ -1,0 +1,18 @@
+[gd_scene load_steps=1 format=3]
+
+[node name="OriginalTitleFlow" type="Control"]
+layout_mode = 3
+offset_right = 480.0
+offset_bottom = 272.0
+mouse_filter = 2
+metadata/gum_source = "Screens/OriginalTitleFlow.gusx"
+
+[node name="FlowFrame" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 272.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 480, 272)

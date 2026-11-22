@@ -14,6 +14,15 @@
         "resolved": "4.7.2",
         "contentHash": "EPvfayB7b7MrBNdASvy86jRS5AbM9dprkVivcRD80g+ngn2M8KAIrBQH4NhyQL+pwxni0xVnuqhD9AFpZeNQpw=="
       },
+      "GodotSharpEditor": {
+        "type": "Direct",
+        "requested": "[4.7.2, )",
+        "resolved": "4.7.2",
+        "contentHash": "Fuf2rNvajla9N8Z+ksxsSIt326wsjpB2F2uZCtxkdfWIsApabCHy5fsE2EKxOlQ4NaINGdgMIv62D0n583qe1A==",
+        "dependencies": {
+          "GodotSharp": "4.7.2"
+        }
+      },
       "Gum.MonoGame": {
         "type": "Direct",
         "requested": "[2026.11.2.1, )",
@@ -147,18 +156,6 @@
           "TagForceSpecial.Cards": "[1.0.0, )",
           "TagForceSpecial.Effects": "[1.0.0, )"
         }
-      }
-    },
-    "net10.0/win-x64": {
-      "MonoGame.Library.OpenAL": {
-        "type": "Transitive",
-        "resolved": "1.24.3.4",
-        "contentHash": "/FhE0hblY9owGPvIHnMbH+6kXtjfl+/t3Cm776RQiZnGyxGy2Qd9pTAzclLuMO8pvtjiGLYkkRwjRciUA4XFyQ=="
-      },
-      "MonoGame.Library.SDL": {
-        "type": "Transitive",
-        "resolved": "2.32.10.2",
-        "contentHash": "mtnmWr50KgH2Ui9fPscHPMI3sXgb5NBRnPS7igi4ViJ23ROdP+MLi/j9CmLWX47KuXvI3Bp5BElCDVwRUlswgg=="
       }
     }
   }

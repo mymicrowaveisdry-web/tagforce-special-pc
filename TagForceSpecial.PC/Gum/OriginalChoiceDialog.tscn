@@ -1,0 +1,52 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://Gum/OriginalDialogButton.tscn" id="1_OriginalDialogButton"]
+
+[node name="OriginalChoiceDialog" type="Control"]
+layout_mode = 3
+offset_right = 480.0
+offset_bottom = 272.0
+mouse_filter = 2
+metadata/gum_source = "Components/OriginalChoiceDialog.gucx"
+
+[node name="Back" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 480.0
+offset_bottom = 272.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 480, 272)
+
+[node name="Message0" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 103.0
+offset_right = 480.0
+offset_bottom = 119.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 480, 16)
+
+[node name="Message1" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 115.0
+offset_right = 480.0
+offset_bottom = 131.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 480, 16)
+
+[node name="Button0" parent="." instance=ExtResource("1_OriginalDialogButton")]
+offset_left = 170.0
+offset_top = 141.0
+offset_right = 230.0
+offset_bottom = 165.0
+
+[node name="Button1" parent="." instance=ExtResource("1_OriginalDialogButton")]
+offset_left = 250.0
+offset_top = 141.0
+offset_right = 310.0
+offset_bottom = 165.0

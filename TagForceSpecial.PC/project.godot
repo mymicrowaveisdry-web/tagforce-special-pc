@@ -26,7 +26,5 @@ project/solution_directory=".."
 
 [rendering]
 
-renderer/rendering_method="forward_plus"
-rendering_device/fallback_to_d3d12=true
-rendering_device/fallback_to_opengl3=false
 textures/canvas_textures/default_texture_filter=0
+rendering_device/fallback_to_opengl3=false

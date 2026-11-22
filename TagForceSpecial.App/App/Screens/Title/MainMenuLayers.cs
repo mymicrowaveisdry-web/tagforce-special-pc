@@ -41,13 +41,17 @@ public sealed class MainMenuLayers
         animatedDraws[motion.Profile.StripDraw] = f => StripDraw(strip, f);
     }
 
+    /// <summary>Number of measured draws in the Main Menu background (other frames drawn over the menu start after them).</summary>
+    public int BackgroundDrawCount => frame.Draws.Length;
+
     /// <summary>Asset keys the background samples, plus the bar panel atlas.</summary>
     public IEnumerable<string> TextureKeys =>
         frame.Draws.Select(d => d.AssetKey).OfType<string>().Append(PanelKey).Distinct(StringComparer.Ordinal);
 
     /// <summary>Background commands for a cleared transparent layer at <paramref name="gameFrame"/> of the loop and
-    /// <paramref name="entryFrame"/> of the entry sequence.</summary>
-    public IReadOnlyList<FlowCommand> Background(int gameFrame, int entryFrame = MainMenuEntry.ReadyFrame)
+    /// <paramref name="entryFrame"/> of the entry sequence. Another screen can supply its own measured <paramref name="title"/> quad
+    /// (Options uses the same header).</summary>
+    public IReadOnlyList<FlowCommand> Background(int gameFrame, int entryFrame = MainMenuEntry.ReadyFrame, FlowQuad? title = null)
     {
         var commands = new List<FlowCommand>(frame.Draws.Length);
         void Add(FlowDraw draw) { if (FlowDrawCompiler.Compile(draw) is { } command) commands.Add(command); }
@@ -62,7 +66,10 @@ public sealed class MainMenuLayers
             else if (i == TitleDraw)
             {
                 int alpha = MainMenuEntry.TitleAlpha(entryFrame);
-                if (alpha > 0) Add(frame.Draws[i] with { Color = [frame.Draws[i].Color[0], frame.Draws[i].Color[1], frame.Draws[i].Color[2], alpha] });
+                var draw = frame.Draws[i];
+                if (alpha > 0 && title is { } q)
+                    commands.Add(FlowDrawCompiler.Quad(draw.AssetKey!, q, 0, 0, draw.LinearSampling, (q.Color[0], q.Color[1], q.Color[2], alpha * q.Color[3] / 255)));
+                else if (alpha > 0) Add(frame.Draws[i] with { Color = [frame.Draws[i].Color[0], frame.Draws[i].Color[1], frame.Draws[i].Color[2], alpha] });
             }
             else Add(frame.Draws[i]);
         }

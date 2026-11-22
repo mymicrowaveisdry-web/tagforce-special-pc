@@ -91,7 +91,7 @@ public sealed class FreeDuelDeckPickerSession(bool player, IReadOnlyList<FreeDue
     public static IReadOnlyList<FreeDuelDeckEntry> OpponentEntries(FreeDuelDecksProfile profile, int character)
     {
         var decks = profile.CharacterDecks[character];
-        var list = new List<FreeDuelDeckEntry> { new(null, FreeDuelVersusRenderer.PcDeckLabel, true) };
+        var list = new List<FreeDuelDeckEntry> { new(null, FreeDuelVersusProfile.PcDeckLabel, true) };
         if (decks.Partner) list.Add(new(profile.PartnerDeck, null, false));
         list.AddRange(decks.Decks.Select(d => new FreeDuelDeckEntry(d, null, false)));
         return list;

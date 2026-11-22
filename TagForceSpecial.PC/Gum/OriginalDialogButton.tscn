@@ -1,0 +1,39 @@
+[gd_scene load_steps=1 format=3]
+
+[node name="OriginalDialogButton" type="Control"]
+layout_mode = 3
+offset_right = 60.0
+offset_bottom = 24.0
+mouse_filter = 2
+metadata/gum_source = "Components/OriginalDialogButton.gucx"
+
+[node name="Plain" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 60.0
+offset_bottom = 24.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 60, 24)
+
+[node name="Focus" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 60.0
+offset_bottom = 24.0
+visible = false
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 60, 24)
+
+[node name="Label" type="TextureRect" parent="."]
+offset_left = 0.0
+offset_top = 4.0
+offset_right = 60.0
+offset_bottom = 20.0
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+metadata/gum_texture_region = Rect2(0, 0, 60, 16)

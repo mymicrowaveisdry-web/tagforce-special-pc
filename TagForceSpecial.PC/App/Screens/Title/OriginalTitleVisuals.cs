@@ -8,9 +8,6 @@ namespace TagForceSpecial.PC.App.Screens.Title;
 /// <summary>Native-size title layers composed from validated source textures.</summary>
 public sealed class OriginalTitleVisuals : IDisposable
 {
-    private sealed record Draw(string Group, int Ordinal, string? AssetKey, int Primitive,
-        float[][] Points, float[][] Uv, int[] Color, bool ClearStencil, bool WriteMask, bool Stencil, bool Additive, bool LinearSampling);
-    private sealed record Frame(int SchemaVersion, string BuildId, string FrameDumpSha256, string Scope, string[] Groups, Draw[] Draws);
     private readonly Dictionary<string, RenderTarget2D> layers = new(StringComparer.Ordinal);
     public IReadOnlyDictionary<string, RenderTarget2D> Layers => layers;
     public void ExportReviewLayers(string directory)
@@ -40,11 +37,7 @@ public sealed class OriginalTitleVisuals : IDisposable
     }
     public OriginalTitleVisuals(GraphicsDevice device, OriginalScreenAssetResolver assets)
     {
-        using var stream = typeof(OriginalTitleVisuals).Assembly.GetManifestResourceStream(
-            "TagForceSpecial.PC.App.Screens.Title.title-frame.json") ?? throw new InvalidDataException("Missing measured title profile.");
-        var frame = JsonSerializer.Deserialize<Frame>(stream) ?? throw new InvalidDataException("Invalid title profile.");
-        if (frame.SchemaVersion != 1 || frame.BuildId != Assets.GameSource.GameBuildProfile.English21.BuildId)
-            throw new InvalidDataException("Title profile/source mismatch.");
+        var frame = TitleFrame.LoadEmbedded();
         // Resolve every required original texture before allocating derived layers.
         var textures = frame.Draws.Where(d => d.AssetKey is not null).Select(d => d.AssetKey!).Distinct(StringComparer.Ordinal)
             .ToDictionary(key => key, key => assets.Resolve(key).Texture, StringComparer.Ordinal);
