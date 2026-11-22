@@ -72,6 +72,39 @@ public sealed class FieldClosureTests
     }
 
     [Fact]
+    public void TheOpeningHandsAreDealtCardByCardAtTheMeasuredVblanks()
+    {
+        CardView[] hand = [Card(1, 4010), Card(2, 4013), Card(3, 4037), Card(4, 4009), Card(5, 4042)];
+        var view = View(0, 1, DuelPhase.Draw, hand, new CardView?[5], new CardView?[5], new ChoiceView(9, "Draw / begin turn", Kind: ActionKind.Draw));
+        var presentation = new DuelFieldPresentation(TimeSpan.Zero, enabled: true);
+        (bool, int, int) At(double v)
+        {
+            var f = presentation.Frame(view, TimeSpan.FromSeconds((v + 0.5) / DuelFieldPresentation.VblankHz));
+            return (f.BeforeDeal, f.BeforeDeal ? f.DealtSelf : -1, f.BeforeDeal ? f.DealtOpponent : -1);
+        }
+        Assert.Equal((true, 0, 0), At(263));
+        Assert.Equal((true, 1, 0), At(264));
+        Assert.Equal((true, 5, 0), At(280));
+        Assert.Equal((true, 5, 1), At(284));
+        Assert.Equal((true, 5, 4), At(298));
+        Assert.Equal((false, -1, -1), At(300));
+        var dealt = DuelFieldPresentation.BeforeOpeningDeal(view, 2, 0);
+        Assert.Equal((2, 35 + 3), (dealt.Self.Hand.Count, dealt.Self.DeckCount));
+    }
+
+    [Fact]
+    public void TheOutcomeWaitsForCircleBeforeTheResultScreen()
+    {
+        var presentation = new DuelFieldPresentation(TimeSpan.Zero, enabled: true);
+        Assert.False(presentation.ResultReady(TimeSpan.FromSeconds(30)));
+        presentation.OutcomeInput(false);
+        Assert.False(presentation.ResultReady(TimeSpan.FromSeconds(31)));
+        presentation.OutcomeInput(true);
+        Assert.True(presentation.ResultReady(TimeSpan.FromSeconds(31)));
+        Assert.True(new DuelFieldPresentation(TimeSpan.Zero, enabled: false).ResultReady(TimeSpan.Zero));
+    }
+
+    [Fact]
     public void AfterAnAttackTheCursorMovesToAMonsterThatCanStillAttack()
     {
         var monsters = new CardView?[5];

@@ -239,7 +239,7 @@ public sealed partial class GameLoop
     /// menu until the original Help screen exists. Every choice is revision-bound; a refusal closes the window without state changes.</summary>
     private void UpdateDuelInput(InputFrame frame)
     {
-        if (duel is null || duel.View.Outcome is not null) return;
+        if (duel is null || duel.View.Outcome is not null) { if (duel is not null) duelFieldPresentation.OutcomeInput(frame.IsPressed(InputAction.Confirm)); return; }
         if (frame.IsPressed(InputAction.Start)) { duel.Paused = true; screen = ScreenId.Paused; return; }
         var input = DuelInput(duel);
         var before = duel.View;

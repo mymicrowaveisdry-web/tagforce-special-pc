@@ -37,7 +37,7 @@ public static class DuelScene
     {
         var list = new DuelDrawList();
         var frame = input.Presentation;
-        var view = frame.BeforeDeal ? DuelFieldPresentation.BeforeOpeningDeal(input.View) : input.View;
+        var view = frame.BeforeDeal ? DuelFieldPresentation.BeforeOpeningDeal(input.View, frame.DealtSelf, frame.DealtOpponent) : input.View;
         bool finished = view.Outcome is not null;
         var session = finished ? null : input.Input;
         // Show Details is an opaque full-screen page; measured: its closing frame is blank.

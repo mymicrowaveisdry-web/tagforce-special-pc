@@ -17,8 +17,8 @@ public static class DuelWalkScenario
     public static IReadOnlyList<uint> OpeningHand { get; } = [4010, 4013, 4037, 4009, 4042];
 
     /// <summary>Frame (after the walk starts) and key of each press. The first press waits for Main Phase 1 to settle.</summary>
-    public static IReadOnlyList<(int Frame, Keys Key)> Presses { get; } = [(300, Keys.Down), (330, Keys.Enter), (360, Keys.Enter)];
-    public const int Frames = 480;
+    public static IReadOnlyList<(int Frame, Keys Key)> Presses { get; } = [(420, Keys.Down), (450, Keys.Enter), (480, Keys.Enter)];
+    public const int Frames = 600;
 
     /// <summary>The player's deck: the native opening hand first (the PC deals the first five cards), then the rest of the 42.</summary>
     public static DeckDefinition PlayerDeck() => Deck("matched-walk-player", "local-player", OpeningHand.Concat(Remaining()));
