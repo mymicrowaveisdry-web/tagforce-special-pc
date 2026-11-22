@@ -92,6 +92,12 @@ public sealed class DuelFieldFocus
             int index = IndexOf(row, Current);
             Current = row[((index + dx) % row.Count + row.Count) % row.Count];
         }
+        // Measured (order34-closure): Down from the player's Deck goes to the last hand card (the card just drawn).
+        if (dy < 0 && Current is { Own: true, Kind: FieldObjectKind.Deck } && rows[DuelFieldRows.OwnBottom].LastOrDefault(o => o.Kind == FieldObjectKind.Hand) is { Card: not null } drawn)
+        {
+            Current = drawn;
+            return;
+        }
         if (dy != 0)
         {
             int next = ((Current.Row + dy) % DuelFieldRows.Count + DuelFieldRows.Count) % DuelFieldRows.Count;

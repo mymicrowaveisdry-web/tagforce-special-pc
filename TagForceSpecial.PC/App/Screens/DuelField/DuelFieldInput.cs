@@ -99,14 +99,20 @@ public sealed class DuelFieldInput
         Modal = null;
         if (phase != view.Phase && view.Phase == DuelPhase.Battle && view.ActivePlayer == view.Viewer)
             FocusFirstAttacker(view); // measured: entering Battle Phase moves the cursor onto the player's monster
+        // Measured (order34-closure): after an attack the cursor moves on to a monster that can still attack.
+        else if (phase == DuelPhase.Battle && view.Phase == DuelPhase.Battle && view.ActivePlayer == view.Viewer &&
+                 !view.Choices.Any(c => c.Kind == ActionKind.Attack && c.FocusInstanceId == Focus.Current.Card?.InstanceId))
+            FocusFirstAttacker(view);
         // Measured (matched walk): the player's Main Phase 1 starts with the cursor on the centre Spell & Trap Zone.
-        if (phase is DuelPhase.Draw or DuelPhase.Standby && view.Phase == DuelPhase.Main1 && view.ActivePlayer == view.Viewer)
+        if (phase is DuelPhase.Draw or DuelPhase.Standby && view.Phase == DuelPhase.Main1 && view.ActivePlayer == view.Viewer && Focus.Current.Kind != FieldObjectKind.Deck)
             Focus.FocusOn(Focus.Row(DuelFieldRows.OwnSpellTrap).First(o => o.Kind == FieldObjectKind.SpellTrap && o.Index == 2));
         phase = view.Phase;
         if (view.Outcome is not null) return null;
         switch (DuelFieldCommands.Mode(view))
         {
-            case DuelInputMode.AutoDraw when !recovering: return new DuelSubmit(view.Revision, view.Choices[0].Id);
+            // Measured: the duel's first turn draws nothing; later Draw Phases wait on the Deck's one-row "Draw" menu (order34-closure).
+            case DuelInputMode.AutoDraw when view.Turn == 1 && !recovering: return new DuelSubmit(view.Revision, view.Choices[0].Id);
+            case DuelInputMode.AutoDraw: OpenDrawMenu(view); break;
             case DuelInputMode.AutoStandby when !recovering: return new DuelSubmit(view.Revision, DuelFieldCommands.StandbyExit(view)!.Id);
             case DuelInputMode.Response: Modal = new ResponseModal(0); break;
             // Measured original screens for a position choice and a card choice; other decisions keep the list.
@@ -118,6 +124,13 @@ public sealed class DuelFieldInput
                 break;
         }
         return null;
+    }
+
+    /// <summary>The Draw Phase prompt: the cursor on the player's Deck with its "Draw" menu open (○ draws; × does nothing, inferred).</summary>
+    private void OpenDrawMenu(DuelView view)
+    {
+        Focus.FocusOn(Focus.Row(DuelFieldRows.OwnBottom).First(o => o.Kind == FieldObjectKind.Deck));
+        Modal = new CardMenuModal(Focus.Current, [new("Draw", new SubmitCommand(view.Choices[0].Id), MenuVerb.Draw)], 0);
     }
 
     private void FocusFirstAttacker(DuelView view)
@@ -151,6 +164,7 @@ public sealed class DuelFieldInput
 
     private DuelSubmit? CardMenu(DuelView view, CardMenuModal m, int dy, bool repeated, bool confirm, bool back)
     {
+        if (back && m.Items is [{ Verb: MenuVerb.Draw }]) return null;
         if (back) return Close(true);
         if (dy != 0) { Modal = m with { Index = Step(m.Index, -dy, m.Items.Count, wrap: !repeated) }; return null; }
         if (!confirm) return null;

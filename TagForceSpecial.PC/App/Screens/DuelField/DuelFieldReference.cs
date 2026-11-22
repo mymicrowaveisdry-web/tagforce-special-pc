@@ -168,6 +168,13 @@ public static class DuelFieldReference
         Save(device, renderer, field, DuelScene.Compose(new(tribute, 0, -1, "", 0, States[0].Style, facts, input), field.Profile), Path.Combine(root, "tribute-prompt.png"));
         input.Handle(tribute, new(InputAction.Confirm, InputAction.Confirm), frame);
         Save(device, renderer, field, DuelScene.Compose(new(tribute, 0, -1, "", 0, States[0].Style, facts, input), field.Profile), Path.Combine(root, "tribute-select.png"));
+
+        // Turn 3's Draw prompt (order34-closure draw-prompt): the Deck's one-row Draw menu.
+        var draw = board with { Revision = 13, Turn = 3, Phase = DuelPhase.Draw, Choices = [new(0, "Draw / begin turn", null, ActionKind.Draw)] };
+        input = new DuelFieldInput();
+        input.Handle(draw, default, frame);
+        Save(device, renderer, field, DuelScene.Compose(new(draw, 0, -1, "", 0, States[0].Style with { Backdrop = "starfield" }, facts, input), field.Profile),
+            Path.Combine(root, "draw-prompt.png"));
     }
 
     /// <summary>Show Details of Caam (aki-board, focused in hand) through ○ → Show Details, compared with ge-aki-detail.png (counters

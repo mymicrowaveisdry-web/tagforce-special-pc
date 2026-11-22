@@ -18,7 +18,7 @@ public sealed record MenuItem(string Label, MenuCommand Command, MenuVerb Verb =
 /// <summary>Command verbs with an original string in duel/basic_jj.ehp. Icons are the card_icon02 cells seen in captures.</summary>
 public enum MenuVerb
 {
-    Summon, SpecialSummon, PendulumSummon, FlipSummon, SetMonster, SetSpellTrap, Activate, PendulumScale, Attack, ToAttack, ToDefense,
+    Draw, Summon, SpecialSummon, PendulumSummon, FlipSummon, SetMonster, SetSpellTrap, Activate, PendulumScale, Attack, ToAttack, ToDefense,
     ShowCardList, Surrender, ShowDetails, ChangePhase, Option, Help, Other
 }
 
@@ -27,7 +27,7 @@ public static class MenuVerbs
     /// <summary>String offsets in duel/basic_jj.ehp (UTF-16, zero-terminated).</summary>
     public static int? TextOffset(MenuVerb verb) => verb switch
     {
-        MenuVerb.Summon => 401574, MenuVerb.SpecialSummon => 401620, MenuVerb.PendulumSummon => 401588, MenuVerb.FlipSummon => 401288,
+        MenuVerb.Draw => 401058, MenuVerb.Summon => 401574, MenuVerb.SpecialSummon => 401620, MenuVerb.PendulumSummon => 401588, MenuVerb.FlipSummon => 401288,
         MenuVerb.SetMonster or MenuVerb.SetSpellTrap => 401354, MenuVerb.Activate => 400808, MenuVerb.PendulumScale => 400826,
         MenuVerb.Attack => 400864, MenuVerb.ToAttack => 400878, MenuVerb.ToDefense => 400924, MenuVerb.ShowCardList => 401472,
         MenuVerb.Surrender => 401642, MenuVerb.ShowDetails => 401502, MenuVerb.ChangePhase => 401262, MenuVerb.Option => 401104,
@@ -37,7 +37,7 @@ public static class MenuVerbs
     /// <summary>card_icon02 cell (13 × 13) of each verb seen in a capture; verbs not captured yet have none.</summary>
     public static (int U, int V)? Icon(MenuVerb verb) => verb switch
     {
-        MenuVerb.Summon => (65, 66), MenuVerb.SetMonster => (104, 92), MenuVerb.SetSpellTrap => (52, 66), MenuVerb.Attack => (91, 66),
+        MenuVerb.Draw => (104, 66), MenuVerb.Summon => (65, 66), MenuVerb.SetMonster => (104, 92), MenuVerb.SetSpellTrap => (52, 66), MenuVerb.Attack => (91, 66),
         MenuVerb.ShowCardList => (65, 79), MenuVerb.Surrender => (0, 79), MenuVerb.ShowDetails => (0, 66), MenuVerb.ChangePhase => (91, 92),
         MenuVerb.Option => (78, 92), MenuVerb.Help => (52, 79), _ => null
     };
@@ -52,8 +52,9 @@ public enum DuelInputMode { Field, Response, AutoDraw, AutoStandby, DecisionList
 public static class DuelFieldCommands
 {
     public const string ShowDetails = "Show Details";
-    /// <summary>Inferred: the one captured summon to an empty row went to the centre slot; other zones are tried centre-out.</summary>
-    public static readonly int[] PreferredZones = [2, 1, 3, 0, 4];
+    /// <summary>Measured (order34-closure summons): the centre zone, then right of centre, then left of centre; the outer zones follow
+    /// right first (inferred).</summary>
+    public static readonly int[] PreferredZones = [2, 3, 1, 4, 0];
 
     private static readonly ActionKind[] ResponseKinds =
         [ActionKind.ChainResponse, ActionKind.ChainPass, ActionKind.BattleResponse, ActionKind.BattlePass];

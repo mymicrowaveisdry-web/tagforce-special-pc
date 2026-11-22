@@ -73,9 +73,10 @@ public static class DuelLayoutProfile
     public static Matrix OpponentHandWorld(int index, int count) => HandTilt * Matrix.CreateTranslation(
         HandX(index, count, OpponentHandPitch), OpponentHandY, OpponentHandZ);
 
-    // PC layout keeps both hands within the six-card span once their counts grow beyond it.
+    // Measured (order34-closure): 5, 6 and 7 cards keep the full pitch (x = ⌊(i − (n−1)/2) · 65⌋); beyond seven the hand is kept within the
+    // seven-card span (inferred).
     private static float HandX(int index, int count, float pitch) =>
-        MathF.Floor((index - (count - 1) / 2f) * pitch * (5f / Math.Max(count - 1, 5)));
+        MathF.Floor((index - (count - 1) / 2f) * pitch * (6f / Math.Max(count - 1, 6)));
 
     private static Matrix Rotation(bool player, BattlePosition? position) =>
         position is BattlePosition.FaceUpDefense or BattlePosition.FaceDownDefense ? (player ? PlayerDefense : OpponentDefense)

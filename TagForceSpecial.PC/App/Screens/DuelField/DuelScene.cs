@@ -91,6 +91,7 @@ public static class DuelScene
     /// the chosen card's menu until the pointer hides (measured).</summary>
     private static IReadOnlyList<MenuVerb>? HandVerbs(DuelView view, DuelFieldInput? session, DuelFieldFrame frame, FieldObject focus)
     {
+        if (session?.Modal is CardMenuModal { Items: [{ Verb: MenuVerb.Draw }] } && focus is { Own: true, Kind: FieldObjectKind.Deck }) return [MenuVerb.Draw];
         if (session is null || !focus.Own || focus.Kind != FieldObjectKind.Hand) return null;
         if (frame.HandBefore is not null) return session.SubmittedFrom?.Items.Select(i => i.Verb).ToArray();
         if (session.Modal is not (null or CardMenuModal)) return null;

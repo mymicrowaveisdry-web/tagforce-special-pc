@@ -77,10 +77,11 @@ public static class InputFocusOverlay
         // The template covers the 32-texel cell at (0, 0); the attack cell sits two cells right and down.
         var cell = attackTarget ? new Vector2(draw.Uv![1][0] * 2, draw.Uv[1][1] * 2) : Vector2.Zero;
         list.Field(DuelPart.Focus, "focus.pointer", 0, new(Offset: new(at.X - template[0], at.Y - template[1]), UvOffset: cell));
-        if (!focus.Own || focus.Kind != FieldObjectKind.Hand || verbs is null) return;
-        float x = at.X - 8;
+        if (!focus.Own || focus.Kind is not (FieldObjectKind.Hand or FieldObjectKind.Deck) || verbs is null) return;
+        // Measured: hand cards from the pointer + (−8, −12); the Deck's Draw icon from + (1, −10) (order34-closure draw prompt).
+        var start = focus.Kind == FieldObjectKind.Deck ? new Vector2(at.X + 1, at.Y - 10) : new Vector2(at.X - 8, at.Y - 12);
         foreach (var verb in verbs)
-            if (DuelMenuWindow.Icon(DuelPart.Focus, field, verb, x, at.Y - 12) is { } icon) { list.Add(icon); x += 14; }
+            if (DuelMenuWindow.Icon(DuelPart.Focus, field, verb, start.X, start.Y) is { } icon) { list.Add(icon); start.X += 14; }
     }
 
     public static void Draw(DuelDrawList list, CardView? card, Rectangle rect, CardView? inspected, double seconds)
